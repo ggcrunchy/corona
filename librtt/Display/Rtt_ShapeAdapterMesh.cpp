@@ -503,7 +503,6 @@ int ShapeAdapterMesh::setIndex( lua_State *L )
 	
 	int indexIndex = luaL_checkint(L, nextArg++) - 1;
 	U16 index = luaL_checkinteger( L, nextArg++ ) - 1; // 1-based
-	Real v = luaL_checkreal( L, nextArg++ );
 	
 	if (indexIndex >= tesselator->GetIndices().Length() || indexIndex < 0)
 	{
@@ -520,9 +519,11 @@ int ShapeAdapterMesh::setIndex( lua_State *L )
 	{
 		windex = index;
 		
-		path->Invalidate( ClosedPath::kFillIndices ); // TODO: not sure what's what here...
+		path->Invalidate( ClosedPath::kFillSourceIndices );
 
-		path->GetObserver()->Invalidate( DisplayObject::kGeometryFlag );
+		path->GetObserver()->Invalidate( DisplayObject::kGeometryFlag |
+										DisplayObject::kStageBoundsFlag |
+										DisplayObject::kTransformFlag );
 	}
 	return 0;
 }
@@ -545,7 +546,6 @@ int ShapeAdapterMesh::setIndexTriangle( lua_State *L )
 	U16 i1 = luaL_checkinteger( L, nextArg++ ) - 1; // 1-based
 	U16 i2 = luaL_checkinteger( L, nextArg++ ) - 1; // 1-based
 	U16 i3 = luaL_checkinteger( L, nextArg++ ) - 1; // 1-based
-	Real v = luaL_checkreal( L, nextArg++ );
 	
 	if (triIndex * 3 >= tesselator->GetIndices().Length() || triIndex < 0)
 	{
@@ -565,9 +565,11 @@ int ShapeAdapterMesh::setIndexTriangle( lua_State *L )
 		tindices[1] = i2;
 		tindices[2] = i3;
 		
-		path->Invalidate( ClosedPath::kFillIndices ); // TODO: not sure what's what here...
+		path->Invalidate( ClosedPath::kFillSourceIndices );
 
-		path->GetObserver()->Invalidate( DisplayObject::kGeometryFlag );
+		path->GetObserver()->Invalidate( DisplayObject::kGeometryFlag |
+										DisplayObject::kStageBoundsFlag |
+										DisplayObject::kTransformFlag );
 	}
 	return 0;
 }
@@ -626,13 +628,13 @@ inline int GetColor( lua_State *L, const Array<Color> &colors, int index )
 
 	lua_createtable( L, 0, 4 );
 	lua_pushnumber( L, (float)u.rgba.r / 255.f );
-	lua_setfield( L, -1, "r" );
+	lua_setfield( L, -2, "r" );
 	lua_pushnumber( L, (float)u.rgba.g / 255.f );
-	lua_setfield( L, -1, "g" );
+	lua_setfield( L, -2, "g" );
 	lua_pushnumber( L, (float)u.rgba.b / 255.f );
-	lua_setfield( L, -1, "b" );
+	lua_setfield( L, -2, "b" );
 	lua_pushnumber( L, (float)u.rgba.a / 255.f );
-	lua_setfield( L, -1, "a" );
+	lua_setfield( L, -2, "a" );
 
 	return 1;
 }
