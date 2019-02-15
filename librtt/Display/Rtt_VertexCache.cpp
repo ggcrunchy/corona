@@ -37,6 +37,9 @@ namespace Rtt
 VertexCache::VertexCache( Rtt_Allocator* pAllocator )
 :	fVertices( pAllocator ),
 	fTexVertices( pAllocator ),
+	// STEVE CHANGE
+	fColors( pAllocator ),
+	// /STEVE CHANGE
 	fCounts( pAllocator )
 {
 }

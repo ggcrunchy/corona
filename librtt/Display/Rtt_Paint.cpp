@@ -175,6 +175,13 @@ Paint::GetTexture() const
 	return & fResource->GetTexture();
 }
 
+// STEVE CHANGE
+inline U8 Scale2 (U16 a, U16 b)
+{
+	return (U8)((a * b) >> 8U);
+}
+// /STEVE CHANGE
+
 void
 Paint::UpdateColor( RenderData& data, U8 objectAlpha )
 {
@@ -199,6 +206,14 @@ Paint::UpdateColor( RenderData& data, U8 objectAlpha )
 
 	Geometry *g = data.fGeometry; Rtt_ASSERT( g ); // Ensure fGeometry is initialized
 	Geometry::Vertex *vertices = g->GetVertexData();
+	// STEVE CHANGE
+	bool perVertex = g->GetUsesPerVertexColors(), scaleVertex = false;
+
+	if (perVertex)
+	{
+		scaleVertex = c.pixel != ColorWhite();
+	}
+	// /STEVE CHANGE
 	for ( U32 i = 0, iMax = g->GetVerticesUsed(); i < iMax; i++ )
 	{
 		Geometry::Vertex& v = vertices[i];
@@ -206,10 +221,25 @@ Paint::UpdateColor( RenderData& data, U8 objectAlpha )
 		// Faster way to assign (rs,gs,bs,as)
 //		ColorUnion *dstScale = (ColorUnion *)& v.rs;
 //		dstScale->pixel = pixel;
+		// STEVE CHANGE
+		if (!perVertex)
+		{
+		// /STEVE CHANGE
 		v.rs = c.rgba.r;
 		v.gs = c.rgba.g;
 		v.bs = c.rgba.b;
 		v.as = c.rgba.a;
+		// STEVE CHANGE
+		}
+
+		if (scaleVertex)
+		{
+			v.rs = Scale2(v.rs, c.rgba.r);
+			v.gs = Scale2(v.gs, c.rgba.g);
+			v.bs = Scale2(v.bs, c.rgba.b);
+			v.as = Scale2(v.as, c.rgba.a);
+		}
+		// /STEVE CHANGE
 		
 		if ( shouldUpdateShader )
 		{

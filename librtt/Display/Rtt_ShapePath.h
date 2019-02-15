@@ -53,6 +53,13 @@ class ShapePath : public ClosedPath
 	public:
 		typedef ClosedPath Super;
 
+		// STEVE CHANGE
+		enum ShapePathFlags {
+			kPerVertexFillColorsFlag = 0x1,
+			kPerVertexStrokeColorsFlag = 0x2
+		};
+		// /STEVE CHANGE
+
 	public:
 		static ShapePath *NewRoundedRect( Rtt_Allocator *pAllocator, Real width, Real height, Real radius );
 		static ShapePath *NewCircle( Rtt_Allocator *pAllocator, Real radius );
@@ -68,6 +75,10 @@ class ShapePath : public ClosedPath
 		void TesselateFill();
 		void TesselateStroke();
 
+		// STEVE CHANGE
+		void PopulateVertexColors( Geometry& geom, const VertexCache& cache );
+		// /STEVE CHANGE
+
 		void UpdateFill( RenderData& data, const Matrix& srcToDstSpace );
 		void UpdateStroke( const Matrix& srcToDstSpace );
 
@@ -77,6 +88,15 @@ class ShapePath : public ClosedPath
 		virtual void UpdateResources( Renderer& renderer ) const;
 		virtual void Translate( Real dx, Real dy );
 		virtual void GetSelfBounds( Rect& rect ) const;
+
+		// STEVE CHANGE
+		void InitFromFlags( int flags, S32 count );
+
+		Array<Color>& GetFillColors() { return fFillSource.Colors(); }
+		Array<Color>& GetStrokeColors() { return fStrokeSource.Colors(); }
+		const Array<Color>& GetFillColors() const { return fFillSource.Colors(); }
+		const Array<Color>& GetStrokeColors() const { return fStrokeSource.Colors(); }
+		// /STEVE CHANGE
 
 	public:
 		virtual bool SetSelfBounds( Real width, Real height );

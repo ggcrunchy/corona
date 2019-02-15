@@ -121,7 +121,12 @@ class Geometry : public CPUResource
 		U32 GetVerticesAllocated() const;
 		U32 GetIndicesAllocated() const;
 		bool GetStoredOnGPU() const;
-		
+
+		// STEVE CHANGE
+		void SetUsesPerVertexColors( bool bUsesPerVertexColors ) { fUsesPerVertexColors = bUsesPerVertexColors; }
+		bool GetUsesPerVertexColors() const { return fUsesPerVertexColors; }
+		// /STEVE CHANGE
+
 		// More space may be allocated than is initially needed. By default,
 		// the use count is zero and must be set for Geometry to be useful.
 		U32 GetVerticesUsed() const;
@@ -157,6 +162,9 @@ class Geometry : public CPUResource
 		U32 fVerticesAllocated;
 		U32 fIndicesAllocated;
 		bool fStoredOnGPU;
+		// STEVE CHANGE
+		bool fUsesPerVertexColors;
+		// /STEVE CHANGE
 		Vertex* fVertexData;
 		Index* fIndexData;
 		U32 fVerticesUsed;

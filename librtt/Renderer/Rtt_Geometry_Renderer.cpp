@@ -116,6 +116,9 @@ Geometry::Geometry( Rtt_Allocator* allocator, PrimitiveType type, U32 vertexCoun
 #else
 	fStoredOnGPU( true ), // Force this to be true if client side arrays are NOT supported
 #endif
+	// STEVE CHANGE
+	fUsesPerVertexColors( false ),
+	// /STEVE CHANGE
 	fVertexData( NULL ),
 	fIndexData( NULL ),
 	fVerticesUsed( 0 ),

@@ -44,7 +44,7 @@ class ShapeAdapterMesh : public ShapeAdapter
 	public:
 		static const ShapeAdapterMesh& Constant();
 	
-		static bool InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator );
+		static bool InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator /* STEVE CHANGE */, int&flags /* /STEVE CHANGE */ );
 		static Geometry::PrimitiveType GetMeshMode(lua_State *L, int index);
 
 	protected:
@@ -66,7 +66,14 @@ class ShapeAdapterMesh : public ShapeAdapter
 		static int setUV( lua_State *L );
 		static int getUV( lua_State *L );
 		static int getVertexOffset( lua_State *L );
-
+		// STEVE CHANGE
+		static int setIndex( lua_State *L );
+		static int setIndexTriangle( lua_State *L );
+		static int setVertexFillColor( lua_State *L );
+		static int getVertexFillColor( lua_State *L );
+		static int setVertexStrokeColor( lua_State *L );
+		static int getVertexStrokeColor( lua_State *L );
+		// /STEVE CHANGE
 };
 
 // ----------------------------------------------------------------------------

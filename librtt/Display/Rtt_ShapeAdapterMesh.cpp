@@ -82,7 +82,7 @@ ShapeAdapterMesh::GetMeshMode(lua_State *L, int index)
 }
 	
 bool
-ShapeAdapterMesh::InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator )
+ShapeAdapterMesh::InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator /* STEVE CHANGE */, int& flags /* /STEVE CHANGE */ )
 {
 	if ( !lua_istable( L, index ) )
 	{
@@ -196,6 +196,24 @@ ShapeAdapterMesh::InitializeMesh(lua_State *L, int index, TesselatorMesh& tessel
 	tesselator.Invalidate();
 	tesselator.Update();
 	
+// STEVE CHANGE
+	// TODO: this might be general enough for other shapes?
+	lua_getfield( L, index, "usePerVertexFillColors" );
+	lua_getfield( L, index, "usePerVertexStrokeColors" );
+
+	if (lua_toboolean( L, -2 ) != 0)
+	{
+		flags |= ShapePath::kPerVertexFillColorsFlag;
+	}
+	
+	if (lua_toboolean( L, -1 ) != 0)
+	{
+		flags |= ShapePath::kPerVertexStrokeColorsFlag;
+	}
+
+	lua_pop( L, 2 );
+// /STEVE CHANGE
+
 	return true;
 }
 // ----------------------------------------------------------------------------
@@ -224,6 +242,14 @@ ShapeAdapterMesh::GetHash( lua_State *L ) const
 		"setUV",		   // 2
 		"getUV",           // 3
 		"getVertexOffset", // 4
+	// STEVE CHANGE
+		"setIndex",			  // 5
+		"setIndexTriangle",	  // 6
+		"setVertexFillColor", // 7
+		"getVertexFillColor", // 8
+		"setVertexStrokeColor", // 9
+		"getVertexStrokeColor"  // 10
+	// /STEVE CHANGE
 	};
 	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 5, 14, 7, __FILE__, __LINE__ );
 	return &sHash;
@@ -266,6 +292,26 @@ ShapeAdapterMesh::ValueForKey(
 		case 4:
 			Lua::PushCachedFunction( L, getVertexOffset );
 			break;
+		// STEVE CHANGE
+		case 5:
+			Lua::PushCachedFunction( L, setIndex );
+			break;
+		case 6:
+			Lua::PushCachedFunction( L, setIndexTriangle );
+			break;
+		case 7:
+			Lua::PushCachedFunction( L, setVertexFillColor );
+			break;
+		case 8:
+			Lua::PushCachedFunction( L, getVertexFillColor );
+			break;
+		case 9:
+			Lua::PushCachedFunction( L, setVertexStrokeColor );
+			break;
+		case 10:
+			Lua::PushCachedFunction( L, getVertexStrokeColor );
+			break;
+		// /STEVE CHANGE
 		default:
 			result = Super::ValueForKey( sender, L, key );
 			break;
@@ -440,6 +486,229 @@ int ShapeAdapterMesh::getVertexOffset( lua_State *L )
 	return result;
 }
 
+// STEVE CHANGE
+int ShapeAdapterMesh::setIndex( lua_State *L )
+{
+	int result = 0;
+	int nextArg = 1;
+	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
+	if(!sender) { return result; }
+	
+	ShapePath *path = (ShapePath *)sender->GetUserdata();
+	if ( ! path ) { return result; }
+	
+	TesselatorMesh *tesselator =
+	static_cast< TesselatorMesh * >( path->GetTesselator() );
+	if ( ! tesselator ) { return result; }
+	
+	int indexIndex = luaL_checkint(L, nextArg++) - 1;
+	U16 index = luaL_checkinteger( L, nextArg++ ) - 1; // 1-based
+	Real v = luaL_checkreal( L, nextArg++ );
+	
+	if (indexIndex >= tesselator->GetIndices().Length() || indexIndex < 0)
+	{
+		luaL_argerror( L, 1, "mesh:setIndex() index of index is out of bounds");
+	}
+
+	if (index >= tesselator->GetMesh().Length())
+	{
+		luaL_argerror( L, 1, "mesh:setIndex() index is out of bounds");
+	}
+	
+	U16& windex = tesselator->GetIndices().WriteAccess()[indexIndex];
+	if( windex != index)
+	{
+		windex = index;
+		
+		path->Invalidate( ClosedPath::kFillIndices ); // TODO: not sure what's what here...
+
+		path->GetObserver()->Invalidate( DisplayObject::kGeometryFlag );
+	}
+	return 0;
+}
+
+int ShapeAdapterMesh::setIndexTriangle( lua_State *L )
+{
+	int result = 0;
+	int nextArg = 1;
+	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
+	if(!sender) { return result; }
+	
+	ShapePath *path = (ShapePath *)sender->GetUserdata();
+	if ( ! path ) { return result; }
+	
+	TesselatorMesh *tesselator =
+	static_cast< TesselatorMesh * >( path->GetTesselator() );
+	if ( ! tesselator ) { return result; }
+	
+	int triIndex = luaL_checkint(L, nextArg++) - 1;
+	U16 i1 = luaL_checkinteger( L, nextArg++ ) - 1; // 1-based
+	U16 i2 = luaL_checkinteger( L, nextArg++ ) - 1; // 1-based
+	U16 i3 = luaL_checkinteger( L, nextArg++ ) - 1; // 1-based
+	Real v = luaL_checkreal( L, nextArg++ );
+	
+	if (triIndex * 3 >= tesselator->GetIndices().Length() || triIndex < 0)
+	{
+		luaL_argerror( L, 1, "mesh:setIndexTriangle() index of triangle is out of bounds");
+	}
+
+	U16 count = (U16)tesselator->GetMesh().Length();
+	if (i1 >= count || i2 >= count || i3 >= count)
+	{
+		luaL_argerror( L, 1, "mesh:setIndexTriangle() index is out of bounds");
+	}
+	
+	U16 * tindices = &tesselator->GetIndices().WriteAccess()[triIndex * 3];
+	if( tindices[0] != i1 || tindices[1] != i2 || tindices[2] != i3 )
+	{
+		tindices[0] = i1;
+		tindices[1] = i2;
+		tindices[2] = i3;
+		
+		path->Invalidate( ClosedPath::kFillIndices ); // TODO: not sure what's what here...
+
+		path->GetObserver()->Invalidate( DisplayObject::kGeometryFlag );
+	}
+	return 0;
+}
+
+inline bool SetColor( lua_State *L, Array<Color> &colors, int index, int nextArg )
+{
+	ColorUnion u;
+	Color old = colors[index];
+
+	u.rgba.r = (U8)(255. * luaL_optnumber( L, nextArg++, 1. ));
+	u.rgba.g = (U8)(255. * luaL_optnumber( L, nextArg++, 1. ));
+	u.rgba.b = (U8)(255. * luaL_optnumber( L, nextArg++, 1. ));
+	u.rgba.a = (U8)(255. * luaL_optnumber( L, nextArg++, 1. ));
+
+	bool changed = u.pixel != old;
+
+	if (changed)
+	{
+		colors[index] = u.pixel;
+	}
+
+	return changed;
+}
+
+int ShapeAdapterMesh::setVertexFillColor( lua_State *L )
+{
+	int result = 0;
+	int nextArg = 1;
+	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
+	if(!sender) { return result; }
+	
+	ShapePath *path = (ShapePath *)sender->GetUserdata();
+	if ( ! path ) { return result; }
+	
+	int vertIndex = luaL_checkint(L, nextArg++) - 1;
+	
+	if (vertIndex >= path->GetFillColors().Length() || vertIndex < 0)
+	{
+		luaL_argerror( L, 1, "mesh:setVertexFillColor() index is out of bounds");
+	}
+	
+	if (SetColor( L, path->GetFillColors(), vertIndex, nextArg ))
+	{
+	//	path->Invalidate( ClosedPath::kFillSourceTexture );
+
+		path->GetObserver()->Invalidate( DisplayObject::kGeometryFlag | DisplayObject::kColorFlag );
+	}
+	return 0;
+}
+
+inline int GetColor( lua_State *L, const Array<Color> &colors, int index )
+{
+	ColorUnion u;
+	u.pixel = colors[index];
+
+
+	lua_createtable( L, 0, 4 );
+	lua_pushnumber( L, (float)u.rgba.r / 255.f );
+	lua_setfield( L, -1, "r" );
+	lua_pushnumber( L, (float)u.rgba.g / 255.f );
+	lua_setfield( L, -1, "g" );
+	lua_pushnumber( L, (float)u.rgba.b / 255.f );
+	lua_setfield( L, -1, "b" );
+	lua_pushnumber( L, (float)u.rgba.a / 255.f );
+	lua_setfield( L, -1, "a" );
+
+	return 1;
+}
+
+int ShapeAdapterMesh::getVertexFillColor( lua_State *L )
+{
+	int result = 0;
+	int nextArg = 1;
+	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
+	if(!sender) { return result; }
+	
+	ShapePath *path = (ShapePath *)sender->GetUserdata();
+	if ( ! path ) { return result; }
+	
+	int vertIndex = luaL_checkint(L, nextArg++) - 1;
+	if (vertIndex >= path->GetFillColors().Length() || vertIndex < 0)
+	{
+		CoronaLuaWarning( L, "mesh:getVertexFillColor() index is out of bounds");
+	}
+	else
+	{
+		result = GetColor( L, path->GetFillColors(), vertIndex );
+	}
+	
+	return result;
+}
+
+int ShapeAdapterMesh::setVertexStrokeColor( lua_State *L )
+{
+	int result = 0;
+	int nextArg = 1;
+	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
+	if(!sender) { return result; }
+	
+	ShapePath *path = (ShapePath *)sender->GetUserdata();
+	if ( ! path ) { return result; }
+	
+	int vertIndex = luaL_checkint(L, nextArg++) - 1;
+	
+	if (vertIndex >= path->GetStrokeColors().Length() || vertIndex < 0)
+	{
+		luaL_argerror( L, 1, "mesh:setVertexStrokeColor() index is out of bounds");
+	}
+	
+	if (SetColor( L, path->GetStrokeColors(), vertIndex, nextArg ))
+	{
+	//	path->Invalidate( ClosedPath::kFillSourceTexture );
+
+		path->GetObserver()->Invalidate( DisplayObject::kGeometryFlag | DisplayObject::kColorFlag );
+	}
+	return 0;
+}
+
+int ShapeAdapterMesh::getVertexStrokeColor( lua_State *L )
+{
+	int result = 0;
+	int nextArg = 1;
+	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
+	if(!sender) { return result; }
+	
+	ShapePath *path = (ShapePath *)sender->GetUserdata();
+	if ( ! path ) { return result; }
+	
+	int vertIndex = luaL_checkint(L, nextArg++) - 1;
+	if (vertIndex >= path->GetStrokeColors().Length() || vertIndex < 0)
+	{
+		CoronaLuaWarning( L, "mesh:getVertexStrokeColor() index is out of bounds");
+	}
+	else
+	{
+		result = GetColor( L, path->GetStrokeColors(), vertIndex );
+	}
+	
+	return result;
+}
+// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
 

@@ -247,6 +247,32 @@ ShapePath::TesselateStroke()
 	}
 }
 
+// STEVE CHANGE
+void
+ShapePath::PopulateVertexColors( Geometry& geom, const VertexCache& cache )
+{
+	const Array<Color>& colors = cache.Colors();
+	Geometry::Vertex* vertices = geom.GetVertexData();
+	S32 iMax = colors.Length();
+
+	for (S32 i = 0; i < iMax; ++i) // assumes #colors = #vertices, else 0
+	{
+		ColorUnion u;
+
+		u.pixel = colors[i];
+		
+		Geometry::Vertex& v = vertices[i];
+
+		v.rs = u.rgba.r;
+		v.gs = u.rgba.g;
+		v.bs = u.rgba.b;
+		v.as = u.rgba.a;
+	}
+
+	geom.SetUsesPerVertexColors( iMax > 0 );
+}
+// /STEVE CHANGE
+
 void
 ShapePath::UpdateFill( RenderData& data, const Matrix& srcToDstSpace )
 {
@@ -279,6 +305,9 @@ ShapePath::UpdateFill( RenderData& data, const Matrix& srcToDstSpace )
 		{
 			fDelegate->UpdateGeometry( * fFillGeometry, fFillSource, srcToDstSpace, flags );
 		}
+		// STEVE CHANGE
+		PopulateVertexColors( *fFillGeometry, fFillSource );
+		// /STEVE CHANGE
 		data.fGeometry = fFillGeometry;
 
 		SetValid( kFill | kFillTexture | kFillIndices );
@@ -315,6 +344,9 @@ ShapePath::UpdateStroke( const Matrix& srcToDstSpace )
 		{
 			fDelegate->UpdateGeometry( * fStrokeGeometry, fStrokeSource, srcToDstSpace, flags );
 		}
+		// STEVE CHANGE
+		PopulateVertexColors( *fStrokeGeometry, fStrokeSource );
+		// /STEVE CHANGE
 		data->fGeometry = fStrokeGeometry;
 
 		SetValid( kStroke | kStrokeTexture );
@@ -329,6 +361,37 @@ ShapePath::Update( RenderData& data, const Matrix& srcToDstSpace )
 	UpdateFill( data, srcToDstSpace );
 	UpdateStroke( srcToDstSpace );
 }
+
+// STEVE CHANGE
+inline void InitColors( Array<Color>& cache, S32 count )
+{
+	cache.Reserve( count );
+
+	Color c = ColorWhite();
+
+	for (int i = 0; i < count; ++i)
+	{
+		cache[i] = c;
+	}
+}
+
+void
+ShapePath::InitFromFlags ( int flags, S32 count )
+{
+	Color c = ColorWhite();
+	TesselatorShape* shape = GetTesselator();
+
+	if (flags & kPerVertexFillColorsFlag)
+	{
+		InitColors( fFillSource.Colors(), count );
+	}
+
+	if (flags & kPerVertexStrokeColorsFlag)
+	{
+		InitColors( fStrokeSource.Colors(), count );
+	}
+}
+// /STEVE CHANGE
 
 void
 ShapePath::UpdateResources( Renderer& renderer ) const
