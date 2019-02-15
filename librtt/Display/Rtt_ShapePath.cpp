@@ -371,7 +371,7 @@ inline void InitColors( Array<Color>& cache, S32 count )
 
 	for (int i = 0; i < count; ++i)
 	{
-		cache[i] = c;
+		cache.Append(c);
 	}
 }
 
