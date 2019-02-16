@@ -125,6 +125,8 @@ class Geometry : public CPUResource
 		// STEVE CHANGE
 		void SetUsesPerVertexColors( bool bUsesPerVertexColors ) { fUsesPerVertexColors = bUsesPerVertexColors; }
 		bool GetUsesPerVertexColors() const { return fUsesPerVertexColors; }
+
+		void PopulatePerVertexColors( const U32* colors, S32 n );
 		// /STEVE CHANGE
 
 		// More space may be allocated than is initially needed. By default,

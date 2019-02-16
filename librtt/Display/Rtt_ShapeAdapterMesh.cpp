@@ -558,10 +558,7 @@ int ShapeAdapterMesh::setIndexTriangle( lua_State *L )
 
 inline bool SetColor( lua_State *L, S32 n, Array<Color> &colors, int index, int nextArg )
 {
-	if (colors.Length() == 0)
-	{
-		ShapePath::InitColors( colors, n );
-	}
+	colors.PadToSize( n, ColorWhite() );
 
 	ColorUnion u;
 	Color old = colors[index];

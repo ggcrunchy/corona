@@ -75,10 +75,6 @@ class ShapePath : public ClosedPath
 		void TesselateFill();
 		void TesselateStroke();
 
-		// STEVE CHANGE
-		void PopulateVertexColors( Geometry& geom, const VertexCache& cache );
-		// /STEVE CHANGE
-
 		void UpdateFill( RenderData& data, const Matrix& srcToDstSpace );
 		void UpdateStroke( const Matrix& srcToDstSpace );
 
@@ -90,8 +86,6 @@ class ShapePath : public ClosedPath
 		virtual void GetSelfBounds( Rect& rect ) const;
 
 		// STEVE CHANGE
-		static void InitColors( Array<Color>& cache, S32 count );
-
 		Array<Color>& GetFillColors() { return fFillSource.Colors(); }
 		Array<Color>& GetStrokeColors() { return fStrokeSource.Colors(); }
 		const Array<Color>& GetFillColors() const { return fFillSource.Colors(); }

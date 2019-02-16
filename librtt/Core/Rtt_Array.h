@@ -130,6 +130,9 @@ class Array : public ArrayStorage
 
 		void Insert( S32 index, const T& item );
 		void Remove( S32 index, S32 numElements, bool finalize = true );
+		// STEVE CHANGE
+		void PadToSize( S32 size, const T& pad );
+		// /STEVE CHANGE
 
 		Rtt_FORCE_INLINE const T* ReadAccess() const { return ElementPtr(); }
 		Rtt_FORCE_INLINE T* WriteAccess() { return ElementPtr(); }
@@ -351,6 +354,26 @@ Array< T >::Remove( S32 index, S32 numElements, bool finalize )
 		fLength -= numElements;
 	}
 }
+
+// STEVE CHANGE
+template < typename T >
+void
+Array< T >::PadToSize( S32 size, const T& pad )
+{
+	if (size > 0)
+	{
+		if (!fLength)
+		{
+			Reserve( size );
+		}
+
+		while (fLength < size)
+		{
+			Append(pad);
+		}
+	}
+}
+// /STEVE CHANGE
 
 /**
  * Copy from start to (end-1). So in an array of 10 characters, to copy the whole thing you'd
