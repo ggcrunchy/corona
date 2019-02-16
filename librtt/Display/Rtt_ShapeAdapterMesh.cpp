@@ -82,7 +82,7 @@ ShapeAdapterMesh::GetMeshMode(lua_State *L, int index)
 }
 	
 bool
-ShapeAdapterMesh::InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator /* STEVE CHANGE */, int& flags /* /STEVE CHANGE */ )
+ShapeAdapterMesh::InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator )
 {
 	if ( !lua_istable( L, index ) )
 	{
@@ -195,24 +195,6 @@ ShapeAdapterMesh::InitializeMesh(lua_State *L, int index, TesselatorMesh& tessel
 
 	tesselator.Invalidate();
 	tesselator.Update();
-	
-// STEVE CHANGE
-	// TODO: this might be general enough for other shapes?
-	lua_getfield( L, index, "usePerVertexFillColors" );
-	lua_getfield( L, index, "usePerVertexStrokeColors" );
-
-	if (lua_toboolean( L, -2 ) != 0)
-	{
-		flags |= ShapePath::kPerVertexFillColorsFlag;
-	}
-	
-	if (lua_toboolean( L, -1 ) != 0)
-	{
-		flags |= ShapePath::kPerVertexStrokeColorsFlag;
-	}
-
-	lua_pop( L, 2 );
-// /STEVE CHANGE
 
 	return true;
 }
@@ -251,7 +233,7 @@ ShapeAdapterMesh::GetHash( lua_State *L ) const
 		"getVertexStrokeColor"  // 10
 	// /STEVE CHANGE
 	};
-	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 5, 14, 7, __FILE__, __LINE__ );
+	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), /* STEVE CHANGE 5, 14, 7 */11, 18, 12, __FILE__, __LINE__ );
 	return &sHash;
 }
 
@@ -574,8 +556,13 @@ int ShapeAdapterMesh::setIndexTriangle( lua_State *L )
 	return 0;
 }
 
-inline bool SetColor( lua_State *L, Array<Color> &colors, int index, int nextArg )
+inline bool SetColor( lua_State *L, S32 n, Array<Color> &colors, int index, int nextArg )
 {
+	if (colors.Length() == 0)
+	{
+		ShapePath::InitColors( colors, n );
+	}
+
 	ColorUnion u;
 	Color old = colors[index];
 
@@ -604,14 +591,19 @@ int ShapeAdapterMesh::setVertexFillColor( lua_State *L )
 	ShapePath *path = (ShapePath *)sender->GetUserdata();
 	if ( ! path ) { return result; }
 	
-	int vertIndex = luaL_checkint(L, nextArg++) - 1;
+	TesselatorMesh *tesselator =
+	static_cast< TesselatorMesh * >( path->GetTesselator() );
+	if ( ! tesselator ) { return result; }
 	
-	if (vertIndex >= path->GetFillColors().Length() || vertIndex < 0)
+	int vertIndex = luaL_checkint(L, nextArg++) - 1;
+	S32 n = tesselator->GetMesh().Length();
+	
+	if (vertIndex >= n || vertIndex < 0)
 	{
 		luaL_argerror( L, 1, "mesh:setVertexFillColor() index is out of bounds");
 	}
 	
-	if (SetColor( L, path->GetFillColors(), vertIndex, nextArg ))
+	if (SetColor( L, n, path->GetFillColors(), vertIndex, nextArg ))
 	{
 	//	path->Invalidate( ClosedPath::kFillSourceTexture );
 
@@ -623,8 +615,7 @@ int ShapeAdapterMesh::setVertexFillColor( lua_State *L )
 inline int GetColor( lua_State *L, const Array<Color> &colors, int index )
 {
 	ColorUnion u;
-	u.pixel = colors[index];
-
+	u.pixel = colors.Length() > 0 ? colors[index] : ColorWhite();
 
 	lua_createtable( L, 0, 4 );
 	lua_pushnumber( L, (float)u.rgba.r / 255.f );
@@ -649,8 +640,12 @@ int ShapeAdapterMesh::getVertexFillColor( lua_State *L )
 	ShapePath *path = (ShapePath *)sender->GetUserdata();
 	if ( ! path ) { return result; }
 	
+	TesselatorMesh *tesselator =
+	static_cast< TesselatorMesh * >( path->GetTesselator() );
+	if ( ! tesselator ) { return result; }
+	
 	int vertIndex = luaL_checkint(L, nextArg++) - 1;
-	if (vertIndex >= path->GetFillColors().Length() || vertIndex < 0)
+	if (vertIndex >= tesselator->GetMesh().Length() || vertIndex < 0)
 	{
 		CoronaLuaWarning( L, "mesh:getVertexFillColor() index is out of bounds");
 	}
@@ -672,14 +667,19 @@ int ShapeAdapterMesh::setVertexStrokeColor( lua_State *L )
 	ShapePath *path = (ShapePath *)sender->GetUserdata();
 	if ( ! path ) { return result; }
 	
-	int vertIndex = luaL_checkint(L, nextArg++) - 1;
+	TesselatorMesh *tesselator =
+	static_cast< TesselatorMesh * >( path->GetTesselator() );
+	if ( ! tesselator ) { return result; }
 	
-	if (vertIndex >= path->GetStrokeColors().Length() || vertIndex < 0)
+	int vertIndex = luaL_checkint(L, nextArg++) - 1;
+	S32 n = tesselator->GetMesh().Length();
+	
+	if (vertIndex >= n || vertIndex < 0)
 	{
 		luaL_argerror( L, 1, "mesh:setVertexStrokeColor() index is out of bounds");
 	}
 	
-	if (SetColor( L, path->GetStrokeColors(), vertIndex, nextArg ))
+	if (SetColor( L, n, path->GetStrokeColors(), vertIndex, nextArg ))
 	{
 	//	path->Invalidate( ClosedPath::kFillSourceTexture );
 
@@ -698,8 +698,12 @@ int ShapeAdapterMesh::getVertexStrokeColor( lua_State *L )
 	ShapePath *path = (ShapePath *)sender->GetUserdata();
 	if ( ! path ) { return result; }
 	
+	TesselatorMesh *tesselator =
+	static_cast< TesselatorMesh * >( path->GetTesselator() );
+	if ( ! tesselator ) { return result; }
+	
 	int vertIndex = luaL_checkint(L, nextArg++) - 1;
-	if (vertIndex >= path->GetStrokeColors().Length() || vertIndex < 0)
+	if (vertIndex >= tesselator->GetMesh().Length() || vertIndex < 0)
 	{
 		CoronaLuaWarning( L, "mesh:getVertexStrokeColor() index is out of bounds");
 	}

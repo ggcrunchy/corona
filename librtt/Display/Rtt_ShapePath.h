@@ -90,7 +90,7 @@ class ShapePath : public ClosedPath
 		virtual void GetSelfBounds( Rect& rect ) const;
 
 		// STEVE CHANGE
-		void InitFromFlags( int flags, S32 count );
+		static void InitColors( Array<Color>& cache, S32 count );
 
 		Array<Color>& GetFillColors() { return fFillSource.Colors(); }
 		Array<Color>& GetStrokeColors() { return fStrokeSource.Colors(); }

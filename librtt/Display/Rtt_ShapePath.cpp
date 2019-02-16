@@ -363,7 +363,8 @@ ShapePath::Update( RenderData& data, const Matrix& srcToDstSpace )
 }
 
 // STEVE CHANGE
-inline void InitColors( Array<Color>& cache, S32 count )
+void
+ShapePath::InitColors( Array<Color>& cache, S32 count )
 {
 	cache.Reserve( count );
 
@@ -372,23 +373,6 @@ inline void InitColors( Array<Color>& cache, S32 count )
 	for (int i = 0; i < count; ++i)
 	{
 		cache.Append(c);
-	}
-}
-
-void
-ShapePath::InitFromFlags ( int flags, S32 count )
-{
-	Color c = ColorWhite();
-	TesselatorShape* shape = GetTesselator();
-
-	if (flags & kPerVertexFillColorsFlag)
-	{
-		InitColors( fFillSource.Colors(), count );
-	}
-
-	if (flags & kPerVertexStrokeColorsFlag)
-	{
-		InitColors( fStrokeSource.Colors(), count );
 	}
 }
 // /STEVE CHANGE

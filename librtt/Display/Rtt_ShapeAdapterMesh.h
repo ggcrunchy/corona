@@ -44,7 +44,7 @@ class ShapeAdapterMesh : public ShapeAdapter
 	public:
 		static const ShapeAdapterMesh& Constant();
 	
-		static bool InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator /* STEVE CHANGE */, int&flags /* /STEVE CHANGE */ );
+		static bool InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator );
 		static Geometry::PrimitiveType GetMeshMode(lua_State *L, int index);
 
 	protected:

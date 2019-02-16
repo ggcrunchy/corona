@@ -834,14 +834,9 @@ DisplayLibrary::newMesh( lua_State *L )
 	ShapePath *path = ShapePath::NewMesh( display.GetAllocator(), ShapeAdapterMesh::GetMeshMode( L, nextArg) );
 	
 	TesselatorMesh *tesselator = (TesselatorMesh *)path->GetTesselator();
-	// STEVE CHANGE
-	int flags = 0;
-	// /STEVE CHANGE
-	if ( ShapeAdapterMesh::InitializeMesh( L, nextArg, * tesselator /* STEVE CHANGE */, flags /* /STEVE CHANGE */ ) )
+
+	if ( ShapeAdapterMesh::InitializeMesh( L, nextArg, * tesselator ) )
 	{
-		// STEVE CHANGE
-		path->InitFromFlags( flags, tesselator->GetMesh().Length() );
-		// /STEVE CHANGE
 		ShapeObject *v = Rtt_NEW( display.GetAllocator(), ShapeObject( path ) );
 		
 		if (tesselator->GetFillPrimitive() == Geometry::kIndexedTriangles)

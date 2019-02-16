@@ -207,12 +207,8 @@ Paint::UpdateColor( RenderData& data, U8 objectAlpha )
 	Geometry *g = data.fGeometry; Rtt_ASSERT( g ); // Ensure fGeometry is initialized
 	Geometry::Vertex *vertices = g->GetVertexData();
 	// STEVE CHANGE
-	bool perVertex = g->GetUsesPerVertexColors(), scaleVertex = false;
-
-	if (perVertex)
-	{
-		scaleVertex = c.pixel != ColorWhite();
-	}
+	bool perVertex = g->GetUsesPerVertexColors();
+	bool scaleVertex = perVertex && c.pixel != ColorWhite();
 	// /STEVE CHANGE
 	for ( U32 i = 0, iMax = g->GetVerticesUsed(); i < iMax; i++ )
 	{
