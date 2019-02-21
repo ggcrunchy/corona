@@ -83,6 +83,9 @@ class GLProgram : public GPUResource
 			GLuint fFragmentShader;			
 			GLint fUniformLocations[Uniform::kNumBuiltInVariables];
 			U32 fTimestamps[Uniform::kNumBuiltInVariables];
+			// STEVE CHANGE
+			U32 fUniformsArrayStamp;
+			// /STEVE CHANGE
 			
 			// Metadata
 			int fHeaderNumLines;

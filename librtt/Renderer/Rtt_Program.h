@@ -94,6 +94,8 @@ class Program : public CPUResource
 
 		ShaderResource *GetShaderResource() { return fResource; }
 		void SetShaderResource( ShaderResource *resource ) { fResource = resource; }
+		bool UniformsArrayDirty() { return fUniformsArrayTimestamp != fResource->GetUniformsArrayTimestamp(); }
+		void SyncUniformsArrayTimestamp() { fUniformsArrayTimestamp = fResource->GetUniformsArrayTimestamp(); }
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
 		ShaderBinaryVersions* GetCompiledShaders() const { return fCompiledShaders; }
 #endif
@@ -118,6 +120,9 @@ class Program : public CPUResource
 		int fVertexShellNumLines;
 		int fFragmentShellNumLines;
 		ShaderResource *fResource;
+		// STEVE CHANGE
+		U32 fUniformsArrayTimestamp;
+		// /STEVE CHANGE
 		bool fCompilerVerbose;
 };
 

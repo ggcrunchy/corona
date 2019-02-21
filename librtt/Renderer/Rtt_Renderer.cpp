@@ -484,7 +484,8 @@ Renderer::Insert( const RenderData* data )
 	bool fillDirty1 = data->fFillTexture1 != fPrevious.fFillTexture1;
 	bool maskTextureDirty = data->fMaskTexture != fPrevious.fMaskTexture;
 	bool maskUniformDirty = data->fMaskUniform != fPrevious.fMaskUniform;
-	bool programDirty = data->fProgram != fPrevious.fProgram || MaskCount() != fCurrentProgramMaskCount;
+	bool programDirty = data->fProgram != fPrevious.fProgram || MaskCount() != fCurrentProgramMaskCount
+		/* STEVE CHANGE */|| data->fProgram->UniformsArrayDirty();
 	bool userUniformDirty0 = data->fUserUniform0 != fPrevious.fUserUniform0;
 	bool userUniformDirty1 = data->fUserUniform1 != fPrevious.fUserUniform1;
 	bool userUniformDirty2 = data->fUserUniform2 != fPrevious.fUserUniform2;
@@ -714,6 +715,16 @@ Renderer::Insert( const RenderData* data )
 		INCREMENT( fStatistics.fProgramBindCount );
 		fCurrentProgramMaskCount = MaskCount();
 	}
+
+	// STEVE CHANGE
+	if (data->fProgram->UniformsArrayDirty())
+	{
+		// TODO: upload or post command to do so
+		// flip resource back? (might be in Sync() function...)
+
+		data->fProgram->SyncUniformsArrayTimestamp();
+	}
+	// /STEVE CHANGE
 
 	// Mask texture
 	if( maskTextureDirty && data->fMaskTexture )

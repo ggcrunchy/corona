@@ -100,6 +100,10 @@ class ShaderResource
 
 		TimeTransform *GetTimeTransform() const { return fTimeTransform; }
 		void SetTimeTransform( TimeTransform *transform ) { fTimeTransform = transform; }
+
+		// STEVE CHANGE
+		U32 GetUniformsArrayTimestamp() const { return fUniformsArrayTimestamp; }
+		// /STEVE CHANGE
 	public:
 		// Shader either stores params on per-vertex basis or in uniforms.
 		// Batching most likely breaks as soon as you use uniforms,
@@ -139,6 +143,11 @@ class ShaderResource
 		UniformDataMap fUniformDataMap;
 		ShaderData *fDefaultData;
 		TimeTransform *fTimeTransform;
+		// STEVE CHANGE
+		Uniform *fUniformsArray;
+		int fUniformsCount;
+		U32 fUniformsArrayTimestamp;
+		// /STEVE CHANGE
 		bool fUsesUniforms;
 		bool fUsesTime;
 
