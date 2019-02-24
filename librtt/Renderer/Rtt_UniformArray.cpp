@@ -23,23 +23,11 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Renderer/Rtt_GLRenderer.h"
-
-#include "Renderer/Rtt_GLCommandBuffer.h"
-#include "Renderer/Rtt_GLFrameBufferObject.h"
-#include "Renderer/Rtt_GLGeometry.h"
-#include "Renderer/Rtt_GLProgram.h"
-#include "Renderer/Rtt_GLTexture.h"
-// STEVE CHANGE
-#include "Renderer/Rtt_GLUniformArray.h"
-// /STEVE CHANGE
-#include "Renderer/Rtt_CPUResource.h"
+#include "Renderer/Rtt_UniformArray.h"
+#include "Core/Rtt_Allocator.h"
 #include "Core/Rtt_Assert.h"
 
-// TODO: Temporary hack
-#ifdef Rtt_IPHONE_ENV
-#include "../platform/iphone/Rtt_IPhoneGLVideoTexture.h"
-#endif
+#include <string.h>
 
 // ----------------------------------------------------------------------------
 
@@ -48,31 +36,81 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-GLRenderer::GLRenderer( Rtt_Allocator* allocator )
-:   Super( allocator )
+UniformArray::UniformArray( Rtt_Allocator *allocator, U32 size )
+:	CPUResource( allocator ),
+	fData( NULL ),
+	fMaxDirtySize( 0 ),
+	fSize( size ),
+	fTimestamp( 0 )
 {
-	fFrontCommandBuffer = Rtt_NEW( allocator, GLCommandBuffer( allocator ) );
-	fBackCommandBuffer = Rtt_NEW( allocator, GLCommandBuffer( allocator ) );
+	Allocate();
 }
 
-GPUResource* 
-GLRenderer::Create( const CPUResource* resource )
+UniformArray::~UniformArray()
 {
-	switch( resource->GetType() )
+	Deallocate();
+}
+
+CPUResource::ResourceType
+UniformArray::GetType() const
+{
+	return CPUResource::kUniformArray;
+}
+
+void
+UniformArray::Allocate()
+{
+	fData = new U8[fSize];
+}
+
+void
+UniformArray::Deallocate()
+{
+	delete [] fData;
+
+	fData = NULL;
+}
+
+U32
+UniformArray::Set( const U8 *bytes, U32 n )
+{
+	Rtt_ASSERT( fData );
+
+	if (n < fSize)
 	{
-		case CPUResource::kFrameBufferObject: return new GLFrameBufferObject;
-		case CPUResource::kGeometry: return new GLGeometry;
-		case CPUResource::kProgram: return new GLProgram;
-		case CPUResource::kTexture: return new GLTexture;
-		case CPUResource::kUniform: return NULL;
-	// STEVE CHANGE
-		case CPUResource::kUniformArray: return new GLUniformArray;
-	// /STEVE CHANGE
-#ifdef Rtt_IPHONE_ENV
-		case CPUResource::kVideoTexture: return new IPhoneGLVideoTexture;
-#endif
-		default: Rtt_ASSERT_NOT_REACHED(); return NULL;
+		n = fSize;
 	}
+
+	if (n)
+	{
+		memcpy( fData, bytes, n );
+
+		if (!GetDirty())
+		{
+			++fTimestamp;
+
+			SetDirty( true );
+		}
+	}
+
+	return n;
+}
+
+U32
+UniformArray::Set( const Real *reals, U32 n )
+{
+	return Set( reinterpret_cast<const U8 *>( reals ), n * sizeof( Real ) ) / sizeof( Real );
+}
+
+void
+UniformArray::SetDirty( bool newValue )
+{
+	 fDirty = newValue;
+
+	 if (!fDirty)
+	 {
+		 fMaxDirtySize = 0;
+	 }
 }
 
 // ----------------------------------------------------------------------------

@@ -23,11 +23,18 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+// STEVE CHANGE
+#include "Display/Rtt_ShaderResource.h"
+// /STEVE CHANGE
+
 #include "Renderer/Rtt_GLProgram.h"
 
 #include "Renderer/Rtt_CommandBuffer.h"
 #include "Renderer/Rtt_Geometry_Renderer.h"
 #include "Renderer/Rtt_Texture.h"
+// STEVE CHANGE
+#include "Renderer/Rtt_UniformArray.h"
+// /STEVE CHANGE
 #ifdef Rtt_USE_PRECOMPILED_SHADERS
 	#include "Renderer/Rtt_ShaderBinary.h"
 	#include "Renderer/Rtt_ShaderBinaryVersions.h"
@@ -138,6 +145,12 @@ GLProgram::Create( CPUResource* resource )
 			Create( fData[i], i );
 		}
 	#endif
+
+	// STEVE CHANGE
+	UniformArray *uniformArray = ((Program *)resource)->GetShaderResource()->GetUniformArray();
+
+	fArraySize = uniformArray ? uniformArray->GetSize() : 0;
+	// /STEVE CHANGE
 }
 
 void
@@ -242,7 +255,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 	const char *program_header_source = program->GetHeaderSource();
 	const char *header = ( program_header_source ? program_header_source : "" );
 
-	const char* shader_source[5];
+	const char* shader_source[/* STEVE CHANGE 5 */8];
 	memset( shader_source, 0, sizeof( shader_source ) );
 	shader_source[0] = header;
 	shader_source[1] = highp_support;
@@ -252,13 +265,32 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 	if ( program->IsCompilerVerbose() )
 	{
 		// All the segments except the last one
-		int numSegments = sizeof( shader_source ) / sizeof( shader_source[0] ) - 1;
+		int numSegments = /* STEVE CHANGE */4;//sizeof( shader_source ) / sizeof( shader_source[0] ) - 1;
 		data.fHeaderNumLines = CountLines( shader_source, numSegments );
 	}
 
 	// Vertex shader.
 	{
-		shader_source[4] = program->GetVertexShaderSource();
+		// STEVE CHANGE
+		char count_str[16] = { 0 };
+
+		shader_source[4] = shader_source[6] = "";
+		shader_source[5] = count_str;
+
+		if (fArraySize)
+		{
+			shader_source[4] = "#define CoronaUniformVectorsCount ";
+
+			sprintf(count_str, "%u", fArraySize / (4U * sizeof( Real )) );
+
+			shader_source[6] =	"\n"
+								"\n"
+								"uniform P_UV vec4 u_UniformVectors[CoronaUniformVectorsCount];\n"
+								"\n"
+								"#define CoronaUniformVector u_UniformVectors\n\n";
+		}
+		// /STEVE CHANGE
+		shader_source[/* STEVE CHANGE 4 */7] = program->GetVertexShaderSource();
 
 		glShaderSource( data.fVertexShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
@@ -270,6 +302,9 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 	// Fragment shader.
 	{
 		shader_source[4] = ( version == Program::kWireframe ) ? kWireframeSource : program->GetFragmentShaderSource();
+		// STEVE CHANGE
+		shader_source[5] = shader_source[6] = shader_source[7] = "";
+		// /STEVE CHANGE
 
 		glShaderSource( data.fFragmentShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
@@ -365,7 +400,10 @@ GLProgram::Update( Program::Version version, VersionData& data )
 	GL_CHECK_ERROR();
 	data.fUniformLocations[Uniform::kUserData3] = glGetUniformLocation( data.fProgram, "u_UserData3" );
 	GL_CHECK_ERROR();
-
+// STEVE CHANGE
+	data.fArrayLocation = glGetUniformLocation( data.fProgram, "u_UniformVectors" );
+	GL_CHECK_ERROR();
+// /STEVE CHANGE
 	glUseProgram( data.fProgram );
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_FillSampler0" ), Texture::kFill0 );
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_FillSampler1" ), Texture::kFill1 );
@@ -388,6 +426,9 @@ GLProgram::Reset( VersionData& data )
 		// OpenGL uses the location -1 for inactive uniforms
 		const GLint kInactiveLocation = -1;
 		data.fUniformLocations[ i ] = kInactiveLocation;
+		// STEVE CHANGE
+		data.fArrayLocation = kInactiveLocation;
+		// /STEVE CHANGE
 		
 		// CommandBuffer also initializes timestamp to zero
 		const U32 kTimestamp = 0;

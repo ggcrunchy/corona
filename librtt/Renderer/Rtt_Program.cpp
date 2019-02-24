@@ -23,7 +23,14 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+// STEVE CHANGE
+#include "Display/Rtt_ShaderResource.h"
+// /STEVE CHANGE
+
 #include "Renderer/Rtt_Program.h"
+// STEVE CHANGE
+#include "Renderer/Rtt_UniformArray.h"
+// /STEVE CHANGE
 #include "Core/Rtt_Config.h"
 #include "Core/Rtt_Allocator.h"
 #include "Core/Rtt_Assert.h"
@@ -98,6 +105,9 @@ Program::Program( Rtt_Allocator* allocator )
 	fHeaderSource( NULL ),
 	fVertexShellNumLines( 0 ),
 	fFragmentShellNumLines( 0 ),
+// STEVE CHANGE
+	fUniformArrayTimestamp( 0 ),
+// /STEVE CHANGE
 	fCompilerVerbose( false )
 {
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
@@ -179,6 +189,7 @@ Program::SetHeaderSource( const char* source )
 {
 	SetSource( &fHeaderSource, source );
 }
+
 
 // ----------------------------------------------------------------------------
 

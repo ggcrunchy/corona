@@ -37,6 +37,10 @@
 #include "Renderer/Rtt_CPUResource.h"
 #include "Renderer/Rtt_Texture.h"
 #include "Renderer/Rtt_Uniform.h"
+// STEVE CHANGE
+#include "Display/Rtt_ShaderResource.h"
+#include "Renderer/Rtt_UniformArray.h"
+// /STEVE CHANGE
 #include "Core/Rtt_Allocator.h"
 #include "Core/Rtt_Assert.h"
 #include "Core/Rtt_Math.h"
@@ -478,14 +482,20 @@ Renderer::Insert( const RenderData* data )
 	Rtt_ASSERT( fBackCommandBuffer != NULL );
 	Rtt_ASSERT( fFrontCommandBuffer != NULL );
 
+	// STEVE CHANGE
+	ShaderResource *shaderResource = data->fProgram->GetShaderResource();
+	UniformArray *uniformArray = shaderResource->GetUniformArray();
+	// /STEVE CHANGE
 	bool blendDirty = data->fBlendMode != fPrevious.fBlendMode;
 	bool blendEquationDirty = data->fBlendEquation != fPrevious.fBlendEquation;
 	bool fillDirty0 = data->fFillTexture0 != fPrevious.fFillTexture0;
 	bool fillDirty1 = data->fFillTexture1 != fPrevious.fFillTexture1;
 	bool maskTextureDirty = data->fMaskTexture != fPrevious.fMaskTexture;
 	bool maskUniformDirty = data->fMaskUniform != fPrevious.fMaskUniform;
-	bool programDirty = data->fProgram != fPrevious.fProgram || MaskCount() != fCurrentProgramMaskCount
-		/* STEVE CHANGE */|| data->fProgram->UniformsArrayDirty();
+	bool programDirty = data->fProgram != fPrevious.fProgram || MaskCount() != fCurrentProgramMaskCount;
+	// STEVE CHANGE
+	bool uniformsArrayDirty = uniformArray != NULL && data->fProgram->GetUniformArrayTimestamp() != uniformArray->GetTimestamp();
+	// /STEVE CHANGE
 	bool userUniformDirty0 = data->fUserUniform0 != fPrevious.fUserUniform0;
 	bool userUniformDirty1 = data->fUserUniform1 != fPrevious.fUserUniform1;
 	bool userUniformDirty2 = data->fUserUniform2 != fPrevious.fUserUniform2;
@@ -529,6 +539,9 @@ Renderer::Insert( const RenderData* data )
 				|| maskTextureDirty
 				|| maskUniformDirty
 				|| programDirty
+				// STEVE CHANGE
+				|| uniformsArrayDirty
+				// /STEVE CHANGE
 				|| userUniformDirty0
 				|| userUniformDirty1
 				|| userUniformDirty2
@@ -717,12 +730,25 @@ Renderer::Insert( const RenderData* data )
 	}
 
 	// STEVE CHANGE
-	if (data->fProgram->UniformsArrayDirty())
+	if (uniformsArrayDirty)
 	{
-		// TODO: upload or post command to do so
-		// flip resource back? (might be in Sync() function...)
+		if (uniformArray->GetDirty())
+		{
+			if (!uniformArray->fGPUResource)
+			{
+				QueueCreate( uniformArray );
+			}
 
-		data->fProgram->SyncUniformsArrayTimestamp();
+			fBackCommandBuffer->CopyUniformArray( uniformArray );
+
+			uniformArray->SetDirty( false );
+		}
+
+		data->fProgram->SetUniformArrayTimestamp( uniformArray->GetTimestamp() );
+
+		Program::Version version = fWireframeEnabled ? Program::kWireframe : static_cast<Program::Version>( MaskCount() );
+
+		fBackCommandBuffer->SyncWithLastKnownArrayState( uniformArray );
 	}
 	// /STEVE CHANGE
 
@@ -916,6 +942,14 @@ Renderer::GetGpuSupportsHighPrecisionFragmentShaders()
 {
 	return CommandBuffer::GetGpuSupportsHighPrecisionFragmentShaders();
 }
+
+// STEVE CHANGE
+int
+Renderer::GetUniformVectorsCount()
+{
+	return CommandBuffer::GetUniformVectorsCount();
+}
+// /STEVE CHANGE
 
 bool
 Renderer::GetStatisticsEnabled() const

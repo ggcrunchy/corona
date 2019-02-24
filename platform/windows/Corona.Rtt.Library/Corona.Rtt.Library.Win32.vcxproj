@@ -178,6 +178,7 @@
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_GLProgram.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_GLRenderer.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_GLTexture.cpp" />
+    <ClCompile Include="..\..\..\librtt\Renderer\Rtt_GLUniformArray.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_GPUResource.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_HighPrecisionTime.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_Matrix_Renderer.cpp">
@@ -198,6 +199,7 @@
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_TextureBitmap.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_TextureVolatile.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_Uniform.cpp" />
+    <ClCompile Include="..\..\..\librtt\Renderer\Rtt_UniformArray.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VideoTexture.cpp" />
     <ClCompile Include="..\..\..\librtt\Rtt_Archive.cpp" />
     <ClCompile Include="..\..\..\librtt\Rtt_CachedPath.cpp" />
@@ -469,6 +471,7 @@
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_GLProgram.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_GLRenderer.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_GLTexture.h" />
+    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_GLUniformArray.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_GPUResource.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_HighPrecisionTime.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_Matrix_Renderer.h" />
@@ -484,6 +487,7 @@
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_TextureBitmap.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_TextureVolatile.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_Uniform.h" />
+    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_UniformArray.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VideoSource.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VideoTexture.h" />
     <ClInclude Include="..\..\..\librtt\Rtt_Archive.h" />

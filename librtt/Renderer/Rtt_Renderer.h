@@ -184,6 +184,10 @@ class Renderer
 		static const char *GetGlString( const char *s );
 		static bool GetGpuSupportsHighPrecisionFragmentShaders();
 
+		// STEVE CHANGE
+		static int GetUniformVectorsCount();
+		// /STEVE CHANGE
+
 		struct Statistics
 		{
 			Statistics();

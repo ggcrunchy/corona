@@ -339,6 +339,10 @@ class Display
 		static const char *GetGlString( const char *s );
 		static bool GetGpuSupportsHighPrecisionFragmentShaders();
 
+		// STEVE CHANGE
+		static int GetUniformVectorsCount();
+		// /STEVE CHANGE
+
 	public:
 		Scene& GetScene() { return *fScene; }
 		const Scene& GetScene() const { return *fScene; }

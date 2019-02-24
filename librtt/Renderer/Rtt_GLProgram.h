@@ -72,6 +72,14 @@ class GLProgram : public GPUResource
 			fData[version].fTimestamps[ unit ] = timestamp;
 		}
 
+		// STEVE CHANGE
+		inline GLint GetUniformArrayLocation( Program::Version version )
+		{
+			Rtt_ASSERT( version <= Program::kNumVersions );
+			return fData[version].fArrayLocation;
+		}
+		// /STEVE CHANGE
+
 	private:
 		// To make custom shader code work seamlessly with masking, multiple
 		// versions of each Program are automatically compiled and linked, 
@@ -84,7 +92,8 @@ class GLProgram : public GPUResource
 			GLint fUniformLocations[Uniform::kNumBuiltInVariables];
 			U32 fTimestamps[Uniform::kNumBuiltInVariables];
 			// STEVE CHANGE
-			U32 fUniformsArrayStamp;
+			GLint fArrayLocation;	// n.b. arrays have slightly different update
+									// behaviors, so are held apart the other uniforms
 			// /STEVE CHANGE
 			
 			// Metadata
@@ -98,6 +107,9 @@ class GLProgram : public GPUResource
 
 		VersionData fData[Program::kNumVersions];
 		CPUResource* fResource;
+		// STEVE CHANGE
+		U32 fArraySize;
+		// /STEVE CHANGE
 };
 
 // ----------------------------------------------------------------------------

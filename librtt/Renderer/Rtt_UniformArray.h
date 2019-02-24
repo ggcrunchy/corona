@@ -23,60 +23,62 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Renderer/Rtt_GLRenderer.h"
+#ifndef _Rtt_UniformArray_H__
+#define _Rtt_UniformArray_H__
 
-#include "Renderer/Rtt_GLCommandBuffer.h"
-#include "Renderer/Rtt_GLFrameBufferObject.h"
-#include "Renderer/Rtt_GLGeometry.h"
-#include "Renderer/Rtt_GLProgram.h"
-#include "Renderer/Rtt_GLTexture.h"
-// STEVE CHANGE
-#include "Renderer/Rtt_GLUniformArray.h"
-// /STEVE CHANGE
 #include "Renderer/Rtt_CPUResource.h"
-#include "Core/Rtt_Assert.h"
-
-// TODO: Temporary hack
-#ifdef Rtt_IPHONE_ENV
-#include "../platform/iphone/Rtt_IPhoneGLVideoTexture.h"
-#endif
+#include "Core/Rtt_Types.h"
+#include "Core/Rtt_Real.h"
 
 // ----------------------------------------------------------------------------
+
+struct Rtt_Allocator;
 
 namespace Rtt
 {
 
 // ----------------------------------------------------------------------------
 
-GLRenderer::GLRenderer( Rtt_Allocator* allocator )
-:   Super( allocator )
+class UniformArray : public CPUResource
 {
-	fFrontCommandBuffer = Rtt_NEW( allocator, GLCommandBuffer( allocator ) );
-	fBackCommandBuffer = Rtt_NEW( allocator, GLCommandBuffer( allocator ) );
-}
+	public:
+		typedef CPUResource Super;
+		typedef UniformArray Self;
 
-GPUResource* 
-GLRenderer::Create( const CPUResource* resource )
-{
-	switch( resource->GetType() )
-	{
-		case CPUResource::kFrameBufferObject: return new GLFrameBufferObject;
-		case CPUResource::kGeometry: return new GLGeometry;
-		case CPUResource::kProgram: return new GLProgram;
-		case CPUResource::kTexture: return new GLTexture;
-		case CPUResource::kUniform: return NULL;
-	// STEVE CHANGE
-		case CPUResource::kUniformArray: return new GLUniformArray;
-	// /STEVE CHANGE
-#ifdef Rtt_IPHONE_ENV
-		case CPUResource::kVideoTexture: return new IPhoneGLVideoTexture;
-#endif
-		default: Rtt_ASSERT_NOT_REACHED(); return NULL;
-	}
-}
+	public:
+		UniformArray( Rtt_Allocator *allocator, U32 size );
+		virtual ~UniformArray();
+
+		virtual ResourceType GetType() const;
+		virtual void Allocate();
+		virtual void Deallocate();
+
+	public:
+		U32 GetMaxDirtySize() const { return fMaxDirtySize; }
+		U32 GetSize() const { return fSize; }
+		U32 GetTimestamp() const { return fTimestamp; }
+
+		U8 *GetData() { return fData; }
+		const U8 *GetData() const { return fData; }
+
+		U32 Set( const U8 *bytes, U32 n );
+		U32 Set( const Real *reals, U32 n );
+
+		bool GetDirty() const { return fDirty; }
+		void SetDirty( bool newValue );
+
+	private:
+		U8 *fData;
+		U32 fMaxDirtySize;
+		U32 fSize;
+		U32 fTimestamp;
+		bool fDirty;
+};
 
 // ----------------------------------------------------------------------------
 
 } // namespace Rtt
 
 // ----------------------------------------------------------------------------
+
+#endif // _Rtt_UniformArray_H__

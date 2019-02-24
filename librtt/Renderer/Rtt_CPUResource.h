@@ -56,6 +56,9 @@ class CPUResource
 			kProgram,
 			kTexture,
 			kUniform,
+		// STEVE CHANGE
+			kUniformArray,
+		// /STEVE CHANGE
 			kVideoTexture,
 			kNumResourceTypes,
 		}

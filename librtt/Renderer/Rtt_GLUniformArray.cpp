@@ -23,23 +23,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Renderer/Rtt_GLRenderer.h"
-
-#include "Renderer/Rtt_GLCommandBuffer.h"
-#include "Renderer/Rtt_GLFrameBufferObject.h"
-#include "Renderer/Rtt_GLGeometry.h"
-#include "Renderer/Rtt_GLProgram.h"
-#include "Renderer/Rtt_GLTexture.h"
-// STEVE CHANGE
 #include "Renderer/Rtt_GLUniformArray.h"
-// /STEVE CHANGE
-#include "Renderer/Rtt_CPUResource.h"
-#include "Core/Rtt_Assert.h"
-
-// TODO: Temporary hack
-#ifdef Rtt_IPHONE_ENV
-#include "../platform/iphone/Rtt_IPhoneGLVideoTexture.h"
-#endif
 
 // ----------------------------------------------------------------------------
 
@@ -48,31 +32,25 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-GLRenderer::GLRenderer( Rtt_Allocator* allocator )
-:   Super( allocator )
+GLUniformArray::GLUniformArray()
+:	fOffset( NULL ),
+	fSize( 0 )
 {
-	fFrontCommandBuffer = Rtt_NEW( allocator, GLCommandBuffer( allocator ) );
-	fBackCommandBuffer = Rtt_NEW( allocator, GLCommandBuffer( allocator ) );
 }
 
-GPUResource* 
-GLRenderer::Create( const CPUResource* resource )
+void
+GLUniformArray::Create( CPUResource* resource )
 {
-	switch( resource->GetType() )
-	{
-		case CPUResource::kFrameBufferObject: return new GLFrameBufferObject;
-		case CPUResource::kGeometry: return new GLGeometry;
-		case CPUResource::kProgram: return new GLProgram;
-		case CPUResource::kTexture: return new GLTexture;
-		case CPUResource::kUniform: return NULL;
-	// STEVE CHANGE
-		case CPUResource::kUniformArray: return new GLUniformArray;
-	// /STEVE CHANGE
-#ifdef Rtt_IPHONE_ENV
-		case CPUResource::kVideoTexture: return new IPhoneGLVideoTexture;
-#endif
-		default: Rtt_ASSERT_NOT_REACHED(); return NULL;
-	}
+}
+
+void
+GLUniformArray::Update( CPUResource* resource )
+{
+}
+
+void
+GLUniformArray::Destroy()
+{
 }
 
 // ----------------------------------------------------------------------------
@@ -80,3 +58,4 @@ GLRenderer::Create( const CPUResource* resource )
 } // namespace Rtt
 
 // ----------------------------------------------------------------------------
+

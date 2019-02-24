@@ -38,6 +38,9 @@ namespace Rtt
 
 class Program;
 class ShaderData;
+// STEVE CHANGE
+class UniformArray;
+// /STEVE CHANGE
 
 struct TimeTransform
 {
@@ -101,9 +104,6 @@ class ShaderResource
 		TimeTransform *GetTimeTransform() const { return fTimeTransform; }
 		void SetTimeTransform( TimeTransform *transform ) { fTimeTransform = transform; }
 
-		// STEVE CHANGE
-		U32 GetUniformsArrayTimestamp() const { return fUniformsArrayTimestamp; }
-		// /STEVE CHANGE
 	public:
 		// Shader either stores params on per-vertex basis or in uniforms.
 		// Batching most likely breaks as soon as you use uniforms,
@@ -131,6 +131,11 @@ class ShaderResource
 		void SetProgramMod(ProgramMod mod, Program *program);
 		Program *GetProgramMod(ProgramMod mod) const;
 		
+// STEVE CHANGE
+	public:
+		void SetUniformArray( UniformArray *uniformArray );
+		UniformArray *GetUniformArray() const;
+// /STEVE CHANGE
 	private:
 		void Init(Program *defaultProgram);
 
@@ -144,9 +149,7 @@ class ShaderResource
 		ShaderData *fDefaultData;
 		TimeTransform *fTimeTransform;
 		// STEVE CHANGE
-		Uniform *fUniformsArray;
-		int fUniformsCount;
-		U32 fUniformsArrayTimestamp;
+		UniformArray *fUniformArray;
 		// /STEVE CHANGE
 		bool fUsesUniforms;
 		bool fUsesTime;

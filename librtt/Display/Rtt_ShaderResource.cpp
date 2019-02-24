@@ -29,6 +29,9 @@
 
 #include "Display/Rtt_ShaderData.h"
 #include "Renderer/Rtt_Program.h"
+// STEVE CHANGE
+#include "Renderer/Rtt_UniformArray.h"
+// /STEVE CHANGE
 
 #include <string.h>
 
@@ -74,6 +77,9 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fUniformDataMap(),
 	fDefaultData( NULL ),
 	fTimeTransform( NULL ),
+// STEVE CHANGE
+	fUniformArray( NULL ),
+// /STEVE CHANGE
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {
@@ -87,6 +93,9 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fUniformDataMap(),
 	fDefaultData( NULL ),
 	fTimeTransform( NULL ),
+// STEVE CHANGE
+	fUniformArray( NULL ),
+// /STEVE CHANGE
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {
@@ -141,6 +150,20 @@ ShaderResource::GetProgramMod(ProgramMod mod) const
 {
 	return fPrograms[mod];
 }
+
+// STEVE CHANGE
+void
+ShaderResource::SetUniformArray( UniformArray *uniformArray )
+{
+	fUniformArray = uniformArray;
+}
+
+UniformArray *
+ShaderResource::GetUniformArray() const
+{
+	return fUniformArray;
+}
+// /STEVE CHANGE
 
 int
 ShaderResource::GetDataIndex( const char *key ) const

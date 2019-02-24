@@ -72,6 +72,10 @@ class GLCommandBuffer : public CommandBuffer
 		virtual void Clear( Real r, Real g, Real b, Real a );
 		virtual void Draw( U32 offset, U32 count, Geometry::PrimitiveType type );
 		virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type );
+		// STEVE CHANGE
+		virtual void CopyUniformArray( UniformArray* uniformArray );
+		virtual void SyncWithLastKnownArrayState( UniformArray* uniformArray );
+		// /STEVE CHANGE
 		virtual S32 GetCachedParam( CommandBuffer::QueryableParams param );
 		
 		// Execute all buffered commands. A valid OpenGL context must be active.
@@ -93,6 +97,10 @@ class GLCommandBuffer : public CommandBuffer
 		template <typename T>
 		void Write(T);
 		
+		// STEVE CHANGE
+		void WriteBytes( const void *bytes, U32 size );
+		// /STEVE CHANGE
+
 		struct UniformUpdate
 		{
 			Uniform* uniform;

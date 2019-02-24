@@ -899,6 +899,33 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
 								Shader *prototype = NULL;
 								prototype = NewShaderPrototype( L, tableIndex, resource );
 								result = (ShaderComposite*)prototype->Clone( fAllocator );
+								// STEVE CHANGE
+								lua_getfield( L, tableIndex, "usesUniformVectors" );
+
+								if (!lua_isnil( L, -1 ))
+								{
+									int count = Display::GetUniformVectorsCount();
+
+									if (lua_isnumber( L, -1 ))
+									{
+										int n = luaL_checkint( L, -1 );
+
+										if (n <= count)
+										{
+											count = n;
+										}
+
+										else
+										{
+											// ERROR, WARNING, etc.
+										}
+
+										// resource->SetUniformsSize(n.
+									}
+								}
+
+								lua_pop( L, 1 );
+								// /STEVE CHANGE
 							}
 						}
 						else

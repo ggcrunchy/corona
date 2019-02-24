@@ -247,6 +247,13 @@ LuaLibSystem::getInfo( lua_State *L )
 		Runtime *runtime = LuaContext::GetRuntime( L );
 		lua_pushboolean( L, runtime->GetDisplay().GetGpuSupportsHighPrecisionFragmentShaders() );
 	}
+	// STEVE CHANGE
+	else if ( Rtt_StringCompare( key, "vertexUniformVectorsCount" ) == 0 )
+	{
+		Runtime *runtime = LuaContext::GetRuntime( L );
+		lua_pushinteger( L, runtime->GetDisplay().GetUniformVectorsCount() );
+	}
+	// /STEVE CHANGE
 	else
 	{
 		// This is a place where we can add system.getInfo() categories that return arbitrary types

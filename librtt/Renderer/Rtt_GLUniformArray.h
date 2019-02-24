@@ -23,23 +23,11 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Renderer/Rtt_GLRenderer.h"
+#ifndef _Rtt_GLUniformArray_H__
+#define _Rtt_GLUniformArray_H__
 
-#include "Renderer/Rtt_GLCommandBuffer.h"
-#include "Renderer/Rtt_GLFrameBufferObject.h"
-#include "Renderer/Rtt_GLGeometry.h"
-#include "Renderer/Rtt_GLProgram.h"
-#include "Renderer/Rtt_GLTexture.h"
-// STEVE CHANGE
-#include "Renderer/Rtt_GLUniformArray.h"
-// /STEVE CHANGE
-#include "Renderer/Rtt_CPUResource.h"
-#include "Core/Rtt_Assert.h"
-
-// TODO: Temporary hack
-#ifdef Rtt_IPHONE_ENV
-#include "../platform/iphone/Rtt_IPhoneGLVideoTexture.h"
-#endif
+#include "Renderer/Rtt_GPUResource.h"
+#include "Renderer/Rtt_UniformArray.h"
 
 // ----------------------------------------------------------------------------
 
@@ -48,35 +36,35 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-GLRenderer::GLRenderer( Rtt_Allocator* allocator )
-:   Super( allocator )
+class GLUniformArray : public GPUResource
 {
-	fFrontCommandBuffer = Rtt_NEW( allocator, GLCommandBuffer( allocator ) );
-	fBackCommandBuffer = Rtt_NEW( allocator, GLCommandBuffer( allocator ) );
-}
+	public:
+		typedef GPUResource Super;
+		typedef GLUniformArray Self;
 
-GPUResource* 
-GLRenderer::Create( const CPUResource* resource )
-{
-	switch( resource->GetType() )
-	{
-		case CPUResource::kFrameBufferObject: return new GLFrameBufferObject;
-		case CPUResource::kGeometry: return new GLGeometry;
-		case CPUResource::kProgram: return new GLProgram;
-		case CPUResource::kTexture: return new GLTexture;
-		case CPUResource::kUniform: return NULL;
-	// STEVE CHANGE
-		case CPUResource::kUniformArray: return new GLUniformArray;
-	// /STEVE CHANGE
-#ifdef Rtt_IPHONE_ENV
-		case CPUResource::kVideoTexture: return new IPhoneGLVideoTexture;
-#endif
-		default: Rtt_ASSERT_NOT_REACHED(); return NULL;
-	}
-}
+	public:
+		GLUniformArray();
+
+		virtual void Create( CPUResource* resource );
+		virtual void Update( CPUResource* resource );
+		virtual void Destroy();
+
+	public:
+		U8 *GetOffset() const { return fOffset; }
+		void SetOffset( U8 *offset ) { fOffset = offset; }
+
+		U32 GetSize() const { return fSize; }
+		void SetSize( U32 size ) { fSize = size; }
+
+	private:
+		U8 *fOffset;
+		U32 fSize;
+};
 
 // ----------------------------------------------------------------------------
 
 } // namespace Rtt
 
 // ----------------------------------------------------------------------------
+
+#endif // _Rtt_GLUniformArray_H__

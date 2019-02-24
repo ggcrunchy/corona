@@ -32,9 +32,15 @@
 #include "Renderer/Rtt_GLGeometry.h"
 #include "Renderer/Rtt_GLProgram.h"
 #include "Renderer/Rtt_GLTexture.h"
+// STEVE CHANGE
+#include "Renderer/Rtt_GLUniformArray.h"
+// /STEVE CHANGE
 #include "Renderer/Rtt_Program.h"
 #include "Renderer/Rtt_Texture.h"
 #include "Renderer/Rtt_Uniform.h"
+// STEVE CHANGE
+#include "Renderer/Rtt_UniformArray.h"
+// /STEVE CHANGE
 #include "Display/Rtt_ShaderResource.h"
 #include "Core/Rtt_Config.h"
 #include "Core/Rtt_Allocator.h"
@@ -87,6 +93,10 @@ namespace /*anonymous*/
 		kCommandClear,
 		kCommandDraw,
 		kCommandDrawIndexed,
+		// STEVE CHANGE
+		kCommandCopyUniformArray,
+		kCommandSyncToUniformArray,
+		// /STEVE CHANGE
 		kNumCommands
 	};
 
@@ -284,6 +294,25 @@ CommandBuffer::GetGpuSupportsHighPrecisionFragmentShaders()
 
 #endif
 }
+
+// STEVE CHANGE
+int
+CommandBuffer::GetUniformVectorsCount()
+{
+	GLint count;
+
+	glGetIntegerv(GL_MAX_VERTEX_UNIFORM_VECTORS, &count);
+	GL_CHECK_ERROR();
+
+	count -=	4 // kViewProjectionMatrix
+				+ 3 * 4 // kMaskMatrix*, assuming 3 vectors each
+				+ 2 // kTotalTime, kDeltaTime, again 1 vector each
+				+ 1 // kTexelSize, ditto
+				+ 1;// kContentScale, the same
+
+	return count;
+}
+// /STEVE CHANGE
 
 GLCommandBuffer::GLCommandBuffer( Rtt_Allocator* allocator )
 :    CommandBuffer( allocator ),
@@ -647,6 +676,31 @@ GLCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 	Write<GLsizei>(count);
 }
 
+// STEVE CHANGE
+void
+GLCommandBuffer::CopyUniformArray( UniformArray* uniformArray )
+{
+	Rtt_ASSERT( uniformArray && uniformArray->GetGPUResource() );
+
+	WRITE_COMMAND( kCommandCopyUniformArray );
+
+	Write<GPUResource*>( uniformArray->GetGPUResource() );
+	Write<U32>( uniformArray->GetMaxDirtySize() );
+	WriteBytes( uniformArray->GetData(), uniformArray->GetMaxDirtySize() );
+}
+
+void
+GLCommandBuffer::SyncWithLastKnownArrayState( UniformArray* uniformArray )
+{
+	Rtt_ASSERT( uniformArray && uniformArray->GetGPUResource() );
+
+	WRITE_COMMAND( kCommandSyncToUniformArray );
+
+	Write<GPUResource*>( uniformArray->GetGPUResource() );
+	Write<GPUResource*>( fProgram->GetGPUResource() );
+}
+// /STEVE CHANGE
+
 S32
 GLCommandBuffer::GetCachedParam( CommandBuffer::QueryableParams param )
 {
@@ -938,6 +992,33 @@ GLCommandBuffer::Execute( bool measureGPU )
 				DEBUG_PRINT( "Draw indexed: mode=%i, count=%i", mode, count );
 				CHECK_ERROR_AND_BREAK;
 			}
+			// STEVE CHANGE
+			case kCommandCopyUniformArray:
+			{
+				GLUniformArray *uniformArray = Read<GLUniformArray*>();
+				U32 size = Read<U32>();
+				U8 *offset = fOffset;
+
+				uniformArray->SetOffset( offset );
+				uniformArray->SetSize( size );
+
+				fOffset += size;
+				
+				DEBUG_PRINT( "Copy uniform array: array=%p, size=%u", uniformArray, size );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandSyncToUniformArray:
+			{
+				GLUniformArray *uniformArray = Read<GLUniformArray*>();
+				GLProgram *program = Read<GLProgram*>();
+				GLsizei n = uniformArray->GetSize() / (4 * sizeof( Real ));
+
+				glUniform4fv( program->GetUniformArrayLocation( fCurrentDrawVersion ), n, reinterpret_cast<GLfloat*>( uniformArray->GetOffset() ) );
+
+				DEBUG_PRINT( "Sync to uniform array: array=%p, program=%p", uniformArray, program );
+				CHECK_ERROR_AND_BREAK;
+			}
+			// /STEVE CHANGE
 			default:
 				DEBUG_PRINT( "Unknown command(%d)", command );
 				Rtt_ASSERT_NOT_REACHED();
@@ -975,7 +1056,8 @@ GLCommandBuffer::Read()
 template <typename T>
 void 
 GLCommandBuffer::Write( T value )
-{
+{	// STEVE CHANGE
+	/*
 	U32 size = sizeof(T);
 	U32 bytesNeeded = fBytesUsed + size;
 	if( bytesNeeded > fBytesAllocated )
@@ -992,8 +1074,34 @@ GLCommandBuffer::Write( T value )
 	}
 
 	memcpy( fBuffer + fBytesUsed, &value, size );
+	fBytesUsed += size;*/
+	WriteBytes( &value, sizeof(T) );
+	// /STEVE CHANGE
+	
+}
+
+// STEVE CHANGE
+void
+GLCommandBuffer::WriteBytes( const void *bytes, U32 size )
+{
+	U32 bytesNeeded = fBytesUsed + size;
+	if( bytesNeeded > fBytesAllocated )
+	{
+		U32 doubleSize = fBytesUsed ? 2 * fBytesUsed : 4;
+		U32 newSize = Max( bytesNeeded, doubleSize );
+		U8* newBuffer = new U8[newSize];
+
+		memcpy( newBuffer, fBuffer, fBytesUsed );
+		delete [] fBuffer;
+
+		fBuffer = newBuffer;
+		fBytesAllocated = newSize;
+	}
+
+	memcpy( fBuffer + fBytesUsed, bytes, size );
 	fBytesUsed += size;
 }
+// /STEVE CHANGE
 
 void GLCommandBuffer::ApplyUniforms( GPUResource* resource )
 {

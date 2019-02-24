@@ -1843,6 +1843,14 @@ Display::GetGpuSupportsHighPrecisionFragmentShaders()
 	return Renderer::GetGpuSupportsHighPrecisionFragmentShaders();
 }
 
+// STEVE CHANGE
+int
+Display::GetUniformVectorsCount()
+{
+	return Renderer::GetUniformVectorsCount();
+}
+// /STEVE CHANGE
+
 void
 Display::SetWireframe( bool newValue )
 {

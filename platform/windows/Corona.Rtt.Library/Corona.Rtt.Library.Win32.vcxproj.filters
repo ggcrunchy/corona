@@ -918,6 +918,12 @@
     <ClCompile Include="..\..\..\librtt\Rtt_PreferenceCollection.cpp">
       <Filter>librtt</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\librtt\Renderer\Rtt_UniformArray.cpp">
+      <Filter>librtt\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\librtt\Renderer\Rtt_GLUniformArray.cpp">
+      <Filter>librtt\Renderer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\external\ALmixer\luaal.h">
@@ -1843,6 +1849,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\librtt\Rtt_PreferenceCollection.h">
       <Filter>librtt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_UniformArray.h">
+      <Filter>librtt\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_GLUniformArray.h">
+      <Filter>librtt\Renderer</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

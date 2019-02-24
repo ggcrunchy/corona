@@ -43,6 +43,9 @@ class FrameBufferObject;
 class Program;
 class Texture;
 class Uniform;
+// STEVE CHANGE
+class UniformArray;
+// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
 
@@ -69,6 +72,9 @@ class CommandBuffer
 		static const char *GetGlString( const char *s );
 		static bool GetGpuSupportsHighPrecisionFragmentShaders();
 
+		// STEVE CHANGE
+		static int GetUniformVectorsCount();
+		// /STEVE CHANGE
 	public:
 		CommandBuffer( Rtt_Allocator* allocator );
 		virtual ~CommandBuffer();
@@ -101,6 +107,10 @@ class CommandBuffer
 		virtual void Clear( Real r, Real g, Real b, Real a ) = 0;
 		virtual void Draw( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
 		virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
+		// STEVE CHANGE
+		virtual void CopyUniformArray( UniformArray* uniformArray ) = 0;
+		virtual void SyncWithLastKnownArrayState( UniformArray* uniformArray ) = 0;
+		// /STEVE CHANGE
 		virtual S32 GetCachedParam( CommandBuffer::QueryableParams param ) = 0;
 		
 		// Execute the generated command buffer. This function should only be
