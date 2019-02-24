@@ -23,7 +23,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Renderer/Rtt_GLUniformArray.h"
+#include "Display/Rtt_ShaderState.h"
 
 // ----------------------------------------------------------------------------
 
@@ -32,26 +32,7 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-GLUniformArray::GLUniformArray()
-:	fBytes( NULL ),
-	fSize( 0 )
-{
-}
-
-void
-GLUniformArray::Create( CPUResource* resource )
-{
-}
-
-void
-GLUniformArray::Update( CPUResource* resource )
-{
-}
-
-void
-GLUniformArray::Destroy()
-{
-}
+// TODO!
 
 // ----------------------------------------------------------------------------
 

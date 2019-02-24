@@ -50,14 +50,14 @@ class GLUniformArray : public GPUResource
 		virtual void Destroy();
 
 	public:
-		U8 *GetOffset() const { return fOffset; }
-		void SetOffset( U8 *offset ) { fOffset = offset; }
+		U8 *GetBytes() const { return fBytes; }
+		void SetBytes( U8 *offset ) { fBytes = offset; }
 
 		U32 GetSize() const { return fSize; }
 		void SetSize( U32 size ) { fSize = size; }
 
 	private:
-		U8 *fOffset;
+		U8 *fBytes;
 		U32 fSize;
 };
 

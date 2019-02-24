@@ -96,10 +96,6 @@ class GLCommandBuffer : public CommandBuffer
 		// command buffer.
 		template <typename T>
 		void Write(T);
-		
-		// STEVE CHANGE
-		void WriteBytes( const void *bytes, U32 size );
-		// /STEVE CHANGE
 
 		struct UniformUpdate
 		{
@@ -122,6 +118,18 @@ class GLCommandBuffer : public CommandBuffer
 		Real fElapsedTimeGPU;
 	
 		TimeTransform* fTimeTransform;
+
+		// STEVE CHANGE
+		struct BytePayload
+		{
+			BytePayload *next;
+			U8 *bytes;
+			U32 size;
+			bool used;
+		};
+
+		BytePayload *fPayloads;
+		// /STEVE CHANGE
 
 		S32 fCachedQuery[kNumQueryableParams];
 		

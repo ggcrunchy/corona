@@ -321,6 +321,9 @@ GLCommandBuffer::GLCommandBuffer( Rtt_Allocator* allocator )
 	 fProgram( NULL ),
      fDefaultFBO( 0 ),
 	 fTimeTransform( NULL ),
+	 // STEVE CHANGE
+	 fPayloads( NULL ),
+	 // /STEVE CHANGE
 	 fTimerQueries( new U32[kTimerQueryCount] ),
 	 fTimerQueryIndex( 0 ),
 	 fElapsedTimeGPU( 0.0f )
@@ -335,6 +338,14 @@ GLCommandBuffer::GLCommandBuffer( Rtt_Allocator* allocator )
 GLCommandBuffer::~GLCommandBuffer()
 {
 	delete [] fTimerQueries;
+
+	for (BytePayload *cur = fPayloads, *next = NULL; cur; cur = next)
+	{
+		next = cur->next; // get before deletion
+
+		delete [] cur->bytes;
+		delete cur;
+	}
 }
 
 void
@@ -686,7 +697,31 @@ GLCommandBuffer::CopyUniformArray( UniformArray* uniformArray )
 
 	Write<GPUResource*>( uniformArray->GetGPUResource() );
 	Write<U32>( uniformArray->GetMaxDirtySize() );
-	WriteBytes( uniformArray->GetData(), uniformArray->GetMaxDirtySize() );
+
+	BytePayload *payload = fPayloads;
+
+	while ( payload && !( payload->used && payload->size >= uniformArray->GetMaxDirtySize() ) )
+	{
+		payload = payload->next;
+	}
+
+	if (!payload)
+	{
+		payload = new BytePayload;
+
+		payload->size = uniformArray->GetMaxDirtySize();
+
+	// TODO: minimum allocation size to avoid profileration with small writes? else occasional cleanup
+
+		payload->bytes = new U8[payload->size];
+	}
+
+	payload->next = fPayloads;
+	payload->used = false;
+
+	fPayloads = payload;
+
+	Write<BytePayload*>( payload );
 }
 
 void
@@ -997,14 +1032,14 @@ GLCommandBuffer::Execute( bool measureGPU )
 			{
 				GLUniformArray *uniformArray = Read<GLUniformArray*>();
 				U32 size = Read<U32>();
-				U8 *offset = fOffset;
+				BytePayload *payload = Read<BytePayload*>();
 
-				uniformArray->SetOffset( offset );
+				uniformArray->SetBytes( payload->bytes );
 				uniformArray->SetSize( size );
-
-				fOffset += size;
 				
-				DEBUG_PRINT( "Copy uniform array: array=%p, size=%u", uniformArray, size );
+				payload->used = true;
+
+				DEBUG_PRINT( "Copy uniform array: array=%p, size=%u, payload=%p", uniformArray, size, payload );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandSyncToUniformArray:
@@ -1013,7 +1048,7 @@ GLCommandBuffer::Execute( bool measureGPU )
 				GLProgram *program = Read<GLProgram*>();
 				GLsizei n = uniformArray->GetSize() / (4 * sizeof( Real ));
 
-				glUniform4fv( program->GetUniformArrayLocation( fCurrentDrawVersion ), n, reinterpret_cast<GLfloat*>( uniformArray->GetOffset() ) );
+				glUniform4fv( program->GetUniformArrayLocation( fCurrentDrawVersion ), n, reinterpret_cast<GLfloat*>( uniformArray->GetBytes() ) );
 
 				DEBUG_PRINT( "Sync to uniform array: array=%p, program=%p", uniformArray, program );
 				CHECK_ERROR_AND_BREAK;
@@ -1056,8 +1091,7 @@ GLCommandBuffer::Read()
 template <typename T>
 void 
 GLCommandBuffer::Write( T value )
-{	// STEVE CHANGE
-	/*
+{
 	U32 size = sizeof(T);
 	U32 bytesNeeded = fBytesUsed + size;
 	if( bytesNeeded > fBytesAllocated )
@@ -1074,34 +1108,9 @@ GLCommandBuffer::Write( T value )
 	}
 
 	memcpy( fBuffer + fBytesUsed, &value, size );
-	fBytesUsed += size;*/
-	WriteBytes( &value, sizeof(T) );
-	// /STEVE CHANGE
+	fBytesUsed += size;
 	
 }
-
-// STEVE CHANGE
-void
-GLCommandBuffer::WriteBytes( const void *bytes, U32 size )
-{
-	U32 bytesNeeded = fBytesUsed + size;
-	if( bytesNeeded > fBytesAllocated )
-	{
-		U32 doubleSize = fBytesUsed ? 2 * fBytesUsed : 4;
-		U32 newSize = Max( bytesNeeded, doubleSize );
-		U8* newBuffer = new U8[newSize];
-
-		memcpy( newBuffer, fBuffer, fBytesUsed );
-		delete [] fBuffer;
-
-		fBuffer = newBuffer;
-		fBytesAllocated = newSize;
-	}
-
-	memcpy( fBuffer + fBytesUsed, bytes, size );
-	fBytesUsed += size;
-}
-// /STEVE CHANGE
 
 void GLCommandBuffer::ApplyUniforms( GPUResource* resource )
 {

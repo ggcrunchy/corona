@@ -23,7 +23,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Renderer/Rtt_GLUniformArray.h"
+#ifndef _Rtt_ShaderState_H__
+#define _Rtt_ShaderState_H__
 
 // ----------------------------------------------------------------------------
 
@@ -32,26 +33,22 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-GLUniformArray::GLUniformArray()
-:	fBytes( NULL ),
-	fSize( 0 )
+class ShaderState
 {
-}
+	public:
+		typedef ShaderState Self;
 
-void
-GLUniformArray::Create( CPUResource* resource )
-{
-}
+	public:
 
-void
-GLUniformArray::Update( CPUResource* resource )
-{
-}
+	public:
 
-void
-GLUniformArray::Destroy()
-{
-}
+
+	private:
+		// shared ptr to ShaderResource...
+		// uniform array...
+		// other fancy abilities... (sort of listed somewhere)
+		// proxy stuff
+};
 
 // ----------------------------------------------------------------------------
 
@@ -59,3 +56,4 @@ GLUniformArray::Destroy()
 
 // ----------------------------------------------------------------------------
 
+#endif // _Rtt_ShaderState_H__
