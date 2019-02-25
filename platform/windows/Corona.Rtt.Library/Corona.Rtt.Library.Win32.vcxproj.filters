@@ -924,6 +924,12 @@
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_GLUniformArray.cpp">
       <Filter>librtt\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderState.cpp">
+      <Filter>librtt\Display</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\librtt\Display\ShaderStateAdapter.cpp">
+      <Filter>librtt\Display</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\external\ALmixer\luaal.h">
@@ -1855,6 +1861,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_GLUniformArray.h">
       <Filter>librtt\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderState.h">
+      <Filter>librtt\Display</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderStateAdapter.h">
+      <Filter>librtt\Display</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

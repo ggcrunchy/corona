@@ -41,6 +41,9 @@
 	#include "Renderer/Rtt_ShaderBinaryVersions.h"
 #endif
 #include "Renderer/Rtt_Uniform.h"
+// STEVE CHANGE
+#include "Renderer/Rtt_UniformArray.h"
+// /STEVE CHANGE
 #include "Rtt_Lua.h"
 #include "Rtt_Runtime.h"
 
@@ -910,17 +913,24 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
 									{
 										int n = luaL_checkint( L, -1 );
 
-										if (n <= count)
+										if (n > 0 && n <= count)
 										{
 											count = n;
 										}
 
 										else
 										{
-											// ERROR, WARNING, etc.
-										}
+											CORONA_LOG_ERROR( "Effect (%s) could not allocate %i uniform vectors!", name, count );
 
-										// resource->SetUniformsSize(n.
+											count = 0;
+										}
+									}
+
+									if (count)
+									{
+										UniformArray *uniformArray = Rtt_NEW( fAllocator, UniformArray( fAllocator, (U32)count ) );
+
+										resource->SetUniformArray( uniformArray );
 									}
 								}
 

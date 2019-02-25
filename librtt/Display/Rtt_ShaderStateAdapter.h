@@ -23,11 +23,10 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Renderer/Rtt_UniformArray.h"
-#include "Core/Rtt_Allocator.h"
-#include "Core/Rtt_Assert.h"
+#ifndef _Rtt_ShaderStateAdapter_H__
+#define _Rtt_ShaderStateAdapter_H__
 
-#include <string.h>
+#include "Rtt_LuaUserdataProxy.h"
 
 // ----------------------------------------------------------------------------
 
@@ -36,100 +35,41 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-UniformArray::UniformArray( Rtt_Allocator *allocator, U32 size )
-:	CPUResource( allocator ),
-	fData( NULL ),
-	fSize( size ),
-	fTimestamp( 0 )
+class ShaderStateAdapter : public MLuaUserdataAdapter
 {
-	Allocate();
-	SetDirty( false );
-}
+	public:
+		typedef ShaderStateAdapter Self;
 
-UniformArray::~UniformArray()
-{
-	Deallocate();
-}
+	public:
+		static const ShaderStateAdapter& Constant();
 
-CPUResource::ResourceType
-UniformArray::GetType() const
-{
-	return CPUResource::kUniformArray;
-}
+	public:
+		virtual int ValueForKey(
+			const LuaUserdataProxy& sender,
+			lua_State *L,
+			const char *key ) const;
 
-void
-UniformArray::Allocate()
-{
-	fData = new U8[fSize];
-}
+		virtual bool SetValueForKey(
+			LuaUserdataProxy& sender,
+			lua_State *L,
+			const char *key,
+			int valueIndex ) const;
 
-void
-UniformArray::Deallocate()
-{
-	delete [] fData;
+		virtual void WillFinalize( LuaUserdataProxy& sender ) const;
 
-	fData = NULL;
-}
+        virtual StringHash *GetHash( lua_State *L ) const;
 
-U32
-UniformArray::Set( const U8 *bytes, U32 offset, U32 n )
-{
-	Rtt_ASSERT( fData );
-
-	if (offset + n > fSize)
-	{
-		n = offset < fSize ? fSize - offset : 0U;
-	}
-
-	if (n)
-	{
-		memcpy( fData, bytes + offset, n );
-
-		if (!GetDirty())
-		{
-			++fTimestamp;
-
-			SetDirty( true );
-		}
-
-		if (offset < fMinDirtyOffset)
-		{
-			fMinDirtyOffset = offset;
-		}
-
-		U32 extent = offset + n;
-
-		if (extent > fMaxDirtyOffset)
-		{
-			fMaxDirtyOffset = extent;
-		}
-	}
-
-	return n;
-}
-
-U32
-UniformArray::Set( const Real *reals, U32 offset, U32 n )
-{
-	const size_t RealSize = sizeof( Real );
-
-	return Set( reinterpret_cast<const U8 *>( reals ), (offset * RealSize) / RealSize, (n * RealSize) / RealSize );
-}
-
-void
-UniformArray::SetDirty( bool newValue )
-{
-	 fDirty = newValue;
-
-	 if (!fDirty)
-	 {
-		 fMaxDirtyOffset = 0U;
-		 fMinDirtyOffset = fSize;
-	 }
-}
+	private:
+		static int getUniformsCount( lua_State *L );
+		static int newUniformsSetter( lua_State *L );
+		static int releaseSelf( lua_State *L );
+		static int setUniforms( lua_State *L );
+};
 
 // ----------------------------------------------------------------------------
 
 } // namespace Rtt
 
 // ----------------------------------------------------------------------------
+
+#endif // _Rtt_ShaderStateAdapter_H__

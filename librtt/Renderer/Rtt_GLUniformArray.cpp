@@ -33,8 +33,7 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 GLUniformArray::GLUniformArray()
-:	fBytes( NULL ),
-	fSize( 0 )
+:	fBytes( NULL )
 {
 }
 

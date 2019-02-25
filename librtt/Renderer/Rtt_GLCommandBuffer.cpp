@@ -343,8 +343,7 @@ GLCommandBuffer::~GLCommandBuffer()
 	{
 		next = cur->next; // get before deletion
 
-		delete [] cur->bytes;
-		delete cur;
+		Rtt_FREE( cur );
 	}
 }
 
@@ -696,30 +695,31 @@ GLCommandBuffer::CopyUniformArray( UniformArray* uniformArray )
 	WRITE_COMMAND( kCommandCopyUniformArray );
 
 	Write<GPUResource*>( uniformArray->GetGPUResource() );
-	Write<U32>( uniformArray->GetMaxDirtySize() );
 
-	BytePayload *payload = fPayloads;
+	BytePayload* prev = NULL;
 
-	while ( payload && !( payload->used && payload->size >= uniformArray->GetMaxDirtySize() ) )
+	for (BytePayload*cur = fPayloads; cur; cur = cur->next)
 	{
-		payload = payload->next;
+		prev = cur;
 	}
 
-	if (!payload)
+	BytePayload* payload = (BytePayload*)Rtt_MALLOC( NULL, sizeof( BytePayload ) + uniformArray->GetDirtySize() );
+
+	payload->next = NULL;
+	payload->offset = uniformArray->GetMinDirtyOffset();
+	payload->size = uniformArray->GetDirtySize();
+
+	memcpy( payload->bytes, uniformArray->GetData(), payload->size );
+
+	if (prev)
 	{
-		payload = new BytePayload;
-
-		payload->size = uniformArray->GetMaxDirtySize();
-
-	// TODO: minimum allocation size to avoid profileration with small writes? else occasional cleanup
-
-		payload->bytes = new U8[payload->size];
+		prev->next = payload;
 	}
 
-	payload->next = fPayloads;
-	payload->used = false;
-
-	fPayloads = payload;
+	else
+	{
+		fPayloads = payload;
+	}
 
 	Write<BytePayload*>( payload );
 }
@@ -1031,24 +1031,25 @@ GLCommandBuffer::Execute( bool measureGPU )
 			case kCommandCopyUniformArray:
 			{
 				GLUniformArray *uniformArray = Read<GLUniformArray*>();
-				U32 size = Read<U32>();
 				BytePayload *payload = Read<BytePayload*>();
 
-				uniformArray->SetBytes( payload->bytes );
-				uniformArray->SetSize( size );
-				
-				payload->used = true;
+				Rtt_FREE( uniformArray->GetBytes() );
 
-				DEBUG_PRINT( "Copy uniform array: array=%p, size=%u, payload=%p", uniformArray, size, payload );
+				fPayloads = payload;
+
+				uniformArray->SetBytes( payload );
+
+				DEBUG_PRINT( "Copy uniform array: array=%p, payload=%p", uniformArray, payload );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandSyncToUniformArray:
 			{
 				GLUniformArray *uniformArray = Read<GLUniformArray*>();
 				GLProgram *program = Read<GLProgram*>();
-				GLsizei n = uniformArray->GetSize() / (4 * sizeof( Real ));
+				BytePayload *payload = static_cast<BytePayload*>( uniformArray->GetBytes() );
+				GLsizei n = payload->size / (4 * sizeof( Real ));
 
-				glUniform4fv( program->GetUniformArrayLocation( fCurrentDrawVersion ), n, reinterpret_cast<GLfloat*>( uniformArray->GetBytes() ) );
+				glUniform4fv( program->GetUniformArrayLocation( fCurrentDrawVersion ), n, reinterpret_cast<GLfloat*>( payload->bytes + payload->offset ) );
 
 				DEBUG_PRINT( "Sync to uniform array: array=%p, program=%p", uniformArray, program );
 				CHECK_ERROR_AND_BREAK;

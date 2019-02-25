@@ -115,6 +115,7 @@
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderName.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderProxy.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderResource.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderState.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderTypes.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShapeAdapter.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShapeAdapterCircle.cpp" />
@@ -148,6 +149,7 @@
     <ClCompile Include="..\..\..\librtt\Display\Rtt_TextureResourceExternal.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_TextureResourceExternalAdapter.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_VertexCache.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\ShaderStateAdapter.cpp" />
     <ClCompile Include="..\..\..\librtt\Input\Rtt_InputAxisCollection.cpp" />
     <ClCompile Include="..\..\..\librtt\Input\Rtt_InputAxisDescriptor.cpp" />
     <ClCompile Include="..\..\..\librtt\Input\Rtt_InputAxisType.cpp" />
@@ -414,6 +416,8 @@
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderName.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderProxy.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderResource.h" />
+    <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderState.h" />
+    <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderStateAdapter.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderTypes.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShapeAdapter.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShapeAdapterCircle.h" />

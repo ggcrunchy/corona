@@ -54,22 +54,25 @@ class UniformArray : public CPUResource
 		virtual void Deallocate();
 
 	public:
-		U32 GetMaxDirtySize() const { return fMaxDirtySize; }
+		U32 GetMinDirtyOffset() const { return fMinDirtyOffset; }
+		U32 GetDirtySize() const { return fMaxDirtyOffset ? (U32)(fMaxDirtyOffset - fMinDirtyOffset) : 0U; }
 		U32 GetSize() const { return fSize; }
+		U32 GetSizeInVectors() const { return fSize / (4 * sizeof( Real )); }
 		U32 GetTimestamp() const { return fTimestamp; }
 
 		U8 *GetData() { return fData; }
 		const U8 *GetData() const { return fData; }
 
-		U32 Set( const U8 *bytes, U32 n );
-		U32 Set( const Real *reals, U32 n );
+		U32 Set( const U8 *bytes, U32 offset, U32 n );
+		U32 Set( const Real *reals, U32 offset, U32 n );
 
 		bool GetDirty() const { return fDirty; }
 		void SetDirty( bool newValue );
 
 	private:
 		U8 *fData;
-		U32 fMaxDirtySize;
+		U32 fMinDirtyOffset;
+		U32 fMaxDirtyOffset;
 		U32 fSize;
 		U32 fTimestamp;
 		bool fDirty;

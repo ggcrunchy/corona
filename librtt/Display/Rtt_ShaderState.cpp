@@ -23,7 +23,10 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include "Display/Rtt_Shader.h"
 #include "Display/Rtt_ShaderState.h"
+#include "Display/Rtt_ShaderStateAdapter.h"
+#include "Renderer/Rtt_UniformArray.h"
 
 // ----------------------------------------------------------------------------
 
@@ -32,7 +35,44 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-// TODO!
+ShaderState::ShaderState( Rtt_Allocator *allocator, Shader *prototype, const SharedPtr< ShaderResource >& resource )
+:	fPrototype( prototype ),
+	fResource( resource )
+{
+}
+
+ShaderState::~ShaderState()
+{
+	if ( fProxy )
+	{
+	//	GetObserver()->QueueRelease( fProxy ); // Release native ref to Lua-side proxy
+		fProxy->DetachUserdata(); // Notify proxy that object is invalid
+	}
+}
+
+void
+ShaderState::PushProxy( lua_State *L ) const
+{
+	if ( ! fProxy )
+	{
+		fProxy = LuaUserdataProxy::New( L, const_cast< Self * >( this ) );
+		fProxy->SetAdapter( & ShaderStateAdapter::Constant() );
+	}
+
+	fProxy->Push( L );
+}
+
+void
+ShaderState::DetachProxy()
+{
+	fProxy = NULL;
+}
+
+UniformArray *
+ShaderState::GetUniformArray() const
+{
+	return fResource->GetUniformArray();
+}
 
 // ----------------------------------------------------------------------------
 

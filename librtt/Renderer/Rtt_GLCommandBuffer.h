@@ -122,10 +122,10 @@ class GLCommandBuffer : public CommandBuffer
 		// STEVE CHANGE
 		struct BytePayload
 		{
-			BytePayload *next;
-			U8 *bytes;
+			BytePayload* next;
+			U32 offset;
 			U32 size;
-			bool used;
+			U8 bytes[1];
 		};
 
 		BytePayload *fPayloads;
