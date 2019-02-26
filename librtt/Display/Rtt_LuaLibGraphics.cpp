@@ -136,7 +136,7 @@ GraphicsLibrary::Open( lua_State *L )
 		{ "newImageSheet", newImageSheet },
 		{ "defineEffect", defineEffect },
 		// STEVE CHANGE
-		{ "getManagerForEffect", getManagerForEffect },
+		{ "getEffectController", getEffectController },
 		// /STEVE CHANGE
 		{ "listEffects", listEffects },
 		{ "newOutline", newOutline }, // This returns an outline in texels.

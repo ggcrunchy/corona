@@ -27,6 +27,7 @@
 #define _Rtt_ShaderState_H__
 
 #include "Core/Rtt_SharedPtr.h"
+#include "Core/Rtt_WeakPtr.h"
 #include "Display/Rtt_ShaderResource.h"
 #include "Display/Rtt_ShaderTypes.h"
 
@@ -53,6 +54,7 @@ class ShaderState
 
 	public:
 		ShaderState( Rtt_Allocator *allocator, const SharedPtr< ShaderResource >& resource );
+		ShaderState();
 		~ShaderState();
 
 	public:
@@ -61,10 +63,14 @@ class ShaderState
 
 		UniformArray *GetUniformArray() const;
 
-		void SetShaderLookupInfo (ShaderTypes::Category category, const std::string &name );
+		void SetShaderCategory( ShaderTypes::Category category ) { fCategory = category; }
+		ShaderTypes::Category GetShaderCategory() const { return fCategory; }
+		
+		void SetShaderName( const std::string &name ) { fName = name; }
+		std::string GetShaderName() const { return fName; }
 
 	private:
-		SharedPtr< ShaderResource > fResource;
+		WeakPtr< ShaderResource > fResource;
 		mutable LuaUserdataProxy *fProxy;
 		ShaderTypes::Category fCategory;
 		std::string fName;

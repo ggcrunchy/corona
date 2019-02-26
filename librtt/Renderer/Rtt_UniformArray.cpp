@@ -36,10 +36,10 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-UniformArray::UniformArray( Rtt_Allocator *allocator, U32 size )
+UniformArray::UniformArray( Rtt_Allocator *allocator, U32 count )
 :	CPUResource( allocator ),
 	fData( NULL ),
-	fSize( size ),
+	fSize( count * sizeof( Real ) ),
 	fTimestamp( 0 )
 {
 	Allocate();
@@ -83,7 +83,7 @@ UniformArray::Set( const U8 *bytes, U32 offset, U32 n )
 
 	if (n)
 	{
-		memcpy( fData, bytes + offset, n );
+		memcpy( fData + offset, bytes, n );
 
 		if (!GetDirty())
 		{
@@ -111,9 +111,7 @@ UniformArray::Set( const U8 *bytes, U32 offset, U32 n )
 U32
 UniformArray::Set( const Real *reals, U32 offset, U32 n )
 {
-	const size_t RealSize = sizeof( Real );
-
-	return Set( reinterpret_cast<const U8 *>( reals ), (offset * RealSize) / RealSize, (n * RealSize) / RealSize );
+	return Set( reinterpret_cast<const U8 *>( reals ), offset * sizeof( Real ), n * sizeof( Real ) );
 }
 
 void

@@ -46,7 +46,7 @@ class UniformArray : public CPUResource
 		typedef UniformArray Self;
 
 	public:
-		UniformArray( Rtt_Allocator *allocator, U32 size );
+		UniformArray( Rtt_Allocator *allocator, U32 count );
 		virtual ~UniformArray();
 
 		virtual ResourceType GetType() const;

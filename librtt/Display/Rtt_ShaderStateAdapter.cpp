@@ -28,6 +28,8 @@
 #include "Renderer/Rtt_UniformArray.h"
 #include "Rtt_LuaContext.h"
 
+#include "Corona/CoronaLog.h"
+
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -55,7 +57,7 @@ ShaderStateAdapter::GetHash( lua_State *L ) const
 		"setUniforms",		// 3
 	};
 
-	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 1, 1, 1, __FILE__, __LINE__ );
+	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 4, 4, 1, __FILE__, __LINE__ );
 	return &sHash;
 }
 
@@ -111,15 +113,16 @@ ShaderStateAdapter::SetValueForKey(
 
 	ShaderState *state = (ShaderState *)sender.GetUserdata();
 	if ( ! state ) { return result; }
-
+	/*
 	int index = GetHash( L )->Lookup( key );
 
 	switch ( index )
 	{
+	// anything to do?
 		default:
 			break;
 	}
-
+	*/
 	return result;
 }
 
@@ -147,7 +150,7 @@ ShaderStateAdapter::getUniformsCount( lua_State *L )
 
 	lua_pushinteger( L, uniformArray ? uniformArray->GetSizeInVectors() : 0 );
 
-	return 0;
+	return 1;
 }
 
 int
@@ -160,6 +163,9 @@ ShaderStateAdapter::newUniformsSetter( lua_State *L )
 
 	ShaderState *state = (ShaderState *)sender->GetUserdata();
 	if ( ! state ) { return result; }
+
+	UniformArray *uniformArray = state->GetUniformArray();
+	if (!uniformArray) { return result; }
 
 	// TODO: needs DisplayObject-ish object
 	// when "drawn", will update contents of uniform array
@@ -179,7 +185,23 @@ ShaderStateAdapter::releaseEffect( lua_State *L )
 	ShaderState *state = (ShaderState *)sender->GetUserdata();
 	if ( ! state ) { return result; }
 
-	// TODO: if allowed, search for prototype proxy in registry and evict
+	std::string name = state->GetShaderName();
+
+	if (!name.empty())
+	{
+		// TODO: tell factory to evict it
+
+		state->SetShaderName( "" );
+	}
+
+	else
+	{
+		const char *reason = state->GetShaderCategory() != ShaderTypes::kCategoryDefault ?
+							 "has already been released" :
+							 "does not have release privileges";
+
+		CORONA_LOG_WARNING( "releaseEffect: Unable to release, effect %s", reason );
+	}
 
 	return 0;
 }
@@ -197,7 +219,7 @@ SetSingleUniformVector( UniformArray *uniformArray, lua_State *L, U32 index )
 		uniform[i] = lua_isnumber( L, -4 + i ) ? (Real)lua_tonumber( L, -4 + i ) : Rtt_REAL_0;
 	}
 
-	uniformArray->Set( uniform, index, 1U );
+	uniformArray->Set( uniform, index * 4U, 4U );
 }
 
 int
@@ -212,6 +234,8 @@ ShaderStateAdapter::setUniforms( lua_State *L )
 	if ( ! state ) { return result; }
 
 	UniformArray *uniformArray = state->GetUniformArray();
+	if (!uniformArray) { return result; }
+
 	int first = 1;
 
 	if (lua_isnumber( L, nextArg ))

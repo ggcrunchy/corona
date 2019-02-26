@@ -36,7 +36,17 @@ namespace Rtt
 
 ShaderState::ShaderState( Rtt_Allocator *allocator, const SharedPtr< ShaderResource >& resource )
 :	fResource( resource ),
-	fCategory( ShaderTypes::kCategoryDefault )
+	fCategory( ShaderTypes::kCategoryDefault ),
+	fProxy( NULL )
+{
+	ShaderResource &res = *resource;
+
+	res.SetShaderState( this );
+}
+
+ShaderState::ShaderState()
+:	fCategory( ShaderTypes::kCategoryDefault ),
+	fProxy( NULL )
 {
 }
 
@@ -70,14 +80,17 @@ ShaderState::DetachProxy()
 UniformArray *
 ShaderState::GetUniformArray() const
 {
-	return fResource->GetUniformArray();
-}
+	if (fResource.NotNull())
+	{
+		SharedPtr<ShaderResource> resource( fResource );
 
-void
-ShaderState::SetShaderLookupInfo (ShaderTypes::Category category, const std::string &name )
-{
-	fCategory = category;
-	fName = name;
+		return resource->GetUniformArray();
+	}
+
+	else
+	{
+		return NULL;
+	}
 }
 
 // ----------------------------------------------------------------------------

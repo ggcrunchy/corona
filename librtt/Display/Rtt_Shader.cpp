@@ -117,10 +117,18 @@ Shader::Clone( Rtt_Allocator *allocator ) const
 }
 
 // STEVE CHANGE
+bool
+Shader::NeedsDistinctState() const
+{
+	return fResource->GetUniformArray() != NULL; // TODO: is releaseable, etc.
+}
+
 ShaderState *
 Shader::NewState( Rtt_Allocator *allocator ) const
 {
-	return Rtt_NEW( allocator, ShaderState( allocator, fResource ) );
+	ShaderState *state = fResource->GetShaderState();
+
+	return state ? state : Rtt_NEW( allocator, ShaderState( allocator, fResource ) );
 }
 // /STEVE CHANGE
 

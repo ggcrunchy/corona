@@ -709,7 +709,7 @@ GLCommandBuffer::CopyUniformArray( UniformArray* uniformArray )
 	payload->offset = uniformArray->GetMinDirtyOffset();
 	payload->size = uniformArray->GetDirtySize();
 
-	memcpy( payload->bytes, uniformArray->GetData(), payload->size );
+	memcpy( payload->bytes, uniformArray->GetData() + payload->offset, payload->size );
 
 	if (prev)
 	{
@@ -1047,9 +1047,9 @@ GLCommandBuffer::Execute( bool measureGPU )
 				GLUniformArray *uniformArray = Read<GLUniformArray*>();
 				GLProgram *program = Read<GLProgram*>();
 				BytePayload *payload = static_cast<BytePayload*>( uniformArray->GetBytes() );
-				GLsizei n = payload->size / (4 * sizeof( Real ));
+				GLsizei offset = payload->offset / sizeof( Real ), size = payload->size / sizeof( Real );
 
-				glUniform4fv( program->GetUniformArrayLocation( fCurrentDrawVersion ), n, reinterpret_cast<GLfloat*>( payload->bytes + payload->offset ) );
+				glUniform4fv( program->GetUniformArrayLocation( fCurrentDrawVersion ) + offset, size, reinterpret_cast<GLfloat*>( payload->bytes ) );
 
 				DEBUG_PRINT( "Sync to uniform array: array=%p, program=%p", uniformArray, program );
 				CHECK_ERROR_AND_BREAK;

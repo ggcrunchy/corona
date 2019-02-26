@@ -86,6 +86,7 @@ class Shader
 		virtual Shader *Clone( Rtt_Allocator *allocator ) const;
 		
 		// STEVE CHANGE
+		bool NeedsDistinctState() const;
 		ShaderState *NewState( Rtt_Allocator *allocator ) const;
 		// /STEVE CHANGE
 

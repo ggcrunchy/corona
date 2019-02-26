@@ -28,6 +28,7 @@
 
 #include <map>
 #include <string>
+
 #include "Display/Rtt_ShaderTypes.h"
 #include "Renderer/Rtt_Uniform.h"
 
@@ -39,6 +40,7 @@ namespace Rtt
 class Program;
 class ShaderData;
 // STEVE CHANGE
+class ShaderState;
 class UniformArray;
 // /STEVE CHANGE
 
@@ -133,6 +135,9 @@ class ShaderResource
 		
 // STEVE CHANGE
 	public:
+		void SetShaderState( ShaderState *state );
+		ShaderState *GetShaderState() const;
+
 		void SetUniformArray( UniformArray *uniformArray );
 		UniformArray *GetUniformArray() const;
 // /STEVE CHANGE
@@ -149,6 +154,7 @@ class ShaderResource
 		ShaderData *fDefaultData;
 		TimeTransform *fTimeTransform;
 		// STEVE CHANGE
+		ShaderState *fShaderState;
 		UniformArray *fUniformArray;
 		// /STEVE CHANGE
 		bool fUsesUniforms;

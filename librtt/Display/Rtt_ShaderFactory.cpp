@@ -112,7 +112,10 @@ ShaderFactory::ShaderFactory( Display& owner, const ProgramHeader& programHeader
 	fOwner( owner ),
 	fDefaultShell( NULL ),
 	fDefaultKernel( NULL ),
-	fProgramHeader( Rtt_NEW( fAllocator, ProgramHeader( programHeader ) ) )
+	fProgramHeader( Rtt_NEW( fAllocator, ProgramHeader( programHeader ) ) ),
+	// STEVE CHANGE
+	fNullState( NULL )
+	// /STEVE CHANGE
 {
 	lua_State *L = fL;
 
@@ -130,6 +133,9 @@ ShaderFactory::~ShaderFactory()
 	CoronaLuaDelete( fL );
 	Rtt_DELETE( fDefaultColorShader );
 	Rtt_DELETE( fDefaultShader );
+	// STEVE CHANGE
+	Rtt_DELETE( fNullState );
+	// /STEVE CHANGE
 }
 
 bool
@@ -1062,38 +1068,22 @@ ShaderFactory::DefineEffect( lua_State *L, int index )
 bool
 ShaderFactory::GetEffectController( lua_State *L, int index )
 {
-	const char *name = luaL_checkstring( L, index );
-
-	ShaderTypes::Category category = ShaderTypes::kCategoryDefault;
-
-	if (strncmp( name, "generator.", sizeof( "generator." )) == 0)
-	{
-		category = ShaderTypes::kCategoryGenerator;
-	}
-
-	else if (strncmp( name, "filter.", sizeof( "filter." )) == 0)
-	{
-		category = ShaderTypes::kCategoryFilter;
-	}
-
-	else if (strncmp( name, "composite.", sizeof( "composite." )) == 0)
-	{
-		category = ShaderTypes::kCategoryComposite;
-	}
-
-	else
+	ShaderName name( luaL_checkstring( L, index ) );
+	
+	if (name.GetCategory() == ShaderTypes::kCategoryDefault)
 	{
 		CORONA_LOG_ERROR( "Unable to discover category from provided name" );
 	}
 
-	if (category != ShaderTypes::kCategoryDefault)
+	else
 	{
-		const Shader *proto = FindPrototype( category, name );
-		ShaderState *state = proto->NewState( fAllocator );
+		const Shader *proto = FindPrototype( name.GetCategory(), name.GetName() );
+		ShaderState *state = proto->NeedsDistinctState() ? proto->NewState( fAllocator ) : GetNullState();
 
 		if (false) // TODO: for releasable prototypes
 		{
-			state->SetShaderLookupInfo( category, name );
+			state->SetShaderCategory( name.GetCategory() );
+			state->SetShaderName( name.GetName() );
 		}
 
 		state->PushProxy( L );
@@ -1305,6 +1295,19 @@ ShaderFactory::FindOrLoad( ShaderTypes::Category category, const char *name )
 {
 	return FindOrLoadGraph( category, name, false );
 }
+
+// STEVE CHANGE
+ShaderState *
+ShaderFactory::GetNullState()
+{
+	if (!fNullState)
+	{
+		fNullState = Rtt_NEW( fAllocator, ShaderState() );
+	}
+
+	return fNullState;
+}
+// /STEVE CHANGE
 
 void
 ShaderFactory::PushList( lua_State *L, ShaderTypes::Category category ) const
