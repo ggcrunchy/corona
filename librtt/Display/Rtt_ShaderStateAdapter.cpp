@@ -51,7 +51,7 @@ ShaderStateAdapter::GetHash( lua_State *L ) const
 	{
 		"getUniformsCount",	// 0
 		"newUniformsSetter",// 1
-		"releaseSelf",		// 2
+		"releaseEffect",	// 2
 		"setUniforms",		// 3
 	};
 
@@ -85,7 +85,7 @@ ShaderStateAdapter::ValueForKey(
 			Lua::PushCachedFunction( L, newUniformsSetter );
 			break;
 		case 2:
-			Lua::PushCachedFunction( L, releaseSelf );
+			Lua::PushCachedFunction( L, releaseEffect );
 			break;
 		case 3:
 			Lua::PushCachedFunction( L, setUniforms );
@@ -169,7 +169,7 @@ ShaderStateAdapter::newUniformsSetter( lua_State *L )
 }
 
 int
-ShaderStateAdapter::releaseSelf( lua_State *L )
+ShaderStateAdapter::releaseEffect( lua_State *L )
 {
 	int result = 0;
 	int nextArg = 1;

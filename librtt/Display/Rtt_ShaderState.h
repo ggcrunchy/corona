@@ -28,8 +28,11 @@
 
 #include "Core/Rtt_SharedPtr.h"
 #include "Display/Rtt_ShaderResource.h"
+#include "Display/Rtt_ShaderTypes.h"
 
 #include "Rtt_LuaUserdataProxy.h"
+
+#include <string>
 
 // ----------------------------------------------------------------------------
 
@@ -39,7 +42,6 @@ namespace Rtt
 {
 
 class LuaUserdataProxy;
-class Shader;
 class UniformArray;
 
 // ----------------------------------------------------------------------------
@@ -50,7 +52,7 @@ class ShaderState
 		typedef ShaderState Self;
 
 	public:
-		ShaderState( Rtt_Allocator *allocator, Shader *prototype, const SharedPtr< ShaderResource >& resource );
+		ShaderState( Rtt_Allocator *allocator, const SharedPtr< ShaderResource >& resource );
 		~ShaderState();
 
 	public:
@@ -59,13 +61,13 @@ class ShaderState
 
 		UniformArray *GetUniformArray() const;
 
+		void SetShaderLookupInfo (ShaderTypes::Category category, const std::string &name );
+
 	private:
 		SharedPtr< ShaderResource > fResource;
 		mutable LuaUserdataProxy *fProxy;
-		Shader *fPrototype;
-		// uniform array...
-		// other fancy abilities... (sort of listed somewhere)
-		// proxy stuff
+		ShaderTypes::Category fCategory;
+		std::string fName;
 };
 
 // ----------------------------------------------------------------------------

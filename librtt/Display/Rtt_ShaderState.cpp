@@ -23,7 +23,6 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Display/Rtt_Shader.h"
 #include "Display/Rtt_ShaderState.h"
 #include "Display/Rtt_ShaderStateAdapter.h"
 #include "Renderer/Rtt_UniformArray.h"
@@ -35,9 +34,9 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-ShaderState::ShaderState( Rtt_Allocator *allocator, Shader *prototype, const SharedPtr< ShaderResource >& resource )
-:	fPrototype( prototype ),
-	fResource( resource )
+ShaderState::ShaderState( Rtt_Allocator *allocator, const SharedPtr< ShaderResource >& resource )
+:	fResource( resource ),
+	fCategory( ShaderTypes::kCategoryDefault )
 {
 }
 
@@ -72,6 +71,13 @@ UniformArray *
 ShaderState::GetUniformArray() const
 {
 	return fResource->GetUniformArray();
+}
+
+void
+ShaderState::SetShaderLookupInfo (ShaderTypes::Category category, const std::string &name )
+{
+	fCategory = category;
+	fName = name;
 }
 
 // ----------------------------------------------------------------------------

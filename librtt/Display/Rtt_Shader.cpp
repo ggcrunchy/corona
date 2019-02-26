@@ -31,6 +31,9 @@
 #include "Display/Rtt_Paint.h"
 #include "Display/Rtt_ShaderData.h"
 #include "Display/Rtt_ShaderResource.h"
+// STEVE CHANGE
+#include "Display/Rtt_ShaderState.h"
+// /STEVE CHANGE
 #include "Renderer/Rtt_RenderData.h"
 #include "Renderer/Rtt_Program.h"
 
@@ -112,6 +115,15 @@ Shader::Clone( Rtt_Allocator *allocator ) const
 	}
 	return Rtt_NEW( allocator, Shader(fAllocator, fResource, data ) );
 }
+
+// STEVE CHANGE
+ShaderState *
+Shader::NewState( Rtt_Allocator *allocator ) const
+{
+	return Rtt_NEW( allocator, ShaderState( allocator, fResource ) );
+}
+// /STEVE CHANGE
+
 void Shader::Log(std::string preprend, bool last)
 {
 	printf( "Shader::Log(%p)::(Effect:%s)\n", this, fResource->GetName().c_str() );

@@ -35,6 +35,9 @@
 #include "Display/Rtt_ShaderData.h"
 #include "Display/Rtt_ShaderName.h"
 #include "Display/Rtt_ShaderResource.h"
+// STEVE CHANGE
+#include "Display/Rtt_ShaderState.h"
+// /STEVE CHANGE
 #include "Renderer/Rtt_Program.h"
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
 	#include "Renderer/Rtt_ShaderBinary.h"
@@ -1054,6 +1057,53 @@ ShaderFactory::DefineEffect( lua_State *L, int index )
 
 	return ( NULL != shader );
 }
+
+// STEVE CHANGE
+bool
+ShaderFactory::GetEffectController( lua_State *L, int index )
+{
+	const char *name = luaL_checkstring( L, index );
+
+	ShaderTypes::Category category = ShaderTypes::kCategoryDefault;
+
+	if (strncmp( name, "generator.", sizeof( "generator." )) == 0)
+	{
+		category = ShaderTypes::kCategoryGenerator;
+	}
+
+	else if (strncmp( name, "filter.", sizeof( "filter." )) == 0)
+	{
+		category = ShaderTypes::kCategoryFilter;
+	}
+
+	else if (strncmp( name, "composite.", sizeof( "composite." )) == 0)
+	{
+		category = ShaderTypes::kCategoryComposite;
+	}
+
+	else
+	{
+		CORONA_LOG_ERROR( "Unable to discover category from provided name" );
+	}
+
+	if (category != ShaderTypes::kCategoryDefault)
+	{
+		const Shader *proto = FindPrototype( category, name );
+		ShaderState *state = proto->NewState( fAllocator );
+
+		if (false) // TODO: for releasable prototypes
+		{
+			state->SetShaderLookupInfo( category, name );
+		}
+
+		state->PushProxy( L );
+
+		return true;
+	}
+
+	return false;
+}
+// /STEVE CHANGE
 
 void ShaderFactory::LoadDependency(LuaMap *nodeGraph, std::string nodeKey, ShaderMap &inputNodes, bool createNode)
 {

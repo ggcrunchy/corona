@@ -116,7 +116,10 @@ class ShaderFactory
 	public:
 		bool DefineEffect( lua_State *L, int shaderIndex );
 		Shader *NewShaderGraph( lua_State *L, int index);
-				
+
+		// STEVE CHANGE
+		bool GetEffectController( lua_State *L, int index );
+		// /STEVE CHANGE
 	protected:
 		const Shader *FindPrototype( ShaderTypes::Category category, const char *name ) const;
 

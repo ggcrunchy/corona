@@ -90,6 +90,9 @@ class GraphicsLibrary
 		static int newGradient( lua_State *L );
 		static int newImageSheet( lua_State *L );
 		static int defineEffect( lua_State *L );
+		// STEVE CHANGE
+		static int getEffectController( lua_State *L );
+		// /STEVE CHANGE
 		static int listEffects( lua_State *L );
 		static int newOutline( lua_State *L ); // This returns an outline in texels.
 		static int newTexture( lua_State *L );
@@ -132,6 +135,9 @@ GraphicsLibrary::Open( lua_State *L )
 		{ "newGradient", newGradient },
 		{ "newImageSheet", newImageSheet },
 		{ "defineEffect", defineEffect },
+		// STEVE CHANGE
+		{ "getManagerForEffect", getManagerForEffect },
+		// /STEVE CHANGE
 		{ "listEffects", listEffects },
 		{ "newOutline", newOutline }, // This returns an outline in texels.
 		{ "newTexture", newTexture },
@@ -320,6 +326,21 @@ GraphicsLibrary::defineEffect( lua_State *L )
 	lua_pushboolean( L, factory.DefineEffect( L, index ) );
 	return 1;
 }
+
+// STEVE CHANGE
+int
+GraphicsLibrary::getEffectController( lua_State *L )
+{
+	GraphicsLibrary *library = GraphicsLibrary::ToLibrary( L );
+	Display& display = library->GetDisplay();
+
+	int index = 1; // index of params
+	
+	ShaderFactory& factory = display.GetShaderFactory();
+
+	return factory.GetEffectController( L, index ) ? 1 : 0;
+}
+// /STEVE CHANGE
 
 // graphics.listEffects( category )
 int

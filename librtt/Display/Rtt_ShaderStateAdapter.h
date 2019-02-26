@@ -62,7 +62,7 @@ class ShaderStateAdapter : public MLuaUserdataAdapter
 	private:
 		static int getUniformsCount( lua_State *L );
 		static int newUniformsSetter( lua_State *L );
-		static int releaseSelf( lua_State *L );
+		static int releaseEffect( lua_State *L );
 		static int setUniforms( lua_State *L );
 };
 

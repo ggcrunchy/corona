@@ -927,7 +927,7 @@
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderState.cpp">
       <Filter>librtt\Display</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\librtt\Display\ShaderStateAdapter.cpp">
+    <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderStateAdapter.cpp">
       <Filter>librtt\Display</Filter>
     </ClCompile>
   </ItemGroup>
