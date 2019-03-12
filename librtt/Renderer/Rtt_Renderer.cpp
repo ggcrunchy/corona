@@ -469,6 +469,19 @@ Renderer::PopMaskCount()
 	--fMaskCountIndex;
 }
 
+// STEVE CHANGE
+static Program::Version
+GetVersion( U32 maskCount, bool wireframeEnabled, bool increment )
+{
+	if (increment)
+	{
+		++maskCount;
+	}
+
+	return wireframeEnabled ? Program::kWireframe : static_cast<Program::Version>( maskCount );
+}
+// /STEVE CHANGE
+
 void 
 Renderer::Insert( const RenderData* data )
 {
@@ -482,10 +495,6 @@ Renderer::Insert( const RenderData* data )
 	Rtt_ASSERT( fBackCommandBuffer != NULL );
 	Rtt_ASSERT( fFrontCommandBuffer != NULL );
 
-	// STEVE CHANGE
-	ShaderResource *shaderResource = data->fProgram->GetShaderResource();
-	UniformArray *uniformArray = shaderResource->GetUniformArray();
-	// /STEVE CHANGE
 	bool blendDirty = data->fBlendMode != fPrevious.fBlendMode;
 	bool blendEquationDirty = data->fBlendEquation != fPrevious.fBlendEquation;
 	bool fillDirty0 = data->fFillTexture0 != fPrevious.fFillTexture0;
@@ -493,14 +502,26 @@ Renderer::Insert( const RenderData* data )
 	bool maskTextureDirty = data->fMaskTexture != fPrevious.fMaskTexture;
 	bool maskUniformDirty = data->fMaskUniform != fPrevious.fMaskUniform;
 	bool programDirty = data->fProgram != fPrevious.fProgram || MaskCount() != fCurrentProgramMaskCount;
-	// STEVE CHANGE
-	bool uniformsArrayDirty = uniformArray != NULL && data->fProgram->GetUniformArrayTimestamp() != uniformArray->GetTimestamp();
-	// /STEVE CHANGE
 	bool userUniformDirty0 = data->fUserUniform0 != fPrevious.fUserUniform0;
 	bool userUniformDirty1 = data->fUserUniform1 != fPrevious.fUserUniform1;
 	bool userUniformDirty2 = data->fUserUniform2 != fPrevious.fUserUniform2;
 	bool userUniformDirty3 = data->fUserUniform3 != fPrevious.fUserUniform3;
 	
+	// STEVE CHANGE
+	ShaderResource *shaderResource = data->fProgram->GetShaderResource();
+	UniformArrayState *state = data->fProgram->GetUniformArrayState();
+	bool uniformsArrayDirty = false;
+
+	if (state != NULL)
+	{
+		Rtt_ASSERT( shaderResource && shaderResource->GetUniformArray() );
+
+		Program::Version version = GetVersion( MaskCount(), fWireframeEnabled, data->fMaskTexture != NULL );
+
+		uniformsArrayDirty = state->GetTimestamp( version ) != shaderResource->GetUniformArray()->GetTimestamp();
+	}
+	// /STEVE CHANGE
+
 	Geometry* geometry = data->fGeometry;
 	Rtt_ASSERT( geometry );
 	fDegenerateVertexCount = 0;
@@ -732,6 +753,8 @@ Renderer::Insert( const RenderData* data )
 	// STEVE CHANGE
 	if (uniformsArrayDirty)
 	{
+		UniformArray *uniformArray = shaderResource->GetUniformArray();
+
 		if (uniformArray->GetDirty())
 		{
 			if (!uniformArray->fGPUResource)
@@ -739,16 +762,16 @@ Renderer::Insert( const RenderData* data )
 				QueueCreate( uniformArray );
 			}
 
-			fBackCommandBuffer->CopyUniformArray( uniformArray );
+			fBackCommandBuffer->UpdateUniformArray( uniformArray );
 
 			uniformArray->SetDirty( false );
 		}
 
-		data->fProgram->SetUniformArrayTimestamp( uniformArray->GetTimestamp() );
+		fBackCommandBuffer->SyncWithArrayState( uniformArray );
 
 		Program::Version version = fWireframeEnabled ? Program::kWireframe : static_cast<Program::Version>( MaskCount() );
 
-		fBackCommandBuffer->SyncWithLastKnownArrayState( uniformArray );
+		state->SetTimestamp( version, uniformArray->GetTimestamp() );
 	}
 	// /STEVE CHANGE
 

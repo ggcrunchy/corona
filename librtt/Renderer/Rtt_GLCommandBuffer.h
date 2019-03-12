@@ -73,8 +73,8 @@ class GLCommandBuffer : public CommandBuffer
 		virtual void Draw( U32 offset, U32 count, Geometry::PrimitiveType type );
 		virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type );
 		// STEVE CHANGE
-		virtual void CopyUniformArray( UniformArray* uniformArray );
-		virtual void SyncWithLastKnownArrayState( UniformArray* uniformArray );
+		virtual void UpdateUniformArray( UniformArray* uniformArray );
+		virtual void SyncWithArrayState( UniformArray* uniformArray );
 		// /STEVE CHANGE
 		virtual S32 GetCachedParam( CommandBuffer::QueryableParams param );
 		
@@ -118,18 +118,6 @@ class GLCommandBuffer : public CommandBuffer
 		Real fElapsedTimeGPU;
 	
 		TimeTransform* fTimeTransform;
-
-		// STEVE CHANGE
-		struct BytePayload
-		{
-			BytePayload* next;
-			U32 offset;
-			U32 size;
-			U8 bytes[1];
-		};
-
-		BytePayload *fPayloads;
-		// /STEVE CHANGE
 
 		S32 fCachedQuery[kNumQueryableParams];
 		

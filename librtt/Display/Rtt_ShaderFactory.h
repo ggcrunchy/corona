@@ -30,9 +30,6 @@
 
 #include "Display/Rtt_Shader.h"
 #include "Display/Rtt_ShaderComposite.h"
-// STEVE CHANGE
-#include "Display/Rtt_ShaderState.h"
-// /STEVE CHANGE
 #include "Display/Rtt_ShaderTypes.h"
 
 // ----------------------------------------------------------------------------
@@ -120,9 +117,6 @@ class ShaderFactory
 		bool DefineEffect( lua_State *L, int shaderIndex );
 		Shader *NewShaderGraph( lua_State *L, int index);
 
-		// STEVE CHANGE
-		bool GetEffectController( lua_State *L, int index );
-		// /STEVE CHANGE
 	protected:
 		const Shader *FindPrototype( ShaderTypes::Category category, const char *name ) const;
 
@@ -132,9 +126,6 @@ class ShaderFactory
 		Shader *FindOrLoad( const ShaderName& shaderName );
 		Shader *FindOrLoad( ShaderTypes::Category category, const char *name );
 
-		// STEVE CHANGE
-		ShaderState *GetNullState();
-		// /STEVE CHANGE
 	public:
 		void PushList( lua_State *L, ShaderTypes::Category category ) const;
 
@@ -151,9 +142,6 @@ class ShaderFactory
 		Program *fDefaultShell;
 		Program *fDefaultKernel;
 		ProgramHeader *fProgramHeader;
-		// STEVE CHANGE
-		ShaderState *fNullState;
-		// /STEVE CHANGE
 };
 
 // ----------------------------------------------------------------------------

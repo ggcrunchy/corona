@@ -94,8 +94,8 @@ namespace /*anonymous*/
 		kCommandDraw,
 		kCommandDrawIndexed,
 		// STEVE CHANGE
-		kCommandCopyUniformArray,
-		kCommandSyncToUniformArray,
+		kCommandUpdateUniformArray,
+		kCommandSyncWithArrayState,
 		// /STEVE CHANGE
 		kNumCommands
 	};
@@ -321,9 +321,6 @@ GLCommandBuffer::GLCommandBuffer( Rtt_Allocator* allocator )
 	 fProgram( NULL ),
      fDefaultFBO( 0 ),
 	 fTimeTransform( NULL ),
-	 // STEVE CHANGE
-	 fPayloads( NULL ),
-	 // /STEVE CHANGE
 	 fTimerQueries( new U32[kTimerQueryCount] ),
 	 fTimerQueryIndex( 0 ),
 	 fElapsedTimeGPU( 0.0f )
@@ -338,13 +335,6 @@ GLCommandBuffer::GLCommandBuffer( Rtt_Allocator* allocator )
 GLCommandBuffer::~GLCommandBuffer()
 {
 	delete [] fTimerQueries;
-
-	for (BytePayload *cur = fPayloads, *next = NULL; cur; cur = next)
-	{
-		next = cur->next; // get before deletion
-
-		Rtt_FREE( cur );
-	}
 }
 
 void
@@ -688,51 +678,26 @@ GLCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 
 // STEVE CHANGE
 void
-GLCommandBuffer::CopyUniformArray( UniformArray* uniformArray )
+GLCommandBuffer::UpdateUniformArray( UniformArray* uniformArray )
 {
 	Rtt_ASSERT( uniformArray && uniformArray->GetGPUResource() );
 
-	WRITE_COMMAND( kCommandCopyUniformArray );
+	WRITE_COMMAND( kCommandUpdateUniformArray );
 
 	Write<GPUResource*>( uniformArray->GetGPUResource() );
-
-	BytePayload* prev = NULL;
-
-	for (BytePayload*cur = fPayloads; cur; cur = cur->next)
-	{
-		prev = cur;
-	}
-
-	BytePayload* payload = (BytePayload*)Rtt_MALLOC( NULL, sizeof( BytePayload ) + uniformArray->GetDirtySize() );
-
-	payload->next = NULL;
-	payload->offset = uniformArray->GetMinDirtyOffset();
-	payload->size = uniformArray->GetDirtySize();
-
-	memcpy( payload->bytes, uniformArray->GetData() + payload->offset, payload->size );
-
-	if (prev)
-	{
-		prev->next = payload;
-	}
-
-	else
-	{
-		fPayloads = payload;
-	}
-
-	Write<BytePayload*>( payload );
 }
 
 void
-GLCommandBuffer::SyncWithLastKnownArrayState( UniformArray* uniformArray )
+GLCommandBuffer::SyncWithArrayState( UniformArray* uniformArray )
 {
 	Rtt_ASSERT( uniformArray && uniformArray->GetGPUResource() );
 
-	WRITE_COMMAND( kCommandSyncToUniformArray );
+	WRITE_COMMAND( kCommandSyncWithArrayState );
 
 	Write<GPUResource*>( uniformArray->GetGPUResource() );
 	Write<GPUResource*>( fProgram->GetGPUResource() );
+	Write<U32>( uniformArray->GetTimestamp() );
+	Write<U32>( fProgram->GetUniformArrayState()->GetTimestamp( fCurrentPrepVersion ) );
 }
 // /STEVE CHANGE
 
@@ -1028,30 +993,42 @@ GLCommandBuffer::Execute( bool measureGPU )
 				CHECK_ERROR_AND_BREAK;
 			}
 			// STEVE CHANGE
-			case kCommandCopyUniformArray:
+			case kCommandUpdateUniformArray:
 			{
 				GLUniformArray *uniformArray = Read<GLUniformArray*>();
-				BytePayload *payload = Read<BytePayload*>();
 
-				Rtt_FREE( uniformArray->GetBytes() );
+				// TODO: has UBO?
 
-				fPayloads = payload;
+				uniformArray->ConsumePayload();
 
-				uniformArray->SetBytes( payload );
-
-				DEBUG_PRINT( "Copy uniform array: array=%p, payload=%p", uniformArray, payload );
+				DEBUG_PRINT( "Update uniform array: array=%p", uniformArray );
 				CHECK_ERROR_AND_BREAK;
 			}
-			case kCommandSyncToUniformArray:
+			case kCommandSyncWithArrayState:
 			{
 				GLUniformArray *uniformArray = Read<GLUniformArray*>();
 				GLProgram *program = Read<GLProgram*>();
-				BytePayload *payload = static_cast<BytePayload*>( uniformArray->GetBytes() );
-				GLsizei offset = payload->offset / sizeof( Real ), size = payload->size / sizeof( Real );
+				U32 arrayTimestamp = Read<U32>();
+				U32 programTimestamp = Read<U32>();
 
-				glUniform4fv( program->GetUniformArrayLocation( fCurrentDrawVersion ) + offset, size, reinterpret_cast<GLfloat*>( payload->bytes ) );
+				// TODO: has UBO?
 
-				DEBUG_PRINT( "Sync to uniform array: array=%p, program=%p", uniformArray, program );
+				if (arrayTimestamp > programTimestamp)
+				{
+					GLUniformArray::Interval intervals[GLUniformArray::kDirtyCount];
+
+					U32 count = uniformArray->GetIntervals( arrayTimestamp - programTimestamp, intervals, program->GetArraySize() );
+					GLsizei base = program->GetUniformArrayLocation( fCurrentDrawVersion );
+					
+					for (U32 i = 0; i < count; ++i)
+					{
+						GLsizei location = base + intervals[i].start / sizeof( Real );
+
+						glUniform4fv( location, intervals[i].count / sizeof( Real ), (GLfloat *)(uniformArray->GetData() + intervals[i].start) );
+					}
+				}
+
+				DEBUG_PRINT( "Sync to uniform array: array=%p, program=%p, array timestamp=%u, program timestamp=%u", uniformArray, program, arrayTimestamp, programTimestamp );
 				CHECK_ERROR_AND_BREAK;
 			}
 			// /STEVE CHANGE

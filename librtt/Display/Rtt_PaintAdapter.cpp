@@ -45,6 +45,10 @@
 	#include "Display/Rtt_ShaderDataAdapter.h"
 #endif
 
+// STEVE CHANGE
+#include "Renderer/Rtt_UniformArray.h"
+// /STEVE CHANGE
+
 #include <cstring>
 
 // ----------------------------------------------------------------------------
@@ -79,9 +83,12 @@ PaintAdapter::GetHash( lua_State *L ) const
 		"effect",			// 4
 		"blendMode",		// 5
 		"blendEquation",	// 6
+		// STEVE CHANGE
+		"uniformArray"		// 7
+		// /STEVE CHANGE
 	};
 
-	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 7, 0, 1, __FILE__, __LINE__ );
+	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 0, 0, 0, __FILE__, __LINE__ ); // <- STEVE CHANGE
 	return &sHash;
 }
 
@@ -144,6 +151,28 @@ PaintAdapter::ValueForKey(
 					result = 1;
 				}
 				break;
+				// STEVE CHANGE
+			case 7:
+				{
+					DisplayObject *observer = paint->GetObserver();
+					if ( Rtt_VERIFY( observer ) )
+					{
+						StageObject *stage = observer->GetStage();
+						Display& display = stage->GetDisplay();
+						ShaderFactory& factory = display.GetShaderFactory();
+						SharedPtr<ShaderResource> resource = paint->GetShader( factory )->GetData()->GetShaderResource();
+						UniformArray *uniformArray = resource->GetUniformArray();
+
+						if (uniformArray)
+						{
+							uniformArray->PushProxy( L );
+
+							result = 1;
+						}
+					}
+				}
+				break;
+				// /STEVE CHANGE
 			default:
 				Rtt_ASSERT_NOT_REACHED();
 				break;
@@ -291,6 +320,11 @@ PaintAdapter::SetValueForKey(
 					paint->SetBlendEquation( blendEquation );
 				}
 				break;
+			// STEVE CHANGE
+			case 7:
+				// error?
+				break;
+			// /STEVE CHANGE
 			default:
 				Rtt_ASSERT_NOT_REACHED();
 				break;

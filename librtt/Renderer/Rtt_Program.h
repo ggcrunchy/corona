@@ -41,10 +41,11 @@ namespace Rtt
 
 class ProgramHeader;
 class ShaderResource;
+// STEVE CHANGE
+class UniformArrayState;
+// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
-
-
 
 class Program : public CPUResource
 {
@@ -96,8 +97,8 @@ class Program : public CPUResource
 		void SetShaderResource( ShaderResource *resource ) { fResource = resource; }
 
 		// STEVE CHANGE
-		U32 GetUniformArrayTimestamp() const { return fUniformArrayTimestamp; }
-		void SetUniformArrayTimestamp( U32 timestamp ) { fUniformArrayTimestamp = timestamp; }
+		UniformArrayState *GetUniformArrayState() const { return fUniformArrayState; }
+		void SetUniformArrayState( UniformArrayState *state ) { fUniformArrayState = state; }
 		// /STEVE CHANGE
 
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
@@ -125,7 +126,7 @@ class Program : public CPUResource
 		int fFragmentShellNumLines;
 		ShaderResource *fResource;
 		// STEVE CHANGE
-		U32 fUniformArrayTimestamp;
+		UniformArrayState *fUniformArrayState;
 		// /STEVE CHANGE
 		bool fCompilerVerbose;
 };
@@ -177,6 +178,17 @@ class ProgramHeader
 	private:
 		S8 fPrecision[kNumType]; // Precision values for each Type index 
 };
+
+// STEVE CHANGE
+class UniformArrayState
+{
+public:
+	virtual ~UniformArrayState() {}
+
+	virtual U32 GetTimestamp( Program::Version version ) const = 0;
+	virtual void SetTimestamp( Program::Version version, U32 timestamp ) = 0;
+};
+// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
 

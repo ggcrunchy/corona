@@ -28,9 +28,6 @@
 #include "Display/Rtt_ShaderResource.h"
 
 #include "Display/Rtt_ShaderData.h"
-// STEVE CHANGE
-#include "Display/Rtt_ShaderState.h"
-// /STEVE CHANGE
 #include "Renderer/Rtt_Program.h"
 // STEVE CHANGE
 #include "Renderer/Rtt_UniformArray.h"
@@ -80,10 +77,6 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fUniformDataMap(),
 	fDefaultData( NULL ),
 	fTimeTransform( NULL ),
-// STEVE CHANGE
-	fShaderState( NULL ),
-	fUniformArray( NULL ),
-// /STEVE CHANGE
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {
@@ -97,10 +90,6 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fUniformDataMap(),
 	fDefaultData( NULL ),
 	fTimeTransform( NULL ),
-// STEVE CHANGE
-	fShaderState( NULL ),
-	fUniformArray( NULL ),
-// /STEVE CHANGE
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {
@@ -136,18 +125,6 @@ ShaderResource::~ShaderResource()
 	{
 		Rtt_DELETE( fTimeTransform );
 	}
-
-	// STEVE CHANGE
-	if ( NULL != fShaderState )
-	{
-		Rtt_DELETE( fShaderState );
-	}
-
-	if ( NULL != fUniformArray )
-	{
-		Rtt_DELETE( fUniformArray );
-	}
-	// /STEVE CHANGE
 }
 
 void
@@ -169,29 +146,17 @@ ShaderResource::GetProgramMod(ProgramMod mod) const
 }
 
 // STEVE CHANGE
-
-void
-ShaderResource::SetShaderState( ShaderState *state )
-{
-	fShaderState = state;
-}
-
-ShaderState *
-ShaderResource::GetShaderState() const
-{
-	return fShaderState;
-}
-
 void
 ShaderResource::SetUniformArray( UniformArray *uniformArray )
 {
-	fUniformArray = uniformArray;
+	fUniformArray = SharedPtr<UniformArray>( uniformArray );
 }
 
 UniformArray *
 ShaderResource::GetUniformArray() const
 {
-	return fUniformArray;
+	return fUniformArray.NotNull()	? &( *fUniformArray )
+									: NULL;
 }
 // /STEVE CHANGE
 

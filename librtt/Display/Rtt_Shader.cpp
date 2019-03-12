@@ -31,9 +31,6 @@
 #include "Display/Rtt_Paint.h"
 #include "Display/Rtt_ShaderData.h"
 #include "Display/Rtt_ShaderResource.h"
-// STEVE CHANGE
-#include "Display/Rtt_ShaderState.h"
-// /STEVE CHANGE
 #include "Renderer/Rtt_RenderData.h"
 #include "Renderer/Rtt_Program.h"
 
@@ -115,22 +112,6 @@ Shader::Clone( Rtt_Allocator *allocator ) const
 	}
 	return Rtt_NEW( allocator, Shader(fAllocator, fResource, data ) );
 }
-
-// STEVE CHANGE
-bool
-Shader::NeedsDistinctState() const
-{
-	return fResource->GetUniformArray() != NULL; // TODO: is releaseable, etc.
-}
-
-ShaderState *
-Shader::NewState( Rtt_Allocator *allocator ) const
-{
-	ShaderState *state = fResource->GetShaderState();
-
-	return state ? state : Rtt_NEW( allocator, ShaderState( allocator, fResource ) );
-}
-// /STEVE CHANGE
 
 void Shader::Log(std::string preprend, bool last)
 {

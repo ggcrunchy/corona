@@ -23,9 +23,15 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Renderer/Rtt_UniformArray.h"
 #include "Core/Rtt_Allocator.h"
 #include "Core/Rtt_Assert.h"
+#include "Core/Rtt_SharedPtr.h"
+#include "Corona/CoronaLua.h"
+#include "Display/Rtt_UniformArrayAdapter.h"
+#include "Renderer/Rtt_Program.h"
+#include "Renderer/Rtt_UniformArray.h"
+#include "Rtt_Lua.h"
+#include "Rtt_LuaUserdataProxy.h"
 
 #include <string.h>
 
@@ -44,6 +50,9 @@ UniformArray::UniformArray( Rtt_Allocator *allocator, U32 count )
 {
 	Allocate();
 	SetDirty( false );
+
+	fLifetimeMaxDirtyOffset = 0U;
+	fLifetimeMinDirtyOffset = fSize;
 }
 
 UniformArray::~UniformArray()
@@ -71,6 +80,24 @@ UniformArray::Deallocate()
 	fData = NULL;
 }
 
+void
+UniformArray::PushProxy( lua_State *L ) const
+{
+	if ( ! fProxy )
+	{
+		fProxy = LuaUserdataProxy::New( L, const_cast< Self * >( this ) );
+		fProxy->SetAdapter( & UniformArrayAdapter::Constant() );
+	}
+
+	fProxy->Push( L );
+}
+
+void
+UniformArray::DetachProxy()
+{
+	fProxy = NULL;
+}
+
 U32
 UniformArray::Set( const U8 *bytes, U32 offset, U32 n )
 {
@@ -95,6 +122,11 @@ UniformArray::Set( const U8 *bytes, U32 offset, U32 n )
 		if (offset < fMinDirtyOffset)
 		{
 			fMinDirtyOffset = offset;
+
+			if (offset < fLifetimeMinDirtyOffset)
+			{
+				fLifetimeMinDirtyOffset = offset;
+			}
 		}
 
 		U32 extent = offset + n;
@@ -102,6 +134,11 @@ UniformArray::Set( const U8 *bytes, U32 offset, U32 n )
 		if (extent > fMaxDirtyOffset)
 		{
 			fMaxDirtyOffset = extent;
+
+			if (extent > fLifetimeMaxDirtyOffset)
+			{
+				fLifetimeMaxDirtyOffset = extent;
+			}
 		}
 	}
 
@@ -124,6 +161,129 @@ UniformArray::SetDirty( bool newValue )
 		 fMaxDirtyOffset = 0U;
 		 fMinDirtyOffset = fSize;
 	 }
+}
+
+static const char kUniformArrayMT[] = "UniformArray";
+
+void
+UniformArray::Register( lua_State *L )
+{
+	luaL_getmetatable( L, kUniformArrayMT ); /* ..., mt */
+
+	if (lua_isnil( L, -1 ))
+	{
+		lua_pop( L, 1 );
+
+		Lua::NewGCMetatable( L, kUniformArrayMT, []( lua_State *L ) {
+			Rtt_DELETE( (SharedPtr<UniformArray> *)Lua::ToUserdata( L, 1, kUniformArrayMT ) );
+
+			return 0;
+		});
+	}
+
+	lua_pushlightuserdata( L, this ); /* ..., mt, raw ptr */
+
+	SharedPtr<UniformArray> * ptr = (SharedPtr<UniformArray> *)lua_newuserdata( L, sizeof(SharedPtr<UniformArray>) );
+
+	new (ptr) SharedPtr<UniformArray>( this ); /* ..., mt, raw ptr, shared ptr */
+
+	lua_pushvalue( L, -3 ); /* ..., mt, raw ptr, shared ptr, mt */
+	lua_setmetatable( L, -2 ); /* ..., mt, raw ptr, shared ptr; shared ptr.metatable = mt */
+	lua_rawset( L, -3 ); /* ..., mt = { .., [raw ptr] = shared ptr } */
+	lua_pop( L, 1 ); /* ... */
+}
+
+void
+UniformArray::Release( lua_State *L )
+{
+	luaL_getmetatable( L, kUniformArrayMT );
+
+	if (!lua_isnil( L, -1 ))
+	{
+		lua_pushlightuserdata( L, this );
+		lua_pushnil( L );
+		lua_rawset( L, -3 );
+	}
+
+	lua_pop( L, 1 );
+}
+
+bool
+UniformArray::IsRegistered( lua_State *L, int arrayIndex )
+{
+	int top = lua_gettop( L );
+
+	arrayIndex = CoronaLuaNormalize( L, arrayIndex );
+
+	luaL_getmetatable( L, kUniformArrayMT );
+
+	bool registered = false;
+
+	if (!lua_isnil( L, -1 ))
+	{
+		for (lua_pushnil( L ); lua_next( L, -2 ); lua_pop( L, 1 ))
+		{
+			if (!lua_islightuserdata( L, -2 )) // ignore __gc
+			{
+				continue;
+			}
+
+			UniformArray *uniformArray = (UniformArray *)lua_touserdata( L, -2 );
+
+			uniformArray->PushProxy( L );
+
+			if (lua_equal( L, -1, arrayIndex ))
+			{
+				registered = true;
+
+				break;
+			}
+
+			lua_pop( L, 1 );
+		}
+	}
+
+	lua_settop( L, top );
+
+	if (!registered)
+	{
+		CoronaLuaError( L, "Object at index %i is either not an array of uniforms or has been released" );
+	}
+
+	return registered;
+}
+
+class VersionedObserver : public UniformArrayState
+{
+public:
+	VersionedObserver()
+	{
+		for (U32 i = 0; i < (U32)Program::kNumVersions; ++i)
+		{
+			fTimestamps[i] = 0U;
+		}
+	}
+
+	virtual U32 GetTimestamp( Program::Version version ) const
+	{
+		return fTimestamps[version];
+	}
+
+	virtual void SetTimestamp( Program::Version version, U32 timestamp )
+	{
+		fTimestamps[version] = timestamp;
+	}
+
+private:
+	U32 fTimestamps[Program::kNumVersions];
+};
+
+UniformArrayState *
+UniformArray::NewObserverState() const
+{
+	// for now:
+		return Rtt_NEW( GetAllocator(), VersionedObserver() );
+	// but if using a UBO would have single (shared?) timestamp
 }
 
 // ----------------------------------------------------------------------------

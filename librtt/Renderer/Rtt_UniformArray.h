@@ -32,6 +32,10 @@
 
 // ----------------------------------------------------------------------------
 
+class LuaUserdataProxy;
+class UniformArrayState;
+
+struct lua_State;
 struct Rtt_Allocator;
 
 namespace Rtt
@@ -53,9 +57,14 @@ class UniformArray : public CPUResource
 		virtual void Allocate();
 		virtual void Deallocate();
 
-	public:
+	public:		
+		void PushProxy( lua_State *L ) const;
+		void DetachProxy();
+
 		U32 GetMinDirtyOffset() const { return fMinDirtyOffset; }
 		U32 GetDirtySize() const { return fMaxDirtyOffset ? (U32)(fMaxDirtyOffset - fMinDirtyOffset) : 0U; }
+		U32 GetLifetimeMinDirtyOffset() const { return fLifetimeMinDirtyOffset; }
+		U32 GetLifetimeDirtySize() const { return fLifetimeMaxDirtyOffset ? (U32)(fLifetimeMaxDirtyOffset - fLifetimeMinDirtyOffset) : 0U; }
 		U32 GetSize() const { return fSize; }
 		U32 GetSizeInVectors() const { return fSize / (4 * sizeof( Real )); }
 		U32 GetTimestamp() const { return fTimestamp; }
@@ -69,10 +78,20 @@ class UniformArray : public CPUResource
 		bool GetDirty() const { return fDirty; }
 		void SetDirty( bool newValue );
 
+		void Register( lua_State *L );
+		void Release( lua_State *L );
+
+		static bool IsRegistered( lua_State *L, int arrayIndex );
+
+		UniformArrayState *NewObserverState() const;
+
 	private:
 		U8 *fData;
-		U32 fMinDirtyOffset;
+		mutable LuaUserdataProxy *fProxy;
+		U32 fLifetimeMaxDirtyOffset;
+		U32 fLifetimeMinDirtyOffset;
 		U32 fMaxDirtyOffset;
+		U32 fMinDirtyOffset;
 		U32 fSize;
 		U32 fTimestamp;
 		bool fDirty;

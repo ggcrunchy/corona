@@ -279,6 +279,11 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 
 		if (fArraySize)
 		{
+			// TODO:
+				// if (ubo)
+					// something something
+				// else
+					// what follows here:
 			shader_source[4] = "#define CoronaUniformVectorsCount ";
 
 			sprintf(count_str, "%u", fArraySize / (4U * sizeof( Real )) );

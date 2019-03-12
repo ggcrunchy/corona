@@ -115,8 +115,7 @@
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderName.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderProxy.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderResource.cpp" />
-    <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderState.cpp" />
-    <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderStateAdapter.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\Rtt_UniformArrayAdapter.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShaderTypes.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShapeAdapter.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ShapeAdapterCircle.cpp" />
@@ -416,8 +415,7 @@
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderName.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderProxy.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderResource.h" />
-    <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderState.h" />
-    <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderStateAdapter.h" />
+    <ClInclude Include="..\..\..\librtt\Display\Rtt_UniformArrayAdapter.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShaderTypes.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShapeAdapter.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_ShapeAdapterCircle.h" />

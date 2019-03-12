@@ -106,7 +106,7 @@ Program::Program( Rtt_Allocator* allocator )
 	fVertexShellNumLines( 0 ),
 	fFragmentShellNumLines( 0 ),
 // STEVE CHANGE
-	fUniformArrayTimestamp( 0 ),
+	fUniformArrayState( NULL ),
 // /STEVE CHANGE
 	fCompilerVerbose( false )
 {
@@ -151,6 +151,12 @@ Program::Deallocate()
 	fHeaderSource = NULL;
 	fVertexShaderSource = NULL;
 	fFragmentShaderSource = NULL;
+
+	// STEVE CHANGE
+	delete fUniformArrayState;
+
+	fUniformArrayState = NULL;
+	// /STEVE CHANGE
 
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
 	if (fCompiledShaders)

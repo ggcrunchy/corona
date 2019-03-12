@@ -108,8 +108,8 @@ class CommandBuffer
 		virtual void Draw( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
 		virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
 		// STEVE CHANGE
-		virtual void CopyUniformArray( UniformArray* uniformArray ) = 0;
-		virtual void SyncWithLastKnownArrayState( UniformArray* uniformArray ) = 0;
+		virtual void UpdateUniformArray( UniformArray* uniformArray ) = 0;
+		virtual void SyncWithArrayState( UniformArray* uniformArray ) = 0;
 		// /STEVE CHANGE
 		virtual S32 GetCachedParam( CommandBuffer::QueryableParams param ) = 0;
 		

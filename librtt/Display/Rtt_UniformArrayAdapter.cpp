@@ -23,8 +23,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Display/Rtt_ShaderState.h"
-#include "Display/Rtt_ShaderStateAdapter.h"
+#include "Display/Rtt_UniformArrayAdapter.h"
 #include "Renderer/Rtt_UniformArray.h"
 #include "Rtt_LuaContext.h"
 
@@ -37,32 +36,32 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-const ShaderStateAdapter&
-ShaderStateAdapter::Constant()
+const UniformArrayAdapter&
+UniformArrayAdapter::Constant()
 {
-	static const ShaderStateAdapter sAdapter;
+	static const UniformArrayAdapter sAdapter;
 	return sAdapter;
 }
 
 // ----------------------------------------------------------------------------
 	
 StringHash *
-ShaderStateAdapter::GetHash( lua_State *L ) const
+UniformArrayAdapter::GetHash( lua_State *L ) const
 {
 	static const char *keys[] = 
 	{
 		"getUniformsCount",	// 0
 		"newUniformsSetter",// 1
-		"releaseEffect",	// 2
+		"releaseSelf",		// 2
 		"setUniforms",		// 3
 	};
 
-	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 4, 4, 1, __FILE__, __LINE__ );
+	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 0, 0, 0, __FILE__, __LINE__ );
 	return &sHash;
 }
 
 int
-ShaderStateAdapter::ValueForKey(
+UniformArrayAdapter::ValueForKey(
 			const LuaUserdataProxy& sender,
 			lua_State *L,
 			const char *key ) const
@@ -71,8 +70,8 @@ ShaderStateAdapter::ValueForKey(
 
 	Rtt_ASSERT( key ); // Caller should check at the top-most level
 
-	const ShaderState *state = (const ShaderState *)sender.GetUserdata();
-	if ( ! state ) { return result; }
+	const UniformArray *uniformArray = (const UniformArray *)sender.GetUserdata();
+	if ( ! uniformArray ) { return result; }
 
 	int index = GetHash( L )->Lookup( key );
 
@@ -87,7 +86,7 @@ ShaderStateAdapter::ValueForKey(
 			Lua::PushCachedFunction( L, newUniformsSetter );
 			break;
 		case 2:
-			Lua::PushCachedFunction( L, releaseEffect );
+			Lua::PushCachedFunction( L, releaseSelf );
 			break;
 		case 3:
 			Lua::PushCachedFunction( L, setUniforms );
@@ -101,7 +100,7 @@ ShaderStateAdapter::ValueForKey(
 }
 
 bool
-ShaderStateAdapter::SetValueForKey(
+UniformArrayAdapter::SetValueForKey(
 			LuaUserdataProxy& sender,
 			lua_State *L,
 			const char *key,
@@ -111,8 +110,8 @@ ShaderStateAdapter::SetValueForKey(
 
 	Rtt_ASSERT( key ); // Caller should check at the top-most level
 
-	ShaderState *state = (ShaderState *)sender.GetUserdata();
-	if ( ! state ) { return result; }
+	UniformArray *uniformArray = (UniformArray *)sender.GetUserdata();
+	if ( ! uniformArray ) { return result; }
 	/*
 	int index = GetHash( L )->Lookup( key );
 
@@ -127,26 +126,24 @@ ShaderStateAdapter::SetValueForKey(
 }
 
 void
-ShaderStateAdapter::WillFinalize( LuaUserdataProxy& sender ) const
+UniformArrayAdapter::WillFinalize( LuaUserdataProxy& sender ) const
 {
-	ShaderState *state = (ShaderState *)sender.GetUserdata();
+	UniformArray *state = (UniformArray *)sender.GetUserdata();
 	if ( ! state ) { return; }
 	
 	state->DetachProxy();
 }
 
 int
-ShaderStateAdapter::getUniformsCount( lua_State *L )
+UniformArrayAdapter::getUniformsCount( lua_State *L )
 {
 	int result = 0;
 	int nextArg = 1;
 	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
 	if(!sender) { return result; }
 
-	ShaderState *state = (ShaderState *)sender->GetUserdata();
-	if ( ! state ) { return result; }
-
-	UniformArray *uniformArray = state->GetUniformArray();
+	UniformArray *uniformArray = (UniformArray *)sender->GetUserdata();
+	if ( ! uniformArray ) { return result; }
 
 	lua_pushinteger( L, uniformArray ? uniformArray->GetSizeInVectors() : 0 );
 
@@ -154,18 +151,15 @@ ShaderStateAdapter::getUniformsCount( lua_State *L )
 }
 
 int
-ShaderStateAdapter::newUniformsSetter( lua_State *L )
+UniformArrayAdapter::newUniformsSetter( lua_State *L )
 {
 	int result = 0;
 	int nextArg = 1;
 	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
 	if(!sender) { return result; }
 
-	ShaderState *state = (ShaderState *)sender->GetUserdata();
-	if ( ! state ) { return result; }
-
-	UniformArray *uniformArray = state->GetUniformArray();
-	if (!uniformArray) { return result; }
+	UniformArray *uniformArray = (UniformArray *)sender->GetUserdata();
+	if ( ! uniformArray ) { return result; }
 
 	// TODO: needs DisplayObject-ish object
 	// when "drawn", will update contents of uniform array
@@ -174,6 +168,23 @@ ShaderStateAdapter::newUniformsSetter( lua_State *L )
 	return 0; // NYI
 }
 
+int
+UniformArrayAdapter::releaseSelf( lua_State *L )
+{
+	int result = 0;
+	int nextArg = 1;
+	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
+	if(!sender) { return result; }
+
+	UniformArray *uniformArray = (UniformArray *)sender->GetUserdata();
+	if ( ! uniformArray ) { return result; }
+
+	uniformArray->Release( L );
+
+	return 0;
+}
+#if 0
+// THIS BELONGS SOMEWHERE ELSE
 int
 ShaderStateAdapter::releaseEffect( lua_State *L )
 {
@@ -205,7 +216,7 @@ ShaderStateAdapter::releaseEffect( lua_State *L )
 
 	return 0;
 }
-
+#endif
 static void
 SetSingleUniformVector( UniformArray *uniformArray, lua_State *L, U32 index )
 {
@@ -223,18 +234,15 @@ SetSingleUniformVector( UniformArray *uniformArray, lua_State *L, U32 index )
 }
 
 int
-ShaderStateAdapter::setUniforms( lua_State *L )
+UniformArrayAdapter::setUniforms( lua_State *L )
 {
 	int result = 0;
 	int nextArg = 1;
 	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
 	if(!sender) { return result; }
 
-	ShaderState *state = (ShaderState *)sender->GetUserdata();
-	if ( ! state ) { return result; }
-
-	UniformArray *uniformArray = state->GetUniformArray();
-	if (!uniformArray) { return result; }
+	UniformArray *uniformArray = (UniformArray *)sender->GetUserdata();
+	if ( ! uniformArray ) { return result; }
 
 	int first = 1;
 

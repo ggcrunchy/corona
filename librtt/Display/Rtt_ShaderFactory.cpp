@@ -35,9 +35,6 @@
 #include "Display/Rtt_ShaderData.h"
 #include "Display/Rtt_ShaderName.h"
 #include "Display/Rtt_ShaderResource.h"
-// STEVE CHANGE
-#include "Display/Rtt_ShaderState.h"
-// /STEVE CHANGE
 #include "Renderer/Rtt_Program.h"
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
 	#include "Renderer/Rtt_ShaderBinary.h"
@@ -112,10 +109,7 @@ ShaderFactory::ShaderFactory( Display& owner, const ProgramHeader& programHeader
 	fOwner( owner ),
 	fDefaultShell( NULL ),
 	fDefaultKernel( NULL ),
-	fProgramHeader( Rtt_NEW( fAllocator, ProgramHeader( programHeader ) ) ),
-	// STEVE CHANGE
-	fNullState( NULL )
-	// /STEVE CHANGE
+	fProgramHeader( Rtt_NEW( fAllocator, ProgramHeader( programHeader ) ) )
 {
 	lua_State *L = fL;
 
@@ -133,9 +127,6 @@ ShaderFactory::~ShaderFactory()
 	CoronaLuaDelete( fL );
 	Rtt_DELETE( fDefaultColorShader );
 	Rtt_DELETE( fDefaultShader );
-	// STEVE CHANGE
-	Rtt_DELETE( fNullState );
-	// /STEVE CHANGE
 }
 
 bool
@@ -916,11 +907,12 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
 
 								if (!lua_isnil( L, -1 ))
 								{
-									int count = Display::GetUniformVectorsCount();
+									UniformArray *uniformArray = NULL;
 
 									if (lua_isnumber( L, -1 ))
 									{
 										int n = luaL_checkint( L, -1 );
+										int count = Display::GetUniformVectorsCount();
 
 										if (n > 0 && n <= count)
 										{
@@ -929,16 +921,28 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
 
 										else
 										{
-											CORONA_LOG_ERROR( "Effect (%s) could not allocate %i uniform vectors!", name, count );
+											CORONA_LOG_ERROR( "Effect (%s) could not allocate %i uniform vectors!", name, n );
 
 											count = 0;
 										}
+										
+										if (count)
+										{
+											uniformArray = Rtt_NEW( fAllocator, UniformArray( fAllocator, (U32)count ) );
+
+											uniformArray->Register( L );
+										}
 									}
 
-									if (count)
+									else if (UniformArray::IsRegistered( L, -1 ))
 									{
-										UniformArray *uniformArray = Rtt_NEW( fAllocator, UniformArray( fAllocator, (U32)count ) );
+										LuaUserdataProxy* proxy = LuaUserdataProxy::ToProxy( L, -1 );
 
+										uniformArray = proxy ? (UniformArray *)proxy->GetUserdata() : NULL;
+									}
+
+									if (uniformArray)
+									{
 										resource->SetUniformArray( uniformArray );
 									}
 								}
@@ -1063,37 +1067,6 @@ ShaderFactory::DefineEffect( lua_State *L, int index )
 
 	return ( NULL != shader );
 }
-
-// STEVE CHANGE
-bool
-ShaderFactory::GetEffectController( lua_State *L, int index )
-{
-	ShaderName name( luaL_checkstring( L, index ) );
-	
-	if (name.GetCategory() == ShaderTypes::kCategoryDefault)
-	{
-		CORONA_LOG_ERROR( "Unable to discover category from provided name" );
-	}
-
-	else
-	{
-		const Shader *proto = FindPrototype( name.GetCategory(), name.GetName() );
-		ShaderState *state = proto->NeedsDistinctState() ? proto->NewState( fAllocator ) : GetNullState();
-
-		if (false) // TODO: for releasable prototypes
-		{
-			state->SetShaderCategory( name.GetCategory() );
-			state->SetShaderName( name.GetName() );
-		}
-
-		state->PushProxy( L );
-
-		return true;
-	}
-
-	return false;
-}
-// /STEVE CHANGE
 
 void ShaderFactory::LoadDependency(LuaMap *nodeGraph, std::string nodeKey, ShaderMap &inputNodes, bool createNode)
 {
@@ -1295,19 +1268,6 @@ ShaderFactory::FindOrLoad( ShaderTypes::Category category, const char *name )
 {
 	return FindOrLoadGraph( category, name, false );
 }
-
-// STEVE CHANGE
-ShaderState *
-ShaderFactory::GetNullState()
-{
-	if (!fNullState)
-	{
-		fNullState = Rtt_NEW( fAllocator, ShaderState() );
-	}
-
-	return fNullState;
-}
-// /STEVE CHANGE
 
 void
 ShaderFactory::PushList( lua_State *L, ShaderTypes::Category category ) const

@@ -23,8 +23,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef _Rtt_ShaderStateAdapter_H__
-#define _Rtt_ShaderStateAdapter_H__
+#ifndef _Rtt_UniformArrayAdapter_H__
+#define _Rtt_UniformArrayAdapterr_H__
 
 #include "Rtt_LuaUserdataProxy.h"
 
@@ -35,13 +35,13 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-class ShaderStateAdapter : public MLuaUserdataAdapter
+class UniformArrayAdapter : public MLuaUserdataAdapter
 {
 	public:
-		typedef ShaderStateAdapter Self;
+		typedef UniformArrayAdapter Self;
 
 	public:
-		static const ShaderStateAdapter& Constant();
+		static const UniformArrayAdapter& Constant();
 
 	public:
 		virtual int ValueForKey(
@@ -62,7 +62,7 @@ class ShaderStateAdapter : public MLuaUserdataAdapter
 	private:
 		static int getUniformsCount( lua_State *L );
 		static int newUniformsSetter( lua_State *L );
-		static int releaseEffect( lua_State *L );
+		static int releaseSelf( lua_State *L );
 		static int setUniforms( lua_State *L );
 };
 
@@ -72,4 +72,4 @@ class ShaderStateAdapter : public MLuaUserdataAdapter
 
 // ----------------------------------------------------------------------------
 
-#endif // _Rtt_ShaderStateAdapter_H__
+#endif // _Rtt_UniformArrayAdapter_H__

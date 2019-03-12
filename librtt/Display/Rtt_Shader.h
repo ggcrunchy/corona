@@ -56,9 +56,6 @@ struct RenderData;
 class Renderer;
 class ShaderData;
 class ShaderResource;
-// STEVE CHANGE
-class ShaderState;
-// /STEVE CHANGE
 class Texture;
 class Geometry;
 
@@ -84,11 +81,6 @@ class Shader
 		
 	public:
 		virtual Shader *Clone( Rtt_Allocator *allocator ) const;
-		
-		// STEVE CHANGE
-		bool NeedsDistinctState() const;
-		ShaderState *NewState( Rtt_Allocator *allocator ) const;
-		// /STEVE CHANGE
 
 		virtual void Prepare( RenderData& objectData, int w, int h, ShaderResource::ProgramMod mod );
 

@@ -40,6 +40,9 @@
 #include "Display/Rtt_ShaderFactory.h"
 #include "Display/Rtt_ShaderTypes.h"
 #include "Display/Rtt_TextureResource.h"
+// STEVE CHANGE
+#include "Renderer/Rtt_UniformArray.h"
+// /STEVE CHANGE
 #include "Rtt_LuaAux.h"
 #include "Rtt_LuaLibSystem.h"
 #include "Display/Rtt_BitmapPaint.h"
@@ -90,12 +93,12 @@ class GraphicsLibrary
 		static int newGradient( lua_State *L );
 		static int newImageSheet( lua_State *L );
 		static int defineEffect( lua_State *L );
-		// STEVE CHANGE
-		static int getEffectController( lua_State *L );
-		// /STEVE CHANGE
 		static int listEffects( lua_State *L );
 		static int newOutline( lua_State *L ); // This returns an outline in texels.
 		static int newTexture( lua_State *L );
+		// STEVE CHANGE
+		static int newUniformArray( lua_State *L );
+		// /STEVE CHANGE
 		static int releaseTextures( lua_State *L );
         static int getFontMetrics( lua_State *L );
 
@@ -135,12 +138,12 @@ GraphicsLibrary::Open( lua_State *L )
 		{ "newGradient", newGradient },
 		{ "newImageSheet", newImageSheet },
 		{ "defineEffect", defineEffect },
-		// STEVE CHANGE
-		{ "getEffectController", getEffectController },
-		// /STEVE CHANGE
 		{ "listEffects", listEffects },
 		{ "newOutline", newOutline }, // This returns an outline in texels.
 		{ "newTexture", newTexture },
+		// STEVE CHANGE
+		{ "newUniformArray", newUniformArray },
+		// /STEVE CHANGE
 		{ "releaseTextures", releaseTextures },
         { "getFontMetrics", getFontMetrics },
 
@@ -326,21 +329,6 @@ GraphicsLibrary::defineEffect( lua_State *L )
 	lua_pushboolean( L, factory.DefineEffect( L, index ) );
 	return 1;
 }
-
-// STEVE CHANGE
-int
-GraphicsLibrary::getEffectController( lua_State *L )
-{
-	GraphicsLibrary *library = GraphicsLibrary::ToLibrary( L );
-	Display& display = library->GetDisplay();
-
-	int index = 1; // index of params
-	
-	ShaderFactory& factory = display.GetShaderFactory();
-
-	return factory.GetEffectController( L, index ) ? 1 : 0;
-}
-// /STEVE CHANGE
 
 // graphics.listEffects( category )
 int
@@ -759,7 +747,50 @@ GraphicsLibrary::newTexture( lua_State *L )
 	return result;
 }
 
-	
+// STEVE CHANGE
+// graphics.newUniformArray( count )
+int
+GraphicsLibrary::newUniformArray( lua_State *L )
+{
+	int result = 0;
+	SharedPtr<UniformArray> ret;
+
+	if (lua_isnumber( L, 1 ))
+	{
+		S32 count = lua_tointeger( L, 1 );
+
+		if (count <= 0)
+		{
+			CoronaLuaError( L, "graphics.newUniformArray() expects a positive integer" );
+		}
+
+		else if (count > Display::GetUniformVectorsCount())
+		{
+			CoronaLuaError( L, "graphics.newUniformArray() requested more than maximum (%i) vector count", Display::GetUniformVectorsCount() );
+		}
+
+		else
+		{
+			// TODO: allow for sharing
+			GraphicsLibrary *library = GraphicsLibrary::ToLibrary( L );
+			ret = SharedPtr<UniformArray>( new UniformArray( library->GetDisplay().GetAllocator(), (U32)count ) );
+		}
+	}
+
+	else
+	{
+		CoronaLuaError( L, "graphics.newUniformArray() requires a number" );
+	}
+
+	if (ret.NotNull())
+	{
+		ret->PushProxy( L );
+		result = 1;
+	}
+
+	return result;
+}
+// /STEVE CHANGE
 	
 // graphics.releaseTextures()
 int

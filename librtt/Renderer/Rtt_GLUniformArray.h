@@ -26,6 +26,7 @@
 #ifndef _Rtt_GLUniformArray_H__
 #define _Rtt_GLUniformArray_H__
 
+#include "Renderer/Rtt_GL.h"
 #include "Renderer/Rtt_GPUResource.h"
 #include "Renderer/Rtt_UniformArray.h"
 
@@ -42,6 +43,13 @@ class GLUniformArray : public GPUResource
 		typedef GPUResource Super;
 		typedef GLUniformArray Self;
 
+		enum : U32 {
+			kDirtyCount = 8U, // Remember the (min, max) range for this many recent writes... (More accurate)
+			kSummarizeCount = 16U, // ...every time we do this many steps, commit the (min, max) to the history...
+			kHistoryCount = 8U, // ...keep this many history entries around (Less accurate)
+			kBridgeableGap = 4U * sizeof( Real ) * 5U // too close to warrant separate uniforms upload?
+		};
+
 	public:
 		GLUniformArray();
 
@@ -50,11 +58,48 @@ class GLUniformArray : public GPUResource
 		virtual void Destroy();
 
 	public:
-		void *GetBytes() const { return fBytes; }
-		void SetBytes( void *offset ) { fBytes = offset; }
+		struct Interval {
+			U32 start;
+			U32 count;
+		};
+
+		void AddPayload( U8 *data, U32 start, U32 count );
+		void ConsumePayload();
+		U32 GetIntervals( U32 lag, Interval out[], U32 size );
+
+		U8 *GetData() const { return fData; }
+
+	private:		
+		struct Payload : public Interval
+		{
+			Payload* next;
+
+			static U8 *GetData( Payload* payload );
+		};
+
+		void Append( Payload* payload );
+		void Commit( Payload* payload );
+		void PrepareRelevantIntervals( U32 n, Interval intervals[] );
+		U32 GatherWithMerge( Interval out[], U32 nintervals, const Interval intervals[]);
+		U32 GetRecentIntervals( U32 lag, Interval out[] );
+		bool GetHistoryInterval( U32 lag, Interval& out );
 
 	private:
-		void *fBytes;
+		U8 *fData;
+		Payload *fPayloads;
+		Interval fRecentDirties[kDirtyCount];
+		Interval fHistory[kHistoryCount];
+		U32 fMaxOffset;
+		U32 fMinOffset;
+		U8 fDirtyIndex;
+		U8 fHistoryIndex;
+		U8 fSummaryIndex;
+
+		// or
+
+	//	GLuint fBlockBinding;
+	//	GLuint fBlockIndex;
+		// probably distinct enough to call for own class
 };
 
 // ----------------------------------------------------------------------------

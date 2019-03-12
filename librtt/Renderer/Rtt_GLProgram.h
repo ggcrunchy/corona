@@ -78,6 +78,8 @@ class GLProgram : public GPUResource
 			Rtt_ASSERT( version <= Program::kNumVersions );
 			return fData[version].fArrayLocation;
 		}
+
+		U32 GetArraySize() const { return fArraySize; }
 		// /STEVE CHANGE
 
 	private:
@@ -92,8 +94,7 @@ class GLProgram : public GPUResource
 			GLint fUniformLocations[Uniform::kNumBuiltInVariables];
 			U32 fTimestamps[Uniform::kNumBuiltInVariables];
 			// STEVE CHANGE
-			GLint fArrayLocation;	// n.b. arrays have slightly different update
-									// behaviors, so are held apart the other uniforms
+			GLint fArrayLocation;
 			// /STEVE CHANGE
 			
 			// Metadata
