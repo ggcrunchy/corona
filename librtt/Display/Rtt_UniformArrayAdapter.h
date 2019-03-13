@@ -60,7 +60,6 @@ class UniformArrayAdapter : public MLuaUserdataAdapter
         virtual StringHash *GetHash( lua_State *L ) const;
 
 	private:
-		static int getUniformsCount( lua_State *L );
 		static int newUniformsSetter( lua_State *L );
 		static int releaseSelf( lua_State *L );
 		static int setUniforms( lua_State *L );

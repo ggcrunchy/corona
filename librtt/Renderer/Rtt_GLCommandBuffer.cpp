@@ -697,7 +697,7 @@ GLCommandBuffer::SyncWithArrayState( UniformArray* uniformArray )
 	Write<GPUResource*>( uniformArray->GetGPUResource() );
 	Write<GPUResource*>( fProgram->GetGPUResource() );
 	Write<U32>( uniformArray->GetTimestamp() );
-	Write<U32>( fProgram->GetUniformArrayState()->GetTimestamp( fCurrentPrepVersion ) );
+	Write<U32>( fProgram->GetArrayStateTimestamp( fCurrentPrepVersion ) );
 }
 // /STEVE CHANGE
 

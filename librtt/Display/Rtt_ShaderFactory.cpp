@@ -928,26 +928,43 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
 										
 										if (count)
 										{
-											uniformArray = Rtt_NEW( fAllocator, UniformArray( fAllocator, (U32)count ) );
+											uniformArray = Rtt_NEW( fAllocator, UniformArray( fOwner, (U32)count ) );
 
-											uniformArray->Register( L );
+											fOwnedArrays[uniformArray->Key()] = SharedPtr<UniformArray>( uniformArray );
 										}
 									}
 
-									else if (UniformArray::IsRegistered( L, -1 ))
+									else if (IsRegisteredUniformArray( L, -1 ))
 									{
 										LuaUserdataProxy* proxy = LuaUserdataProxy::ToProxy( L, -1 );
 
-										uniformArray = proxy ? (UniformArray *)proxy->GetUserdata() : NULL;
+										Rtt_ASSERT( proxy );
+
+										uniformArray = (UniformArray *)proxy->GetUserdata();
+									}
+
+									else
+									{
+										CORONA_LOG_ERROR( "Object at index %i is either not an array of uniforms or has been released", CoronaLuaNormalize( L, -1 ) );
 									}
 
 									if (uniformArray)
 									{
+										resource->SetAcceptsInstances( true );
 										resource->SetUniformArray( uniformArray );
 									}
 								}
 
 								lua_pop( L, 1 );
+
+								if (!resource->GetAcceptsInstances())
+								{
+									lua_getfield( L, tableIndex, "acceptsInstances" );
+
+									resource->SetAcceptsInstances( lua_toboolean( L, -1 ) != 0 );
+
+									lua_pop( L, 1 );
+								}
 								// /STEVE CHANGE
 							}
 						}
@@ -1219,6 +1236,33 @@ ShaderFactory::FindOrLoad( const ShaderName& shaderName )
 {
 	return FindOrLoad( shaderName.GetCategory(), shaderName.GetName() );
 }
+
+// STEVE CHANGE
+bool
+ShaderFactory::IsRegisteredUniformArray( lua_State *L, int arrayIndex ) const
+{
+	arrayIndex = CoronaLuaNormalize( L, arrayIndex );
+
+	bool registered = false;
+
+	for (UniformArrayMap::const_iterator iter = fOwnedArrays.begin(); !registered && iter != fOwnedArrays.end(); ++iter)
+	{
+		iter->second->PushProxy( L );
+
+		registered = lua_equal( L, -1, arrayIndex ) != 0;
+
+		lua_pop( L, 1 );
+	}
+
+	return registered;
+}
+
+void
+ShaderFactory::ReleaseUniformArray( UniformArray *uniformArray )
+{
+	fOwnedArrays.erase( uniformArray->Key() );
+}
+// /STEVE CHANGE
 
 Shader&
 ShaderFactory::GetDefaultColorShader() const

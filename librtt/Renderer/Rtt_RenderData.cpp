@@ -51,7 +51,10 @@ RenderData::RenderData()
 //	fMinDepthRange( 0.0 ),
 //	fMaxDepthRange( 1.0 ),
 	fBlendMode(),
-	fBlendEquation( RenderTypes::kAddEquation )
+	fBlendEquation( RenderTypes::kAddEquation ),
+	// STEVE CHANGE
+	fInstanceCount( 0U )
+	// /STEVE CHANGE
 {
 	
 }
@@ -80,6 +83,9 @@ RenderData::Log( const char *msg ) const
 	Rtt_LogException( "\tmaskTex = %p\n", fMaskTexture );
 	Rtt_LogException( "\tmaskUniform = %p\n", fMaskUniform );
 	Rtt_LogException( "\tgeometry: numVertices(%d)\n", fGeometry->GetVerticesUsed() );
+	// STEVE CHANGE
+	Rtt_LogException( "\tinstanceCount = %d\n", fInstanceCount );
+	// /STEVE CHANGE
 	Geometry::Vertex *vertices = fGeometry->GetVertexData();
 	for ( U32 i = 0, iMax = fGeometry->GetVerticesUsed(); i < iMax; i++ )
 	{

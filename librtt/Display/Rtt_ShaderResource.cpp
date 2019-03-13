@@ -77,6 +77,9 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fUniformDataMap(),
 	fDefaultData( NULL ),
 	fTimeTransform( NULL ),
+	// STEVE CHANGE
+	fAcceptsInstances( false ),
+	// /STEVE CHANGE
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {
@@ -90,6 +93,9 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fUniformDataMap(),
 	fDefaultData( NULL ),
 	fTimeTransform( NULL ),
+	// STEVE CHANGE
+	fAcceptsInstances( false ),
+	// /STEVE CHANGE
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {

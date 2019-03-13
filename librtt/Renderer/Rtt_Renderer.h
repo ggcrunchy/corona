@@ -262,6 +262,10 @@ class Renderer
 	private:
 		void FlushBatch();
 
+		// STEVE CHANGE
+		void UpdateInstanceIndices( U32 count, U32 index );
+		// /STEVE CHANGE
+
 	protected:
 		void UpdateBatch( bool batch, bool enoughSpace, bool storedOnGPU, U32 verticesRequired );
 		void CopyVertexData( Geometry* geometry, Geometry::Vertex* destination, bool interior );

@@ -773,7 +773,7 @@ GraphicsLibrary::newUniformArray( lua_State *L )
 		{
 			// TODO: allow for sharing
 			GraphicsLibrary *library = GraphicsLibrary::ToLibrary( L );
-			ret = SharedPtr<UniformArray>( new UniformArray( library->GetDisplay().GetAllocator(), (U32)count ) );
+			ret = SharedPtr<UniformArray>( new UniformArray( library->GetDisplay(), (U32)count ) );
 		}
 	}
 

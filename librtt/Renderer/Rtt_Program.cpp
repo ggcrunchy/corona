@@ -107,6 +107,7 @@ Program::Program( Rtt_Allocator* allocator )
 	fFragmentShellNumLines( 0 ),
 // STEVE CHANGE
 	fUniformArrayState( NULL ),
+	fArrayStateType( kNoState ),
 // /STEVE CHANGE
 	fCompilerVerbose( false )
 {
@@ -153,7 +154,7 @@ Program::Deallocate()
 	fFragmentShaderSource = NULL;
 
 	// STEVE CHANGE
-	delete fUniformArrayState;
+	Rtt_FREE( fUniformArrayState );
 
 	fUniformArrayState = NULL;
 	// /STEVE CHANGE
@@ -196,6 +197,45 @@ Program::SetHeaderSource( const char* source )
 	SetSource( &fHeaderSource, source );
 }
 
+// STEVE CHANGE
+void 
+Program::SetArrayStateType( ArrayStateType type )
+{
+	Rtt_FREE( fUniformArrayState );
+
+	if (kVersioned == type)
+	{
+		fUniformArrayState = (U32*)Rtt_CALLOC( GetAllocator(), kNumVersions, sizeof( U32 ) );
+	}
+
+	fArrayStateType = type;
+}
+
+U32 
+Program::GetArrayStateTimestamp( Program::Version version ) const
+{
+	switch (fArrayStateType)
+	{
+	case kVersioned:
+		return fUniformArrayState[version];
+	default:
+		return 0U;
+	}
+}
+
+void 
+Program::SetArrayStateTimestamp( Program::Version version, U32 timestamp )
+{
+	switch (fArrayStateType)
+	{
+	case kVersioned:
+		fUniformArrayState[version] = timestamp;
+		break;
+	default:
+		break;
+	}
+}
+// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
 

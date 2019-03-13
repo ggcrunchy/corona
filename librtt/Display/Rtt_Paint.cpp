@@ -86,7 +86,10 @@ Paint::Paint()
 	fShader( NULL ),
 	fProxy( NULL ),
 	fObserver( NULL ),
-	fResource()
+	fResource(),
+	// STEVE CHANGE
+	fInstanceCount( 0U )
+	// /STEVE CHANGE
 {
 }
 
@@ -100,7 +103,10 @@ Paint::Paint(const SharedPtr< TextureResource >& resource)
 	fShader( NULL ),
 	fProxy( NULL ),
 	fObserver( NULL ),
-	fResource( resource )
+	fResource( resource ),
+	// STEVE CHANGE
+	fInstanceCount( 0U )
+	// /STEVE CHANGE
 {
 }
 
@@ -120,7 +126,10 @@ Paint::Paint( const SharedPtr< TextureResource >& resource, Color c )
 	fShader( NULL ),
 	fProxy( NULL ),
 	fObserver( NULL ),
-	fResource( resource )
+	fResource( resource ),
+	// STEVE CHANGE
+	fInstanceCount( 0U )
+	// /STEVE CHANGE
 {
 }
 
@@ -166,6 +175,10 @@ Paint::UpdatePaint( RenderData& data )
 		}
 		SetValid( kShaderUniformDataFlag );
 	}
+
+	// STEVE CHANGE
+	data.fInstanceCount = GetInstanceCount();
+	// /STEVE CHANGE
 }
 
 Texture *
@@ -508,6 +521,26 @@ Paint::DetachShaderProxy()
 	fShader->DetachProxy();
 	fShader = NULL;
 }
+
+// STEVE CHANGE
+U32
+Paint::GetInstanceCount() const
+{
+	U32 count = 1U;
+
+	if (fShader && fInstanceCount > 1U)
+	{
+		SharedPtr<ShaderResource> resource = fShader->GetData()->GetShaderResource();
+
+		if (resource->GetAcceptsInstances())
+		{
+			count = fInstanceCount;
+		}
+	}
+
+	return count;
+}
+// /STEVE CHANGE
 
 PlatformBitmap *
 Paint::GetBitmap() const

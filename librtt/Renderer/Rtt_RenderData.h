@@ -65,6 +65,9 @@ struct RenderData
 //	Real fMaxDepthRange;
 	BlendMode fBlendMode;
 	RenderTypes::BlendEquation fBlendEquation;
+	// STEVE CHANGE
+	U32 fInstanceCount;
+	// /STEVE CHANGE
 
 };
 

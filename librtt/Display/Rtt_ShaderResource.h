@@ -99,6 +99,10 @@ class ShaderResource
 		int GetNumTags() const { return 0; }
 
 	public:
+	// STEVE CHANGE
+		void SetAcceptsInstances( bool newValue ) { fAcceptsInstances = newValue; }
+		bool GetAcceptsInstances() const { return fAcceptsInstances; }
+	// /STEVE CHANGE
 		bool UsesUniforms() const { return fUsesUniforms; }
 		void SetUsesUniforms( bool newValue ) { fUsesUniforms = newValue; }
 
@@ -154,6 +158,7 @@ class ShaderResource
 		TimeTransform *fTimeTransform;
 		// STEVE CHANGE
 		SharedPtr<UniformArray> fUniformArray;
+		bool fAcceptsInstances;
 		// /STEVE CHANGE
 		bool fUsesUniforms;
 		bool fUsesTime;

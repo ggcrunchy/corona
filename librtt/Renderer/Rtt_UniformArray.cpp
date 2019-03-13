@@ -25,12 +25,11 @@
 
 #include "Core/Rtt_Allocator.h"
 #include "Core/Rtt_Assert.h"
-#include "Core/Rtt_SharedPtr.h"
 #include "Corona/CoronaLua.h"
+#include "Display/Rtt_Display.h"
+#include "Display/Rtt_ShaderFactory.h"
 #include "Display/Rtt_UniformArrayAdapter.h"
-#include "Renderer/Rtt_Program.h"
 #include "Renderer/Rtt_UniformArray.h"
-#include "Rtt_Lua.h"
 #include "Rtt_LuaUserdataProxy.h"
 
 #include <string.h>
@@ -42,8 +41,9 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-UniformArray::UniformArray( Rtt_Allocator *allocator, U32 count )
-:	CPUResource( allocator ),
+UniformArray::UniformArray( Display &display, U32 count )
+:	CPUResource( display.GetAllocator() ),
+	fDisplay( display ),
 	fData( NULL ),
 	fSize( count * sizeof( Real ) ),
 	fTimestamp( 0 )
@@ -95,6 +95,12 @@ UniformArray::PushProxy( lua_State *L ) const
 void
 UniformArray::DetachProxy()
 {
+	if (fProxy)
+	{
+		fDisplay.GetShaderFactory().ReleaseUniformArray( this );
+	//	fProxy->DetachUserdata(); is this needed?
+	}
+
 	fProxy = NULL;
 }
 
@@ -163,127 +169,14 @@ UniformArray::SetDirty( bool newValue )
 	 }
 }
 
-static const char kUniformArrayMT[] = "UniformArray";
-
-void
-UniformArray::Register( lua_State *L )
+std::string
+UniformArray::Key() const
 {
-	luaL_getmetatable( L, kUniformArrayMT ); /* ..., mt */
+	char key[32];
 
-	if (lua_isnil( L, -1 ))
-	{
-		lua_pop( L, 1 );
+	sprintf( key, "Array: %p", this );
 
-		Lua::NewGCMetatable( L, kUniformArrayMT, []( lua_State *L ) {
-			Rtt_DELETE( (SharedPtr<UniformArray> *)Lua::ToUserdata( L, 1, kUniformArrayMT ) );
-
-			return 0;
-		});
-	}
-
-	lua_pushlightuserdata( L, this ); /* ..., mt, raw ptr */
-
-	SharedPtr<UniformArray> * ptr = (SharedPtr<UniformArray> *)lua_newuserdata( L, sizeof(SharedPtr<UniformArray>) );
-
-	new (ptr) SharedPtr<UniformArray>( this ); /* ..., mt, raw ptr, shared ptr */
-
-	lua_pushvalue( L, -3 ); /* ..., mt, raw ptr, shared ptr, mt */
-	lua_setmetatable( L, -2 ); /* ..., mt, raw ptr, shared ptr; shared ptr.metatable = mt */
-	lua_rawset( L, -3 ); /* ..., mt = { .., [raw ptr] = shared ptr } */
-	lua_pop( L, 1 ); /* ... */
-}
-
-void
-UniformArray::Release( lua_State *L )
-{
-	luaL_getmetatable( L, kUniformArrayMT );
-
-	if (!lua_isnil( L, -1 ))
-	{
-		lua_pushlightuserdata( L, this );
-		lua_pushnil( L );
-		lua_rawset( L, -3 );
-	}
-
-	lua_pop( L, 1 );
-}
-
-bool
-UniformArray::IsRegistered( lua_State *L, int arrayIndex )
-{
-	int top = lua_gettop( L );
-
-	arrayIndex = CoronaLuaNormalize( L, arrayIndex );
-
-	luaL_getmetatable( L, kUniformArrayMT );
-
-	bool registered = false;
-
-	if (!lua_isnil( L, -1 ))
-	{
-		for (lua_pushnil( L ); lua_next( L, -2 ); lua_pop( L, 1 ))
-		{
-			if (!lua_islightuserdata( L, -2 )) // ignore __gc
-			{
-				continue;
-			}
-
-			UniformArray *uniformArray = (UniformArray *)lua_touserdata( L, -2 );
-
-			uniformArray->PushProxy( L );
-
-			if (lua_equal( L, -1, arrayIndex ))
-			{
-				registered = true;
-
-				break;
-			}
-
-			lua_pop( L, 1 );
-		}
-	}
-
-	lua_settop( L, top );
-
-	if (!registered)
-	{
-		CoronaLuaError( L, "Object at index %i is either not an array of uniforms or has been released" );
-	}
-
-	return registered;
-}
-
-class VersionedObserver : public UniformArrayState
-{
-public:
-	VersionedObserver()
-	{
-		for (U32 i = 0; i < (U32)Program::kNumVersions; ++i)
-		{
-			fTimestamps[i] = 0U;
-		}
-	}
-
-	virtual U32 GetTimestamp( Program::Version version ) const
-	{
-		return fTimestamps[version];
-	}
-
-	virtual void SetTimestamp( Program::Version version, U32 timestamp )
-	{
-		fTimestamps[version] = timestamp;
-	}
-
-private:
-	U32 fTimestamps[Program::kNumVersions];
-};
-
-UniformArrayState *
-UniformArray::NewObserverState() const
-{
-	// for now:
-		return Rtt_NEW( GetAllocator(), VersionedObserver() );
-	// but if using a UBO would have single (shared?) timestamp
+	return key;
 }
 
 // ----------------------------------------------------------------------------

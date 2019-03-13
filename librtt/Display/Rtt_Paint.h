@@ -167,6 +167,11 @@ class Paint
 		DisplayObject *GetObserver() const { return fObserver; }
 		void SetObserver( DisplayObject *newValue ) { fObserver = newValue; }
 
+		// STEVE CHANGE
+		U32 GetInstanceCount() const;
+		void SetInstanceCount( U32 count ) { fInstanceCount = count; }
+		// /STEVE CHANGE
+
 	public:
 		virtual PlatformBitmap *GetBitmap() const;
 
@@ -181,6 +186,10 @@ class Paint
 		mutable LuaUserdataProxy *fProxy;
 		DisplayObject *fObserver; // weak ptr
 		
+		// STEVE CHANGE
+		U32 fInstanceCount;
+		// /STEVE CHANGE
+
 	protected:
 		SharedPtr< TextureResource > fResource;
 };

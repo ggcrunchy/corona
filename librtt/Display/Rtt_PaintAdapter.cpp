@@ -84,11 +84,12 @@ PaintAdapter::GetHash( lua_State *L ) const
 		"blendMode",		// 5
 		"blendEquation",	// 6
 		// STEVE CHANGE
-		"uniformArray"		// 7
+		"numInstances",		// 7
+		"uniformArray"		// 8
 		// /STEVE CHANGE
 	};
 
-	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 0, 0, 0, __FILE__, __LINE__ ); // <- STEVE CHANGE
+	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 9, 2, 2, __FILE__, __LINE__ ); // <- STEVE CHANGE
 	return &sHash;
 }
 
@@ -153,6 +154,12 @@ PaintAdapter::ValueForKey(
 				break;
 				// STEVE CHANGE
 			case 7:
+				{
+					lua_pushinteger( L, paint->GetInstanceCount() );
+					result = 1;
+				}
+				break;
+			case 8:
 				{
 					DisplayObject *observer = paint->GetObserver();
 					if ( Rtt_VERIFY( observer ) )
@@ -322,6 +329,26 @@ PaintAdapter::SetValueForKey(
 				break;
 			// STEVE CHANGE
 			case 7:
+				{
+					S32 count = 0;
+
+					if (lua_isnumber( L, valueIndex ))
+					{
+						count = lua_tointeger( L, valueIndex );
+					}
+
+					if (count > 0)
+					{
+						paint->SetInstanceCount( (U32)count );
+					}
+
+					else
+					{
+						Rtt_TRACE_SIM( ( "ERROR: paint.numInstances could not be set b/c it expects a positive integer.\n" ) );
+					}
+				}
+				break;
+			case 8:
 				// error?
 				break;
 			// /STEVE CHANGE

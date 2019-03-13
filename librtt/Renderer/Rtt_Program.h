@@ -73,6 +73,16 @@ class Program : public CPUResource
 		}
 		Version;
 
+		// STEVE CHANGE
+		typedef enum _ArrayStateType
+		{
+			kNoState,
+			kVersioned,
+			// TODO: one or both of kSingle, kShared
+		}
+		ArrayStateType;
+		// /STEVE CHANGE
+
 		static const char *HeaderForLanguage( Language language, const ProgramHeader& headerData );
 
 		static int CountLines( const char *str );
@@ -97,8 +107,10 @@ class Program : public CPUResource
 		void SetShaderResource( ShaderResource *resource ) { fResource = resource; }
 
 		// STEVE CHANGE
-		UniformArrayState *GetUniformArrayState() const { return fUniformArrayState; }
-		void SetUniformArrayState( UniformArrayState *state ) { fUniformArrayState = state; }
+		void SetArrayStateType( ArrayStateType type );
+
+		U32 GetArrayStateTimestamp( Program::Version version ) const;
+		void SetArrayStateTimestamp( Program::Version version, U32 timestamp );
 		// /STEVE CHANGE
 
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
@@ -126,7 +138,8 @@ class Program : public CPUResource
 		int fFragmentShellNumLines;
 		ShaderResource *fResource;
 		// STEVE CHANGE
-		UniformArrayState *fUniformArrayState;
+		U32 *fUniformArrayState;
+		ArrayStateType fArrayStateType;
 		// /STEVE CHANGE
 		bool fCompilerVerbose;
 };
@@ -178,17 +191,6 @@ class ProgramHeader
 	private:
 		S8 fPrecision[kNumType]; // Precision values for each Type index 
 };
-
-// STEVE CHANGE
-class UniformArrayState
-{
-public:
-	virtual ~UniformArrayState() {}
-
-	virtual U32 GetTimestamp( Program::Version version ) const = 0;
-	virtual void SetTimestamp( Program::Version version, U32 timestamp ) = 0;
-};
-// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
 

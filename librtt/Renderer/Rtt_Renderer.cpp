@@ -495,6 +495,12 @@ Renderer::Insert( const RenderData* data )
 	Rtt_ASSERT( fBackCommandBuffer != NULL );
 	Rtt_ASSERT( fFrontCommandBuffer != NULL );
 
+	// STEVE CHANGE
+	// TODO: the instance count should also be disregarded if the shader claims not to use them
+for (U32 loop = 0U, nloops = /*!data->fGeometry->UseHardwareInstances()*/true ? data->fInstanceCount : 1U; loop < nloops; ++loop)
+{
+	// /STEVE CHANGE
+
 	bool blendDirty = data->fBlendMode != fPrevious.fBlendMode;
 	bool blendEquationDirty = data->fBlendEquation != fPrevious.fBlendEquation;
 	bool fillDirty0 = data->fFillTexture0 != fPrevious.fFillTexture0;
@@ -506,19 +512,20 @@ Renderer::Insert( const RenderData* data )
 	bool userUniformDirty1 = data->fUserUniform1 != fPrevious.fUserUniform1;
 	bool userUniformDirty2 = data->fUserUniform2 != fPrevious.fUserUniform2;
 	bool userUniformDirty3 = data->fUserUniform3 != fPrevious.fUserUniform3;
+	// STEVE CHANGE
+	bool instancingDirty = false;//data->fGeometry->UseHardwareInstances() || (fPrevious.fGeometry && fPrevious.fGeometry->UseHardwareInstances());
+	// /STEVE CHANGE
 	
 	// STEVE CHANGE
 	ShaderResource *shaderResource = data->fProgram->GetShaderResource();
-	UniformArrayState *state = data->fProgram->GetUniformArrayState();
+	UniformArray *uniformArray = shaderResource->GetUniformArray();
 	bool uniformsArrayDirty = false;
 
-	if (state != NULL)
+	if (uniformArray != NULL)
 	{
-		Rtt_ASSERT( shaderResource && shaderResource->GetUniformArray() );
-
 		Program::Version version = GetVersion( MaskCount(), fWireframeEnabled, data->fMaskTexture != NULL );
 
-		uniformsArrayDirty = state->GetTimestamp( version ) != shaderResource->GetUniformArray()->GetTimestamp();
+		uniformsArrayDirty = data->fProgram->GetArrayStateTimestamp( version ) != shaderResource->GetUniformArray()->GetTimestamp();
 	}
 	// /STEVE CHANGE
 
@@ -561,6 +568,7 @@ Renderer::Insert( const RenderData* data )
 				|| maskUniformDirty
 				|| programDirty
 				// STEVE CHANGE
+				|| instancingDirty
 				|| uniformsArrayDirty
 				// /STEVE CHANGE
 				|| userUniformDirty0
@@ -607,6 +615,12 @@ Renderer::Insert( const RenderData* data )
 		// Copy the the incoming vertex data into the current Geometry
 		// pool instance, even if the data will not be batched.
 		CopyVertexData( geometry, fCurrentVertex, batch && enoughSpace );
+		// STEVE CHANGE
+		if (loop > 0U)
+		{
+			UpdateInstanceIndices( verticesRequired, loop );
+		}
+		// /STEVE CHANGE
 		fCurrentVertex += verticesRequired;
 		fVertexCount += verticesRequired;
 		fCurrentGeometry->SetVerticesUsed( fCurrentGeometry->GetVerticesUsed() + verticesRequired );
@@ -753,8 +767,6 @@ Renderer::Insert( const RenderData* data )
 	// STEVE CHANGE
 	if (uniformsArrayDirty)
 	{
-		UniformArray *uniformArray = shaderResource->GetUniformArray();
-
 		if (uniformArray->GetDirty())
 		{
 			if (!uniformArray->fGPUResource)
@@ -771,7 +783,7 @@ Renderer::Insert( const RenderData* data )
 
 		Program::Version version = fWireframeEnabled ? Program::kWireframe : static_cast<Program::Version>( MaskCount() );
 
-		state->SetTimestamp( version, uniformArray->GetTimestamp() );
+		data->fProgram->SetArrayStateTimestamp( version, uniformArray->GetTimestamp() );
 	}
 	// /STEVE CHANGE
 
@@ -818,11 +830,31 @@ Renderer::Insert( const RenderData* data )
 		fPrevious.fUserUniform3 = data->fUserUniform3;
 	}
 	
+	// STEVE CHANGE
+} /* instance loop */
+	// /STEVE CHANGE
+
 	DEBUG_PRINT( "Insert RenderData: data=%p\n", data );
 	#if ENABLE_DEBUG_PRINT
 		data->Log();
 	#endif
 }
+
+// STEVE CHANGE
+void
+Renderer::UpdateInstanceIndices( U32 count, U32 index )
+{
+	for (U32 i = 0; i < count; ++index)
+	{
+		fCurrentVertex[i].z = (Real)index;	// TODO: this is VERY data-dependent, e.g. an actual 3D shader would
+											// balk here, and we might even have a dedicated attribute stream of
+											// mostly repeated indices (if less than 256 entries or in combination
+											// with say a uniform offset, we could even memset() this) which could
+											// be much gentler on the cache, provided the gains held up against the
+											// later vertex assembly
+	}
+}
+// /STEVE CHANGE
 
 void 
 Renderer::Render()

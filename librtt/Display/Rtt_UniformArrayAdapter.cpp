@@ -50,8 +50,8 @@ UniformArrayAdapter::GetHash( lua_State *L ) const
 {
 	static const char *keys[] = 
 	{
-		"getUniformsCount",	// 0
-		"newUniformsSetter",// 1
+		"newUniformsSetter",// 0
+		"numVectors",		// 1
 		"releaseSelf",		// 2
 		"setUniforms",		// 3
 	};
@@ -80,7 +80,9 @@ UniformArrayAdapter::ValueForKey(
 	switch ( index )
 	{
 		case 0:
-			Lua::PushCachedFunction( L, getUniformsCount );
+			{
+				lua_pushinteger( L, uniformArray->GetSizeInVectors() );
+			}
 			break;
 		case 1:
 			Lua::PushCachedFunction( L, newUniformsSetter );
@@ -135,22 +137,6 @@ UniformArrayAdapter::WillFinalize( LuaUserdataProxy& sender ) const
 }
 
 int
-UniformArrayAdapter::getUniformsCount( lua_State *L )
-{
-	int result = 0;
-	int nextArg = 1;
-	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
-	if(!sender) { return result; }
-
-	UniformArray *uniformArray = (UniformArray *)sender->GetUserdata();
-	if ( ! uniformArray ) { return result; }
-
-	lua_pushinteger( L, uniformArray ? uniformArray->GetSizeInVectors() : 0 );
-
-	return 1;
-}
-
-int
 UniformArrayAdapter::newUniformsSetter( lua_State *L )
 {
 	int result = 0;
@@ -179,7 +165,7 @@ UniformArrayAdapter::releaseSelf( lua_State *L )
 	UniformArray *uniformArray = (UniformArray *)sender->GetUserdata();
 	if ( ! uniformArray ) { return result; }
 
-	uniformArray->Release( L );
+	sender->DetachUserdata();
 
 	return 0;
 }

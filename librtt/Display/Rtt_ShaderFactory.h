@@ -31,6 +31,9 @@
 #include "Display/Rtt_Shader.h"
 #include "Display/Rtt_ShaderComposite.h"
 #include "Display/Rtt_ShaderTypes.h"
+// STEVE CHANGE
+#include "Renderer/Rtt_UniformArray.h"
+// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
 
@@ -58,6 +61,7 @@ class ShaderFactory
 		typedef ShaderFactory Self;
 	private:
 		typedef std::map<std::string, SharedPtr< Shader> > ShaderMap;
+		typedef std::map<std::string, SharedPtr< UniformArray> > UniformArrayMap;
 
 	private:
 		static int ShaderFinalizer( lua_State *L );
@@ -126,6 +130,10 @@ class ShaderFactory
 		Shader *FindOrLoad( const ShaderName& shaderName );
 		Shader *FindOrLoad( ShaderTypes::Category category, const char *name );
 
+	// STEVE CHANGE
+		bool IsRegisteredUniformArray( lua_State *L, int arrayIndex ) const;
+		void ReleaseUniformArray( UniformArray *uniformArray );
+	// /STEVE CHANGE
 	public:
 		void PushList( lua_State *L, ShaderTypes::Category category ) const;
 
@@ -142,6 +150,9 @@ class ShaderFactory
 		Program *fDefaultShell;
 		Program *fDefaultKernel;
 		ProgramHeader *fProgramHeader;
+		// STEVE CHANGE
+		UniformArrayMap fOwnedArrays;
+		// /STEVE CHANGE
 };
 
 // ----------------------------------------------------------------------------

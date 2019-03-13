@@ -26,14 +26,15 @@
 #ifndef _Rtt_UniformArray_H__
 #define _Rtt_UniformArray_H__
 
-#include "Renderer/Rtt_CPUResource.h"
 #include "Core/Rtt_Types.h"
 #include "Core/Rtt_Real.h"
+#include "Core/Rtt_SharedPtr.h"
+#include "Renderer/Rtt_CPUResource.h"
 
 // ----------------------------------------------------------------------------
 
+class Display;
 class LuaUserdataProxy;
-class UniformArrayState;
 
 struct lua_State;
 struct Rtt_Allocator;
@@ -49,8 +50,8 @@ class UniformArray : public CPUResource
 		typedef CPUResource Super;
 		typedef UniformArray Self;
 
-	public:
-		UniformArray( Rtt_Allocator *allocator, U32 count );
+	public:		
+		UniformArray( Display &display, U32 count );
 		virtual ~UniformArray();
 
 		virtual ResourceType GetType() const;
@@ -78,14 +79,10 @@ class UniformArray : public CPUResource
 		bool GetDirty() const { return fDirty; }
 		void SetDirty( bool newValue );
 
-		void Register( lua_State *L );
-		void Release( lua_State *L );
-
-		static bool IsRegistered( lua_State *L, int arrayIndex );
-
-		UniformArrayState *NewObserverState() const;
+		std::string Key() const;
 
 	private:
+		Display &fDisplay;
 		U8 *fData;
 		mutable LuaUserdataProxy *fProxy;
 		U32 fLifetimeMaxDirtyOffset;
