@@ -56,7 +56,7 @@ UniformArrayAdapter::GetHash( lua_State *L ) const
 		"setUniforms",		// 3
 	};
 
-	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 0, 0, 0, __FILE__, __LINE__ );
+	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 4, 0, 2, __FILE__, __LINE__ );
 	return &sHash;
 }
 

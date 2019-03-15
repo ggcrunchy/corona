@@ -908,11 +908,11 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
 								if (!lua_isnil( L, -1 ))
 								{
 									UniformArray *uniformArray = NULL;
-
+									int count = 0;
+									
 									if (lua_isnumber( L, -1 ))
 									{
 										int n = luaL_checkint( L, -1 );
-										int count = Display::GetUniformVectorsCount();
 
 										if (n > 0 && n <= count)
 										{
@@ -925,13 +925,18 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
 
 											count = 0;
 										}
-										
-										if (count)
-										{
-											uniformArray = Rtt_NEW( fAllocator, UniformArray( fOwner, (U32)count ) );
+									}
 
-											fOwnedArrays[uniformArray->Key()] = SharedPtr<UniformArray>( uniformArray );
-										}
+									else if (lua_type( L, -1 ) == LUA_TBOOLEAN && lua_toboolean( L, -1 ))
+									{
+										count = Display::GetUniformVectorsCount();
+									}
+										
+									if (count)
+									{
+										uniformArray = Rtt_NEW( fAllocator, UniformArray( fOwner, (U32)count ) );
+
+										fOwnedArrays[uniformArray->Key()] = SharedPtr<UniformArray>( uniformArray );
 									}
 
 									else if (IsRegisteredUniformArray( L, -1 ))

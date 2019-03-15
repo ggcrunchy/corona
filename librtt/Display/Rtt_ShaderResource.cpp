@@ -135,8 +135,7 @@ ShaderResource::~ShaderResource()
 
 void
 ShaderResource::SetProgramMod(ProgramMod mod, Program *program)
-{
-	
+{	
 	if ( Rtt_VERIFY(NULL == fPrograms[mod]) )
 	{
 		fPrograms[mod] = program;
@@ -156,6 +155,11 @@ void
 ShaderResource::SetUniformArray( UniformArray *uniformArray )
 {
 	fUniformArray = SharedPtr<UniformArray>( uniformArray );
+
+	for (int i = 0; i < kNumProgramMods; ++i)
+	{
+		fPrograms[i]->SetArrayStateType( Program::kVersioned );
+	}
 }
 
 UniformArray *

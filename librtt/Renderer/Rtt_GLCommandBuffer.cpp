@@ -684,6 +684,10 @@ GLCommandBuffer::UpdateUniformArray( UniformArray* uniformArray )
 
 	WRITE_COMMAND( kCommandUpdateUniformArray );
 
+	GLUniformArray *glUniformArray = (GLUniformArray *)uniformArray->GetGPUResource();
+
+	glUniformArray->AddPayload( uniformArray->GetData(), uniformArray->GetMinDirtyOffset(), uniformArray->GetDirtySize() );
+
 	Write<GPUResource*>( uniformArray->GetGPUResource() );
 }
 

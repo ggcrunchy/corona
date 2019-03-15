@@ -45,6 +45,7 @@ UniformArray::UniformArray( Display &display, U32 count )
 :	CPUResource( display.GetAllocator() ),
 	fDisplay( display ),
 	fData( NULL ),
+	fProxy( NULL ),
 	fSize( count * sizeof( Real ) ),
 	fTimestamp( 0 )
 {

@@ -524,7 +524,7 @@ for (U32 loop = 0U, nloops = /*!data->fGeometry->UseHardwareInstances()*/true ? 
 	{
 		Program::Version version = GetVersion( MaskCount(), fWireframeEnabled, data->fMaskTexture != NULL );
 
-		uniformsArrayDirty = data->fProgram->GetArrayStateTimestamp( version ) != shaderResource->GetUniformArray()->GetTimestamp();
+		uniformsArrayDirty = data->fProgram->GetArrayStateTimestamp( version ) != uniformArray->GetTimestamp();
 	}
 	// /STEVE CHANGE
 
