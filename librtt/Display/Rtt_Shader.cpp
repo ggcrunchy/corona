@@ -261,6 +261,10 @@ Shader::Prepare( RenderData& objectData, int w, int h, ShaderResource::ProgramMo
 	Program *program = fResource->GetProgramMod(mod);
 	
 	objectData.fProgram = program;
+
+	// STEVE CHANGE
+	objectData.fInstanceCount = fOwner ? fOwner->GetInstanceCount( this ) : 1U;
+	// /STEVE CHANGE
 }
 
 void

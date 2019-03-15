@@ -496,7 +496,6 @@ Renderer::Insert( const RenderData* data )
 	Rtt_ASSERT( fFrontCommandBuffer != NULL );
 
 	// STEVE CHANGE
-	// TODO: the instance count should also be disregarded if the shader claims not to use them
 for (U32 loop = 0U, nloops = /*!data->fGeometry->UseHardwareInstances()*/true ? data->fInstanceCount : 1U; loop < nloops; ++loop)
 {
 	// /STEVE CHANGE
@@ -531,7 +530,14 @@ for (U32 loop = 0U, nloops = /*!data->fGeometry->UseHardwareInstances()*/true ? 
 
 	Geometry* geometry = data->fGeometry;
 	Rtt_ASSERT( geometry );
+// STEVE CHANGE
+	if (0U == loop) // TODO: just hoist out of loop? also, is this right if we have a large number of instances?
+	{
+// /STEVE CHANGE
 	fDegenerateVertexCount = 0;
+// STEVE CHANGE
+	}
+// /STEVE CHANGE
 
 	// Geometry that is stored on the GPU does not need to be copied
 	// over each frame. As a consequence, they can not be batched.	
@@ -616,6 +622,9 @@ for (U32 loop = 0U, nloops = /*!data->fGeometry->UseHardwareInstances()*/true ? 
 		// pool instance, even if the data will not be batched.
 		CopyVertexData( geometry, fCurrentVertex, batch && enoughSpace );
 		// STEVE CHANGE
+		// TODO: this and the surrounding stuff the only thing really needing further iteration,
+		// so could probably break down into some auxiliary methods (might not also be true of
+		// storedOnGPU, though)
 		if (loop > 0U)
 		{
 			UpdateInstanceIndices( verticesRequired, loop );
@@ -844,7 +853,7 @@ for (U32 loop = 0U, nloops = /*!data->fGeometry->UseHardwareInstances()*/true ? 
 void
 Renderer::UpdateInstanceIndices( U32 count, U32 index )
 {
-	for (U32 i = 0; i < count; ++index)
+	for (U32 i = 0; i < count; ++i)
 	{
 		fCurrentVertex[i].z = (Real)index;	// TODO: this is VERY data-dependent, e.g. an actual 3D shader would
 											// balk here, and we might even have a dedicated attribute stream of

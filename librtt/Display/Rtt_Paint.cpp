@@ -175,10 +175,6 @@ Paint::UpdatePaint( RenderData& data )
 		}
 		SetValid( kShaderUniformDataFlag );
 	}
-
-	// STEVE CHANGE
-	data.fInstanceCount = GetInstanceCount();
-	// /STEVE CHANGE
 }
 
 Texture *
@@ -524,13 +520,13 @@ Paint::DetachShaderProxy()
 
 // STEVE CHANGE
 U32
-Paint::GetInstanceCount() const
+Paint::GetInstanceCount( const Shader *shader ) const
 {
 	U32 count = 1U;
 
-	if (fShader && fInstanceCount > 1U)
+	if (fInstanceCount > 1U)
 	{
-		SharedPtr<ShaderResource> resource = fShader->GetData()->GetShaderResource();
+		const SharedPtr<ShaderResource> resource = shader->GetData()->GetShaderResource();
 
 		if (resource->GetAcceptsInstances())
 		{

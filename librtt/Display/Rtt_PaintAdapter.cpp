@@ -155,7 +155,7 @@ PaintAdapter::ValueForKey(
 				// STEVE CHANGE
 			case 7:
 				{
-					lua_pushinteger( L, paint->GetInstanceCount() );
+					lua_pushinteger( L, paint->GetInstanceCount( NULL/* TODO!*/ ) );
 					result = 1;
 				}
 				break;
@@ -340,6 +340,13 @@ PaintAdapter::SetValueForKey(
 					if (count > 0)
 					{
 						paint->SetInstanceCount( (U32)count );
+
+						DisplayObject *observer = paint->GetObserver();
+
+						if (observer)
+						{
+							observer->Invalidate( DisplayObject::kProgramFlag );
+						}
 					}
 
 					else

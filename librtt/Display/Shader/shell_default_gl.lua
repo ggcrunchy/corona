@@ -8,7 +8,7 @@ shell.name = "default"
 
 shell.vertex =
 [[
-attribute vec2 a_Position;
+attribute vec3 a_Position; // <- STEVE CHANGE
 attribute vec3 a_TexCoord;
 attribute vec4 a_ColorScale;
 attribute vec4 a_UserData;
@@ -27,6 +27,10 @@ uniform P_POSITION mat4 u_ViewProjectionMatrix;
 #define CoronaDeltaTime u_DeltaTime
 #define CoronaTexelSize u_TexelSize
 #define CoronaContentScale u_ContentScale
+
+// STEVE CHANGE
+#define CoronaInstanceIndex a_Position.z
+// /STEVE CHANGE
 
 #if MASK_COUNT > 0
     uniform P_POSITION mat3 u_MaskMatrix0;
@@ -83,7 +87,7 @@ void main()
 	v_ColorScale = a_ColorScale;
 	v_UserData = a_UserData;
 
-	P_POSITION vec2 position = VertexKernel( a_Position );
+	P_POSITION vec2 position = VertexKernel( a_Position.xy ); // <- STEVE CHANGE
 
     #if MASK_COUNT > 0
         v_MaskUV0 = ( u_MaskMatrix0 * vec3( position, 1.0 ) ).xy;

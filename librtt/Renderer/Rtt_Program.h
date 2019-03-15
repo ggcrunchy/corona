@@ -78,6 +78,9 @@ class Program : public CPUResource
 		{
 			kNoState,
 			kVersioned,
+			// TODO: could have a non-allocating versioned by binning timestamps into
+			// sizeof( UniformArrayState * ) / kNumVersions bits each, only "upgrading"
+			// to an allocated one if one of these overflows the bin
 			// TODO: one or both of kSingle, kShared
 		}
 		ArrayStateType;

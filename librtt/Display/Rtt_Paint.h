@@ -168,7 +168,7 @@ class Paint
 		void SetObserver( DisplayObject *newValue ) { fObserver = newValue; }
 
 		// STEVE CHANGE
-		U32 GetInstanceCount() const;
+		U32 GetInstanceCount( const Shader *shader ) const;
 		void SetInstanceCount( U32 count ) { fInstanceCount = count; }
 		// /STEVE CHANGE
 

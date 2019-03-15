@@ -292,7 +292,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 								"\n"
 								"uniform P_UV vec4 u_UniformVectors[ CoronaUniformVectorsCount ];\n"
 								"\n"
-								"#define CoronaUniformVector( i ) u_UniformVectors[ int( i ) ]\n\n";
+								"#define CoronaUniformVector( INDEX ) u_UniformVectors[ int( INDEX ) ]\n\n";
 		}
 		// /STEVE CHANGE
 		shader_source[/* STEVE CHANGE 4 */7] = program->GetVertexShaderSource();
