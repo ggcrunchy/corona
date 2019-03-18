@@ -748,38 +748,106 @@ GraphicsLibrary::newTexture( lua_State *L )
 }
 
 // STEVE CHANGE
-// graphics.newUniformArray( count )
+// graphics.newUniformArray( [count] )
+// graphics.newUniformArray( { [count=], [type=], [isCompact=] } )
 int
 GraphicsLibrary::newUniformArray( lua_State *L )
 {
-	int result = 0;
+	int result = 0, n = 0, max = Display::GetUniformVectorsCount();
+	Uniform::DataType type = Uniform::kVec4;
+	bool compact = false;
+
 	SharedPtr<UniformArray> ret;
 
-	if (lua_isnumber( L, 1 ))
+	if (lua_istable( L, 1 ))
 	{
-		S32 count = lua_tointeger( L, 1 );
+		n = max;
 
-		if (count <= 0)
+		lua_getfield( L, 1, "count" );
+
+		if (lua_isnumber( L, -1 ))
 		{
-			CoronaLuaError( L, "graphics.newUniformArray() expects a positive integer" );
+			n = lua_tointeger( L, -1 );
 		}
 
-		else if (count > Display::GetUniformVectorsCount())
+		lua_pop( L, 1 );
+
+		lua_getfield( L, 1, "type" );
+
+		if (lua_isstring( L, -1 ))
 		{
-			CoronaLuaError( L, "graphics.newUniformArray() requested more than maximum (%i) vector count", Display::GetUniformVectorsCount() );
+			const char *str = lua_tostring( L, -1 );
+
+			type = Uniform::DataTypeForString( str );
+
+			switch (type)
+			{
+			case Uniform::kMat3:
+				n *= 3;
+				break;
+			case Uniform::kMat4:
+				n *= 4;
+				break;
+			}
 		}
 
-		else
+		lua_pop( L, 1 );
+
+		lua_getfield( L, 1, "isCompact" );
+
+		compact = lua_toboolean( L, -1 ) != 0;
+
+		if (compact)
 		{
-			// TODO: allow for sharing
-			GraphicsLibrary *library = GraphicsLibrary::ToLibrary( L );
-			ret = SharedPtr<UniformArray>( new UniformArray( library->GetDisplay(), (U32)count ) );
+			switch (type)
+			{
+			case Uniform::kVec2:
+				n += 1; // round up
+				n /= 2; // can pack two per vec4
+				break;
+			case Uniform::kScalar:
+			case Uniform::kVec3:
+			case Uniform::kMat3:
+				if (type != Uniform::kScalar)
+				{
+					n *= 3; // n.b. in mat3 case, already rounded up in previous step
+				}
+
+				n += 3; // round up...
+				n /= 4; // ...and put in terms of vec4
+				break;
+			}
 		}
+
+		lua_pop( L, 1 );
+
+		// TODO: allow for sharing
+	}
+
+	else if (lua_isnumber( L, 1 ) || lua_isnoneornil( L, 1 ))
+	{
+		n = lua_isnumber( L, 1 ) ? lua_tointeger( L, 1 ) : max;
 	}
 
 	else
 	{
-		CoronaLuaError( L, "graphics.newUniformArray() requires a number" );
+		CoronaLuaError( L, "graphics.newUniformArray() requires a number or table" );
+	}
+	
+	if (n > 0 && n <= max)
+	{
+		GraphicsLibrary *library = GraphicsLibrary::ToLibrary( L );
+		ret = SharedPtr<UniformArray>( new UniformArray( library->GetDisplay(), (U32)n, type, compact ) );
+	}
+
+	else if (n <= 0)
+	{
+		CoronaLuaError( L, "graphics.newUniformArray() expects a positive integer" );
+	}
+
+	else
+	{
+		CoronaLuaError( L, "graphics.newUniformArray() requested more than maximum (%i) vector count", Display::GetUniformVectorsCount() );
 	}
 
 	if (ret.NotNull())

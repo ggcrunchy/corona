@@ -78,9 +78,7 @@ class Program : public CPUResource
 		{
 			kNoState,
 			kVersioned,
-			// TODO: could have a non-allocating versioned by binning timestamps into
-			// sizeof( UniformArrayState * ) / kNumVersions bits each, only "upgrading"
-			// to an allocated one if one of these overflows the bin
+			kVersionedAllocating,
 			// TODO: one or both of kSingle, kShared
 		}
 		ArrayStateType;
@@ -129,6 +127,10 @@ class Program : public CPUResource
 		bool IsCompilerVerbose() const { return fCompilerVerbose; }
 		void SetCompilerVerbose( bool newValue ) { fCompilerVerbose = newValue; }
 
+		// STEVE CHANGE
+	private:
+		static void ClearArrayState( ArrayStateType type, U32 *state );
+		// /STEVE CHANGE
 
 	private:
 		char *fVertexShaderSource;

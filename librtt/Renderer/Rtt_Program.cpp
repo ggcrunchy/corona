@@ -154,8 +154,9 @@ Program::Deallocate()
 	fFragmentShaderSource = NULL;
 
 	// STEVE CHANGE
-	Rtt_FREE( fUniformArrayState );
+	ClearArrayState( fArrayStateType, fUniformArrayState );
 
+	fArrayStateType = kNoState;
 	fUniformArrayState = NULL;
 	// /STEVE CHANGE
 
@@ -201,14 +202,24 @@ Program::SetHeaderSource( const char* source )
 void 
 Program::SetArrayStateType( ArrayStateType type )
 {
-	Rtt_FREE( fUniformArrayState );
-
-	if (kVersioned == type)
+	if (type != fArrayStateType)
 	{
-		fUniformArrayState = (U32*)Rtt_CALLOC( GetAllocator(), kNumVersions, sizeof( U32 ) );
-	}
+		U32 *prevState = fUniformArrayState;
 
-	fArrayStateType = type;
+		switch (type)
+		{
+		case kVersioned:
+			fUniformArrayState = NULL;
+			break;
+		case kVersionedAllocating:
+			fUniformArrayState = (U32*)Rtt_CALLOC( GetAllocator(), kNumVersions, sizeof( U32 ) );
+			break;
+		}
+
+		ClearArrayState( fArrayStateType, prevState );
+
+		fArrayStateType = type;
+	}
 }
 
 U32 
@@ -217,6 +228,16 @@ Program::GetArrayStateTimestamp( Program::Version version ) const
 	switch (fArrayStateType)
 	{
 	case kVersioned:
+		{
+			const size_t StampBits = sizeof( fUniformArrayState ) / kNumVersions;
+			const U64 Mask = (1U << StampBits) - 1U;
+
+			U64 uintptr = reinterpret_cast<U64>(fUniformArrayState);
+			size_t shift = StampBits * version;
+
+			return (U32)((uintptr >> shift) & Mask);
+		}
+	case kVersionedAllocating:
 		return fUniformArrayState[version];
 	default:
 		return 0U;
@@ -226,13 +247,54 @@ Program::GetArrayStateTimestamp( Program::Version version ) const
 void 
 Program::SetArrayStateTimestamp( Program::Version version, U32 timestamp )
 {
+	const size_t StampBits = sizeof( fUniformArrayState ) / kNumVersions;
+	const U64 Mask = (1U << StampBits) - 1U;
+
 	switch (fArrayStateType)
 	{
 	case kVersioned:
+		if (timestamp <= Mask)
+		{
+			U64 uintptr = reinterpret_cast<U64>(fUniformArrayState);
+			size_t shift = StampBits * version;
+
+			uintptr &= ~(Mask << shift);
+			uintptr |= timestamp << shift;
+
+			fUniformArrayState = reinterpret_cast<U32*>(uintptr);
+
+			break;
+		}
+
+		else
+		{
+			U32 stamps[kNumVersions];
+
+			for (U32 i = 0; i < kNumVersions; ++i)
+			{
+				stamps[i] = GetArrayStateTimestamp( (Program::Version)i );
+			}
+
+			SetArrayStateType( kVersionedAllocating );
+
+			memcpy( fUniformArrayState, stamps, sizeof( stamps ) );
+
+			// fall through...
+		}
+	case kVersionedAllocating:
 		fUniformArrayState[version] = timestamp;
 		break;
 	default:
 		break;
+	}
+}
+
+void
+Program::ClearArrayState( ArrayStateType type, U32 *state )
+{
+	if (kVersioned == type)
+	{
+		Rtt_FREE( state );
 	}
 }
 // /STEVE CHANGE

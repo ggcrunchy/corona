@@ -934,7 +934,7 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
 										
 									if (count)
 									{
-										uniformArray = Rtt_NEW( fAllocator, UniformArray( fOwner, (U32)count ) );
+										uniformArray = Rtt_NEW( fAllocator, UniformArray( fOwner, (U32)count, Uniform::kVec4, false ) );
 
 										fOwnedArrays[uniformArray->Key()] = SharedPtr<UniformArray>( uniformArray );
 									}

@@ -30,6 +30,7 @@
 #include "Core/Rtt_Real.h"
 #include "Core/Rtt_SharedPtr.h"
 #include "Renderer/Rtt_CPUResource.h"
+#include "Renderer/Rtt_Uniform.h"
 
 // ----------------------------------------------------------------------------
 
@@ -51,7 +52,7 @@ class UniformArray : public CPUResource
 		typedef UniformArray Self;
 
 	public:		
-		UniformArray( Display &display, U32 count );
+		UniformArray( Display &display, U32 count, Uniform::DataType dataType, bool compact );
 		virtual ~UniformArray();
 
 		virtual ResourceType GetType() const;
@@ -76,21 +77,30 @@ class UniformArray : public CPUResource
 		U32 Set( const U8 *bytes, U32 offset, U32 n );
 		U32 Set( const Real *reals, U32 offset, U32 n );
 
+		Uniform::DataType GetDataType() const { return fDataType; }
+		bool GetIsCompact() const { return fCompact; }
+
 		bool GetDirty() const { return fDirty; }
 		void SetDirty( bool newValue );
 
 		std::string Key() const;
 
 	private:
+		void ZeroPadExtrema();
+		void ZeroRange( U32 from, U32 to );
+
+	private:
 		Display &fDisplay;
 		U8 *fData;
 		mutable LuaUserdataProxy *fProxy;
+		Uniform::DataType fDataType;
 		U32 fLifetimeMaxDirtyOffset;
 		U32 fLifetimeMinDirtyOffset;
 		U32 fMaxDirtyOffset;
 		U32 fMinDirtyOffset;
 		U32 fSize;
 		U32 fTimestamp;
+		bool fCompact;
 		bool fDirty;
 };
 

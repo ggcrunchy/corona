@@ -519,22 +519,18 @@ Paint::DetachShaderProxy()
 }
 
 // STEVE CHANGE
+static bool
+AcceptsInstances( const Shader *shader )
+{
+	SharedPtr<ShaderResource> resource = shader->GetData()->GetShaderResource();
+
+	return resource->GetAcceptsInstances();
+}
+
 U32
 Paint::GetInstanceCount( const Shader *shader ) const
 {
-	U32 count = 1U;
-
-	if (fInstanceCount > 1U)
-	{
-		const SharedPtr<ShaderResource> resource = shader->GetData()->GetShaderResource();
-
-		if (resource->GetAcceptsInstances())
-		{
-			count = fInstanceCount;
-		}
-	}
-
-	return count;
+	return fInstanceCount > 1U && (!shader || AcceptsInstances( shader )) ? fInstanceCount : 1U;
 }
 // /STEVE CHANGE
 

@@ -41,13 +41,15 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-UniformArray::UniformArray( Display &display, U32 count )
+UniformArray::UniformArray( Display &display, U32 count, Uniform::DataType dataType, bool compact )
 :	CPUResource( display.GetAllocator() ),
 	fDisplay( display ),
 	fData( NULL ),
 	fProxy( NULL ),
+	fDataType( dataType ),
 	fSize( count * sizeof( Real ) ),
-	fTimestamp( 0 )
+	fTimestamp( 0 ),
+	fCompact( compact )
 {
 	Allocate();
 	SetDirty( false );
@@ -132,6 +134,15 @@ UniformArray::Set( const U8 *bytes, U32 offset, U32 n )
 
 			if (offset < fLifetimeMinDirtyOffset)
 			{
+				if (offset + n < fLifetimeMinDirtyOffset) // does this introduce a swath of uninitialized memory?
+				{
+					ZeroRange( offset + n, fLifetimeMinDirtyOffset ); // Platforms like GL zero the memory by default; clearing the
+																	  // unassigned parts leaves the corresponding parts intact. The
+																	  // same motivation underlies ZeroPadExtrema: when writing non-
+																	  // vec4 / mat4 types, we might otherwise leave gaps.
+																	  // (TODO: can arrays be initialized in-shader?)
+				}
+
 				fLifetimeMinDirtyOffset = offset;
 			}
 		}
@@ -168,6 +179,40 @@ UniformArray::SetDirty( bool newValue )
 		 fMaxDirtyOffset = 0U;
 		 fMinDirtyOffset = fSize;
 	 }
+}
+
+void
+UniformArray::ZeroPadExtrema()
+{
+	const size_t Alignment = 4U * sizeof( Real );
+
+	U32 maxPart = fLifetimeMaxDirtyOffset % Alignment;
+
+	if (maxPart != 0)
+	{
+		U32 maxDirtyOffset = fLifetimeMaxDirtyOffset + (Alignment - maxPart);
+
+		ZeroRange( fLifetimeMaxDirtyOffset, maxDirtyOffset );
+
+		fLifetimeMaxDirtyOffset = maxDirtyOffset;
+	}
+
+	U32 minPart = fLifetimeMinDirtyOffset % Alignment;
+
+	if (minPart != 0)
+	{
+		U32 minDirtyOffset = fLifetimeMinDirtyOffset - minPart;
+
+		ZeroRange( minDirtyOffset, fLifetimeMinDirtyOffset );
+
+		fLifetimeMinDirtyOffset = minDirtyOffset;
+	}
+}
+
+void
+UniformArray::ZeroRange( U32 from, U32 to )
+{
+	memset( fData + from, 0, to < Min( to, fSize ) - from );
 }
 
 std::string
