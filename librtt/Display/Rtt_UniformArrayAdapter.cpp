@@ -23,6 +23,10 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include "Core/Rtt_Macros.h"
+#include "Core/Rtt_Types.h"
+#include "Core/Rtt_Math.h"
+#include "Core/Rtt_Real.h"
 #include "Display/Rtt_UniformArrayAdapter.h"
 #include "Renderer/Rtt_UniformArray.h"
 #include "Rtt_LuaContext.h"
@@ -203,21 +207,6 @@ ShaderStateAdapter::releaseEffect( lua_State *L )
 	return 0;
 }
 #endif
-static void
-SetSingleUniformVector( UniformArray *uniformArray, lua_State *L, U32 index )
-{
-	Real uniform[4];
-
-	for (int i = 0; i < 4; ++i)
-	{
-		// Errors along the way mean partially written uniforms, but guarding against this
-		// requires a potentially expensive verify step or making a copy. As a compromise,
-		// treat non-numbers as 0.
-		uniform[i] = lua_isnumber( L, -4 + i ) ? (Real)lua_tonumber( L, -4 + i ) : Rtt_REAL_0;
-	}
-
-	uniformArray->Set( uniform, index * 4U, 4U );
-}
 
 int
 UniformArrayAdapter::setUniforms( lua_State *L )
@@ -236,68 +225,118 @@ UniformArrayAdapter::setUniforms( lua_State *L )
 	{
 		first = lua_tointeger( L, nextArg++ );
 
-		luaL_argcheck( L, first > 0 && (U32)first < uniformArray->GetSizeInVectors(), nextArg - 1, "Uniform index is out of bounds" );
+		luaL_argcheck( L, first > 0, nextArg - 1, "Index must be positive" );
 	}
 
 	int tableIndex = nextArg++;
 
 	luaL_checktype( L, tableIndex, LUA_TTABLE );
-	lua_getfield( L, tableIndex, "x" );
-	lua_getfield( L, tableIndex, "y" );
-	lua_getfield( L, tableIndex, "z" );
-	lua_getfield( L, tableIndex, "w" );
+	
+	Uniform::DataType type = uniformArray->GetDataType();
+	U32 comps;
 
-	bool single = !lua_isnil( L, -4 ) || !lua_isnil( L, -3 ) || !lua_isnil( L, -2 ) || !lua_isnil( L, -1 );
-
-	if (single)
+	switch (type)
 	{
-		SetSingleUniformVector( uniformArray, L, (U32)(first - 1) ); // see note (although since not in a loop, could be more aggressive)
+	case Uniform::kScalar:
+		comps = 1U;
+		break;
+	case Uniform::kVec2:
+		comps = 2U;
+		break;
+	case Uniform::kVec3:
+		comps = 3U;
+		break;
+	case Uniform::kVec4:
+		comps = 4U;
+		break;
+	case Uniform::kMat3:
+		comps = 9U;
+		break;
+	case Uniform::kMat4:
+		comps = 16U;
+		break;
+	default:
+		Rtt_ASSERT_NOT_REACHED();
 	}
 
-	lua_pop( L, 4 );
+	U32 step = comps;
+	bool compact = uniformArray->GetIsCompact();
 
-	if (!single)
+	if (!compact)
 	{
-		int iMin = 1, iMax = 0;
+		step += 3U;
+		step &= ~3U;
+	}
+
+	int nsteps = (int)(uniformArray->GetSizeInVectors() / step);
+	int iMin = 1, iMax = nsteps;
+
+	if (lua_isnumber( L, nextArg ))
+	{
+		iMin = lua_tointeger( L, nextArg++ );
+
+		luaL_argcheck( L, iMin >= 1, nextArg - 1, "Table min index is out of bounds" );
 
 		if (lua_isnumber( L, nextArg ))
 		{
-			iMin = lua_tointeger( L, nextArg++ );
+			iMax = lua_tointeger( L, nextArg );
 
-			luaL_argcheck( L, iMin >= 1, nextArg - 1, "Table min index is out of bounds" );
-
-			if (lua_isnumber( L, nextArg ))
-			{
-				iMax = lua_tointeger( L, nextArg );
-
-				luaL_argcheck( L, iMax >= iMin, nextArg, "Table max index is out of bounds" );
-			}
+			luaL_argcheck( L, iMax >= iMin, nextArg, "Table max index is out of bounds" );
 		}
+	}
 
-		int offset = (iMin - 1) * 4;
+	U32 read_pos = (U32)(iMin - 1) * comps;
+	U32 write_pos = (U32)(first - 1) * step;
+	Real uniform[16];
 
-		for (U32 i = (U32)(first - 1), size = uniformArray->GetSizeInVectors(); i < size; ++i, ++iMin, offset += 4)
+	for (nsteps = Min( iMax, nsteps ) - iMin + 1; nsteps > 0; --nsteps, write_pos += step)
+	{
+		U32 nread = 0;
+
+		for (U32 i = 0; i < comps; ++i)
 		{
-			lua_rawgeti( L, tableIndex, offset + 1 );
-			lua_rawgeti( L, tableIndex, offset + 2 );
-			lua_rawgeti( L, tableIndex, offset + 3 );
-			lua_rawgeti( L, tableIndex, offset + 4 );
+			lua_rawgeti( L, tableIndex, ++read_pos );
 
-			bool done = iMax ?
-				iMin > iMax :
-				!lua_isnumber( L, -4 ) || !lua_isnumber( L, -3 ) || !lua_isnumber( L, -2 ) || !lua_isnumber( L, -1 ); // see note in SetSingleUniformVector()
-
-			if (done)
+			if (!lua_isnil( L, -1 ))
 			{
-				break;
+				uniform[nread++] = luaL_toreal( L, -1 );
 			}
-			
+
 			else
 			{
-				SetSingleUniformVector( uniformArray, L, i );
+				for (U32 n = nread ? comps : 0U; i < n; ++i)
+				{
+					uniform[i] = Rtt_REAL_0;
+				}
+
+				i = comps;	// kill the inner...
+				nsteps = 0; // ...and outer loops
 			}
 
-			lua_pop( L, 4 );
+			lua_pop( L, 1 );
+		}
+
+		if (nread)
+		{
+			if (type != Uniform::kMat3 || compact)
+			{
+				uniformArray->Set( uniform, write_pos, comps );
+
+				if (type != Uniform::kVec4 && type != Uniform::kMat4)
+				{
+					uniformArray->ZeroPadExtrema();
+				}
+			}
+
+			else
+			{
+				uniformArray->Set( &uniform[0], write_pos, 3U );
+				uniformArray->ZeroPadExtrema();
+				uniformArray->Set( &uniform[4], write_pos + 4U, 3U );
+				uniformArray->ZeroPadExtrema();
+				uniformArray->Set( &uniform[8], write_pos + 8U, 3U );
+				uniformArray->ZeroPadExtrema();
+			}
 		}
 	}
 

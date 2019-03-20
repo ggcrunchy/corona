@@ -76,6 +76,7 @@ class UniformArray : public CPUResource
 
 		U32 Set( const U8 *bytes, U32 offset, U32 n );
 		U32 Set( const Real *reals, U32 offset, U32 n );
+		void ZeroPadExtrema();
 
 		Uniform::DataType GetDataType() const { return fDataType; }
 		bool GetIsCompact() const { return fCompact; }
@@ -86,7 +87,6 @@ class UniformArray : public CPUResource
 		std::string Key() const;
 
 	private:
-		void ZeroPadExtrema();
 		void ZeroRange( U32 from, U32 to );
 
 	private:
