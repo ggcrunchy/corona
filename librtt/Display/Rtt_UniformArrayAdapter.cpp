@@ -208,32 +208,10 @@ ShaderStateAdapter::releaseEffect( lua_State *L )
 }
 #endif
 
-int
-UniformArrayAdapter::setUniforms( lua_State *L )
+static U32
+GetComponentCount( Uniform::DataType type )
 {
-	int result = 0;
-	int nextArg = 1;
-	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
-	if(!sender) { return result; }
-
-	UniformArray *uniformArray = (UniformArray *)sender->GetUserdata();
-	if ( ! uniformArray ) { return result; }
-
-	int first = 1;
-
-	if (lua_isnumber( L, nextArg ))
-	{
-		first = lua_tointeger( L, nextArg++ );
-
-		luaL_argcheck( L, first > 0, nextArg - 1, "Index must be positive" );
-	}
-
-	int tableIndex = nextArg++;
-
-	luaL_checktype( L, tableIndex, LUA_TTABLE );
-	
-	Uniform::DataType type = uniformArray->GetDataType();
-	U32 comps;
+	U32 comps = 0U;
 
 	switch (type)
 	{
@@ -259,7 +237,74 @@ UniformArrayAdapter::setUniforms( lua_State *L )
 		Rtt_ASSERT_NOT_REACHED();
 	}
 
-	U32 step = comps;
+	return comps;
+}
+
+static void
+ZeroPad( Real uniform[], U32 i, U32 comps )
+{
+	while (i < comps)
+	{
+		uniform[i++] = Rtt_REAL_0;
+	}
+}
+
+static U32
+ReadUniform( lua_State *L, int tableIndex, Real uniform[], U32 read_pos, U32 comps )
+{
+	U32 nread = 0U;
+
+	for (U32 i = 0U; i < comps; ++i)
+	{
+		lua_rawgeti( L, tableIndex, ++read_pos );
+
+		if (!lua_isnil( L, -1 ))
+		{
+			uniform[nread++] = luaL_toreal( L, -1 );
+		}
+
+		else
+		{
+			if (nread)
+			{
+				ZeroPad( uniform, nread, comps );
+			}
+
+			comps = 0U;	// kill the loop
+		}
+
+		lua_pop( L, 1 );
+	}
+
+	return nread;
+}
+
+int
+UniformArrayAdapter::setUniforms( lua_State *L )
+{
+	int result = 0;
+	int nextArg = 1;
+	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
+	if(!sender) { return result; }
+
+	UniformArray *uniformArray = (UniformArray *)sender->GetUserdata();
+	if ( ! uniformArray ) { return result; }
+
+	int first = 1;
+
+	if (lua_isnumber( L, nextArg ))
+	{
+		first = lua_tointeger( L, nextArg++ );
+
+		luaL_argcheck( L, first > 0, nextArg - 1, "Index must be positive" );
+	}
+
+	int tableIndex = nextArg++;
+
+	luaL_checktype( L, tableIndex, LUA_TTABLE );
+	
+	Uniform::DataType type = uniformArray->GetDataType();
+	U32 comps = GetComponentCount( type ), step = comps;
 	bool compact = uniformArray->GetIsCompact();
 
 	if (!compact)
@@ -287,34 +332,12 @@ UniformArrayAdapter::setUniforms( lua_State *L )
 
 	U32 read_pos = (U32)(iMin - 1) * comps;
 	U32 write_pos = (U32)(first - 1) * step;
-	Real uniform[16];
 
 	for (nsteps = Min( iMax, nsteps ) - iMin + 1; nsteps > 0; --nsteps, write_pos += step)
 	{
-		U32 nread = 0;
+		Real uniform[16];
 
-		for (U32 i = 0; i < comps; ++i)
-		{
-			lua_rawgeti( L, tableIndex, ++read_pos );
-
-			if (!lua_isnil( L, -1 ))
-			{
-				uniform[nread++] = luaL_toreal( L, -1 );
-			}
-
-			else
-			{
-				for (U32 n = nread ? comps : 0U; i < n; ++i)
-				{
-					uniform[i] = Rtt_REAL_0;
-				}
-
-				i = comps;	// kill the inner...
-				nsteps = 0; // ...and outer loops
-			}
-
-			lua_pop( L, 1 );
-		}
+		U32 nread = ReadUniform( L, tableIndex, uniform, read_pos, comps );
 
 		if (nread)
 		{
@@ -330,13 +353,20 @@ UniformArrayAdapter::setUniforms( lua_State *L )
 
 			else
 			{
-				uniformArray->Set( &uniform[0], write_pos, 3U );
+				uniformArray->Set( &uniform[0], write_pos + 0U, 3U );
 				uniformArray->ZeroPadExtrema();
-				uniformArray->Set( &uniform[4], write_pos + 4U, 3U );
+				uniformArray->Set( &uniform[3], write_pos + 4U, 3U );
 				uniformArray->ZeroPadExtrema();
-				uniformArray->Set( &uniform[8], write_pos + 8U, 3U );
+				uniformArray->Set( &uniform[6], write_pos + 8U, 3U );
 				uniformArray->ZeroPadExtrema();
 			}
+
+			read_pos += nread;
+		}
+		
+		if (nread < comps)
+		{
+			break;
 		}
 	}
 
