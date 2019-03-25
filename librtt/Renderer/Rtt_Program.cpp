@@ -229,7 +229,7 @@ Program::GetArrayStateTimestamp( Program::Version version ) const
 	{
 	case kVersioned:
 		{
-			const size_t StampBits = sizeof( fUniformArrayState ) / kNumVersions;
+			const size_t StampBits = sizeof( fUniformArrayState ) * 8U / kNumVersions;
 			const U64 Mask = (1U << StampBits) - 1U;
 
 			U64 uintptr = reinterpret_cast<U64>(fUniformArrayState);
@@ -247,7 +247,7 @@ Program::GetArrayStateTimestamp( Program::Version version ) const
 void 
 Program::SetArrayStateTimestamp( Program::Version version, U32 timestamp )
 {
-	const size_t StampBits = sizeof( fUniformArrayState ) / kNumVersions;
+	const size_t StampBits = sizeof( fUniformArrayState ) * 8U / kNumVersions;
 	const U64 Mask = (1U << StampBits) - 1U;
 
 	switch (fArrayStateType)

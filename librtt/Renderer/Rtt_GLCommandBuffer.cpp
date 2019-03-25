@@ -1026,7 +1026,7 @@ GLCommandBuffer::Execute( bool measureGPU )
 					
 					for (U32 i = 0; i < count; ++i)
 					{
-						GLsizei location = base + intervals[i].start / sizeof( Real );
+						GLsizei location = base + intervals[i].start / (4U * sizeof( Real ));
 
 						glUniform4fv( location, intervals[i].count / sizeof( Real ), (GLfloat *)(uniformArray->GetData() + intervals[i].start) );
 					}
