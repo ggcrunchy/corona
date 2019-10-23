@@ -2067,7 +2067,8 @@ void RuntimeEnvironment::OnDestroyingSurface(UI::UIComponent &sender, const Even
 		// We can't reliably select the OpenGL context of a window/control that is being destroyed.
 		// So, let Corona's OpenGL functions no-op and let the surface destroy the context itself.
 		::wglMakeCurrent(nullptr, nullptr);
-
+// STEVE CHANGE TODO
+// /STEVE CHANGE
 		// Delete the Corona runtime.
 		// Note: This will dispatch a Lua "applicationEvent" and terminate the runtime before deletion.
 		Rtt_DELETE(fRuntimePointer);

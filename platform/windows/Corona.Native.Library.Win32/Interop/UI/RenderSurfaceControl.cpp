@@ -28,10 +28,13 @@
 #include "Core\Rtt_Assert.h"
 #include "WinString.h"
 #include <exception>
+// STEVE CHANGE TODO
 #include <GL\glew.h>
 #include <GL\wglew.h>
 #include <GL\gl.h>
 #include <GL\glu.h>
+// #include <vulkan/vulkan.h>
+// /STEVE CHANGE
 
 
 namespace Interop { namespace UI {
@@ -86,6 +89,7 @@ void RenderSurfaceControl::SelectRenderingContext()
 	BOOL wasSelected = FALSE;
 	if (fRenderingContextHandle)
 	{
+// STEVE CHANGE TODO
 		// Favor the Win32 BeginPaint() function's device context over our main device context, if available.
 		if (fPaintDeviceContextHandle)
 		{
@@ -95,7 +99,7 @@ void RenderSurfaceControl::SelectRenderingContext()
 		{
 			wasSelected = ::wglMakeCurrent(fMainDeviceContextHandle, fRenderingContextHandle);
 		}
-
+// /STEVE CHANGE
 		// Log an error if we've failed to select a rendering context.
 		// Note: This can happen while the control is being destroyed.
 		if (!wasSelected)
@@ -125,7 +129,9 @@ void RenderSurfaceControl::SelectRenderingContext()
 	// If we've failed, then select a null context so that the caller won't clobber another rendering context by mistake.
 	if (!wasSelected)
 	{
+		// STEVE CHANGE TODO
 		::wglMakeCurrent(nullptr, nullptr);
+		// /STEVE CHANGE
 	}
 }
 
@@ -218,7 +224,9 @@ void RenderSurfaceControl::CreateContext()
 	}
 
 	// Create and enable the OpenGL rendering context.
+// STEVE CHANGE TODO
 	fRenderingContextHandle = ::wglCreateContext(fMainDeviceContextHandle);
+// /STEVE CHANGE
 	if (!fRenderingContextHandle)
 	{
 		LPWSTR utf16Buffer;
@@ -240,7 +248,7 @@ void RenderSurfaceControl::CreateContext()
 		}
 		::LocalFree(utf16Buffer);
 	}
-
+// STEVE CHANGE TODO
 	// Select the newly created OpenGL context.
 	::wglMakeCurrent(fMainDeviceContextHandle, fRenderingContextHandle);
 
@@ -249,6 +257,7 @@ void RenderSurfaceControl::CreateContext()
 
 	// Fetch the OpenGL driver's version.
 	const char* versionString = (const char*)glGetString(GL_VERSION);
+// STEVE CHANGE
 	fRendererVersion.SetString(versionString);
 	fRendererVersion.SetMajorNumber(0);
 	fRendererVersion.SetMinorNumber(0);
@@ -270,7 +279,7 @@ void RenderSurfaceControl::DestroyContext()
 {
 	// Fetch this control's window handle.
 	auto windowHandle = GetWindowHandle();
-
+// STEVE CHANGE TODO
 	// Destroy the OpenGL context.
 	::wglMakeCurrent(nullptr, nullptr);
 	if (fRenderingContextHandle)
@@ -278,6 +287,7 @@ void RenderSurfaceControl::DestroyContext()
 		::wglDeleteContext(fRenderingContextHandle);
 		fRenderingContextHandle = nullptr;
 	}
+// /STEVE CHANGE
 	if (fMainDeviceContextHandle)
 	{
 		if (windowHandle)
@@ -374,7 +384,7 @@ RenderSurfaceControl::FetchMultisampleFormatResult RenderSurfaceControl::FetchMu
 			::DestroyWindow(controlHandle);
 			return result;
 		}
-
+// STEVE CHANGE TODO
 		// Select the newly created OpenGL context.
 		BOOL wasContextSelected = ::wglMakeCurrent(deviceContextHandle, renderingContextHandle);
 		if (!wasContextSelected)
@@ -425,7 +435,7 @@ RenderSurfaceControl::FetchMultisampleFormatResult RenderSurfaceControl::FetchMu
 		::wglDeleteContext(renderingContextHandle);
 		::ReleaseDC(controlHandle, deviceContextHandle);
 		::DestroyWindow(controlHandle);
-
+// /STEVE CHANGE
 		// Stop now if multisampling is supported.
 		if (result.IsSupported)
 		{
@@ -511,8 +521,10 @@ void RenderSurfaceControl::OnPaint()
 		}
 		if (false == didDraw)
 		{
+// STEVE CHANGE TODO
 			::glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 			::glClear(GL_COLOR_BUFFER_BIT);
+// /STEVE CHANGE
 			SwapBuffers();
 		}
 	}
