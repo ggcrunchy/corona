@@ -17,9 +17,14 @@
 #include <GL\wglew.h>
 #include <GL\gl.h>
 #include <GL\glu.h>
-// #include <vulkan/vulkan.h>
-// /STEVE CHANGE
 
+
+#ifdef free
+#undef free
+#endif
+
+#include <vulkan\vulkan.hpp>
+// /STEVE CHANGE
 
 namespace Interop { namespace UI {
 
@@ -74,6 +79,34 @@ void RenderSurfaceControl::SelectRenderingContext()
 	if (fRenderingContextHandle)
 	{
 // STEVE CHANGE TODO
+	/*
+		VkInstance instance;
+
+		VkApplicationInfo appInfo = {};
+		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		appInfo.pApplicationName = "Hello Triangle";
+		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+		appInfo.pEngineName = "Solar2D";
+		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+		appInfo.apiVersion = VK_API_VERSION_1_0;
+
+		VkInstanceCreateInfo createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		createInfo.pApplicationInfo = &appInfo;
+		unsigned int extensionCount = 0;
+		const char* extensionNames[] = {
+			VK_KHR_SURFACE_EXTENSION_NAME,
+			VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+		};
+		vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, NULL);
+		createInfo.enabledExtensionCount = extensionCount;
+		createInfo.ppEnabledExtensionNames = extensionNames;
+		createInfo.enabledLayerCount = 0;
+
+		if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create instance!");
+		}
+	*/
 		// Favor the Win32 BeginPaint() function's device context over our main device context, if available.
 		if (fPaintDeviceContextHandle)
 		{
