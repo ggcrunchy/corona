@@ -174,7 +174,7 @@ typedef struct CoronaMemoryCallbacks {
 	*/
 	unsigned long size;
 
-	void * (*getBytes)(lua_State * L, int objectIndex, unsigned int * count, CoronaMemoryExtra * extra); // required
+	void * (*getBytes)(lua_State * L, int objectIndex, unsigned int * count, int writable, CoronaMemoryExtra * extra); // required
 
 	int (*canAcquire)(lua_State * L, int objectIndex, CoronaMemoryExtra * extra); // if present, used to filter acquires
 	int (*ensureSize)(lua_State * L, int objectIndex, const unsigned int * expectedSizes, int sizeCount, CoronaMemoryExtra * extra); // if present, we can do 'CoronaMemoryEnsureSizeAndAcquireWritableBytes()'
@@ -289,7 +289,16 @@ CoronaMemoryData * CoronaMemoryEnsureSizeAndAcquireWritableBytes (lua_State * L,
  @return 1 on success, else 0
 */
 CORONA_API
-void * CoronaMemoryGetBytes (lua_State * L, CoronaMemoryData * memoryData) CORONA_PUBLIC_SUFFIX; // get acquired memory, containing 'CoronaMemoryGetByteCount()' bytes
+const void * CoronaMemoryGetBytes (lua_State * L, CoronaMemoryData * memoryData) CORONA_PUBLIC_SUFFIX; // get acquired memory, containing 'CoronaMemoryGetByteCount()' bytes
+
+/**
+ TODO
+ @param L Lua state pointer
+ @param memoryData Handle to memory data acquired from an object.
+ @return 1 on success, else 0
+*/
+CORONA_API
+void * CoronaMemoryGetWritableBytes (lua_State * L, CoronaMemoryData * memoryData) CORONA_PUBLIC_SUFFIX; // get acquired memory, containing 'CoronaMemoryGetByteCount()' bytes
 
 /**
  TODO
@@ -373,7 +382,7 @@ int CoronaMemoryPopFromStash (lua_State * L, CoronaMemoryData * memoryData) CORO
  @return 1 on success, else 0
 */
 CORONA_API
-void * CoronaMemoryRegisterCallbacks (lua_State * L, const CoronaMemoryCallbacks * callbacks, int writable, const char * name, void * userData) CORONA_PUBLIC_SUFFIX; // register for reuse; name allows search
+void * CoronaMemoryRegisterCallbacks (lua_State * L, const CoronaMemoryCallbacks * callbacks, const char * name, void * userData) CORONA_PUBLIC_SUFFIX; // register for reuse; name allows search
 
 /**
  TODO
@@ -391,7 +400,7 @@ void * CoronaMemoryFindRegisteredCallbacks (lua_State * L, const char * name) CO
  @return 1 on success, else 0
 */
 CORONA_API
-int CoronaMemorySetRegisteredCallbacks (lua_State * L, int objectIndex, void * key) CORONA_PUBLIC_SUFFIX; // attach callbacks to some object, which is then available to be acquired; key comes from 'CoronaMemoryRegisterCallbacks()'
+int CoronaMemorySetRegisteredCallbacks (lua_State * L, int objectIndex, int writable, void * key) CORONA_PUBLIC_SUFFIX; // attach callbacks to some object, which is then available to be acquired; key comes from 'CoronaMemoryRegisterCallbacks()'
 
 /**
  TODO
@@ -436,7 +445,7 @@ int CoronaMemoryIsWritable (lua_State * L, int objectIndex) CORONA_PUBLIC_SUFFIX
  @return 1 on success, else 0
 */
 CORONA_API
-int CoronaMemoryUsesReader (lua_State * L, int objectIndex, const void * key) CORONA_PUBLIC_SUFFIX;
+void * CoronaMemoryGetReaderKey (lua_State * L, int objectIndex) CORONA_PUBLIC_SUFFIX;
 
 /**
  TODO
@@ -445,7 +454,7 @@ int CoronaMemoryUsesReader (lua_State * L, int objectIndex, const void * key) CO
  @return 1 on success, else 0
 */
 CORONA_API
-int CoronaMemoryUsesReaderWriter (lua_State * L, int objectIndex, const void * key) CORONA_PUBLIC_SUFFIX;
+void * CoronaMemoryGetReaderWriterKey (lua_State * L, int objectIndex) CORONA_PUBLIC_SUFFIX;
 /**
  TODO
  @param L Lua state pointer
@@ -453,6 +462,6 @@ int CoronaMemoryUsesReaderWriter (lua_State * L, int objectIndex, const void * k
  @return 1 on success, else 0
 */
 CORONA_API
-int CoronaMemoryUsesrWriter (lua_State * L, int objectIndex, const void * key) CORONA_PUBLIC_SUFFIX;
+void * CoronaMemoryGetWriterKey (lua_State * L, int objectIndex) CORONA_PUBLIC_SUFFIX;
 
 #endif // _CoronaMemory_H__
