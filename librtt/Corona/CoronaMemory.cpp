@@ -82,7 +82,7 @@ int CoronaMemoryGetPosition (lua_State * L, CoronaMemoryHandle * memoryHandle)
 	return memoryHandle->lastKnownStackPosition;
 }
 
-static void GetWeakTable (lua_State * L, bool writable, bool hashes = false)
+static void GetWeakTable (lua_State * L, bool writable, bool hashProduct = false)
 {
 	static int nonce;
 
@@ -102,7 +102,7 @@ static void GetWeakTable (lua_State * L, bool writable, bool hashes = false)
 			lua_pushvalue(L, -1); // ..., weak_tables, mt, mt[, mt[, mt]]
 		}
 
-		for (int i = 1; i <= 4; ++i) // {readable, writable, readable hashes, writable hashes}
+		for (int i = 1; i <= 4; ++i) // readable, writable, readable hash products, writable hash products
 		{
 			lua_newtable(L); // ..., weak_table, mt[, mt[, mt[, mt]]], wt
 			lua_insert(L, -2); // ..., weak_tables[, mt[, mt[, mt]]], wt, mt
@@ -115,18 +115,29 @@ static void GetWeakTable (lua_State * L, bool writable, bool hashes = false)
 		lua_rawset(L, LUA_REGISTRYINDEX); // ..., weak_tables; registry[nonce] = weak_tables
 	}
 
-	lua_rawgeti(L, -1, (writable ? 2 : 1) + (hashes ? 2 : 0)); // ..., weak_tables, wt
+	lua_rawgeti(L, -1, (writable ? 2 : 1) + (hashProduct ? 2 : 0)); // ..., weak_tables, wt
 	lua_remove(L, -2); // ..., wt
+}
+
+static void ObjectLookup (lua_State* L, int objectIndex, bool writable, bool hashProduct = false)
+{
+	GetWeakTable(L, writable, hashProduct); // ..., object, ..., wt
+
+	lua_pushvalue(L, objectIndex); // ..., object, ..., wt, object
+	lua_rawget(L, -2); // ..., object, ..., wt, info?
+}
+
+static CoronaMemoryCallbacks* AsCallbacks (lua_State * L, int index)
+{
+	return (CoronaMemoryCallbacks *)lua_touserdata(L, index);
 }
 
 static bool GetAssignedCallbacks (lua_State * L, int & objectIndex, bool writable, bool wantEnsureSizes)
 {
 	objectIndex = CoronaLuaNormalize(L, objectIndex);
 
-	GetWeakTable(L, writable); // ..., wt
+	ObjectLookup(L, objectIndex, writable); // ..., wt, callbacks_info?
 
-	lua_pushvalue(L, objectIndex); // ..., wt, object
-	lua_rawget(L, -2); // ..., wt, callbacks_info?
 	lua_remove(L, -2); // ..., callbacks_info?
 
 	if (lua_istable(L, -1))
@@ -135,7 +146,7 @@ static bool GetAssignedCallbacks (lua_State * L, int & objectIndex, bool writabl
 		lua_remove(L, -2); // ..., callbacks?
 	}
 
-	if (lua_isnil(L, -1) || (wantEnsureSizes && !((CoronaMemoryCallbacks *)lua_touserdata(L, -1))->ensureSizes))
+	if (lua_isnil(L, -1) || (wantEnsureSizes && !AsCallbacks(L, -1)->ensureSizes))
 	{
 		lua_pop(L, 1); // ...
 
@@ -159,7 +170,7 @@ struct CallbackInfo {
 			lua_getfield(L, -2, "name"); // ..., t, callbacks, name?
 			lua_getfield(L, -3, "userData"); // ..., t, callbacks, name?, userData?
 
-			fCallbacks = (CoronaMemoryCallbacks *)lua_touserdata(L, -3);
+			fCallbacks = AsCallbacks(L, -3);
 			fUserData = lua_touserdata(L, -1);
 
 			if (lua_isstring(L, -2)) fName = lua_tostring(L, -2);
@@ -169,7 +180,7 @@ struct CallbackInfo {
 
 		else
 		{
-			fCallbacks = (CoronaMemoryCallbacks *)lua_touserdata(L, -1);
+			fCallbacks = AsCallbacks(L, -1);
 		}
 
 		luaL_argcheck(L, -1, fCallbacks->size == sizeof(CoronaMemoryCallbacks), "Incompatible memory callbacks");
@@ -708,7 +719,9 @@ int CoronaMemoryPeekAtStash (lua_State * L, CoronaMemoryHandle * memoryHandle)
 
 static CoronaMemoryCallbacks * NewCallbacks (lua_State * L, const CoronaMemoryCallbacks * callbacks, const char * name, bool userDataFromStack)
 {
-	CoronaMemoryCallbacks * res = (CoronaMemoryCallbacks *)lua_newuserdata(L, sizeof(CoronaMemoryCallbacks)); // ...[, userData], callbacks
+	lua_newuserdata(L, sizeof(CoronaMemoryCallbacks)); // ...[, userData], callbacks
+
+	CoronaMemoryCallbacks * res = AsCallbacks(L, -1);
 
 	*res = *callbacks;
 
@@ -803,40 +816,40 @@ void * CoronaMemoryFindCallbacks (lua_State * L, const char * name)
 	return key;
 }
 
-static void ObjectInfoLookup (lua_State * L, int objectIndex, bool writable)
+static unsigned int KeyHashProduct (void * key, unsigned int hash)
 {
-	GetWeakTable(L, writable); // ..., object, ..., wt
+	return hash * std::hash<void *>{}(key);
+}
 
-	lua_pushvalue(L, objectIndex); // ..., object, ..., wt, object
-	lua_rawget(L, -2); // ..., object, ..., wt, info?
+static void PushCallbacksFrom (lua_State * L, int index)
+{
+	if (lua_istable(L, index))
+	{
+		lua_getfield(L, index, "callbacks"); // ..., callbacks
+	}
+
+	else
+	{
+		lua_pushvalue(L, index); // ..., callbacks
+	}
 }
 
 static int AssignInfoToObject (lua_State * L, int objectIndex, bool writable, unsigned int * hash)
 {
-	ObjectInfoLookup(L, objectIndex, writable);	// ..., object, ..., callbacks_info, wt, info?
+	ObjectLookup(L, objectIndex, writable);	// ..., object, ..., callbacks_info, wt, info?
 
 	if (lua_isnil(L, -1))
 	{
 		if (hash)
 		{
-			GetWeakTable(L, writable, true); // ..., object, ..., callbacks_info, wt, nil, hashes_wt
+			GetWeakTable(L, writable, true); // ..., object, ..., callbacks_info, wt, nil, hash_products_wt
+			PushCallbacksFrom(L, -4); // ..., object, ..., callbacks_info, wt, nil, hash_products_wt, callbacks
 
-			if (lua_istable(L, -4))
-			{
-				lua_getfield(L, -4, "callbacks"); // ..., object, ..., callbacks_info, wt, nil, hashes_wt, callbacks
-			}
-
-			else
-			{
-				lua_pushvalue(L, 4); // ..., object, ..., callbacks_info, wt, nil, hashes_wt, callbacks
-			}
-
-			void * key = lua_touserdata(L, -1);
 			*hash = std::hash<uint64_t>{}(Rtt_GetAbsoluteTime());
 
-			lua_pushvalue(L, objectIndex); // ..., object, ..., callbacks_info, wt, nil, hashes_wt, callbacks, object
-			lua_pushinteger(L, *hash * std::hash<void *>{}(key)); // ..., object, ..., callbacks_info, wt, nil, hashes_wt, callbacks, object, product
-			lua_rawset(L, -4); // ..., object, ..., callbacks_info, wt, nil, hashes_wt = { ..., [object] = product }, callbacks
+			lua_pushvalue(L, objectIndex); // ..., object, ..., callbacks_info, wt, nil, hash_products_wt, callbacks, object
+			lua_pushinteger(L, KeyHashProduct(lua_touserdata(L, -2), *hash)); // ..., object, ..., callbacks_info, wt, nil, hash_products_wt, callbacks, object, product
+			lua_rawset(L, -4); // ..., object, ..., callbacks_info, wt, nil, hash_products_wt = { ..., [object] = product }, callbacks
 			lua_pop(L, 2); // ..., object, ..., callbacks_info, wt, nil
 		}
 
@@ -957,23 +970,50 @@ int CoronaMemorySetWriteCallbacksByKey (lua_State * L, int objectIndex, void * k
 	return SetCallbacksByKey(L, objectIndex, key, true, hash);
 }
 
+static int RemoveCallbacks (lua_State * L, int objectIndex, unsigned int hash, bool writable)
+{
+	objectIndex = CoronaLuaNormalize(L, objectIndex);
+
+	int result = 0, top = lua_gettop(L);
+
+	ObjectLookup(L, objectIndex, writable, true); // ..., object, ..., hash_products, product?
+
+	if (!lua_isnil(L, -1))
+	{
+		ObjectLookup(L, objectIndex, writable); // ..., object, ..., hash_products, product, wt, callbacks
+
+		if (KeyHashProduct(lua_touserdata(L, -1), hash) == size_t(luaL_optnumber(L, -3, 0U)))
+		{
+			lua_pushvalue(L, objectIndex); // ..., object, ..., hash_products, product, wt, callbacks, object
+			lua_pushnil(L); // ..., object, ..., hash_products, product, wt, callbacks, object, nil
+			lua_rawset(L, -4); // ..., object, ..., hash_products, product, wt = { ..., [object] = nil }, callbacks
+
+			result = 1;
+		}
+	}
+
+	lua_settop(L, top); // ..., object, ...
+
+	return result;
+}
+
 CORONA_API
 int CoronaMemoryRemoveReadCallbacks (lua_State * L, int objectIndex, unsigned int hash)
 {
-	return 0;
+	return RemoveCallbacks(L, objectIndex, hash, false);
 }
 
 CORONA_API
 int CoronaMemoryRemoveWriteCallbacks (lua_State * L, int objectIndex, unsigned int hash)
 {
-	return 0;
+	return RemoveCallbacks(L, objectIndex, hash, true);
 }
 
 static int GetAlignment (lua_State * L, int objectIndex, bool writable, unsigned int * alignment)
 {
 	if (GetAssignedCallbacks(L, objectIndex, writable, false)) // ...[, callbacks]
 	{
-		*alignment = ((CoronaMemoryCallbacks *)lua_touserdata(L, -1))->alignment;
+		*alignment = AsCallbacks(L, -1)->alignment;
 
 		lua_pop(L, 1); // ...
 
