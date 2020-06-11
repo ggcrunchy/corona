@@ -401,7 +401,7 @@ void * CoronaMemoryFindCallbacks (lua_State * L, const char * name) CORONA_PUBLI
  @return Non-0 on success.
 */
 CORONA_API
-void * CoronaMemorySetReadCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCallbacks * callbacks, int userDataFromStack) CORONA_PUBLIC_SUFFIX;	// one-off object, so no registration
+void * CoronaMemorySetReadCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCallbacks * callbacks, int userDataFromStack, unsigned int * hash) CORONA_PUBLIC_SUFFIX;
 
 /**
  TODO
@@ -413,7 +413,7 @@ void * CoronaMemorySetReadCallbacks (lua_State * L, int objectIndex, const Coron
  @return Non-0 on success.
 */
 CORONA_API
-void * CoronaMemorySetWriteCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCallbacks * callbacks, int userDataFromStack) CORONA_PUBLIC_SUFFIX;	// one-off object, so no registration
+void * CoronaMemorySetWriteCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCallbacks * callbacks, int userDataFromStack, unsigned int * hash) CORONA_PUBLIC_SUFFIX;
 
 /**
  TODO
@@ -423,7 +423,7 @@ void * CoronaMemorySetWriteCallbacks (lua_State * L, int objectIndex, const Coro
  @return Non-0 on success.
 */
 CORONA_API
-int CoronaMemorySetReadCallbacksByKey (lua_State * L, int objectIndex, void * key) CORONA_PUBLIC_SUFFIX; // attach callbacks to some object, which is then available to be acquired; key comes from 'CoronaMemoryRegisterCallbacks()'
+int CoronaMemorySetReadCallbacksByKey (lua_State * L, int objectIndex, void * key, unsigned int * hash) CORONA_PUBLIC_SUFFIX;
 
 /**
  TODO
@@ -433,7 +433,31 @@ int CoronaMemorySetReadCallbacksByKey (lua_State * L, int objectIndex, void * ke
  @return Non-0 on success.
 */
 CORONA_API
-int CoronaMemorySetWriteCallbacksByKey (lua_State * L, int objectIndex, void * key) CORONA_PUBLIC_SUFFIX; // attach callbacks to some object, which is then available to be acquired; key comes from 'CoronaMemoryRegisterCallbacks()'
+int CoronaMemorySetWriteCallbacksByKey (lua_State * L, int objectIndex, void * key, unsigned int * hash) CORONA_PUBLIC_SUFFIX;
+
+/**
+ TODO
+ @param L Lua state pointer
+ @param objectIndex Stack position of the object.
+ @param callbacks @see CoronaMemoryCallbacks
+ @param kind
+ @param userData
+ @return Non-0 on success.
+*/
+CORONA_API
+int CoronaMemoryRemoveReadCallbacks (lua_State * L, int objectIndex, unsigned int hash) CORONA_PUBLIC_SUFFIX;
+
+/**
+ TODO
+ @param L Lua state pointer
+ @param objectIndex Stack position of the object.
+ @param callbacks @see CoronaMemoryCallbacks
+ @param kind
+ @param userData
+ @return Non-0 on success.
+*/
+CORONA_API
+int CoronaMemoryRemoveWriteCallbacks (lua_State * L, int objectIndex, unsigned int hash) CORONA_PUBLIC_SUFFIX;
 
 /**
  TODO

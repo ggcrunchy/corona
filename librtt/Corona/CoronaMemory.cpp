@@ -8,9 +8,12 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #include "Core/Rtt_Array.h"
+#include "Core/Rtt_Time.h"
 
 #include "CoronaMemory.h"
 #include "CoronaLua.h"
+
+#include <functional>
 
 struct CoronaMemoryData {
 	CoronaMemoryData();
@@ -45,22 +48,22 @@ int CoronaMemoryIsValid(lua_State * L, CoronaMemoryHandle * memoryHandle)
 	}
 }
 
-static bool FoundObjectAt (lua_State * L, int index, void * object)
-{
-	return lua_type(L, index) == LUA_TUSERDATA && lua_topointer(L, index) == object;
-}
-
-static int FindObjectOnStack (lua_State * L, void * object)
+static int FindObjectOnStack (lua_State * L, void * object, bool (*find)(lua_State * L, int index, void * object))
 {
 	for (int i = 1, top = lua_gettop(L); i <= top; ++i)
 	{
-		if (FoundObjectAt(L, i, object))
+		if (find(L, i, object))
 		{
 			return i;
 		}
 	}
 
 	return 0;
+}
+
+static bool FoundObjectAt (lua_State * L, int index, void * object)
+{
+	return lua_type(L, index) == LUA_TUSERDATA && lua_topointer(L, index) == object;
 }
 
 CORONA_API
@@ -73,13 +76,13 @@ int CoronaMemoryGetPosition (lua_State * L, CoronaMemoryHandle * memoryHandle)
 
 	else if (!FoundObjectAt(L, memoryHandle->lastKnownStackPosition, memoryHandle->data))
 	{
-		memoryHandle->lastKnownStackPosition = FindObjectOnStack(L, memoryHandle->data);
+		memoryHandle->lastKnownStackPosition = FindObjectOnStack(L, memoryHandle->data, FoundObjectAt);
 	}
 
 	return memoryHandle->lastKnownStackPosition;
 }
 
-static void GetWeakTable (lua_State * L, bool writable)
+static void GetWeakTable (lua_State * L, bool writable, bool hashes = false)
 {
 	static int nonce;
 
@@ -93,14 +96,18 @@ static void GetWeakTable (lua_State * L, bool writable)
 		lua_createtable(L, 0, 1); // ..., weak_tables, mt
 		lua_pushliteral(L, "k"); // ..., weak_tables, mt, "k"
 		lua_setfield(L, -2, "__mode"); // ..., weak_tables, mt = { __mode = "k" }
-		lua_pushvalue(L, -1); // ..., weak_tables, mt, mt
 
-		for (int i = 1; i <= 2; ++i) // {readable, writable}
+		for (int i = 1; i <= 3; ++i)
 		{
-			lua_newtable(L); // ..., weak_table, mt[, mt], wt
-			lua_insert(L, -2); // ..., weak_tables[, mt], wt, mt
-			lua_setmetatable(L, -2); // ..., weak_tables[, mt], wt; wt.metatable = mt
-			lua_rawseti(L, -4 + i, i); // ..., weak_tables = { ..., wt }[, mt]
+			lua_pushvalue(L, -1); // ..., weak_tables, mt, mt[, mt[, mt]]
+		}
+
+		for (int i = 1; i <= 4; ++i) // {readable, writable, readable hashes, writable hashes}
+		{
+			lua_newtable(L); // ..., weak_table, mt[, mt[, mt[, mt]]], wt
+			lua_insert(L, -2); // ..., weak_tables[, mt[, mt[, mt]]], wt, mt
+			lua_setmetatable(L, -2); // ..., weak_tables[, mt[, mt[, mt]]]], wt; wt.metatable = mt
+			lua_rawseti(L, -6 + i, i); // ..., weak_tables = { ..., wt }[, mt]
 		}
 
 		lua_pushlightuserdata(L, &nonce); // ..., weak_tables, nonce
@@ -108,19 +115,25 @@ static void GetWeakTable (lua_State * L, bool writable)
 		lua_rawset(L, LUA_REGISTRYINDEX); // ..., weak_tables; registry[nonce] = weak_tables
 	}
 
-	lua_rawgeti(L, -1, writable ? 2 : 1); // ..., weak_tables, wt
+	lua_rawgeti(L, -1, (writable ? 2 : 1) + (hashes ? 2 : 0)); // ..., weak_tables, wt
 	lua_remove(L, -2); // ..., wt
 }
 
-static bool FindCallbacks (lua_State * L, int & objectIndex, bool writable, bool wantEnsureSizes)
+static bool GetAssignedCallbacks (lua_State * L, int & objectIndex, bool writable, bool wantEnsureSizes)
 {
 	objectIndex = CoronaLuaNormalize(L, objectIndex);
 
 	GetWeakTable(L, writable); // ..., wt
 
 	lua_pushvalue(L, objectIndex); // ..., wt, object
-	lua_rawget(L, -2); // ..., wt, callbacks?
-	lua_remove(L, -2); // ..., callbacks?
+	lua_rawget(L, -2); // ..., wt, callbacks_info?
+	lua_remove(L, -2); // ..., callbacks_info?
+
+	if (lua_istable(L, -1))
+	{
+		lua_getfield(L, -1, "callbacks");// ..., callbacks_info?, callbacks?
+		lua_remove(L, -2); // ..., callbacks?
+	}
 
 	if (lua_isnil(L, -1) || (wantEnsureSizes && !((CoronaMemoryCallbacks *)lua_touserdata(L, -1))->ensureSizes))
 	{
@@ -437,7 +450,7 @@ static void GetLuaObjectReader (lua_State * L)
 CORONA_API
 CoronaMemoryHandle CoronaMemoryAcquireReadableBytes (lua_State * L, int objectIndex, void * params)
 {
-	bool found = FindCallbacks(L, objectIndex, 0, false); // ..., object, ...[, reader]
+	bool found = GetAssignedCallbacks(L, objectIndex, 0, false); // ..., object, ...[, reader]
 
 	if (!found && lua_isstring(L, objectIndex))
 	{
@@ -464,7 +477,7 @@ CoronaMemoryHandle CoronaMemoryAcquireWritableBytes (lua_State * L, int objectIn
 {
 	objectIndex = CoronaLuaNormalize(L, objectIndex);
 
-	if (FindCallbacks(L, objectIndex, 1, false)) // ..., object, ...[, writer]
+	if (GetAssignedCallbacks(L, objectIndex, 1, false)) // ..., object, ...[, writer]
 	{
 		return Acquire(L, objectIndex, 1, params);
 	}
@@ -510,7 +523,7 @@ CoronaMemoryHandle CoronaMemoryEnsureSizeAndAcquireReadableBytes (lua_State * L,
 {
 	objectIndex = CoronaLuaNormalize(L, objectIndex);
 
-	if (FindCallbacks(L, objectIndex, 0, false)) // ..., object, ...[, reader]
+	if (GetAssignedCallbacks(L, objectIndex, 0, false)) // ..., object, ...[, reader]
 	{
 		return EnsureSizeAndAcquire(L, objectIndex, expectedSizes, sizeCount, 0, params);
 	}
@@ -528,7 +541,7 @@ CoronaMemoryHandle CoronaMemoryEnsureSizeAndAcquireWritableBytes (lua_State * L,
 {
 	objectIndex = CoronaLuaNormalize(L, objectIndex);
 
-	if (FindCallbacks(L, objectIndex, 1, false)) // ..., object, ...[, writer]
+	if (GetAssignedCallbacks(L, objectIndex, 1, false)) // ..., object, ...[, writer]
 	{
 		return EnsureSizeAndAcquire(L, objectIndex, expectedSizes, sizeCount, 1, params);
 	}
@@ -798,12 +811,35 @@ static void ObjectInfoLookup (lua_State * L, int objectIndex, bool writable)
 	lua_rawget(L, -2); // ..., object, ..., wt, info?
 }
 
-static int AssignInfoToObject (lua_State * L, int objectIndex, bool writable)
+static int AssignInfoToObject (lua_State * L, int objectIndex, bool writable, unsigned int * hash)
 {
 	ObjectInfoLookup(L, objectIndex, writable);	// ..., object, ..., callbacks_info, wt, info?
 
 	if (lua_isnil(L, -1))
 	{
+		if (hash)
+		{
+			GetWeakTable(L, writable, true); // ..., object, ..., callbacks_info, wt, nil, hashes_wt
+
+			if (lua_istable(L, -4))
+			{
+				lua_getfield(L, -4, "callbacks"); // ..., object, ..., callbacks_info, wt, nil, hashes_wt, callbacks
+			}
+
+			else
+			{
+				lua_pushvalue(L, 4); // ..., object, ..., callbacks_info, wt, nil, hashes_wt, callbacks
+			}
+
+			void * key = lua_touserdata(L, -1);
+			*hash = std::hash<uint64_t>{}(Rtt_GetAbsoluteTime());
+
+			lua_pushvalue(L, objectIndex); // ..., object, ..., callbacks_info, wt, nil, hashes_wt, callbacks, object
+			lua_pushinteger(L, *hash * std::hash<void *>{}(key)); // ..., object, ..., callbacks_info, wt, nil, hashes_wt, callbacks, object, product
+			lua_rawset(L, -4); // ..., object, ..., callbacks_info, wt, nil, hashes_wt = { ..., [object] = product }, callbacks
+			lua_pop(L, 2); // ..., object, ..., callbacks_info, wt, nil
+		}
+
 		lua_pushvalue(L, objectIndex); // ..., object, ..., callbacks, callbacks_info, wt, nil, object
 		lua_pushvalue(L, -4); // ..., object, ..., callbacks, callbacks_info, wt, nil, object, callbacks_info
 		lua_rawset(L, -4); // ..., object, ..., callbacks, callbacks_info, wt = { ..., [object] = callbacks_info }, nil
@@ -814,7 +850,7 @@ static int AssignInfoToObject (lua_State * L, int objectIndex, bool writable)
 	return 0;
 }
 
-static void * SetCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCallbacks * callbacks, bool writable, bool userDataFromStack)
+static void * SetCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCallbacks * callbacks, bool writable, bool userDataFromStack, unsigned int * hash)
 {
 	if (!lua_isnoneornil(L, objectIndex) && sizeof(CoronaMemoryCallbacks) == callbacks->size && callbacks->getBytes)
 	{
@@ -831,7 +867,7 @@ static void * SetCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCa
 		}
 
 		CoronaMemoryCallbacks * res = NewCallbacks(L, callbacks, nullptr, userDataFromStack); // ..., callbacks_info
-		bool available = AssignInfoToObject(L, objectIndex, writable); // ..., callbacks_info, wt, info?
+		bool available = AssignInfoToObject(L, objectIndex, writable, hash); // ..., callbacks_info, wt, info?
 
 		lua_pop(L, 3); // ...
 
@@ -842,18 +878,37 @@ static void * SetCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCa
 }
 
 CORONA_API
-void * CoronaMemorySetReadCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCallbacks * callbacks, int userDataFromStack)
+void * CoronaMemorySetReadCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCallbacks * callbacks, int userDataFromStack, unsigned int * hash)
 {
-	return SetCallbacks(L, objectIndex, callbacks, false, userDataFromStack);
+	return SetCallbacks(L, objectIndex, callbacks, false, userDataFromStack, hash);
 }
 
 CORONA_API
-void * CoronaMemorySetWriteCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCallbacks * callbacks, int userDataFromStack)
+void * CoronaMemorySetWriteCallbacks (lua_State * L, int objectIndex, const CoronaMemoryCallbacks * callbacks, int userDataFromStack, unsigned int * hash)
 {
-	return SetCallbacks(L, objectIndex, callbacks, true, userDataFromStack);
+	return SetCallbacks(L, objectIndex, callbacks, true, userDataFromStack, hash);
 }
 
-static int SetCallbacksByKey (lua_State * L, int objectIndex, void * key, bool writable)
+static bool FoundCallbacksAt (lua_State * L, int index, void * object)
+{
+	if (lua_istable(L, index))
+	{
+		lua_getfield(L, index, "callbacks"); // ..., callbacks_info?, ..., callbacks?
+
+		index = -1; // n.b. FindObjectsOnStack uses positive indices
+	}
+
+	bool found = lua_type(L, index) == LUA_TUSERDATA && lua_topointer(L, index) == object;
+
+	if (-1 == index)
+	{
+		lua_pop(L, 1); // ..., callbacks_info, ...
+	}
+
+	return found;
+}
+
+static int SetCallbacksByKey (lua_State * L, int objectIndex, void * key, bool writable, unsigned int * hash)
 {
 	int available = 0;
 
@@ -870,7 +925,7 @@ static int SetCallbacksByKey (lua_State * L, int objectIndex, void * key, bool w
 
 		if (lua_isnil(L, -1))
 		{
-			int callbackIndex = FindObjectOnStack(L, key);
+			int callbackIndex = FindObjectOnStack(L, key, FoundCallbacksAt);
 
 			if (callbackIndex)
 			{
@@ -881,7 +936,7 @@ static int SetCallbacksByKey (lua_State * L, int objectIndex, void * key, bool w
 
 		if (!lua_isnil(L, -1))
 		{
-			available = AssignInfoToObject(L, objectIndex, writable); // ..., object, ..., callbacks, callbacks_info, wt, info?
+			available = AssignInfoToObject(L, objectIndex, writable, hash); // ..., object, ..., callbacks, callbacks_info, wt, info?
 		}
 
 		lua_settop(L, top); // ..., object, ...
@@ -891,20 +946,32 @@ static int SetCallbacksByKey (lua_State * L, int objectIndex, void * key, bool w
 }
 
 CORONA_API
-int CoronaMemorySetReadCallbacksByKey (lua_State * L, int objectIndex, void * key)
+int CoronaMemorySetReadCallbacksByKey (lua_State * L, int objectIndex, void * key, unsigned int * hash)
 {
-	return SetCallbacksByKey(L, objectIndex, key, false);
+	return SetCallbacksByKey(L, objectIndex, key, false, hash);
 }
 
 CORONA_API
-int CoronaMemorySetWriteCallbacksByKey (lua_State * L, int objectIndex, void * key)
+int CoronaMemorySetWriteCallbacksByKey (lua_State * L, int objectIndex, void * key, unsigned int * hash)
 {
-	return SetCallbacksByKey(L, objectIndex, key, true);
+	return SetCallbacksByKey(L, objectIndex, key, true, hash);
+}
+
+CORONA_API
+int CoronaMemoryRemoveReadCallbacks (lua_State * L, int objectIndex, unsigned int hash)
+{
+	return 0;
+}
+
+CORONA_API
+int CoronaMemoryRemoveWriteCallbacks (lua_State * L, int objectIndex, unsigned int hash)
+{
+	return 0;
 }
 
 static int GetAlignment (lua_State * L, int objectIndex, bool writable, unsigned int * alignment)
 {
-	if (FindCallbacks(L, objectIndex, writable, false)) // ...[, callbacks]
+	if (GetAssignedCallbacks(L, objectIndex, writable, false)) // ...[, callbacks]
 	{
 		*alignment = ((CoronaMemoryCallbacks *)lua_touserdata(L, -1))->alignment;
 
@@ -940,7 +1007,7 @@ int CoronaMemoryGetWriteAlignment (lua_State * L, int objectIndex, unsigned int 
 
 static int FindResult (lua_State * L, int objectIndex, bool writable, bool wantEnsureSize)
 {
-	if (FindCallbacks(L, objectIndex, writable, wantEnsureSize)) // ...[, callbacks]
+	if (GetAssignedCallbacks(L, objectIndex, writable, wantEnsureSize)) // ...[, callbacks]
 	{
 		lua_pop(L, 1); // ...
 
@@ -977,9 +1044,9 @@ int CoronaMemoryIsResizableForWrites (lua_State * L, int objectIndex)
 	return FindResult(L, objectIndex, true, true);
 }
 
-static void * GetCallbacks (lua_State * L, int objectIndex, bool writable)
+static void * GetCallbacksKey (lua_State * L, int objectIndex, bool writable)
 {
-	if (FindCallbacks(L, objectIndex, writable, false)) // ...[, callbacks]
+	if (GetAssignedCallbacks(L, objectIndex, writable, false)) // ...[, callbacks]
 	{
 		return lua_touserdata(L, -1);
 	}
@@ -993,7 +1060,7 @@ static void * GetCallbacks (lua_State * L, int objectIndex, bool writable)
 CORONA_API
 void * CoronaMemoryGetReadCallbacks (lua_State * L, int objectIndex)
 {
-	void * key = GetCallbacks(L, objectIndex, 0); // ...[, read_callbacks]
+	void * key = GetCallbacksKey(L, objectIndex, 0); // ...[, read_callbacks]
 
 	if (!key && lua_isstring(L, objectIndex))
 	{
@@ -1008,5 +1075,5 @@ void * CoronaMemoryGetReadCallbacks (lua_State * L, int objectIndex)
 CORONA_API
 void * CoronaMemoryGetWriteCallbacks (lua_State * L, int objectIndex)
 {
-	return GetCallbacks(L, objectIndex, 1); // ...[, write_callbacks]
+	return GetCallbacksKey(L, objectIndex, 1); // ...[, write_callbacks]
 }
