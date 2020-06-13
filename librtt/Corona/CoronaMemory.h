@@ -21,106 +21,6 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-#if 0
-/**
- This structure contains callbacks required for TextureResource's life cycle
- When Corona would require some information about Texture or it's bitmap, a callback would be invoked
- `userData` parameter is passed to all callbacks is same with which TextureResourceExternal was created
- Typical workflow & callbacks descriptions:
-  - time to time Corona would request `getWidth()` and `getHeight()` for various calculation
-  - when texture's bitmap data is required:
-	  * to retrieve raw data pointer `onRequestBitmap()` is called
-	  * `onRequestBitmap()` should always return valid pointer
-		to `getWidth()*getHeight()*CoronaExternalFormatBPP(getFormat())` bytes
-	  * pixels should be aligned row-by-row; first byte of pixel on row `Y` and column `X`:
-		`((unsigned char*)onRequestBitmap())[ (Y*getWidth() + X) * CoronaExternalFormatBPP(getFormat())]`
-	  * Corona would read data for a short time and call `onReleaseBitmap()` when done
-	  * bitmap pointer need not be valid after `onReleaseBitmap()` is called
-	  * `onRequestBitmap()` (and consequent `onReleaseBitmap()`) may be called several times when data access is required
-  - `getFormat()` should return bitmap format; if NULL RGBA would be used
-	  * if `kExternalBitmapFormat_Mask` is returned, texture would be treated as mask
-  - `onFinalize()` if present, would be called when texture is no longer needed. Usually happens when `texture:releaseSelf()`
-	is called and all objects using texture are destroyed. Also called when app is shutting down or restarted
-  - `onGetField()` is used when user queries texture for unknown field from Lua. Returned number
-	must be a number of values pushed on Lua stack
-
- In order to create external bitmap you must provide width, height and bitmap callbacks
- all other are optional and will be ignored if set to NULL
-*/
-typedef struct CoronaExternalTextureCallbacks
-{
-	/**
-	 Required
-	 When creating instance of this type set this member to `size = sizeof(CoronaExternalTextureCallbacks)`.
-	 This is required for identifying version of API used.
-	*/
-	unsigned long size;
-
-	/**
-	 Required
-	 called when Texture bitmap's width is required
-	 @param userData Pointer passed to CoronaExternalPushTexture
-	 @return The width of Texture's bitmap; Important: if it is a Mask, width should be a multiple of 4
-	*/
-	unsigned int (*getWidth)(void* userData);
-
-	/**
-	 Required
-	 called when Texture bitmap's height is required
-	 @param userData Pointer passed to CoronaExternalPushTexture
-	 @return The width of Texture's height
-	*/
-	unsigned int (*getHeight)(void* userData);
-
-	/**
-	 Required
-	 called when Texture bitmap's data is required. Always followed by @see onReleaseBitmap call.
-	 @param userData Pointer passed to CoronaExternalPushTexture
-	 @return Valid pointer to data containing bitmap information. Corona expects bitmap data to be row-by-row array of pixels
-			 starting from top of the image, each pixel represented by `bpp = CoronaExternalFormatBPP(getFormat())` bytes.
-			 Each channel use 1 byte and ordered same as format name, left to right. So, with RGBA format, R index is 0
-			 Overall size of memory must me at least `getWidth()*getHeight()*bpp`
-			 Accessing left most (R in RGBA) value of bitmap could be written as
-			 `((unsigned char*)onRequestBitmap())[ (Y*getWidth() + X) * CoronaExternalFormatBPP(getFormat()) ]`
-			 RGBA format (default) uses premultiplied alpha
-	*/
-	const void* (*onRequestBitmap)(void* userData);
-
-	/**
-	 Optional
-	 Called when Texture bitmap's data is no longer required.
-	 After this callback is invoked, pointer returned by `onRequestBitmap` need not longer be valid
-	 @param userData Pointer passed to CoronaExternalPushTexture
-	*/
-	void (*onReleaseBitmap)(void* userData);
-
-	/**
-	 Optional
-	 called when Texture bitmap's format is required
-	 @param userData Pointer passed to CoronaExternalPushTexture
-	 @return One of the CoronaExternalBitmapFormat entries. Default format is RGBA (kExternalBitmapFormat_RGBA)
-	*/
-	CoronaExternalBitmapFormat (*getFormat)(void* userData);
-
-	/**
-	 Optional
-	 Called when TextureResource is about to be destroyed
-	 After this callback is invoked, no callbacks or returned bitmap pointers would be accessed
-	 @param userData Pointer passed to CoronaExternalPushTexture
-	*/
-	void (*onFinalize)(void *userData);     // optional; texture will not be used again
-
-	/**
-	 Optional
-	 Called when unknown property of Texture is requested from Lua
-	 @param L Lua state pointer
-	 @param field String containing name of requested field
-	 @param userData Pointer passed to CoronaExternalPushTexture
-	 @return number of values pushed on Lua stack
-	*/
-	int (*onGetField)(lua_State *L, const char *field, void* userData);   // optional; called Lua texture property lookup
-} CoronaExternalTextureCallbacks;
-#endif
 
 /**
  Extra information supplied to the various callbacks during an acquire.
@@ -138,7 +38,14 @@ typedef struct CoronaMemoryExtra {
 } CoronaMemoryExtra;
 
 /**
- TODO
+ This structure contains callbacks used to acquire readable or writable access to memory, given an object
+ on the stack. The object itself will only be modified by its callbacks, if at all.
+ The callbacks are traversed in the order listed and called if present / relevant, stopping if one fails,
+ i.e. return `NULL` or `0`.
+ On a successful attempt, some internal state will replace the object on the stack. However, a reference
+ to the object is still maintained.
+ In the event of failure, an error will the replace the object on the stack. If the stack has grown, the
+ topmost item--if not `nil`--will be interpreted as this error; otherwise, a suitable default is used.
 */
 typedef struct CoronaMemoryCallbacks {
 	/**
@@ -156,13 +63,11 @@ typedef struct CoronaMemoryCallbacks {
 
 	/**
 	 Optional
-	 User-supplied data to pass along to the various callbacks. May be `NULL`. @see CoronaMemoryExtra
-	 Users can either assign this directly. However, if the data will have an extended lifetime, the callbacks can
-	 take ownership: cf. the register / set callbacks functions' `userDataFromStack` commentary.
+	 User-supplied data to pass along to the various callbacks. @see CoronaMemoryExtra
+	 Users can assign this explicitly. Alternatively, the callbacks can assume ownership of a value on the Lua
+	 stack, cf. the register / set callbacks functions' `userDataFromStack` commentary.
 	*/
 	void * userData;
-
-	// The following are traversed in order and called if present, stopping if one of them fails:
 
 	/**
 	 Optional
@@ -178,7 +83,8 @@ typedef struct CoronaMemoryCallbacks {
 
 	/**
 	 Required
-	 On success, points to the memory and populates `byteCount` with the addressable size.
+	 On success, points to the acquired memory and populates `byteCount` with the addressable size; if the stack has grown,
+	 a reference to the topmost value will also be kept with the memory data.
 	*/
 	void * (*getBytes)(lua_State * L, int objectIndex, unsigned int * byteCount, int writable, CoronaMemoryExtra * extra);
 
@@ -187,10 +93,6 @@ typedef struct CoronaMemoryCallbacks {
 	 If this returns 0, `strideCount` is populated with some count and the corresponding numbers pushed on the stack.
 	*/
 	int (*getStrides)(lua_State * L, int objectIndex, unsigned int * strideCount, CoronaMemoryExtra * extra);
-
-	// If any of the above left new items on the stack before failing, i.e. returning `NULL` or `0`, the topmost item will
-	// be interpreted as an error and replace the object at 'objectIndex'. Otherwise, in said failure case, an appropriate
-	// default error will replace the object instead.
 } CoronaMemoryCallbacks;
 
 
@@ -205,6 +107,17 @@ typedef struct CoronaMemoryHandle {
 	int lastKnownStackPosition;
 	struct CoronaMemoryData * data;
 } CoronaMemoryHandle;
+
+/**
+ Get the last error from a function taking a `CoronaMemoryHandle *`.
+ Any error is cleared when calling such a function, possibly removing it from memory.
+ @param L Lua state pointer
+ @param memoryHandle Handle to memory data acquired from an object.
+ @param clear If non-0, clear any error after reading it.
+ @return Read-only error string, or `NULL` if there was no new error.
+*/
+CORONA_API
+const char * CoronaMemoryGetLastError (lua_State * L, CoronaMemoryHandle * memoryHandle, int clear) CORONA_PUBLIC_SUFFIX;
 
 /**
  Check if a memory handle is valid.
@@ -235,7 +148,7 @@ int CoronaMemoryGetPosition (lua_State * L, CoronaMemoryHandle * memoryHandle) C
  @param objectIndex Stack position of the object providing the memory. (This object may be a Lua string; if it does not
 			already have one of the callbacks, a reader is provided that interprets it as a length-sized array.) The call
 			will replace this object: on success, by some internal state; otherwise, an error.
- @param param User-supplied parameter; may be NULL. @see CoronaMemoryExtra
+ @param param User-supplied parameter; may be `NULL`. @see CoronaMemoryExtra
  @return Handle to memory data, with valid contents on success. @see CoronaMemoryHandle
 */
 CORONA_API
@@ -246,7 +159,7 @@ CoronaMemoryHandle CoronaMemoryAcquireReadableBytes (lua_State * L, int objectIn
  @param L Lua state pointer
  @param objectIndex Stack position of the object providing the memory. The call will replace this object: on success, by
 			some internal state; otherwise, an error.
- @param param User-supplied parameter; may be NULL. @see CoronaMemoryExtra
+ @param param User-supplied parameter; may be `NULL`. @see CoronaMemoryExtra
  @return Handle to memory data, with valid contents on success. @see CoronaMemoryHandle
 */
 CORONA_API
@@ -345,21 +258,23 @@ int CoronaMemoryRelease (lua_State * L, CoronaMemoryHandle * memoryHandle) CORON
  stack. It might not be safe to let the object simply be collected, say if it backs the acquired memory; furthermore, in some
  cases we might want to maintain intermediate components, with the same concerns applying to each.
  In the event of an error, the underlying array will be cleaned up along with the acquired memory.
+ TODO: should this require a hash? written on first add, must be same for subsequent ones? (if so, how to expose?)
  @param L Lua state pointer
  @param memoryHandle Handle to memory data acquired from an object.
  @return Non-0 on success.
 */
 CORONA_API
-int CoronaMemoryAddToStash (lua_State * L, CoronaMemoryHandle * memoryHandle) CORONA_PUBLIC_SUFFIX;
+int CoronaMemoryAddToStash (lua_State * L, CoronaMemoryHandle * memoryHandle/*, unsigned int * hash */) CORONA_PUBLIC_SUFFIX;
 
 /**
  Remove the most recently added object from the acquired memory's stash. @see CoronaMemoryAddToStash
+ TODO: if add requires hash, so must this
  @param L Lua state pointer
  @param memoryHandle Handle to memory data acquired from an object.
  @return Non-0 on success.
 */
 CORONA_API
-int CoronaMemoryRemoveFromStash (lua_State * L, CoronaMemoryHandle * memoryHandle) CORONA_PUBLIC_SUFFIX;
+int CoronaMemoryRemoveFromStash (lua_State * L, CoronaMemoryHandle * memoryHandle/*, unsigned int hash */) CORONA_PUBLIC_SUFFIX;
 
 /**
  The object most recently added to the acquired memory's stash is pushed onto the stack. @see CoronaMemoryAddToStash

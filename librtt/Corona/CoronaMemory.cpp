@@ -16,9 +16,10 @@
 #include <functional>
 
 struct CoronaMemoryData {
-	CoronaMemoryData();
-	CoronaMemoryData(const CoronaMemoryData & other) = default;
+	CoronaMemoryData ();
+	CoronaMemoryData (const CoronaMemoryData & other) = default;
 
+	const char * fError;
 	const void * fBytes;
 	unsigned int fByteCount;
 	unsigned int fStrideCount;
@@ -26,6 +27,7 @@ struct CoronaMemoryData {
 };
 
 CoronaMemoryData::CoronaMemoryData () :
+	fError(nullptr),
 	fBytes(nullptr),
 	fByteCount(0U),
 	fStrideCount(0U),
@@ -33,9 +35,29 @@ CoronaMemoryData::CoronaMemoryData () :
 {
 }
 
+CORONA_API
+const char * CoronaMemoryGetLastError (lua_State * L, CoronaMemoryHandle * memoryHandle, int clear)
+{
+	if (!CoronaMemoryIsValid(L, memoryHandle))
+	{
+		return "Invalid memory handle";
+	}
+
+	else
+	{
+		const char * error = memoryHandle->data->fError;
+
+		if (clear)
+		{
+			memoryHandle->data->fError = nullptr; // n.b. any reference still intact
+		}
+
+		return error;
+	}
+}
 
 CORONA_API
-int CoronaMemoryIsValid(lua_State * L, CoronaMemoryHandle * memoryHandle)
+int CoronaMemoryIsValid (lua_State * L, CoronaMemoryHandle * memoryHandle)
 {
 	if (memoryHandle && memoryHandle->data && memoryHandle->lastKnownStackPosition != 0)
 	{
@@ -74,7 +96,9 @@ int CoronaMemoryGetPosition (lua_State * L, CoronaMemoryHandle * memoryHandle)
 		return 0;
 	}
 
-	else if (!FoundObjectAt(L, memoryHandle->lastKnownStackPosition, memoryHandle->data))
+	memoryHandle->data->fError = nullptr;
+
+	if (!FoundObjectAt(L, memoryHandle->lastKnownStackPosition, memoryHandle->data))
 	{
 		memoryHandle->lastKnownStackPosition = FindObjectOnStack(L, memoryHandle->data, FoundObjectAt);
 	}
@@ -119,7 +143,7 @@ static void GetWeakTable (lua_State * L, bool writable, bool hashProduct = false
 	lua_remove(L, -2); // ..., wt
 }
 
-static void ObjectLookup (lua_State* L, int objectIndex, bool writable, bool hashProduct = false)
+static void ObjectLookup (lua_State * L, int objectIndex, bool writable, bool hashProduct = false)
 {
 	GetWeakTable(L, writable, hashProduct); // ..., object, ..., wt
 
@@ -127,36 +151,9 @@ static void ObjectLookup (lua_State* L, int objectIndex, bool writable, bool has
 	lua_rawget(L, -2); // ..., object, ..., wt, info?
 }
 
-static CoronaMemoryCallbacks* AsCallbacks (lua_State * L, int index)
+static CoronaMemoryCallbacks * AsCallbacks (lua_State * L, int index)
 {
 	return (CoronaMemoryCallbacks *)lua_touserdata(L, index);
-}
-
-static bool GetAssignedCallbacks (lua_State * L, int & objectIndex, bool writable, bool wantEnsureSizes)
-{
-	objectIndex = CoronaLuaNormalize(L, objectIndex);
-
-	ObjectLookup(L, objectIndex, writable); // ..., wt, callbacks_info?
-
-	lua_remove(L, -2); // ..., callbacks_info?
-
-	if (lua_istable(L, -1))
-	{
-		lua_getfield(L, -1, "callbacks");// ..., callbacks_info?, callbacks?
-		lua_remove(L, -2); // ..., callbacks?
-	}
-
-	if (lua_isnil(L, -1) || (wantEnsureSizes && !AsCallbacks(L, -1)->ensureSizes))
-	{
-		lua_pop(L, 1); // ...
-
-		return false;
-	}
-
-	else
-	{
-		return true;
-	}
 }
 
 struct CallbackInfo {
@@ -230,7 +227,7 @@ static CoronaMemoryData * GetMemoryData (lua_State * L, const CoronaMemoryData &
 		memoryData = (CoronaMemoryData *)lua_newuserdata(L, sizeof(CoronaMemoryData)); // ..., memoryData
 
 		lua_createtable(L, 1, 0); // ..., memoryData, env
-		lua_setfenv(L, -2); // ..., memoryData; data.environment = env
+		lua_getfenv(L, -2); // ..., memoryData; data.environment = env
 	}
 
 	else
@@ -247,7 +244,7 @@ static void ReplaceWithError (lua_State * L, int objectIndex, int oldTop, const 
 {
 	int newTop = lua_gettop(L);
 
-	if (newTop == oldTop) lua_pushstring(L, defaultError); // ..., object, ..., etc., defError
+	if (newTop == oldTop || lua_isnil(L, newTop)) lua_pushstring(L, defaultError); // ..., object, ..., etc., defError
 
 	else if (lua_isstring(L, -1))
 	{
@@ -281,6 +278,13 @@ static CoronaMemoryHandle NullHandle (void)
 	return {0, nullptr};
 }
 
+static CoronaMemoryHandle ReplaceWithErrorAndReturnNullHandle (lua_State * L, int objectIndex, int oldTop, const char * defaultError)
+{
+	ReplaceWithError(L, objectIndex, oldTop, defaultError);
+
+	return NullHandle();
+}
+
 static CoronaMemoryHandle GetBytesAndRest (lua_State * L, int objectIndex, int oldTop, const CallbackInfo & info, bool writable, CoronaMemoryExtra * extra)
 {
 	CoronaMemoryData work;
@@ -289,27 +293,21 @@ static CoronaMemoryHandle GetBytesAndRest (lua_State * L, int objectIndex, int o
 
 	if (!work.fBytes)
 	{
-		ReplaceWithError(L, objectIndex, oldTop, "'getBytes()' callback failed");
-
-		return NullHandle();
+		return ReplaceWithErrorAndReturnNullHandle(L, objectIndex, oldTop, "'getBytes()' callback failed");
 	}
 
 	lua_settop(L, oldTop); // ...
 
 	if (info.fCallbacks->getStrides && !info.fCallbacks->getStrides(L, objectIndex, &work.fStrideCount, extra)) // ...[, etc. / strides, error]
 	{
-		ReplaceWithError(L, objectIndex, oldTop, "'getStrides()' callback failed"); // ...
-
-		return NullHandle();
+		return ReplaceWithErrorAndReturnNullHandle(L, objectIndex, oldTop, "'getStrides()' callback failed"); // ...
 	}
 
 	if (work.fStrideCount > 0U)
 	{
 		if (oldTop + work.fStrideCount > lua_gettop(L))
 		{
-			ReplaceWithError(L, objectIndex, oldTop, "'getStrides()' callback reports more strides than found on stack"); // ...
-
-			return NullHandle();
+			return ReplaceWithErrorAndReturnNullHandle(L, objectIndex, oldTop, "'getStrides()' callback reports more strides than found on stack"); // ...
 		}
 
 		unsigned strideProduct = 1U;
@@ -318,9 +316,7 @@ static CoronaMemoryHandle GetBytesAndRest (lua_State * L, int objectIndex, int o
 		{
 			if (!lua_isnumber(L, -i))
 			{
-				ReplaceWithError(L, objectIndex, oldTop, "'getStrides()' callback returned non-numeric stride"); // ...
-
-				return NullHandle();
+				return ReplaceWithErrorAndReturnNullHandle(L, objectIndex, oldTop, "'getStrides()' callback returned non-numeric stride"); // ...
 			}
 
 			strideProduct *= (unsigned int)lua_tointeger(L, -i);
@@ -328,9 +324,7 @@ static CoronaMemoryHandle GetBytesAndRest (lua_State * L, int objectIndex, int o
 
 		if (strideProduct > work.fByteCount)
 		{
-			ReplaceWithError(L, objectIndex, oldTop, "'getStrides()' callback returns stride spanning more bytes than received"); // ...
-
-			return NullHandle();
+			return ReplaceWithErrorAndReturnNullHandle(L, objectIndex, oldTop, "'getStrides()' callback returns stride spanning more bytes than received"); // ...
 		}
 	}
 
@@ -388,6 +382,33 @@ static CoronaMemoryHandle Acquire (lua_State * L, int objectIndex, bool writable
 	else
 	{
 		return NullHandle();
+	}
+}
+
+static bool GetAssignedCallbacks (lua_State * L, int & objectIndex, bool writable, bool wantEnsureSizes)
+{
+	objectIndex = CoronaLuaNormalize(L, objectIndex);
+
+	ObjectLookup(L, objectIndex, writable); // ..., wt, callbacks_info?
+
+	lua_remove(L, -2); // ..., callbacks_info?
+
+	if (lua_istable(L, -1))
+	{
+		lua_getfield(L, -1, "callbacks");// ..., callbacks_info?, callbacks?
+		lua_remove(L, -2); // ..., callbacks?
+	}
+
+	if (lua_isnil(L, -1) || (wantEnsureSizes && !AsCallbacks(L, -1)->ensureSizes))
+	{
+		lua_pop(L, 1); // ...
+
+		return false;
+	}
+
+	else
+	{
+		return true;
 	}
 }
 
@@ -541,9 +562,7 @@ CoronaMemoryHandle CoronaMemoryEnsureSizeAndAcquireReadableBytes (lua_State * L,
 
 	else
 	{
-		ReplaceWithError(L, objectIndex, lua_gettop(L), "Object has no reader or reader-writer");
-
-		return NullHandle();
+		return ReplaceWithErrorAndReturnNullHandle(L, objectIndex, lua_gettop(L), "Object has no reader or reader-writer");
 	}
 }
 
@@ -559,9 +578,7 @@ CoronaMemoryHandle CoronaMemoryEnsureSizeAndAcquireWritableBytes (lua_State * L,
 
 	else
 	{
-		ReplaceWithError(L, objectIndex, lua_gettop(L), "Object has no writer or reader-writer");
-
-		return NullHandle();
+		return ReplaceWithErrorAndReturnNullHandle(L, objectIndex, lua_gettop(L), "Object has no writer or reader-writer");
 	}
 }
 
@@ -586,23 +603,36 @@ unsigned int CoronaMemoryGetByteCount (lua_State * L, CoronaMemoryHandle * memor
 CORONA_API
 int CoronaMemoryGetStride (lua_State * L, CoronaMemoryHandle * memoryHandle, int strideIndex, unsigned int * stride)
 {
-	if (CoronaMemoryGetPosition(L, memoryHandle) && strideIndex >= 1 && strideIndex <= memoryHandle->data->fStrideCount)
+	if (CoronaMemoryGetPosition(L, memoryHandle))
 	{
-		lua_getfenv(L, memoryHandle->lastKnownStackPosition); // ..., env
-		lua_getfield(L, -1, "strides"); // ..., env, strides
-
-		int has_strides = lua_istable(L, -1);
-
-		if (has_strides)
+		if (strideIndex >= 1 && strideIndex <= memoryHandle->data->fStrideCount)
 		{
-			lua_rawgeti(L, -1, strideIndex); // ..., env, strides, stride
+			lua_getfenv(L, memoryHandle->lastKnownStackPosition); // ..., env
+			lua_getfield(L, -1, "strides"); // ..., env, strides
 
-			*stride = (unsigned int)lua_tointeger(L, -1);
+			int has_strides = lua_istable(L, -1);
+
+			if (has_strides)
+			{
+				lua_rawgeti(L, -1, strideIndex); // ..., env, strides, stride
+
+				*stride = (unsigned int)lua_tointeger(L, -1);
+			}
+
+			else // n.b. sanity check (should never get here)
+			{
+				memoryHandle->data->fError = "No strides found";
+			}
+
+			lua_pop(L, 2 + has_strides); // ...
+
+			return has_strides;
 		}
 
-		lua_pop(L, 2 + has_strides); // ...
-
-		return has_strides;
+		else
+		{
+			memoryHandle->data->fError = "Out-of-bounds stride index";
+		}
 	}
 
 	return 0;
@@ -627,10 +657,10 @@ int CoronaMemoryRelease (lua_State * L, CoronaMemoryHandle * memoryHandle)
 		GetMemoryDataCache(L); // ..., memoryData, ..., cache
 
 		lua_pushvalue(L, memoryHandle->lastKnownStackPosition); // ..., memoryData, ..., cache, memoryData
-		lua_rawseti(L, -2, StackSize(L, -1) + 1); // ..., memoryData, ..., cache = { ..., memoryData }
+		lua_rawseti(L, -2, StackSize(L, -2) + 1); // ..., memoryData, ..., cache = { ..., memoryData }
 		lua_getfenv(L, memoryHandle->lastKnownStackPosition); // ..., memoryData, ..., cache, env
 
-		for (int n = (int)lua_objlen(L, -1); n > 0; --n)
+		for (int n = StackSize(L, -1); n > 0; --n)
 		{
 			lua_pushnil(L); // ..., memoryData, ..., cache, env, nil
 			lua_rawseti(L, -2, n); // ..., memoryData, ..., cache, env = { ..., [#env] = nil }
