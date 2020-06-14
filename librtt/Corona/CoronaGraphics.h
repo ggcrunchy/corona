@@ -186,6 +186,12 @@ CORONA_API
 int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format) CORONA_PUBLIC_SUFFIX;
 
 // STEVE CHANGE
+/**
+ Most of the following assumes some familiarity with the source, in particular from librtt\Display and librtt\Renderer:
+
+ TODO: backend, e.g. geometry, program, renderer, texture / FBO stuff, uniforms
+*/
+
 CORONA_API
 int CoronaRendererRegisterBeginFrameOp (uint16_t * id, int (*onBeginFrame)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
 
