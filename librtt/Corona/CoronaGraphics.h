@@ -185,5 +185,34 @@ void* CoronaExternalGetUserData( lua_State *L, int index ) CORONA_PUBLIC_SUFFIX;
 CORONA_API
 int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format) CORONA_PUBLIC_SUFFIX;
 
+// STEVE CHANGE
+CORONA_API
+int CoronaRendererRegisterBeginFrameOp (uint16_t * id, int (*onBeginFrame)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererScheduleForNextFrame (uint16_t id, int schedule) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererRegisterClearOp (uint16_t * id, int (*onClear)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererEnableClear (uint16_t id, int enable) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererRegisterStateOp (uint64_t * id, int (*onState)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererSetOperationStateDirty (uint64_t id) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererRegisterCommand (uint64_t * id, void (*read)(uint8_t * read), int (*write)(uint8_t * bytes, const void * data, uint32_t size)) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererIssueCommand (uint64_t id, void * data, uint32_t size) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererSetFrustum (const float * viewMatrix, const float * projectionMatrix) CORONA_PUBLIC_SUFFIX;
+
+// /STEVE CHANGE
 
 #endif // _CoronaGraphics_H__
