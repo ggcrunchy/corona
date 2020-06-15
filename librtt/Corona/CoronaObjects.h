@@ -40,13 +40,13 @@ typedef struct DisplayObjectParams {
     //
 
     // TODO:
-    typedef void (*BasicBookend) (void * object, void * userData);
+    typedef void (*AddedToParentBookend) (const void * object, void * userData, lua_State * L, void * groupObject);
 
-    BasicBookend beforeAddedToParent;
-    BasicBookend afterAddedToParent;
+    AddedToParentBookend beforeAddedToParent;
+    AddedToParentBookend afterAddedToParent;
 
     // TODO:
-    typedef void (*BooleanResultBookend) (void * object, void * userData, int * result);
+    typedef void (*BooleanResultBookend) (const void * object, void * userData, int * result);
 
     BooleanResultBookend beforeCanCull;
     BooleanResultBookend afterCanCull;
@@ -54,11 +54,14 @@ typedef struct DisplayObjectParams {
     BooleanResultBookend beforeCanHitTest;
     BooleanResultBookend afterCanHitTest;
 
+    // TODO:
+    typedef void (*BasicBookend) (const void * object, void * userData);
+
     BasicBookend beforeDidMoveOffscreen;
     BasicBookend afterDidMoveOffscreen;
 
     // TODO:
-    typedef void (*MatrixBookend) (void * object, void * userData, float matrix[9]);
+    typedef void (*MatrixBookend) (const void * object, void * userData, float matrix[9]);
 
     MatrixBookend beforeDidUpdateTransform;
     MatrixBookend afterDidUpdateTransform;
@@ -67,7 +70,7 @@ typedef struct DisplayObjectParams {
     BasicBookend afterDraw;
 
     // TODO:
-    typedef void (*RectResultBookend) (void * object, void * userData, float * xMin, float * yMin, float * xMax, float * yMax);
+    typedef void (*RectResultBookend) (const void * object, void * userData, float * xMin, float * yMin, float * xMax, float * yMax);
 
     RectResultBookend beforeGetSelfBounds;
     RectResultBookend afterGetSelfBounds;
@@ -76,7 +79,7 @@ typedef struct DisplayObjectParams {
     RectResultBookend afterGetSelfBoundsForAnchor;
 
     // TODO:
-    typedef void (*BooleanResultPointBookend) (void * object, void * userData, float x, float y, int * result);
+    typedef void (*BooleanResultPointBookend) (const void * object, void * userData, float x, float y, int * result);
 
     BooleanResultPointBookend beforeHitTest;
     BooleanResultPointBookend afterHitTest;
@@ -85,43 +88,43 @@ typedef struct DisplayObjectParams {
     BasicBookend afterPrepare;
 
     // TODO:
-    typedef void (*RemovedFromParentBookend) (void * object, void * userData, lua_State * L, void * groupObject);
+    typedef void (*RemovedFromParentBookend) (const void * object, void * userData, lua_State * L, void * groupObject);
 
     RemovedFromParentBookend beforeRemovedFromParent;
     RemovedFromParentBookend afterRemovedFromParent;
 
     // TODO:
-    typedef void (*RotateBookend) (void * object, void * userData, float delta);
+    typedef void (*RotateBookend) (const void * object, void * userData, float delta);
 
     RotateBookend beforeRotate;
     RotateBookend afterRotate;
 
     // TODO:
-    typedef void (*ScaleBookend) (void * object, void * userData, float sx, float sy, int isNew);
+    typedef void (*ScaleBookend) (const void * object, void * userData, float sx, float sy, int isNew);
 
     ScaleBookend beforeScale;
     ScaleBookend afterScale;
 
     // TODO:
-    typedef void (*SetValueBookend) (void * object, void * userData, lua_State * L, const char key[], int valueIndex, int * result);
+    typedef void (*SetValueBookend) (const void * object, void * userData, lua_State * L, const char key[], int valueIndex, int * result);
 
     SetValueBookend beforeSetValue;
     SetValueBookend afterSetValue;
 
     // TODO:
-    typedef void (*TranslateBookend) (void * object, void * userData, float x, float y);
+    typedef void (*TranslateBookend) (const void * object, void * userData, float x, float y);
 
     TranslateBookend beforeTranslate;
     TranslateBookend afterTranslate;
 
     // TODO:
-    typedef void (*BooleanResultMatrixBookend) (void * object, void * userData, const float matrix[9], int * result);
+    typedef void (*BooleanResultMatrixBookend) (const void * object, void * userData, const float matrix[9], int * result);
 
     BooleanResultMatrixBookend beforeUpdateTransform;
     BooleanResultMatrixBookend afterUpdateTransform;
 
     // TODO:
-    typedef void (*ValueBookend) (void * object, void * userData, lua_State * L, const char key[], int * result);
+    typedef void (*ValueBookend) (const const void * object, void * userData, lua_State * L, const char key[], int * result);
 
     ValueBookend beforeValue;
     ValueBookend afterValue;
@@ -133,10 +136,8 @@ typedef struct DisplayObjectParams {
     // Lifetime and custom state
     //
 
-    void * userData;
-
-    void (*onCreate) (void * object, void * userData);
-    void (*onFinalize) (void * object, void * userData);
+    void (*onCreate) (const void * object, void * userData);
+    void (*onFinalize) (const void * object, void * userData);
 
     //
     // Flags
@@ -146,21 +147,12 @@ typedef struct DisplayObjectParams {
 
     // put these last in case inheriting types can merge with them
     Flags ignoreOriginalAddedToParent : 1; // only use before and / or after, ignoring the original method
-    Flags ignoreOriginalMoveOffscreen : 1;
 
-    Flags canCullNotDefault : 1; // default to true or false; n.b. it is convenient to initialize structures like these with 0, but `true` is a more common default, thus the "Not"
-    Flags canCullAllowEarlyOut : 1; // if this is true and we have a `beforeCanCull`, then early-out if its result is...
-    Flags canCullEarlyOutResult : 1; // ...true or false, as specified here
+    Flags earlyOutCanCullIfZero : 1; // in the case of boolean results, calls are assumed to early-out if "before" returned either true or false: use zero (false)?
     Flags ignoreOriginalCanCull : 1;
-    Flags canCullConditionallyOverwrite : 1; // if this is true and we haven `afterCanCull`, only replace the current value if its result is...
-    Flags canCullOverwriteResult : 1; // ...true or false, as specified here
 
-    Flags canHitTestNotDefault : 1; // see canCull notes
-    Flags canHitTestAllowEarlyOut : 1;
-    Flags canHitTestEarlyOutResult : 1;
+    Flags earlyOutCanHitTestIfZero : 1;
     Flags ignoreOriginalCanHitTest : 1;
-    Flags canHitTestConditionallyOverwrite : 1;
-    Flags canHitTestOverwriteResult : 1;
 
     Flags ignoreOriginalDidMoveOffscreen : 1;
     Flags ignoreOriginalDidUpdateTransform : 1;
@@ -168,35 +160,26 @@ typedef struct DisplayObjectParams {
     Flags ignoreOriginalGetSelfBounds : 1;
     Flags ignoreOriginalGetSelfBoundsForAnchor : 1;
 
-    Flags hitTestDefault : 1; // see canCull notes
-    Flags hitTestAllowEarlyOut : 1;
-    Flags hitTestEarlyOutResult : 1;
+    Flags earlyOutHitTestIfZero : 1;
     Flags ignoreOriginalHitTest : 1;
-    Flags hitTestConditionallyOverwrite : 1;
-    Flags hitTestOverwriteResult : 1;
 
+    Flags ignoreOriginalMoveOffscreen : 1;
     Flags ignoreOriginalPrepare : 1;
     Flags ignoreOriginalRemovedFromParent : 1;
     Flags ignoreOriginalRotate : 1;
     Flags ignoreOriginalScale : 1;
 
-    Flags setValueDisallowEarlyOut : 1; // see canCull notes
+    Flags setValueDisallowEarlyOut : 1; // usually want to early-out if we set a value, but we can suppress this, say if we just wanted a side effect
     Flags ignoreOriginalSetValue : 1;
 
     Flags ignoreOriginalTranslate : 1;
 
-    Flags updateTransformDefault : 1; // see canCull notes
-    Flags updateTransformAllowEarlyOut : 1;
-    Flags updateTransformEarlyOutResult : 1;
+    Flags earlyOutUpdateTransformIfZero : 1;
     Flags ignoreOriginalUpdateTransform : 1;
-    Flags updateTransformConditionallyOverwrite : 1;
-    Flags updateTransformOverwriteResult : 1;
 
-    Flags valueDisallowEarlyOut : 1; // see canCull notes
-    Flags valueNotEarlyOutResult : 1;
+    Flags valueDisallowEarlyOut : 1; // usually we want to early-out if we got a value, but we can suppress this, say if we want to transform the result
+    Flags valueEarlyOutIfZero : 1;
     Flags ignoreOriginalValue : 1;
-    Flags valueConditionallyOverwrite : 1;
-    Flags valueOverwriteResult : 1;
 
     Flags ignoreOriginalWillMoveOnscreen : 1;
 } DisplayObjectParams;
@@ -218,15 +201,17 @@ typedef struct GroupParams {
     DisplayObjectParams::BasicBookend afterDidRemove;
 } GroupParams;
 
+// TODO: allow params to be shared / reused, i.e. what we almost always want
+
 CORONA_API
-int CoronaObjectsPushGroup (lua_State * L, const GroupParams * params) CORONA_PUBLIC_SUFFIX;
+int CoronaObjectsPushGroup (lua_State * L, void * userData, const GroupParams * params, int temporaryParams) CORONA_PUBLIC_SUFFIX;
 
 typedef struct ShapeParams {
     DisplayObjectParams inherited;
 } ShapeParams;
 
 CORONA_API
-int CoronaObjectsPushRect (lua_State * L, const ShapeParams * params) CORONA_PUBLIC_SUFFIX;
+int CoronaObjectsPushRect (lua_State * L, void * userData, const ShapeParams * params, int temporaryParams) CORONA_PUBLIC_SUFFIX;
 
 typedef struct SnapshotParams {
     DisplayObjectParams inherited;
@@ -234,7 +219,7 @@ typedef struct SnapshotParams {
 } SnapshotParams;
 
 CORONA_API
-int CoronaObjectsPushSnapshot (lua_State * L, const SnapshotParams * params) CORONA_PUBLIC_SUFFIX;
+int CoronaObjectsPushSnapshot (lua_State * L, void * userData, const SnapshotParams * params, int temporaryParams) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 int CoronaObjectsShouldDraw (void * object, int * shouldDraw) CORONA_PUBLIC_SUFFIX;

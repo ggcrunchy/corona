@@ -6,11 +6,15 @@
 // Contact: support@coronalabs.com
 //
 //////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////
+
+#include "Core/Rtt_Build.h"
 
 #include "CoronaObjects.h"
 #include "CoronaLua.h"
 
 #include "Rtt_LuaContext.h"
+#include "Rtt_LuaProxyVTable.h"
 #include "Rtt_Runtime.h"
 
 #include "Display/Rtt_Display.h"
@@ -19,121 +23,436 @@
 #include "Display/Rtt_SnapshotObject.h"
 #include "Display/Rtt_StageObject.h"
 
-#include <stddef.h>
+static bool
+ValuePrologue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[], void * userData, const DisplayObjectParams & params, int * result )
+{
+	if (params.beforeValue)
+	{
+		params.beforeValue( &object, userData, L, key, result );
 
-/*
-	Flags canCullNotDefault : 1; // default to true or false; n.b. it is convenient to initialize structures like these with 0, but `true` is a more common default, thus the "Not"
-	Flags canCullAllowEarlyOut : 1; // if this is true and we have a `beforeCanCull`, then early-out if its result is...
-	Flags canCullEarlyOutResult : 1; // ...true or false, as specified here
-	Flags ignoreOriginalCanCull : 1;
-	Flags canCullConditionallyOverwrite : 1; // if this is true and we haven `afterCanCull`, only replace the current value if its result is...
-	Flags canCullOverwriteResult : 1; // ...true or false, as specified here
+		bool canEarlyOut = !params.valueDisallowEarlyOut, earlyOutResult = !params.valueEarlyOutIfZero;
 
-	Flags canHitTestNotDefault : 1; // see canCull notes
-	Flags canHitTestAllowEarlyOut : 1;
-	Flags canHitTestEarlyOutResult : 1;
-	Flags ignoreOriginalCanHitTest : 1;
-	Flags canHitTestConditionallyOverwrite : 1;
-	Flags canHitTestOverwriteResult : 1;
+		if (canEarlyOut && earlyOutResult == !!result)
+		{
+			return false;
+		}
+	}
 
-	Flags ignoreOriginalDidUpdateTransform : 1;
-	Flags ignoreOriginalDraw : 1;
-	Flags ignoreOriginalGetSelfBounds : 1;
-	Flags ignoreOriginalGetSelfBoundsForAnchor : 1;
+	return true;
+}
 
-	Flags hitTestDefault : 1; // see canCull notes
-	Flags hitTestAllowEarlyOut : 1;
-	Flags hitTestEarlyOutResult : 1;
-	Flags ignoreOriginalHitTest : 1;
-	Flags hitTestConditionallyOverwrite : 1;
-	Flags hitTestOverwriteResult : 1;
+static int
+ValueEpilogue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[], void * userData, const DisplayObjectParams & params, int result )
+{
+	if (params.afterValue)
+	{
+		params.afterValue( &object, userData, L, key, &result ); // n.b. `result` previous values still on stack
+	}
 
-	Flags ignoreOriginalPrepare : 1;
-	Flags ignoreOriginalRemovedFromParent : 1;
-	Flags ignoreOriginalRotate : 1;
-	Flags ignoreOriginalScale : 1;
+	return result;
+}
 
-	Flags setValueDisallowEarlyOut : 1; // see canCull notes
-	Flags ignoreOriginalSetValue : 1;
+static bool
+SetValuePrologue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], int valueIndex, void * userData, const DisplayObjectParams & params, int * result )
+{
+	if (params.beforeSetValue)
+	{
+		params.beforeSetValue( &object, userData, L, key, valueIndex, result );
 
-	Flags ignoreOriginalTranslate : 1;
+		bool canEarlyOut = !params.setValueDisallowEarlyOut;
 
-	Flags updateTransformDefault : 1; // see canCull notes
-	Flags updateTransformAllowEarlyOut : 1;
-	Flags updateTransformEarlyOutResult : 1;
-	Flags updateTransformConditionallyOverwrite : 1;
-	Flags updateTransformOverwriteResult : 1;
+		if (canEarlyOut && result)
+		{
+			return false;
+		}
+	}
 
-	Flags valueDisallowEarlyOut : 1; // see canCull notes
-	Flags valueNotEarlyOutResult : 1;
-	Flags ignoreOriginalValue : 1;
-	Flags valueConditionallyOverwrite : 1;
-	Flags valueOverwriteResult : 1;
+	return true;
+}
 
-	Flags ignoreOriginalWillMoveOnscreen : 1;
-*/
+static bool
+SetValueEpilogue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], int valueIndex, void * userData, const DisplayObjectParams & params, int result )
+{
+	if (params.afterSetValue)
+	{
+		params.afterSetValue( &object, userData, L, key, valueIndex, &result );
+	}
 
-/*
-virtual void AddedToParent(lua_State * L, GroupObject * parent);
-virtual bool CanCull() const;
-virtual bool CanHitTest() const;
-virtual void DidMoveOffscreen();
-virtual void Draw(Renderer& renderer) const;
-virtual void DidUpdateTransform(Matrix& srcToDst);
-virtual void FinalizeSelf(lua_State *L);
-virtual void GetSelfBounds(Rect& rect) const;
-virtual bool HitTest(Real contentX, Real contentY);
-virtual void GetSelfBoundsForAnchor(Rect& rect) const;
-virtual void Prepare(const Display& display);
-virtual void RemovedFromParent(lua_State * L, GroupObject * parent);
-virtual void Rotate(Real deltaTheta);
-virtual void Scale(Real sx, Real sy, bool isNewValue);
-virtual void Translate(Real deltaX, Real deltaY);
-virtual bool UpdateTransform(const Matrix& parentToDstSpace);
-virtual void WillMoveOnscreen();
+	return result;
+}
 
-virtual const LuaProxyVTable& ProxyVTable() const;
-*/
+#define CORONA_OBJECTS_VTABLE(OBJECT_KIND, OBJECT_PARAMS)  \
+								 						   \
+class OBJECT_KIND##2ProxyVTable : public Rtt::Lua##OBJECT_KIND##ObjectProxyVTable \
+{																	              \
+public:																			  \
+	typedef OBJECT_KIND##2ProxyVTable Self;				\
+	typedef Lua##OBJECT_KIND##ObjectProxyVTable Super;  \
+														\
+public:																			 \
+	static const Self& Constant() { static const Self kVTable; return kVTable; } \
+																				 \
+protected:							\
+	OBJECT_KIND##2ProxyVTable() {}	\
+									\
+public:																																	\
+	virtual int ValueForKey( lua_State *L, const Rtt::MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const \
+	{																																	\
+		const DisplayObjectParams & params = static_cast<const OBJECT_KIND##2 &>(object).OBJECT_PARAMS; \
+		void * userData = const_cast<void *>(static_cast<const OBJECT_KIND##2 &>(object).fUserData);	\
+		int result = 0;																					\
+																										\
+		if (!ValuePrologue( L, object, key, userData, params, &result ))	\
+		{																	\
+			return result;													\
+		}																	\
+																			\
+		else if (!params.ignoreOriginalValue)												\
+		{																					\
+			result += Super::Constant().ValueForKey( L, object, key, overrideRestriction );	\
+		}																					\
+																							\
+		return ValueEpilogue( L, object, key, userData, params, result );	\
+	}																		\
+																			\
+	virtual bool SetValueForKey( lua_State *L, Rtt::MLuaProxyable& object, const char key[], int valueIndex ) const	\
+	{																												\
+		const DisplayObjectParams & params = static_cast<OBJECT_KIND##2 &>(object).OBJECT_PARAMS;	\
+		void * userData = static_cast<const OBJECT_KIND##2 &>(object).fUserData;					\
+		int result = 0;																				\
+																									\
+		if (!SetValuePrologue( L, object, key, valueIndex, userData, params, &result ))	\
+		{																				\
+			return result;																\
+		}																				\
+																						\
+		else if (!params.ignoreOriginalSetValue)									\
+		{																			\
+			result = Super::Constant().SetValueForKey( L, object, key, valueIndex );\
+		}																			\
+																					\
+		return SetValueEpilogue( L, object, key, valueIndex, userData, params, result );	\
+	}																						\
+																							\
+	virtual const LuaProxyVTable& Parent() const { return Super::Constant(); }	\
+}
+
 static bool
 PushFactory( lua_State * L, const char * name )
 {
-    Rtt::Display & display = Rtt::LuaContext::GetRuntime( L )->GetDisplay();
+	Rtt::Display & display = Rtt::LuaContext::GetRuntime( L )->GetDisplay();
 
-    if (!display.PushObjectFactories()) // ...[, factories]
-    {
-        return false;
-    }
+	if (!display.PushObjectFactories()) // ...[, factories]
+	{
+		return false;
+	}
 
-    lua_getfield( L, -1, name ); // ..., factories, factory
+	lua_getfield( L, -1, name ); // ..., factories, factory
 
-    return true;
+	return true;
 }
+
+static bool 
+CallNewFactory (lua_State * L, const char * name, void * func)
+{
+	int nargs = lua_gettop( L );
+
+	if (PushFactory( L, name ) ) // args[, factories, factory]
+	{
+		lua_pushlightuserdata( L, func ); // args, factories, factory, func
+		lua_rawseti( L, -2, lua_upvalueindex( 2 ) ); // args, factories, factory; factory.upvalue[2] = func
+		lua_pushvalue( L, -1 ); // args, factories, factory, factory
+		lua_insert( L, 1 ); // factory, args, factories, factory
+		lua_insert( L, 1 ); // factory, factory, args, factories
+		lua_pop( L, 1 ); // factory, factory, args
+		lua_call( L, nargs, 1 ); // factory, object?
+		lua_pushnil( L ); // factory, object?, nil
+		lua_rawseti( L, -3, lua_upvalueindex( 2 ) ); // factory, object?; factory.upvalue[2] = nil
+
+		return !lua_isnil( L, -1 );
+	}
+
+	return false;
+}
+
+static void *
+CopyParams( lua_State * L, const void * from, size_t size, bool isTemporary, int & ref )
+{
+	if (isTemporary)
+	{
+		void * out = lua_newuserdata( L, size );
+
+		memcpy( out, from, size );
+
+		ref = luaL_ref( L, LUA_REGISTRYINDEX );
+
+		return out;
+	}
+
+	return const_cast<void *>(from);
+}
+
+#define CORONA_OBJECTS_PUSH(OBJECT_KIND, PARAMS_KIND, TO_MEMBERS)							\
+	if (CallNewFactory( L, "new" #OBJECT_KIND, &New##OBJECT_KIND##2) ) /* ...[, object] */	\
+	{																			\
+		OBJECT_KIND##2 * object = (OBJECT_KIND##2 *)lua_touserdata( L, -1 );	\
+																				\
+		object->fParams = (PARAMS_KIND *)CopyParams( L, params, sizeof(*params), temporaryParams, object->fRef );	\
+		object->fUserData = userData;																				\
+																													\
+		if (TO_MEMBERS.onCreate)	\
+		{							\
+			TO_MEMBERS.onCreate( object, userData );	\
+		}												\
+					\
+		return 1;	\
+	}				\
+					\
+	return 0
+
+#define CORONA_OBJECTS_METHOD(METHOD_NAME, TO_MEMBERS)	\
+	const DisplayObjectParams & params = TO_MEMBERS;	\
+														\
+	if (params.before##METHOD_NAME)						\
+	{													\
+		params.before##METHOD_NAME( this, fUserData );	\
+	}													\
+														\
+	if (!params.ignoreOriginal##METHOD_NAME)	\
+	{											\
+		Super::METHOD_NAME();					\
+	}											\
+												\
+	if (params.after##METHOD_NAME)						\
+	{													\
+		params.after##METHOD_NAME( this, fUserData );	\
+	}
+
+#define CORONA_OBJECTS_METHOD_STRIP_ARGUMENT(METHOD_NAME, TO_MEMBERS, ARGUMENT)	\
+	const DisplayObjectParams & params = TO_MEMBERS;							\
+																				\
+	if (params.before##METHOD_NAME)						\
+	{													\
+		params.before##METHOD_NAME( this, fUserData );	\
+	}													\
+														\
+	if (!params.ignoreOriginal##METHOD_NAME)	\
+	{											\
+		Super::METHOD_NAME( ARGUMENT );			\
+	}											\
+												\
+	if (params.after##METHOD_NAME)						\
+	{													\
+		params.after##METHOD_NAME( this, fUserData );	\
+	}
+
+#define CORONA_OBJECTS_METHOD_WITH_ARGS(METHOD_NAME, TO_MEMBERS, ...)	\
+	const DisplayObjectParams & params = TO_MEMBERS;					\
+																		\
+	if (params.before##METHOD_NAME)									\
+	{																\
+		params.before##METHOD_NAME( this, fUserData, __VA_ARGS__ );	\
+	}																\
+																	\
+	if (!params.ignoreOriginal##METHOD_NAME)	\
+	{											\
+		Super::METHOD_NAME( __VA_ARGS__ );		\
+	}											\
+												\
+	if (params.after##METHOD_NAME)									\
+	{																\
+		params.after##METHOD_NAME( this, fUserData, __VA_ARGS__ );	\
+	}
 
 class Group2 : public Rtt::GroupObject {
 public:
-    Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject );
+	typedef Group2 Self;
+	typedef Rtt::GroupObject Super;
 
-    // BOILERPLATE
-    // UNIQUE
+public:
 
-    GroupParams fParams;
+	Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject );
+
+	// Didinsert
+	// DidRemove
+
+	#define GROUP2_MEMBERS fParams->inherited
+
+	virtual void AddedToParent( lua_State * L, GroupObject * parent )
+	{
+		CORONA_OBJECTS_METHOD_WITH_ARGS( AddedToParent, GROUP2_MEMBERS, L, parent )
+	}
+
+	virtual bool CanCull() const
+	{
+		const DisplayObjectParams & params = GROUP2_MEMBERS;
+		int result = 0;
+
+		if (params.beforeCanCull)
+		{
+			params.beforeCanCull( this, fUserData, &result );
+
+			if (params.earlyOutCanCullIfZero == !result)
+			{
+				return !!result;
+			}
+		}
+
+		if (!params.ignoreOriginalCanCull)
+		{
+			result = Super::CanCull();
+		}
+
+		if (params.afterCanCull)
+		{
+			params.afterCanCull( this, fUserData, &result );
+		}
+
+		return result;
+	}
+
+	virtual bool CanHitTest() const
+	{
+		// TODO: see CanCull
+		/*
+		Flags canHitTestEarlyOutIfZero : 1;
+		Flags ignoreOriginalCanHitTest : 1;
+		*/
+		return false;
+	}
+
+	virtual void DidMoveOffscreen()
+	{
+		CORONA_OBJECTS_METHOD( DidMoveOffscreen, GROUP2_MEMBERS )
+	}
+
+	virtual void DidUpdateTransform( Rtt::Matrix & srcToDst )
+	{
+	//	Flags ignoreOriginalDidUpdateTransform : 1;
+	}
+
+	virtual void Draw( Rtt::Renderer & renderer ) const
+	{
+		CORONA_OBJECTS_METHOD_STRIP_ARGUMENT( Draw, GROUP2_MEMBERS, renderer )
+	}
+
+	virtual void FinalizeSelf( lua_State * L )
+	{
+		if (GROUP2_MEMBERS.onFinalize)
+		{
+			GROUP2_MEMBERS.onFinalize( this, fUserData );
+		}
+
+		lua_unref( L, fRef );
+
+		Super::FinalizeSelf( L );
+	}
+
+	virtual void GetSelfBounds( Rtt::Rect & rect ) const
+	{
+		// Flags ignoreOriginalGetSelfBounds : 1;
+	}
+
+	virtual void GetSelfBoundsForAnchor( Rtt::Rect & rect ) const
+	{
+
+		// Flags ignoreOriginalGetSelfBoundsForAnchor : 1;
+	}
+
+	virtual bool HitTest( Rtt::Real contentX, Rtt::Real contentY )
+	{
+		const DisplayObjectParams & params = GROUP2_MEMBERS;
+		int result = 0;
+
+		if (params.beforeHitTest)
+		{
+			params.beforeHitTest( this, fUserData, contentX, contentY, &result );
+
+			if (params.earlyOutHitTestIfZero == !result)
+			{
+				return !!result;
+			}
+		}
+
+		if (!params.ignoreOriginalHitTest)
+		{
+			result = Super::HitTest( contentX, contentY );
+		}
+
+		if (params.afterCanCull)
+		{
+			params.afterCanCull( this, fUserData, &result );
+		}
+
+		return result;
+		/*
+		Flags hitTestEarlyOutIfZero : 1;
+		Flags ignoreOriginalHitTest : 1;
+		*/
+	}
+
+	virtual void Prepare( const Rtt::Display & display )
+	{
+		CORONA_OBJECTS_METHOD_STRIP_ARGUMENT( Prepare, GROUP2_MEMBERS, display )
+	}
+
+	virtual void RemovedFromParent( lua_State * L, GroupObject * parent )
+	{
+		CORONA_OBJECTS_METHOD_WITH_ARGS( RemovedFromParent, GROUP2_MEMBERS, L, parent )
+	}
+
+	virtual void Rotate( Rtt::Real deltaTheta )
+	{
+		CORONA_OBJECTS_METHOD_WITH_ARGS( Rotate, GROUP2_MEMBERS, deltaTheta )
+	}
+
+	virtual void Scale( Rtt::Real sx, Rtt::Real sy, bool isNewValue )
+	{
+		CORONA_OBJECTS_METHOD_WITH_ARGS( Scale, GROUP2_MEMBERS, sx, sy, isNewValue )
+	}
+
+	virtual void Translate( Rtt::Real deltaX, Rtt::Real deltaY )
+	{
+		CORONA_OBJECTS_METHOD_WITH_ARGS( Translate, GROUP2_MEMBERS, deltaX, deltaY )
+	}
+
+	virtual bool UpdateTransform( const Rtt::Matrix & parentToDstSpace )
+	{
+		/*
+		Flags updateTransformEarlyOutIfZero : 1;
+		Flags ignoreOriginalUpdateTransform : 1;
+		*/
+		return false;
+	}
+
+	virtual void WillMoveOnscreen()
+	{
+		CORONA_OBJECTS_METHOD( WillMoveOnscreen, GROUP2_MEMBERS )
+	}
+
+	virtual const Rtt::LuaProxyVTable& ProxyVTable() const;
+
+	GroupParams * fParams;
+	int fRef;
+	void * fUserData;
+
+	#undef GROUP2_MEMBERS
 };
 
-template<size_t offset, typename T> const DisplayObjectParams &
-GetParams (const T & drawable)
-{
-    return *reinterpret_cast<const DisplayObjectParams *>(reinterpret_cast<const uint8_t *>(&drawable) + offset);
-}
-/*
-static const DisplayObjectParams &
-GetFromGroup (const Group2 & g)
-{
-    return GetParams<offsetof(Group2, fParams.inherited)>(g);
-}
-*/
 Group2::Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
-    : GroupObject( allocator, stageObject )
+	: GroupObject( allocator, stageObject ),
+		fParams( NULL ),
+		fRef( LUA_NOREF ),
+		fUserData( NULL )
 {
+}
+
+CORONA_OBJECTS_VTABLE(Group, fParams->inherited);
+
+const Rtt::LuaProxyVTable&
+Group2::ProxyVTable() const
+{
+	return Group2ProxyVTable::Constant();
 }
 
 static Rtt::GroupObject *
@@ -142,57 +461,61 @@ NewGroup2 (Rtt_Allocator * allocator, Rtt::StageObject * stageObject)
     return Rtt_NEW( allocator, Group2( allocator, NULL ) );
 }
 
-static bool 
-CallNewFactory (lua_State * L, const char * name, void * func)
+CORONA_API
+int CoronaObjectsPushGroup (lua_State * L, void * userData, const GroupParams * params, int temporaryParams)
 {
-    int nargs = lua_gettop( L );
-
-    if (PushFactory( L, name ) ) // args[, factories, factory]
-    {
-        lua_pushlightuserdata( L, func ); // args, factories, factory, func
-        lua_rawseti( L, -2, lua_upvalueindex( 2 ) ); // args, factories, factory; factory.upvalue[2] = func
-        lua_pushvalue( L, -1 ); // args, factories, factory, factory
-        lua_insert( L, 1 ); // factory, args, factories, factory
-        lua_insert( L, 1 ); // factory, factory, args, factories
-        lua_pop( L, 1 ); // factory, factory, args
-        lua_call( L, nargs, 1 ); // factory, object?
-        lua_pushnil( L ); // factory, object?, nil
-        lua_rawseti( L, -3, lua_upvalueindex( 2 ) ); // factory, object?; factory.upvalue[2] = nil
-
-        return !lua_isnil( L, -1 );
-    }
-
-    return false;
+	CORONA_OBJECTS_PUSH(Group, GroupParams, object->fParams->inherited);
 }
+/*
+class LuaShape2ProxyVTable : public LuaShapeObjectProxyVTable
+{
+public:
+	typedef LuaShape2ProxyVTable Self;
+	typedef LuaShapeObjectProxyVTable Super;
+
+public:
+	static const Self& Constant();
+
+protected:
+	LuaShape2ProxyVTable() {}
+
+public:
+	virtual int ValueForKey( lua_State *L, const MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const;
+	virtual bool SetValueForKey( lua_State *L, MLuaProxyable& object, const char key[], int valueIndex ) const;
+	virtual const LuaProxyVTable& Parent() const;
+};
+*/
+
+//CORONA_OBJECTS_VTABLE(Group, fParams);
 
 CORONA_API
-int CoronaObjectsPushGroup (lua_State * L, const GroupParams * params)
-{
-    if (CallNewFactory( L, "newGroup", &NewGroup2) ) // ...[, group]
-    {
-        Group2 * group = (Group2 *)lua_touserdata( L, -1 );
-
-        group->fParams = *params;
-
-        if (params->inherited.onCreate)
-        {
-            params->inherited.onCreate( group, params->inherited.userData );
-        }
-
-        return 1;
-    }
-
-    return 0;
-}
-
-CORONA_API
-int CoronaObjectsPushRect (lua_State * L, const ShapeParams * params)
+int CoronaObjectsPushRect (lua_State * L, void * userData, const ShapeParams * params, int temporaryParams)
 {
     return 0;
 }
 
+/*
+class LuaSnapshot2ProxyVTable : public LuaSnapshotObjectProxyVTable
+{
+public:
+	typedef LuaSnapshot2ProxyVTable Self;
+	typedef LuaSnapshotObjectProxyVTable Super;
+
+public:
+	static const Self& Constant();
+
+protected:
+	LuaSnapshot2ProxyVTable() {}
+
+public:
+	virtual int ValueForKey( lua_State *L, const MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const;
+	virtual bool SetValueForKey( lua_State *L, MLuaProxyable& object, const char key[], int valueIndex ) const;
+	virtual const LuaProxyVTable& Parent() const;
+};
+*/
+
 CORONA_API
-int CoronaObjectsPushSnapshot (lua_State * L, const SnapshotParams * params)
+int CoronaObjectsPushSnapshot (lua_State * L, void * userData, const SnapshotParams * params, int temporaryParams)
 {
     return 0;
 }
