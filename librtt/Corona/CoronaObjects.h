@@ -34,16 +34,6 @@ extern "C" {
  TODO: backend, e.g. texture / FBO stuff
 */
 
-/**
- Pushes TextureResourseExternal instance onto stack
- @param L Lua state pointer
- @param callbacks set of callbacks used to create texture. @see CoronaExternalTextureCallbacks
- @param userData pointer which would be passed to callbacks
- @return number of values pushed onto Lua stack;
-         1 - means texture was successfully created and is on stack
-         0 - error occurred and nothing was pushed on stack
-*/
-
 typedef struct DisplayObjectParams {
     //
     // Bookends
@@ -55,9 +45,6 @@ typedef struct DisplayObjectParams {
     BasicBookend beforeAddedToParent;
     BasicBookend afterAddedToParent;
 
-    BasicBookend beforeMoveOffscreen;
-    BasicBookend afterMoveOffscreen;
-
     // TODO:
     typedef void (*BooleanResultBookend) (void * object, void * userData, int * result);
 
@@ -66,6 +53,9 @@ typedef struct DisplayObjectParams {
 
     BooleanResultBookend beforeCanHitTest;
     BooleanResultBookend afterCanHitTest;
+
+    BasicBookend beforeDidMoveOffscreen;
+    BasicBookend afterDidMoveOffscreen;
 
     // TODO:
     typedef void (*MatrixBookend) (void * object, void * userData, float matrix[9]);
@@ -172,6 +162,7 @@ typedef struct DisplayObjectParams {
     Flags canHitTestConditionallyOverwrite : 1;
     Flags canHitTestOverwriteResult : 1;
 
+    Flags ignoreOriginalDidMoveOffscreen : 1;
     Flags ignoreOriginalDidUpdateTransform : 1;
     Flags ignoreOriginalDraw : 1;
     Flags ignoreOriginalGetSelfBounds : 1;
@@ -197,6 +188,7 @@ typedef struct DisplayObjectParams {
     Flags updateTransformDefault : 1; // see canCull notes
     Flags updateTransformAllowEarlyOut : 1;
     Flags updateTransformEarlyOutResult : 1;
+    Flags ignoreOriginalUpdateTransform : 1;
     Flags updateTransformConditionallyOverwrite : 1;
     Flags updateTransformOverwriteResult : 1;
 
@@ -227,27 +219,14 @@ typedef struct GroupParams {
 } GroupParams;
 
 CORONA_API
-int CoronaObjectsPushGroup (lua_State *L, const GroupParams * params) CORONA_PUBLIC_SUFFIX;
-
-/**
- Retrieves userData from TextureResourceExternal on Lua stack
- @param index: location of texture resource on Lua stack
- @return `userData` value texture was created with or
-         NULL if stack doesn't contain valid external texture resource at specified index
-*/
+int CoronaObjectsPushGroup (lua_State * L, const GroupParams * params) CORONA_PUBLIC_SUFFIX;
 
 typedef struct ShapeParams {
     DisplayObjectParams inherited;
 } ShapeParams;
 
 CORONA_API
-int CoronaObjectsPushRect (lua_State *L, const ShapeParams * params) CORONA_PUBLIC_SUFFIX;
-
-/**
- Helper function, returns how many Bytes Per Pixel bitmap of specified format has
- @param format CoronaExternalBitmapFormat to check
- @return number of bytes per pixel (bpp) of bitmap with specified bitmap format
-*/
+int CoronaObjectsPushRect (lua_State * L, const ShapeParams * params) CORONA_PUBLIC_SUFFIX;
 
 typedef struct SnapshotParams {
     DisplayObjectParams inherited;
@@ -257,6 +236,7 @@ typedef struct SnapshotParams {
 CORONA_API
 int CoronaObjectsPushSnapshot (lua_State * L, const SnapshotParams * params) CORONA_PUBLIC_SUFFIX;
 
-// 
+CORONA_API
+int CoronaObjectsShouldDraw (void * object, int * shouldDraw) CORONA_PUBLIC_SUFFIX;
 
 #endif // _CoronaObjects_H__

@@ -192,29 +192,132 @@ int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format) CORONA_PUBLIC_SUF
  TODO: backend, e.g. geometry, program, renderer, texture / FBO stuff, uniforms
 */
 
-CORONA_API
-int CoronaRendererRegisterBeginFrameOp (uint16_t * id, int (*onBeginFrame)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
+typedef enum {
+	/**
+	TODO
+	*/
+	kBackend_None,
+
+	/**
+	TODO
+	*/
+	kBackend_OpenGL,
+
+	/**
+	TODO
+	*/
+	kBackend_OpenGLES
+} CoronaRendererBackend;
+
+/**
+TODO
+*/
+typedef struct CoronaGraphicsToken {
+	unsigned char bytes[8];
+	bool hasValue;
+} CoronaGraphicsToken;
+
+/**
+TODO
+*/
+typedef struct CoronaShaderCallbacks {
+	/**
+	Required
+	TODO
+	*/
+	unsigned long size;
+
+	// This seems okay... 
+
+	/**
+	Optional
+	TODO
+	*/
+	const char ** (*beginTransform) (const char * source[], unsigned int * n, void * userData);
+
+	/**
+	Optional
+	TODO
+	*/
+	void (*endTransform) (const char * transformed[], unsigned int n, void * userData);
+
+	// Argh, this uniform stuff isn't ready to go :P
+
+	/**
+	Optional
+	TODO
+	*/
+	unsigned int (*getUniforms) (void * programContext, void * userData);
+
+	/**
+	Optional
+	TODO
+	*/
+	void (*resetUniforms) (void * programContext, void * userData);
+
+	/**
+	Optional
+	TODO
+	*/
+	unsigned char * (*queryUniform) (void * programContext, unsigned int index, unsigned int * valueCount, unsigned int * sizeInBytes);
+
+	/**
+	Optional
+	TODO
+	*/
+	void (*updateUniform) (void * programContext, unsigned int index);
+
+	/**
+	Required
+	TODO
+	*/
+	CoronaGraphicsToken attributes;
+} CoronaShaderCallbacks;
+
+/**
+TODO
+*/
+typedef struct CoronaShaderAttribute {
+	const char * name;
+	unsigned int offset;
+	unsigned int size;
+	unsigned int type;
+	unsigned int stride;
+	int normalized;
+} CoronaShaderAttribute;
 
 CORONA_API
-int CoronaRendererScheduleForNextFrame (uint16_t id, int schedule) CORONA_PUBLIC_SUFFIX;
+int CoronaShaderRegisterAttributes (CoronaGraphicsToken * token, const CoronaShaderAttribute * attributes, unsigned int attributeCount) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererRegisterClearOp (uint16_t * id, int (*onClear)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
+int CoronaShaderRegisterPolicy (lua_State * L, const char * name, const CoronaShaderCallbacks * callbacks, void * userData) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererEnableClear (uint16_t id, int enable) CORONA_PUBLIC_SUFFIX;
+CoronaRendererBackend CoronaRendererGetBackend () CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererRegisterStateOp (uint64_t * id, int (*onState)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererRegisterBeginFrameOp (CoronaGraphicsToken * token, int (*onBeginFrame)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererSetOperationStateDirty (uint64_t id) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererScheduleForNextFrame (const CoronaGraphicsToken * token, int schedule) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererRegisterCommand (uint64_t * id, void (*read)(uint8_t * read), int (*write)(uint8_t * bytes, const void * data, uint32_t size)) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererRegisterClearOp (CoronaGraphicsToken * token, int (*onClear)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererIssueCommand (uint64_t id, void * data, uint32_t size) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererEnableClear (const CoronaGraphicsToken * token, int enable) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererRegisterStateOp (CoronaGraphicsToken * token, int (*onState)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererSetOperationStateDirty (const CoronaGraphicsToken * token) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererRegisterCommand (CoronaGraphicsToken * token, void (*read)(uint8_t * read), int (*write)(uint8_t * bytes, const void * data, uint32_t size)) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererIssueCommand (const CoronaGraphicsToken * token, void * data, uint32_t size) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 int CoronaRendererSetFrustum (const float * viewMatrix, const float * projectionMatrix) CORONA_PUBLIC_SUFFIX;

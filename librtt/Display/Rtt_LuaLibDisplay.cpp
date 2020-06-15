@@ -233,6 +233,10 @@ DisplayLibrary::Open( lua_State *L )
 	// Set library as upvalue for each library function
 	Self *library = Rtt_NEW( & display->GetRuntime().GetAllocator(), Self( * display ) );
 
+	// STEVE CHANGE
+	display->GatherObjectFactories( kVTable, library );
+	// /STEVE CHANGE
+
 	// Store the library singleton in the registry so it persists
 	// using kMetatableName as the unique key.
 	CoronaLuaPushUserdata( L, library, kMetatableName ); // push ud
@@ -697,6 +701,16 @@ DisplayLibrary::PushImage(
 	return v;
 }
 
+// STEVE CHANGE
+template<typename F> F *
+GetObjectFactory( lua_State * L, F * defaultFactory )
+{
+	F * replacement = (F *)lua_touserdata( L, lua_upvalueindex( 2 ) );	// if this the GatherFactories() version, it might have a factory subbed in (else nil)
+
+	return replacement ? replacement : defaultFactory;
+}
+// /STEVE CHANGE
+
 int
 DisplayLibrary::newCircle( lua_State *L )
 {
@@ -843,7 +857,8 @@ DisplayLibrary::newMesh( lua_State *L )
 	
 	return result;
 }
-	
+
+
 int
 DisplayLibrary::newRect( lua_State *L )
 {
@@ -858,7 +873,10 @@ DisplayLibrary::newRect( lua_State *L )
 	Real w = luaL_checkreal( L, nextArg++ );
 	Real h = luaL_checkreal( L, nextArg++ );
 
-	ShapeObject* v = RectObject::NewRect( display.GetAllocator(), w, h );
+	// STEVE CHANGE
+	auto * rectFactory = GetObjectFactory( L, &RectObject::NewRect );
+	ShapeObject* v = /*RectObject::NewRect*/rectFactory( display.GetAllocator(), w, h );
+	// /STEVE CHANGE
 	int result = LuaLibDisplay::AssignParentAndPushResult( L, display, v, parent );
 
 	if ( display.GetDefaults().IsV1Compatibility() )
@@ -1478,6 +1496,14 @@ DisplayLibrary::newEmbossedText( lua_State *L )
 	return CreateTextObject( L, isEmbossed );
 }
 
+// STEVE CHANGE
+static Rtt::GroupObject *
+NewGroup( Rtt_Allocator * context )
+{
+	return Rtt_NEW( context, Rtt::GroupObject( context, NULL ) );
+}
+// STEVE CHANGE
+
 // display.newGroup( [child1 [, child2 [, child3 ... ]]] )
 // With no args, create an empty group and set parent to root
 // 
@@ -1495,7 +1521,10 @@ DisplayLibrary::newGroup( lua_State *L )
 	Display& display = library->GetDisplay();
 	Rtt_Allocator* context = display.GetAllocator();
 
-	GroupObject *o = Rtt_NEW( context, GroupObject( context, NULL ) );
+	// STEVE CHANGE
+	auto * groupFactory = GetObjectFactory( L, &NewGroup );
+	GroupObject *o = groupFactory( context );//Rtt_NEW( context, GroupObject( context, NULL ) );
+	// /STEVE CHANGE
 	GroupObject *parent = NULL; // Default parent is root
 
 	DisplayObject *child = NULL;
@@ -1583,6 +1612,14 @@ DisplayLibrary::_newContainer( lua_State *L )
 	return result;
 }
 
+// STEVE CHANGE
+static Rtt::SnapshotObject *
+NewSnapshot( Rtt_Allocator * context, Rtt::Display & display, Real w, Real h )
+{
+	return Rtt_NEW( context, SnapshotObject( context, display, w, h ) );
+}
+// STEVE CHANGE
+
 // display.newSnapshot( [parent, ] w, h )
 int
 DisplayLibrary::newSnapshot( lua_State *L )
@@ -1606,7 +1643,10 @@ DisplayLibrary::newSnapshot( lua_State *L )
 	Real w = luaL_checkreal( L, nextArg++ );
 	Real h = luaL_checkreal( L, nextArg++ );
 
-	SnapshotObject *o = Rtt_NEW( context, SnapshotObject( context, display, w, h ) );
+	// STEVE CHANGE
+	auto * snapshotFactory = GetObjectFactory( L, &NewSnapshot );
+	SnapshotObject *o = snapshotFactory( context, display, w, h );//Rtt_NEW( context, SnapshotObject( context, display, w, h ) );
+	// /STEVE CHANGE
 
 	if ( display.GetDefaults().IsV1Compatibility() )
 	{
