@@ -133,6 +133,17 @@ Renderer::Renderer( Rtt_Allocator* allocator )
 	fTexelSize( Rtt_NEW( fAllocator, Uniform( fAllocator, Uniform::kVec4 ) ) ),
 	fContentScale( Rtt_NEW( fAllocator, Uniform( fAllocator, Uniform::kVec2 ) ) ),
 	fViewProjectionMatrix( Rtt_NEW( fAllocator, Uniform( fAllocator, Uniform::kMat4 ) ) ),
+// STEVE COUNT
+	fPendingCommands( allocator ),
+	fBeginFrameOps( allocator ),
+	fClearOps( allocator ),
+	fStateOps( allocator ),
+	fStateFlags( 0U ),
+	fBeginFrameFlags( 0U ),
+	fDoNotCancelFlags( 0U ),
+	fClearFlags( 0U ),
+	fCommandCount( 0U ),
+// /STEVE COUNT
 	fMaskCountIndex( 0 ),
 	fMaskCount( allocator ),
 	fCurrentProgramMaskCount( 0 ),
@@ -834,6 +845,58 @@ Renderer::TallyTimeDependency( bool usesTime )
 		++fTimeDependencyCount;
 	}
 }
+
+// STEVE CHANGE
+U16
+Renderer::AddCustomCommand( CustomCommand reader, WriteCommand writer )
+{
+	if (0xFFFF == fCommandCount)
+	{
+		return 0U;
+	}
+
+	CustomCommand command = { reader, writer };
+
+//	fFrontCommandBuffer->ADD( command );
+
+	fPendingCommands.Append( command );
+
+	return ++fCommandCount;
+}
+
+static U16
+AddOp( Rtt::Array< Renderer::CustomOp > & arr, Renderer::CustomOp::Action action, void * userData, U16 max )
+{
+	if (max == arr.Length())
+	{
+		return 0U;
+	}
+
+	Renderer::CustomOpPacket packet = { op, userData };
+
+	arr.Append( packet );
+
+	return arr.Length();
+}
+
+U16
+Renderer::AddBeginFrameOp( CustomOp op, void * userData )
+{
+
+}
+
+U16
+Renderer::AddClearOp( CustomOp op, void * userData )
+{
+
+}
+
+U16
+Renderer::AddStateOp( CustomOp op, void * userData )
+{
+
+}
+// /STEVE CHANGE
 
 void 
 Renderer::QueueUpdate( CPUResource* resource )

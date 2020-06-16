@@ -224,6 +224,37 @@ class Renderer
 		void SetTimeDependencyCount( U32 newValue ) { fTimeDependencyCount = newValue; }
 		U32 GetTimeDependencyCount() const { return fTimeDependencyCount; }
 
+		// STEVE CHANGE
+		struct CustomCommand {
+			typedef void (*Reader)(unsigned char *);
+			typedef void (*Writer)(unsigned char *, const void *, unsigned int);
+
+			Reader fReader;
+			Writer fWriter;
+		};
+
+		struct CustomOp {
+			typedef void (*Action)(void *);
+
+			Action fAction;
+			void * fUserData;
+		};
+
+		U16 AddCustomCommand( CustomCommand::Reader reader, CustomCommand::Writer writer );
+		U16 AddBeginFrameOp( CustomOp::Action action, void * userData );
+		U16 AddClearOp( CustomOp::Action action, void * userData );
+		U16 AddStateOp( CustomOp::Action action, void * userData );
+
+		U64 GetStateFlags() const { return fStateFlags; }
+		U32 GetBeginFrameFlags() const { return fBeginFrameFlags; }
+		U32 GetDoNotCancelFlags() const { return fDoNotCancelFlags; }
+		U32 GetClearFlags() const { return fClearFlags; }
+
+		void SetStateFlags( U64 flags ) { fStateFlags = flags; }
+		void SetBeginFrameFlags( U32 flags ) { fBeginFrameFlags = flags; }
+		void SetDoNotCancelFlags( U32 flags ) { fDoNotCancelFlags = flags; }
+		void SetClearFlags( U32 flags ) { fClearFlags = flags; }
+		// /STEVE CHANGE
 	protected:
 		// Destroys all queued GPU resources passed into the DestroyQueue() method.
 		void DestroyQueuedGPUResources();
@@ -311,6 +342,19 @@ class Renderer
 		Real fContentScaleY; // Temporary holder.
 
 		U32 fTimeDependencyCount;
+
+		// STEVE CHANGE
+		Array< CustomCommand > fPendingCommands;
+		Array< CustomOpPacket > fBeginFrameOps;
+		Array< CustomOpPacket > fClearOps;
+		Array< CustomOpPacket > fStateOps;
+
+		U64 fStateFlags;
+		U32 fBeginFrameFlags;
+		U32 fDoNotCancelFlags;
+		U32 fClearFlags;
+		U16 fCommandCount;
+		// /STEVE CHANGE
 };
 
 // ----------------------------------------------------------------------------

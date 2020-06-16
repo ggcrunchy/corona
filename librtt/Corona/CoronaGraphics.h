@@ -209,12 +209,45 @@ typedef enum {
 	kBackend_OpenGLES
 } CoronaRendererBackend;
 
+typedef enum {
+	/**
+	TODO
+	*/
+	kTokenType_None,
+
+	/**
+	TODO
+	*/
+	kTokenType_Attribute,
+
+	/**
+	TODO
+	*/
+	kTokenType_BeginFrameOp,
+
+	/**
+	TODO
+	*/
+	kTokenType_ClearOp,
+
+	/**
+	TODO
+	*/
+	kTokenType_Command,
+
+	/**
+	TODO
+	*/
+	kTokenType_StateOp
+} CoronaGraphicsTokenType;
+
 /**
 TODO
 */
 typedef struct CoronaGraphicsToken {
+	CoronaGraphicsTokenType tokenType;
 	unsigned char bytes[8];
-	bool hasValue;
+	unsigned char hasValue;
 } CoronaGraphicsToken;
 
 /**
@@ -227,19 +260,17 @@ typedef struct CoronaShaderCallbacks {
 	*/
 	unsigned long size;
 
-	// This seems okay... 
+	/**
+	Optional
+	TODO
+	*/
+	const char ** (*beginTransform)(const char * source[], unsigned int * n, void * userData);
 
 	/**
 	Optional
 	TODO
 	*/
-	const char ** (*beginTransform) (const char * source[], unsigned int * n, void * userData);
-
-	/**
-	Optional
-	TODO
-	*/
-	void (*endTransform) (const char * transformed[], unsigned int n, void * userData);
+	void (*endTransform)(const char * transformed[], unsigned int n, void * userData);
 
 	// Argh, this uniform stuff isn't ready to go :P
 
@@ -247,25 +278,31 @@ typedef struct CoronaShaderCallbacks {
 	Optional
 	TODO
 	*/
-	unsigned int (*getUniforms) (void * programContext, void * userData);
+	unsigned int (*getUniforms)(void * programContext, void * userData);
 
 	/**
 	Optional
 	TODO
 	*/
-	void (*resetUniforms) (void * programContext, void * userData);
+	void (*resetUniforms)(void * programContext, void * userData);
 
 	/**
 	Optional
 	TODO
 	*/
-	unsigned char * (*queryUniform) (void * programContext, unsigned int index, unsigned int * valueCount, unsigned int * sizeInBytes);
+	unsigned char * (*queryUniform)(void * programContext, unsigned int index, unsigned int * valueCount, unsigned int * sizeInBytes);
 
 	/**
 	Optional
 	TODO
 	*/
-	void (*updateUniform) (void * programContext, unsigned int index);
+	void (*updateUniform)(void * programContext, unsigned int index);
+
+	/**
+	Optional
+	TODO
+	*/
+	void (*onFinalize)(void * userData);
 
 	/**
 	Required
@@ -287,40 +324,60 @@ typedef struct CoronaShaderAttribute {
 } CoronaShaderAttribute;
 
 CORONA_API
-int CoronaShaderRegisterAttributes (CoronaGraphicsToken * token, const CoronaShaderAttribute * attributes, unsigned int attributeCount) CORONA_PUBLIC_SUFFIX;
+int CoronaShaderRegisterAttributes( CoronaGraphicsToken * token, const CoronaShaderAttribute * attributes, unsigned int attributeCount ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaShaderRegisterPolicy (lua_State * L, const char * name, const CoronaShaderCallbacks * callbacks, void * userData) CORONA_PUBLIC_SUFFIX;
+int CoronaShaderRegisterPolicy( lua_State * L, const char * name, const CoronaShaderCallbacks * callbacks, void * userData ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-CoronaRendererBackend CoronaRendererGetBackend () CORONA_PUBLIC_SUFFIX;
+CoronaRendererBackend CoronaRendererGetBackend() CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererRegisterBeginFrameOp (CoronaGraphicsToken * token, int (*onBeginFrame)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererRegisterBeginFrameOp( CoronaGraphicsToken * token, void (*onBeginFrame)(void *), void * userData ) CORONA_PUBLIC_SUFFIX;
+
+/**
+ TODO
+*/
+typedef enum {
+	/**
+	TODO (schedule a begin-frame op)
+	*/
+	kBeginFrame_Schedule,
+
+	/**
+	TODO (cancel a begin-frame op, unless established)
+	*/
+	kBeginFrame_Cancel,
+
+	/**
+	TODO (schedule + ignore subsequent cancels)
+	*/
+	kBeginFrame_Establish
+} CoronaRenderBeginFrame;
 
 CORONA_API
-int CoronaRendererScheduleForNextFrame (const CoronaGraphicsToken * token, int schedule) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererScheduleForNextFrame( const CoronaGraphicsToken * token, CoronaRenderBeginFrame action ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererRegisterClearOp (CoronaGraphicsToken * token, int (*onClear)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererRegisterClearOp( CoronaGraphicsToken * token, void (*onClear)(void *), void * userData ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererEnableClear (const CoronaGraphicsToken * token, int enable) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererEnableClear( const CoronaGraphicsToken * token, int enable ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererRegisterStateOp (CoronaGraphicsToken * token, int (*onState)(void *), void * userData) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererRegisterStateOp( CoronaGraphicsToken * token, void (*onState)(void *), void * userData ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererSetOperationStateDirty (const CoronaGraphicsToken * token) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererSetOperationStateDirty( const CoronaGraphicsToken * token ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererRegisterCommand (CoronaGraphicsToken * token, void (*read)(uint8_t * read), int (*write)(uint8_t * bytes, const void * data, uint32_t size)) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererRegisterCommand( CoronaGraphicsToken * token, void (*read)(unsigned char *), int (*write)(unsigned char *, const void *, unsigned int) ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererIssueCommand (const CoronaGraphicsToken * token, void * data, uint32_t size) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererIssueCommand( const CoronaGraphicsToken * token, void * data, unsigned int size ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererSetFrustum (const float * viewMatrix, const float * projectionMatrix) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererSetFrustum( const float * viewMatrix, const float * projectionMatrix ) CORONA_PUBLIC_SUFFIX;
 
 // /STEVE CHANGE
 
