@@ -61,7 +61,7 @@ typedef struct DisplayObjectParams {
     BasicBookend afterDidMoveOffscreen;
 
     // TODO:
-    typedef void (*MatrixBookend) (const void * object, void * userData, float matrix[9]);
+    typedef void (*MatrixBookend) (const void * object, void * userData, float matrix[6]);
 
     MatrixBookend beforeDidUpdateTransform;
     MatrixBookend afterDidUpdateTransform;
@@ -118,7 +118,7 @@ typedef struct DisplayObjectParams {
     TranslateBookend afterTranslate;
 
     // TODO:
-    typedef void (*BooleanResultMatrixBookend) (const void * object, void * userData, const float matrix[9], int * result);
+    typedef void (*BooleanResultMatrixBookend) (const void * object, void * userData, const float matrix[6], int * result);
 
     BooleanResultMatrixBookend beforeUpdateTransform;
     BooleanResultMatrixBookend afterUpdateTransform;

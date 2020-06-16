@@ -30,9 +30,9 @@ ValuePrologue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[]
 	{
 		params.beforeValue( &object, userData, L, key, result );
 
-		bool canEarlyOut = !params.valueDisallowEarlyOut, earlyOutResult = !params.valueEarlyOutIfZero;
+		bool canEarlyOut = !params.valueDisallowEarlyOut, expectsNonZero = !params.valueEarlyOutIfZero;
 
-		if (canEarlyOut && earlyOutResult == !!result)
+		if (canEarlyOut && expectsNonZero == !!result)
 		{
 			return false;
 		}
@@ -81,8 +81,8 @@ SetValueEpilogue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], i
 	return result;
 }
 
-#define CORONA_OBJECTS_VTABLE(OBJECT_KIND, OBJECT_PARAMS)  \
-								 						   \
+#define CORONA_OBJECTS_VTABLE(OBJECT_KIND, TO_PARAMS)  \
+								 					   \
 class OBJECT_KIND##2ProxyVTable : public Rtt::Lua##OBJECT_KIND##ObjectProxyVTable \
 {																	              \
 public:																			  \
@@ -98,7 +98,7 @@ protected:							\
 public:																																	\
 	virtual int ValueForKey( lua_State *L, const Rtt::MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const \
 	{																																	\
-		const DisplayObjectParams & params = static_cast<const OBJECT_KIND##2 &>(object).OBJECT_PARAMS; \
+		const DisplayObjectParams & params = static_cast<const OBJECT_KIND##2 &>(object).TO_PARAMS;		\
 		void * userData = const_cast<void *>(static_cast<const OBJECT_KIND##2 &>(object).fUserData);	\
 		int result = 0;																					\
 																										\
@@ -117,10 +117,10 @@ public:																																	\
 																			\
 	virtual bool SetValueForKey( lua_State *L, Rtt::MLuaProxyable& object, const char key[], int valueIndex ) const	\
 	{																												\
-		const DisplayObjectParams & params = static_cast<OBJECT_KIND##2 &>(object).OBJECT_PARAMS;	\
-		void * userData = static_cast<const OBJECT_KIND##2 &>(object).fUserData;					\
-		int result = 0;																				\
-																									\
+		const DisplayObjectParams & params = static_cast<OBJECT_KIND##2 &>(object).TO_PARAMS;	\
+		void * userData = static_cast<const OBJECT_KIND##2 &>(object).fUserData;				\
+		int result = 0;																			\
+																								\
 		if (!SetValuePrologue( L, object, key, valueIndex, userData, params, &result ))	\
 		{																				\
 			return result;																\
@@ -210,58 +210,92 @@ CopyParams( lua_State * L, const void * from, size_t size, bool isTemporary, int
 					\
 	return 0
 
-#define CORONA_OBJECTS_METHOD(METHOD_NAME, TO_MEMBERS)	\
-	const DisplayObjectParams & params = TO_MEMBERS;	\
-														\
-	if (params.before##METHOD_NAME)						\
-	{													\
-		params.before##METHOD_NAME( this, fUserData );	\
-	}													\
-														\
+#define FIRST_ARGS this, fUserData
+#define CORONA_OBJECTS_METHOD_BOOKEND(WHEN, METHOD_NAME, ...)	\
+	if (params.WHEN##METHOD_NAME)								\
+	{															\
+		params.WHEN##METHOD_NAME( __VA_ARGS__ );				\
+	}
+
+#define CORONA_OBJECTS_METHOD_CORE(METHOD_NAME)	\
 	if (!params.ignoreOriginal##METHOD_NAME)	\
 	{											\
 		Super::METHOD_NAME();					\
-	}											\
-												\
-	if (params.after##METHOD_NAME)						\
-	{													\
-		params.after##METHOD_NAME( this, fUserData );	\
 	}
 
-#define CORONA_OBJECTS_METHOD_STRIP_ARGUMENT(METHOD_NAME, TO_MEMBERS, ARGUMENT)	\
-	const DisplayObjectParams & params = TO_MEMBERS;							\
-																				\
-	if (params.before##METHOD_NAME)						\
-	{													\
-		params.before##METHOD_NAME( this, fUserData );	\
-	}													\
-														\
-	if (!params.ignoreOriginal##METHOD_NAME)	\
-	{											\
-		Super::METHOD_NAME( ARGUMENT );			\
-	}											\
-												\
-	if (params.after##METHOD_NAME)						\
-	{													\
-		params.after##METHOD_NAME( this, fUserData );	\
+#define CORONA_OBJECTS_METHOD_CORE_WITH_RESULT(METHOD_NAME)	\
+	if (!params.ignoreOriginal##METHOD_NAME)				\
+	{														\
+		result = Super::METHOD_NAME();						\
 	}
 
-#define CORONA_OBJECTS_METHOD_WITH_ARGS(METHOD_NAME, TO_MEMBERS, ...)	\
-	const DisplayObjectParams & params = TO_MEMBERS;					\
+#define CORONA_OBJECTS_METHOD_CORE_WITH_ARGS(METHOD_NAME, ...)	\
+	if (!params.ignoreOriginal##METHOD_NAME)					\
+	{															\
+		Super::METHOD_NAME( __VA_ARGS__ );						\
+	}
+
+#define CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT(METHOD_NAME, ...)	\
+	if (!params.ignoreOriginal##METHOD_NAME)								\
+	{																		\
+		result = Super::METHOD_NAME( __VA_ARGS__ );							\
+	}
+
+#define CORONA_OBJECTS_METHOD(METHOD_NAME, TO_PARAMS)					\
+	const DisplayObjectParams & params = TO_PARAMS;						\
 																		\
-	if (params.before##METHOD_NAME)									\
-	{																\
-		params.before##METHOD_NAME( this, fUserData, __VA_ARGS__ );	\
-	}																\
+	CORONA_OBJECTS_METHOD_BOOKEND( before, METHOD_NAME, FIRST_ARGS )	\
+	CORONA_OBJECTS_METHOD_CORE( METHOD_NAME )							\
+	CORONA_OBJECTS_METHOD_BOOKEND( after, METHOD_NAME, FIRST_ARGS)
+
+#define CORONA_OBJECTS_METHOD_STRIP_ARGUMENT(METHOD_NAME, TO_PARAMS, ARGUMENT)	\
+	const DisplayObjectParams & params = TO_PARAMS;								\
+																		\
+	CORONA_OBJECTS_METHOD_BOOKEND( before, METHOD_NAME, FIRST_ARGS )	\
+	CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( METHOD_NAME, ARGUMENT )		\
+	CORONA_OBJECTS_METHOD_BOOKEND( after, METHOD_NAME, FIRST_ARGS)
+
+#define CORONA_OBJECTS_METHOD_WITH_ARGS(METHOD_NAME, TO_PARAMS, ...)	\
+	const DisplayObjectParams & params = TO_PARAMS;						\
+																		\
+	CORONA_OBJECTS_METHOD_BOOKEND( before, METHOD_NAME, FIRST_ARGS, __VA_ARGS__ )	\
+	CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( METHOD_NAME, __VA_ARGS__ )				\
+	CORONA_OBJECTS_METHOD_BOOKEND( after, METHOD_NAME, FIRST_ARGS, __VA_ARGS__ )
+
+#define CORONA_OBJECTS_EARLY_OUT_IF_APPROPRIATE(METHOD_NAME)		\
+	bool expectZeroResult = params.earlyOut##METHOD_NAME##IfZero;	\
 																	\
-	if (!params.ignoreOriginal##METHOD_NAME)	\
-	{											\
-		Super::METHOD_NAME( __VA_ARGS__ );		\
-	}											\
-												\
-	if (params.after##METHOD_NAME)									\
+	if (params.before##METHOD_NAME && expectZeroResult == !result)	\
 	{																\
-		params.after##METHOD_NAME( this, fUserData, __VA_ARGS__ );	\
+		return !!result;											\
+	}
+
+#define CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT(METHOD_NAME, ...) \
+	int result = 0;	\
+					\
+	CORONA_OBJECTS_METHOD_BOOKEND( before, METHOD_NAME, __VA_ARGS__, &result )	\
+	CORONA_OBJECTS_EARLY_OUT_IF_APPROPRIATE( METHOD_NAME )
+
+static void
+Copy3 (float * dst, const float * src)
+{
+	static_assert(sizeof(float) == sizeof(Rtt::Real), "Incompatible real type");
+
+	memcpy(dst, src, 3 * sizeof(float));
+}
+
+#define CORONA_OBJECTS_MATRIX_BOOKEND_METHOD(WHEN, METHOD_NAME)	\
+	if (params.WHEN##METHOD_NAME)								\
+	{															\
+		Rtt::Real matrix[6];				\
+											\
+		Copy3(matrix, srcToDst.Row0());		\
+		Copy3(matrix + 3, srcToDst.Row1());	\
+											\
+		params.WHEN##METHOD_NAME(FIRST_ARGS, matrix);				\
+																	\
+		Copy3(const_cast<float *>(srcToDst.Row0()), matrix);		\
+		Copy3(const_cast<float *>(srcToDst.Row1()), matrix + 3);	\
 	}
 
 class Group2 : public Rtt::GroupObject {
@@ -286,39 +320,23 @@ public:
 	virtual bool CanCull() const
 	{
 		const DisplayObjectParams & params = GROUP2_MEMBERS;
-		int result = 0;
 
-		if (params.beforeCanCull)
-		{
-			params.beforeCanCull( this, fUserData, &result );
-
-			if (params.earlyOutCanCullIfZero == !result)
-			{
-				return !!result;
-			}
-		}
-
-		if (!params.ignoreOriginalCanCull)
-		{
-			result = Super::CanCull();
-		}
-
-		if (params.afterCanCull)
-		{
-			params.afterCanCull( this, fUserData, &result );
-		}
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( CanCull, FIRST_ARGS )
+		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanCull )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, CanCull, FIRST_ARGS, &result )
 
 		return result;
 	}
 
 	virtual bool CanHitTest() const
 	{
-		// TODO: see CanCull
-		/*
-		Flags canHitTestEarlyOutIfZero : 1;
-		Flags ignoreOriginalCanHitTest : 1;
-		*/
-		return false;
+		const DisplayObjectParams & params = GROUP2_MEMBERS;
+
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( CanHitTest, FIRST_ARGS )
+		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanHitTest )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, CanHitTest, FIRST_ARGS, &result )
+
+		return result;
 	}
 
 	virtual void DidMoveOffscreen()
@@ -328,7 +346,11 @@ public:
 
 	virtual void DidUpdateTransform( Rtt::Matrix & srcToDst )
 	{
-	//	Flags ignoreOriginalDidUpdateTransform : 1;
+		const DisplayObjectParams & params = GROUP2_MEMBERS;
+
+		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( before, DidUpdateTransform )
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( DidUpdateTransform, srcToDst )
+		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( after, DidUpdateTransform )
 	}
 
 	virtual void Draw( Rtt::Renderer & renderer ) const
@@ -350,45 +372,31 @@ public:
 
 	virtual void GetSelfBounds( Rtt::Rect & rect ) const
 	{
-		// Flags ignoreOriginalGetSelfBounds : 1;
+		const DisplayObjectParams & params = GROUP2_MEMBERS;
+
+		CORONA_OBJECTS_METHOD_BOOKEND( before, GetSelfBounds, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBounds, rect )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, GetSelfBounds, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
 	}
 
 	virtual void GetSelfBoundsForAnchor( Rtt::Rect & rect ) const
 	{
+		const DisplayObjectParams & params = GROUP2_MEMBERS;
 
-		// Flags ignoreOriginalGetSelfBoundsForAnchor : 1;
+		CORONA_OBJECTS_METHOD_BOOKEND( before, GetSelfBoundsForAnchor, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBoundsForAnchor, rect )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, GetSelfBoundsForAnchor, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
 	}
 
 	virtual bool HitTest( Rtt::Real contentX, Rtt::Real contentY )
 	{
 		const DisplayObjectParams & params = GROUP2_MEMBERS;
-		int result = 0;
 
-		if (params.beforeHitTest)
-		{
-			params.beforeHitTest( this, fUserData, contentX, contentY, &result );
-
-			if (params.earlyOutHitTestIfZero == !result)
-			{
-				return !!result;
-			}
-		}
-
-		if (!params.ignoreOriginalHitTest)
-		{
-			result = Super::HitTest( contentX, contentY );
-		}
-
-		if (params.afterCanCull)
-		{
-			params.afterCanCull( this, fUserData, &result );
-		}
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( HitTest, FIRST_ARGS, contentX, contentY )
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( HitTest, contentX, contentY )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, HitTest, FIRST_ARGS, contentX, contentY, &result )
 
 		return result;
-		/*
-		Flags hitTestEarlyOutIfZero : 1;
-		Flags ignoreOriginalHitTest : 1;
-		*/
 	}
 
 	virtual void Prepare( const Rtt::Display & display )
@@ -418,11 +426,18 @@ public:
 
 	virtual bool UpdateTransform( const Rtt::Matrix & parentToDstSpace )
 	{
-		/*
-		Flags updateTransformEarlyOutIfZero : 1;
-		Flags ignoreOriginalUpdateTransform : 1;
-		*/
-		return false;
+		float matrix[6];
+
+		Copy3( matrix, parentToDstSpace.Row0() );
+		Copy3( matrix + 3, parentToDstSpace.Row1() );
+
+		const DisplayObjectParams & params = GROUP2_MEMBERS;
+
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( UpdateTransform, FIRST_ARGS, matrix )
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( UpdateTransform, parentToDstSpace )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, UpdateTransform, FIRST_ARGS, matrix, &result )
+
+		return result;
 	}
 
 	virtual void WillMoveOnscreen()
@@ -528,3 +543,5 @@ int CoronaObjectsShouldDraw (void * object, int * shouldDraw)
 
     return 0;
 }
+
+#undef FIRST_ARGS
