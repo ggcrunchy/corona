@@ -20,6 +20,7 @@
 #include "Display/Rtt_Display.h"
 #include "Display/Rtt_GroupObject.h"
 #include "Display/Rtt_RectObject.h"
+#include "Display/Rtt_RectPath.h"
 #include "Display/Rtt_SnapshotObject.h"
 #include "Display/Rtt_StageObject.h"
 
@@ -81,13 +82,13 @@ SetValueEpilogue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], i
 	return result;
 }
 
-#define CORONA_OBJECTS_VTABLE(OBJECT_KIND, TO_PARAMS)  \
-								 					   \
-class OBJECT_KIND##2ProxyVTable : public Rtt::Lua##OBJECT_KIND##ObjectProxyVTable \
-{																	              \
-public:																			  \
+#define CORONA_OBJECTS_VTABLE(OBJECT_KIND, PROXY_KIND, TO_PARAMS)	\
+								 									\
+class OBJECT_KIND##2ProxyVTable : public Rtt::Lua##PROXY_KIND##ObjectProxyVTable	\
+{																					\
+public:																				\
 	typedef OBJECT_KIND##2ProxyVTable Self;				\
-	typedef Lua##OBJECT_KIND##ObjectProxyVTable Super;  \
+	typedef Lua##PROXY_KIND##ObjectProxyVTable Super;	\
 														\
 public:																			 \
 	static const Self& Constant() { static const Self kVTable; return kVTable; } \
@@ -98,10 +99,11 @@ protected:							\
 public:																																	\
 	virtual int ValueForKey( lua_State *L, const Rtt::MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const \
 	{																																	\
-		const DisplayObjectParams & params = static_cast<const OBJECT_KIND##2 &>(object).TO_PARAMS;		\
-		void * userData = const_cast<void *>(static_cast<const OBJECT_KIND##2 &>(object).fUserData);	\
-		int result = 0;																					\
-																										\
+		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);	\
+		const DisplayObjectParams & params = TO_PARAMS;									\
+		void * userData = const_cast<void *>( resolved.fUserData );						\
+		int result = 0;																	\
+																						\
 		if (!ValuePrologue( L, object, key, userData, params, &result ))	\
 		{																	\
 			return result;													\
@@ -117,10 +119,11 @@ public:																																	\
 																			\
 	virtual bool SetValueForKey( lua_State *L, Rtt::MLuaProxyable& object, const char key[], int valueIndex ) const	\
 	{																												\
-		const DisplayObjectParams & params = static_cast<OBJECT_KIND##2 &>(object).TO_PARAMS;	\
-		void * userData = static_cast<const OBJECT_KIND##2 &>(object).fUserData;				\
-		int result = 0;																			\
-																								\
+		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);	\
+		const DisplayObjectParams & params = TO_PARAMS;									\
+		void * userData = const_cast<void *>( resolved.fUserData );						\
+		int result = 0;																	\
+																						\
 		if (!SetValuePrologue( L, object, key, valueIndex, userData, params, &result ))	\
 		{																				\
 			return result;																\
@@ -135,7 +138,9 @@ public:																																	\
 	}																						\
 																							\
 	virtual const LuaProxyVTable& Parent() const { return Super::Constant(); }	\
-}
+};																				\
+																				\
+const Rtt::LuaProxyVTable& OBJECT_KIND##2::ProxyVTable() const { return OBJECT_KIND##2ProxyVTable::Constant(); }
 
 static bool
 PushFactory( lua_State * L, const char * name )
@@ -192,7 +197,7 @@ CopyParams( lua_State * L, const void * from, size_t size, bool isTemporary, int
 	return const_cast<void *>(from);
 }
 
-#define CORONA_OBJECTS_PUSH(OBJECT_KIND, PARAMS_KIND, TO_MEMBERS)							\
+#define CORONA_OBJECTS_PUSH(OBJECT_KIND, PARAMS_KIND, TO_PARAMS)							\
 	if (CallNewFactory( L, "new" #OBJECT_KIND, &New##OBJECT_KIND##2) ) /* ...[, object] */	\
 	{																			\
 		OBJECT_KIND##2 * object = (OBJECT_KIND##2 *)lua_touserdata( L, -1 );	\
@@ -200,11 +205,11 @@ CopyParams( lua_State * L, const void * from, size_t size, bool isTemporary, int
 		object->fParams = (PARAMS_KIND *)CopyParams( L, params, sizeof(*params), temporaryParams, object->fRef );	\
 		object->fUserData = userData;																				\
 																													\
-		if (TO_MEMBERS.onCreate)	\
-		{							\
-			TO_MEMBERS.onCreate( object, userData );	\
+		if (( TO_PARAMS ).onCreate)						\
+		{												\
+			( TO_PARAMS ).onCreate( object, userData );	\
 		}												\
-					\
+														\
 		return 1;	\
 	}				\
 					\
@@ -241,23 +246,23 @@ CopyParams( lua_State * L, const void * from, size_t size, bool isTemporary, int
 		result = Super::METHOD_NAME( __VA_ARGS__ );							\
 	}
 
-#define CORONA_OBJECTS_METHOD(METHOD_NAME, TO_PARAMS)					\
-	const DisplayObjectParams & params = TO_PARAMS;						\
-																		\
+#define CORONA_OBJECTS_METHOD(METHOD_NAME, TO_PARAMS)	\
+	const auto & params = TO_PARAMS;					\
+														\
 	CORONA_OBJECTS_METHOD_BOOKEND( before, METHOD_NAME, FIRST_ARGS )	\
 	CORONA_OBJECTS_METHOD_CORE( METHOD_NAME )							\
 	CORONA_OBJECTS_METHOD_BOOKEND( after, METHOD_NAME, FIRST_ARGS)
 
 #define CORONA_OBJECTS_METHOD_STRIP_ARGUMENT(METHOD_NAME, TO_PARAMS, ARGUMENT)	\
-	const DisplayObjectParams & params = TO_PARAMS;								\
-																		\
+	const auto & params = TO_PARAMS;	\
+										\
 	CORONA_OBJECTS_METHOD_BOOKEND( before, METHOD_NAME, FIRST_ARGS )	\
 	CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( METHOD_NAME, ARGUMENT )		\
 	CORONA_OBJECTS_METHOD_BOOKEND( after, METHOD_NAME, FIRST_ARGS)
 
 #define CORONA_OBJECTS_METHOD_WITH_ARGS(METHOD_NAME, TO_PARAMS, ...)	\
-	const DisplayObjectParams & params = TO_PARAMS;						\
-																		\
+	const auto & params = TO_PARAMS;	\
+										\
 	CORONA_OBJECTS_METHOD_BOOKEND( before, METHOD_NAME, FIRST_ARGS, __VA_ARGS__ )	\
 	CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( METHOD_NAME, __VA_ARGS__ )				\
 	CORONA_OBJECTS_METHOD_BOOKEND( after, METHOD_NAME, FIRST_ARGS, __VA_ARGS__ )
@@ -270,9 +275,9 @@ CopyParams( lua_State * L, const void * from, size_t size, bool isTemporary, int
 		return !!result;											\
 	}
 
-#define CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT(METHOD_NAME, ...) \
-	int result = 0;	\
-					\
+#define CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT(METHOD_NAME, ...)	\
+	int result = 0;															\
+																			\
 	CORONA_OBJECTS_METHOD_BOOKEND( before, METHOD_NAME, __VA_ARGS__, &result )	\
 	CORONA_OBJECTS_EARLY_OUT_IF_APPROPRIATE( METHOD_NAME )
 
@@ -284,20 +289,163 @@ Copy3 (float * dst, const float * src)
 	memcpy(dst, src, 3 * sizeof(float));
 }
 
-#define CORONA_OBJECTS_MATRIX_BOOKEND_METHOD(WHEN, METHOD_NAME)	\
-	if (params.WHEN##METHOD_NAME)								\
-	{															\
-		Rtt::Real matrix[6];				\
-											\
-		Copy3(matrix, srcToDst.Row0());		\
-		Copy3(matrix + 3, srcToDst.Row1());	\
-											\
-		params.WHEN##METHOD_NAME(FIRST_ARGS, matrix);				\
-																	\
+#define CORONA_OBJECTS_INIT_MATRIX( SOURCE )	\
+	Rtt::Real matrix[6];						\
+												\
+	Copy3( matrix, SOURCE.Row0() );		\
+	Copy3( matrix + 3, SOURCE.Row1() )
+
+#define CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( WHEN, METHOD_NAME )	\
+	if (params.WHEN##METHOD_NAME)									\
+	{																\
+		CORONA_OBJECTS_INIT_MATRIX( srcToDst );	\
+												\
+		params.WHEN##METHOD_NAME( FIRST_ARGS, matrix );	\
+														\
 		Copy3(const_cast<float *>(srcToDst.Row0()), matrix);		\
 		Copy3(const_cast<float *>(srcToDst.Row1()), matrix + 3);	\
 	}
 
+#define CORONA_OBJECTS_INTERFACE( PARAMS_TYPE, TO_PARAMS )						\
+	virtual void AddedToParent( lua_State * L, Rtt::GroupObject * parent )		\
+	{																			\
+		CORONA_OBJECTS_METHOD_WITH_ARGS( AddedToParent, TO_PARAMS, L, parent )	\
+	}																			\
+																				\
+	virtual bool CanCull() const						\
+	{													\
+		const DisplayObjectParams & params = TO_PARAMS;	\
+														\
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( CanCull, FIRST_ARGS )	\
+		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanCull ) 						\
+		CORONA_OBJECTS_METHOD_BOOKEND( after, CanCull, FIRST_ARGS, &result )	\
+						\
+		return result;	\
+	}					\
+						\
+	virtual bool CanHitTest() const						\
+	{													\
+		const DisplayObjectParams & params = TO_PARAMS;	\
+														\
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( CanHitTest, FIRST_ARGS )	\
+		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanHitTest )						\
+		CORONA_OBJECTS_METHOD_BOOKEND( after, CanHitTest, FIRST_ARGS, &result )		\
+						\
+		return result;	\
+	}					\
+						\
+	virtual void DidMoveOffscreen()								\
+	{															\
+		CORONA_OBJECTS_METHOD( DidMoveOffscreen, TO_PARAMS )	\
+	}															\
+																\
+	virtual void DidUpdateTransform( Rtt::Matrix & srcToDst )	\
+	{															\
+		const DisplayObjectParams & params = TO_PARAMS;			\
+																\
+		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( before, DidUpdateTransform )		\
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( DidUpdateTransform, srcToDst )	\
+		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( after, DidUpdateTransform )		\
+	}																			\
+																				\
+	virtual void Draw(Rtt::Renderer & renderer) const						\
+	{																		\
+		CORONA_OBJECTS_METHOD_STRIP_ARGUMENT( Draw, TO_PARAMS, renderer )	\
+	}																		\
+																			\
+	virtual void FinalizeSelf( lua_State * L )				\
+	{														\
+		if (( TO_PARAMS ).onFinalize)						\
+		{													\
+			( TO_PARAMS ).onFinalize( this, fUserData );	\
+		}													\
+															\
+		lua_unref( L, fRef );	\
+								\
+		Super::FinalizeSelf( L );	\
+	}								\
+									\
+	virtual void GetSelfBounds( Rtt::Rect & rect ) const	\
+	{														\
+		const DisplayObjectParams & params = TO_PARAMS;		\
+															\
+		CORONA_OBJECTS_METHOD_BOOKEND( before, GetSelfBounds, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )	\
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBounds, rect )															\
+		CORONA_OBJECTS_METHOD_BOOKEND( after, GetSelfBounds, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )	\
+	}																														\
+																															\
+	virtual void GetSelfBoundsForAnchor( Rtt::Rect & rect ) const	\
+	{																\
+		const DisplayObjectParams & params = TO_PARAMS;				\
+																	\
+		CORONA_OBJECTS_METHOD_BOOKEND( before, GetSelfBoundsForAnchor, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )	\
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBoundsForAnchor, rect )														\
+		CORONA_OBJECTS_METHOD_BOOKEND( after, GetSelfBoundsForAnchor, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )	\
+	}																																\
+																																	\
+	virtual bool HitTest( Rtt::Real contentX, Rtt::Real contentY )	\
+	{																\
+		const DisplayObjectParams & params = TO_PARAMS;				\
+																	\
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( HitTest, FIRST_ARGS, contentX, contentY )	\
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( HitTest, contentX, contentY )				\
+		CORONA_OBJECTS_METHOD_BOOKEND( after, HitTest, FIRST_ARGS, contentX, contentY, &result )	\
+																									\
+		return result;	\
+	}					\
+						\
+	virtual void Prepare( const Rtt::Display & display )					\
+	{																		\
+		CORONA_OBJECTS_METHOD_STRIP_ARGUMENT( Prepare, TO_PARAMS, display )	\
+	}																		\
+																			\
+	virtual void RemovedFromParent( lua_State * L, Rtt::GroupObject * parent )		\
+	{																				\
+		CORONA_OBJECTS_METHOD_WITH_ARGS( RemovedFromParent, TO_PARAMS, L, parent )	\
+	}																				\
+																					\
+	virtual void Rotate( Rtt::Real deltaTheta )								\
+	{																		\
+		CORONA_OBJECTS_METHOD_WITH_ARGS( Rotate, TO_PARAMS, deltaTheta )	\
+	}																		\
+																			\
+	virtual void Scale( Rtt::Real sx, Rtt::Real sy, bool isNewValue )				\
+	{																				\
+		CORONA_OBJECTS_METHOD_WITH_ARGS( Scale, TO_PARAMS, sx, sy, isNewValue )		\
+	}																				\
+																					\
+	virtual void Translate( Rtt::Real deltaX, Rtt::Real deltaY )				\
+	{																			\
+		CORONA_OBJECTS_METHOD_WITH_ARGS( Translate, TO_PARAMS, deltaX, deltaY )	\
+	}																			\
+																				\
+	virtual bool UpdateTransform( const Rtt::Matrix & parentToDstSpace )	\
+	{																		\
+		CORONA_OBJECTS_INIT_MATRIX( parentToDstSpace );						\
+																			\
+		const DisplayObjectParams & params = TO_PARAMS;	\
+														\
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( UpdateTransform, FIRST_ARGS, matrix )	\
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( UpdateTransform, parentToDstSpace )	\
+		CORONA_OBJECTS_METHOD_BOOKEND( after, UpdateTransform, FIRST_ARGS, matrix, &result )	\
+																								\
+		return result;	\
+	}					\
+						\
+	virtual void WillMoveOnscreen()								\
+	{															\
+		CORONA_OBJECTS_METHOD( WillMoveOnscreen, TO_PARAMS )	\
+	}															\
+																\
+	virtual const Rtt::LuaProxyVTable& ProxyVTable() const;	\
+															\
+	PARAMS_TYPE * fParams;	\
+	int fRef;				\
+	void * fUserData
+
+/**
+TODO
+*/
 class Group2 : public Rtt::GroupObject {
 public:
 	typedef Group2 Self;
@@ -307,151 +455,17 @@ public:
 
 	Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject );
 
-	// Didinsert
-	// DidRemove
-
-	#define GROUP2_MEMBERS fParams->inherited
-
-	virtual void AddedToParent( lua_State * L, GroupObject * parent )
+	virtual void DidInsert( bool childParentChanged )
 	{
-		CORONA_OBJECTS_METHOD_WITH_ARGS( AddedToParent, GROUP2_MEMBERS, L, parent )
+		CORONA_OBJECTS_METHOD_WITH_ARGS( DidInsert, *fParams, childParentChanged )
 	}
 
-	virtual bool CanCull() const
+	virtual void DidRemove()
 	{
-		const DisplayObjectParams & params = GROUP2_MEMBERS;
-
-		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( CanCull, FIRST_ARGS )
-		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanCull )
-		CORONA_OBJECTS_METHOD_BOOKEND( after, CanCull, FIRST_ARGS, &result )
-
-		return result;
+		CORONA_OBJECTS_METHOD( DidRemove, *fParams, ... )
 	}
 
-	virtual bool CanHitTest() const
-	{
-		const DisplayObjectParams & params = GROUP2_MEMBERS;
-
-		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( CanHitTest, FIRST_ARGS )
-		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanHitTest )
-		CORONA_OBJECTS_METHOD_BOOKEND( after, CanHitTest, FIRST_ARGS, &result )
-
-		return result;
-	}
-
-	virtual void DidMoveOffscreen()
-	{
-		CORONA_OBJECTS_METHOD( DidMoveOffscreen, GROUP2_MEMBERS )
-	}
-
-	virtual void DidUpdateTransform( Rtt::Matrix & srcToDst )
-	{
-		const DisplayObjectParams & params = GROUP2_MEMBERS;
-
-		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( before, DidUpdateTransform )
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( DidUpdateTransform, srcToDst )
-		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( after, DidUpdateTransform )
-	}
-
-	virtual void Draw( Rtt::Renderer & renderer ) const
-	{
-		CORONA_OBJECTS_METHOD_STRIP_ARGUMENT( Draw, GROUP2_MEMBERS, renderer )
-	}
-
-	virtual void FinalizeSelf( lua_State * L )
-	{
-		if (GROUP2_MEMBERS.onFinalize)
-		{
-			GROUP2_MEMBERS.onFinalize( this, fUserData );
-		}
-
-		lua_unref( L, fRef );
-
-		Super::FinalizeSelf( L );
-	}
-
-	virtual void GetSelfBounds( Rtt::Rect & rect ) const
-	{
-		const DisplayObjectParams & params = GROUP2_MEMBERS;
-
-		CORONA_OBJECTS_METHOD_BOOKEND( before, GetSelfBounds, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBounds, rect )
-		CORONA_OBJECTS_METHOD_BOOKEND( after, GetSelfBounds, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
-	}
-
-	virtual void GetSelfBoundsForAnchor( Rtt::Rect & rect ) const
-	{
-		const DisplayObjectParams & params = GROUP2_MEMBERS;
-
-		CORONA_OBJECTS_METHOD_BOOKEND( before, GetSelfBoundsForAnchor, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBoundsForAnchor, rect )
-		CORONA_OBJECTS_METHOD_BOOKEND( after, GetSelfBoundsForAnchor, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
-	}
-
-	virtual bool HitTest( Rtt::Real contentX, Rtt::Real contentY )
-	{
-		const DisplayObjectParams & params = GROUP2_MEMBERS;
-
-		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( HitTest, FIRST_ARGS, contentX, contentY )
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( HitTest, contentX, contentY )
-		CORONA_OBJECTS_METHOD_BOOKEND( after, HitTest, FIRST_ARGS, contentX, contentY, &result )
-
-		return result;
-	}
-
-	virtual void Prepare( const Rtt::Display & display )
-	{
-		CORONA_OBJECTS_METHOD_STRIP_ARGUMENT( Prepare, GROUP2_MEMBERS, display )
-	}
-
-	virtual void RemovedFromParent( lua_State * L, GroupObject * parent )
-	{
-		CORONA_OBJECTS_METHOD_WITH_ARGS( RemovedFromParent, GROUP2_MEMBERS, L, parent )
-	}
-
-	virtual void Rotate( Rtt::Real deltaTheta )
-	{
-		CORONA_OBJECTS_METHOD_WITH_ARGS( Rotate, GROUP2_MEMBERS, deltaTheta )
-	}
-
-	virtual void Scale( Rtt::Real sx, Rtt::Real sy, bool isNewValue )
-	{
-		CORONA_OBJECTS_METHOD_WITH_ARGS( Scale, GROUP2_MEMBERS, sx, sy, isNewValue )
-	}
-
-	virtual void Translate( Rtt::Real deltaX, Rtt::Real deltaY )
-	{
-		CORONA_OBJECTS_METHOD_WITH_ARGS( Translate, GROUP2_MEMBERS, deltaX, deltaY )
-	}
-
-	virtual bool UpdateTransform( const Rtt::Matrix & parentToDstSpace )
-	{
-		float matrix[6];
-
-		Copy3( matrix, parentToDstSpace.Row0() );
-		Copy3( matrix + 3, parentToDstSpace.Row1() );
-
-		const DisplayObjectParams & params = GROUP2_MEMBERS;
-
-		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( UpdateTransform, FIRST_ARGS, matrix )
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( UpdateTransform, parentToDstSpace )
-		CORONA_OBJECTS_METHOD_BOOKEND( after, UpdateTransform, FIRST_ARGS, matrix, &result )
-
-		return result;
-	}
-
-	virtual void WillMoveOnscreen()
-	{
-		CORONA_OBJECTS_METHOD( WillMoveOnscreen, GROUP2_MEMBERS )
-	}
-
-	virtual const Rtt::LuaProxyVTable& ProxyVTable() const;
-
-	GroupParams * fParams;
-	int fRef;
-	void * fUserData;
-
-	#undef GROUP2_MEMBERS
+	CORONA_OBJECTS_INTERFACE( GroupParams, fParams->inherited );
 };
 
 Group2::Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
@@ -462,13 +476,7 @@ Group2::Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
 {
 }
 
-CORONA_OBJECTS_VTABLE(Group, fParams->inherited);
-
-const Rtt::LuaProxyVTable&
-Group2::ProxyVTable() const
-{
-	return Group2ProxyVTable::Constant();
-}
+CORONA_OBJECTS_VTABLE( Group, Group, resolved.fParams->inherited )
 
 static Rtt::GroupObject *
 NewGroup2 (Rtt_Allocator * allocator, Rtt::StageObject * stageObject)
@@ -479,60 +487,81 @@ NewGroup2 (Rtt_Allocator * allocator, Rtt::StageObject * stageObject)
 CORONA_API
 int CoronaObjectsPushGroup (lua_State * L, void * userData, const GroupParams * params, int temporaryParams)
 {
-	CORONA_OBJECTS_PUSH(Group, GroupParams, object->fParams->inherited);
+	CORONA_OBJECTS_PUSH( Group, GroupParams, object->fParams->inherited );
 }
-/*
-class LuaShape2ProxyVTable : public LuaShapeObjectProxyVTable
-{
-public:
-	typedef LuaShape2ProxyVTable Self;
-	typedef LuaShapeObjectProxyVTable Super;
 
-public:
-	static const Self& Constant();
-
-protected:
-	LuaShape2ProxyVTable() {}
-
-public:
-	virtual int ValueForKey( lua_State *L, const MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const;
-	virtual bool SetValueForKey( lua_State *L, MLuaProxyable& object, const char key[], int valueIndex ) const;
-	virtual const LuaProxyVTable& Parent() const;
-};
+/**
+TODO
 */
+class Rect2 : public Rtt::RectObject {
+public:
+	typedef Rect2 Self;
+	typedef Rtt::RectObject Super;
 
-//CORONA_OBJECTS_VTABLE(Group, fParams);
+public:
+	Rect2( Rtt::RectPath * path );
+
+	CORONA_OBJECTS_INTERFACE( DisplayObjectParams, *fParams ); // TODO: should this be ShapeParams? could streamline macros if ALWAYS expecting `inherited`...
+};
+
+Rect2::Rect2( Rtt::RectPath * path )
+	: RectObject( path ),
+	fParams( NULL ),
+	fRef( LUA_NOREF ),
+	fUserData( NULL )
+{
+}
+
+CORONA_OBJECTS_VTABLE( Rect, Shape, *resolved.fParams )
+
+static Rtt::RectObject *
+NewRect2( Rtt_Allocator* pAllocator, Rtt::Real width, Rtt::Real height )
+{
+	Rtt::RectPath* path = Rtt::RectPath::NewRect( pAllocator, width, height );
+
+	return Rtt_NEW( pAllocator, Rect2( path ) );
+}
 
 CORONA_API
 int CoronaObjectsPushRect (lua_State * L, void * userData, const ShapeParams * params, int temporaryParams)
 {
-    return 0;
+	CORONA_OBJECTS_PUSH( Rect, DisplayObjectParams, *object->fParams );
 }
 
-/*
-class LuaSnapshot2ProxyVTable : public LuaSnapshotObjectProxyVTable
-{
-public:
-	typedef LuaSnapshot2ProxyVTable Self;
-	typedef LuaSnapshotObjectProxyVTable Super;
-
-public:
-	static const Self& Constant();
-
-protected:
-	LuaSnapshot2ProxyVTable() {}
-
-public:
-	virtual int ValueForKey( lua_State *L, const MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const;
-	virtual bool SetValueForKey( lua_State *L, MLuaProxyable& object, const char key[], int valueIndex ) const;
-	virtual const LuaProxyVTable& Parent() const;
-};
+/**
+TODO
 */
+class Snapshot2 : public Rtt::SnapshotObject {
+public:
+	typedef Snapshot2 Self;
+	typedef Rtt::SnapshotObject Super;
+
+public:
+	Snapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real contentW, Rtt::Real contentH );
+
+	CORONA_OBJECTS_INTERFACE( SnapshotParams, fParams->inherited );
+};
+
+Snapshot2::Snapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real contentW, Rtt::Real contentH )
+	: SnapshotObject( pAllocator, display, contentW, contentH ),
+	fParams( NULL ),
+	fRef( LUA_NOREF ),
+	fUserData( NULL )
+{
+}
+
+CORONA_OBJECTS_VTABLE( Snapshot, Snapshot, resolved.fParams->inherited )
+
+static Rtt::SnapshotObject *
+NewSnapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real width, Rtt::Real height )
+{
+	return Rtt_NEW( pAllocator, Snapshot2( pAllocator, display, width, height ) );
+}
 
 CORONA_API
 int CoronaObjectsPushSnapshot (lua_State * L, void * userData, const SnapshotParams * params, int temporaryParams)
 {
-    return 0;
+	CORONA_OBJECTS_PUSH( Snapshot, SnapshotParams, object->fParams->inherited );
 }
 
 CORONA_API
