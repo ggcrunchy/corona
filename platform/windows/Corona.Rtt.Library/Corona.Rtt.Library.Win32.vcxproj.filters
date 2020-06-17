@@ -1808,6 +1808,9 @@
     <ClInclude Include="..\..\..\librtt\Corona\CoronaObjects.h">
       <Filter>librtt\Corona</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\librtt\Corona\CoronaCustomCommand.h">
+      <Filter>librtt\Corona</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <LuaToCpp Include="..\..\resources\loader_callback.lua">

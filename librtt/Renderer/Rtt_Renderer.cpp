@@ -186,6 +186,57 @@ Renderer::Initialize()
 	fFrontCommandBuffer->Initialize();
 }
 
+// STEVE CHANGE
+template<typename T> T
+LowestBit( T x )
+{
+	return x & -x;
+}
+
+// https://graphics.stanford.edu/~seander/bithacks.html#IntegerLogDeBruijn with power of 2
+static U32
+Log2OfPower( U32 power )
+{
+	static const U32 MultiplyDeBruijnBitPosition2[32] = 
+	{
+	  0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
+	  31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
+	};
+
+	return MultiplyDeBruijnBitPosition2[(power * 0x077CB531U) >> 27];
+}
+
+static U64
+Log2OfPower( U64 power )
+{
+	union {
+		U64 power;
+		U32 arr[2];
+	} v;
+
+	v.power = power;
+
+	U32 index = !v.arr[0]; // if 0, choose 1
+
+	return (index << 32) + Log2OfPower( v.arr[index] );
+}
+
+template<typename T> void
+CallOps( Rtt::Array< Renderer::CustomOp > & ops, T flags )
+{
+	while (flags)
+	{
+		U32 lowest = LowestBit( flags );
+		Renderer::CustomOp & op = ops[ Log2OfPower( lowest ) ];
+
+		op.fAction( op.fUserData );
+
+		flags -= lowest;
+	}
+}
+
+// /STEVE CHANGE
+
 void 
 Renderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY )
 {
@@ -225,6 +276,22 @@ Renderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real c
 	fBackCommandBuffer->SetBlendEnabled( fPrevious.fBlendEquation != RenderTypes::kDisabledEquation );
 	fBackCommandBuffer->SetBlendFunction( fPrevious.fBlendMode );
 	fBackCommandBuffer->SetBlendEquation( fPrevious.fBlendEquation );
+
+	// STEVE CHANGE
+	// Add pending commands
+	for (int i = 0; i < fPendingCommands.Length(); ++i)
+	{
+		const CoronaCustomCommand & command = fPendingCommands[i];
+
+		fBackCommandBuffer->AddCommand( command.fReader, command.fWriter );
+	}
+
+	fPendingCommands.Clear();
+
+	CallOps( fBeginFrameOps, fBeginFrameFlags );
+
+	fBeginFrameFlags = 0U;
+	// /STEVE CHANGE
 
 	fTimeDependencyCount = 0;
 
@@ -403,6 +470,10 @@ Renderer::Clear( Real r, Real g, Real b, Real a )
 	fBackCommandBuffer->Clear( r, g, b, a );
 	
 	DEBUG_PRINT( "Clear: r=%f, g=%f, b=%f, a=%f\n", r, g, b, a );
+
+	// STEVE CHANGE
+	CallOps( fClearOps, fClearFlags );
+	// /STEVE CHANGE
 }
 
 void 
@@ -480,6 +551,9 @@ Renderer::Insert( const RenderData* data )
 	bool maskTextureDirty = data->fMaskTexture != fPrevious.fMaskTexture;
 	bool maskUniformDirty = data->fMaskUniform != fPrevious.fMaskUniform;
 	bool programDirty = data->fProgram != fPrevious.fProgram || MaskCount() != fCurrentProgramMaskCount;
+	// STEVE CHANGE
+	bool stateDirty = fStateFlags;
+	// /STEVE CHANGE
 	bool userUniformDirty0 = data->fUserUniform0 != fPrevious.fUserUniform0;
 	bool userUniformDirty1 = data->fUserUniform1 != fPrevious.fUserUniform1;
 	bool userUniformDirty2 = data->fUserUniform2 != fPrevious.fUserUniform2;
@@ -523,6 +597,9 @@ Renderer::Insert( const RenderData* data )
 				|| maskTextureDirty
 				|| maskUniformDirty
 				|| programDirty
+				// STEVE CHANGE
+				|| stateDirty
+				// /STEVE CHANGE
 				|| userUniformDirty0
 				|| userUniformDirty1
 				|| userUniformDirty2
@@ -727,7 +804,11 @@ Renderer::Insert( const RenderData* data )
 	{
 		--MaskCount();
 	}
+// STEVE CHANGE
+	CallOps( fStateOps, fStateFlags );
 
+	fStateFlags = 0U;
+// /STEVE CHANGE
 	// User data
 	if( userUniformDirty0 && data->fUserUniform0 )
 	{
@@ -848,16 +929,16 @@ Renderer::TallyTimeDependency( bool usesTime )
 
 // STEVE CHANGE
 U16
-Renderer::AddCustomCommand( CustomCommand reader, WriteCommand writer )
+Renderer::AddCustomCommand( CoronaCustomCommandReader reader, CoronaCustomCommandWriter writer )
 {
 	if (0xFFFF == fCommandCount)
 	{
 		return 0U;
 	}
 
-	CustomCommand command = { reader, writer };
+	fFrontCommandBuffer->AddCommand( reader, writer );
 
-//	fFrontCommandBuffer->ADD( command );
+	CoronaCustomCommand command = { reader, writer };
 
 	fPendingCommands.Append( command );
 
@@ -872,29 +953,46 @@ AddOp( Rtt::Array< Renderer::CustomOp > & arr, Renderer::CustomOp::Action action
 		return 0U;
 	}
 
-	Renderer::CustomOpPacket packet = { op, userData };
+	Renderer::CustomOp op = { action, userData };
 
-	arr.Append( packet );
+	arr.Append( op );
 
 	return arr.Length();
 }
 
-U16
-Renderer::AddBeginFrameOp( CustomOp op, void * userData )
-{
+#define MAX_ARRAY_ENTRIES(flags) sizeof(flags) * 8U
 
+U16
+Renderer::AddBeginFrameOp( CustomOp::Action action, void * userData )
+{
+	return AddOp( fBeginFrameOps, action, userData, MAX_ARRAY_ENTRIES( fBeginFrameFlags ) );
 }
 
 U16
-Renderer::AddClearOp( CustomOp op, void * userData )
+Renderer::AddClearOp( CustomOp::Action action, void * userData )
 {
-
+	return AddOp( fClearOps, action, userData, MAX_ARRAY_ENTRIES( fClearFlags ) );
 }
 
 U16
-Renderer::AddStateOp( CustomOp op, void * userData )
+Renderer::AddStateOp( CustomOp::Action action, void * userData )
 {
+	return AddOp( fStateOps, action, userData, MAX_ARRAY_ENTRIES( fStateFlags ) );
+}
 
+#undef MAX_ARRAY_ENTRIES
+
+bool
+Renderer::IssueCustomCommand( U16 id, const void * data, U32 size )
+{
+	if (id < fCommandCount)
+	{
+		fFrontCommandBuffer->IssueCommand( id, data, size );
+
+		return true;
+	}
+
+	return false;
 }
 // /STEVE CHANGE
 

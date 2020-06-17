@@ -22,6 +22,10 @@
 #include "Core/Rtt_Real.h"
 #include "Core/Rtt_Time.h"
 
+// STEVE CHANGE
+#include "Corona/CoronaCustomCommand.h"
+// /STEVE CHANGE
+
 // ----------------------------------------------------------------------------
 
 struct Rtt_Allocator;
@@ -225,14 +229,6 @@ class Renderer
 		U32 GetTimeDependencyCount() const { return fTimeDependencyCount; }
 
 		// STEVE CHANGE
-		struct CustomCommand {
-			typedef void (*Reader)(unsigned char *);
-			typedef void (*Writer)(unsigned char *, const void *, unsigned int);
-
-			Reader fReader;
-			Writer fWriter;
-		};
-
 		struct CustomOp {
 			typedef void (*Action)(void *);
 
@@ -240,10 +236,12 @@ class Renderer
 			void * fUserData;
 		};
 
-		U16 AddCustomCommand( CustomCommand::Reader reader, CustomCommand::Writer writer );
+		U16 AddCustomCommand( CoronaCustomCommandReader reader, CoronaCustomCommandWriter writer );
 		U16 AddBeginFrameOp( CustomOp::Action action, void * userData );
 		U16 AddClearOp( CustomOp::Action action, void * userData );
 		U16 AddStateOp( CustomOp::Action action, void * userData );
+
+		bool IssueCustomCommand( U16 id, const void * data, U32 size );
 
 		U64 GetStateFlags() const { return fStateFlags; }
 		U32 GetBeginFrameFlags() const { return fBeginFrameFlags; }
@@ -344,10 +342,10 @@ class Renderer
 		U32 fTimeDependencyCount;
 
 		// STEVE CHANGE
-		Array< CustomCommand > fPendingCommands;
-		Array< CustomOpPacket > fBeginFrameOps;
-		Array< CustomOpPacket > fClearOps;
-		Array< CustomOpPacket > fStateOps;
+		Array< CoronaCustomCommand > fPendingCommands;
+		Array< CustomOp > fBeginFrameOps;
+		Array< CustomOp > fClearOps;
+		Array< CustomOp > fStateOps;
 
 		U64 fStateFlags;
 		U32 fBeginFrameFlags;

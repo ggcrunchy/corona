@@ -16,6 +16,10 @@
 #include "Core/Rtt_Types.h"
 #include "Core/Rtt_Real.h"
 
+// STEVE CHANGE
+#include "Corona/CoronaCustomCommand.h"
+// /STEVE CHANGE
+
 // ----------------------------------------------------------------------------
 
 struct Rtt_Allocator;
@@ -87,7 +91,12 @@ class CommandBuffer
 		virtual void Draw( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
 		virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
 		virtual S32 GetCachedParam( CommandBuffer::QueryableParams param ) = 0;
-		
+
+		// STEVE CHANGE
+		virtual void AddCommand( CoronaCustomCommandReader reader, CoronaCustomCommandWriter writer ) = 0;
+		virtual void IssueCommand( U16 id, const void * data, U32 size ) = 0;
+		// /STEVE CHANGE
+
 		// Execute the generated command buffer. This function should only be
 		// called from a thread with an active rendering context. If requested
 		// (and the platform supports it), this function should return the time
