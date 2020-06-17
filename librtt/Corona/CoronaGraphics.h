@@ -255,6 +255,30 @@ typedef struct CoronaGraphicsToken {
 /**
 TODO
 */
+typedef struct CoronaShaderAttribute {
+	const char * name;
+	unsigned int offset;
+	unsigned int size;
+	unsigned int type;
+	unsigned int stride;
+	int normalized;
+} CoronaShaderAttribute;
+
+/**
+TODO
+*/
+typedef struct CoronaShaderSourceTransformParams {
+	const char * type;
+	const char ** sources;
+	const char ** hints;
+	const CoronaShaderAttribute * attributes; // NYI
+	unsigned int nsources; // n.b. must agree with output after call
+	unsigned int nattribs;
+} CoronaShaderAttribute;
+
+/**
+TODO
+*/
 typedef struct CoronaShaderCallbacks {
 	/**
 	Required
@@ -262,17 +286,21 @@ typedef struct CoronaShaderCallbacks {
 	*/
 	unsigned long size;
 
-	/**
-	Optional
-	TODO
-	*/
-	const char ** (*beginTransform)(const char * source[], unsigned int * n, void * userData);
+	typedef const char ** (*SourceTransformBegin)(CoronaShaderSourceTransformParams * params, void * key);
+	typedef void (*SourceTransformFinish)(const char * transformed[], unsigned int n, void * key);
+	typedef void (*SourceTransformStateCleanup)(void * key);
 
 	/**
 	Optional
 	TODO
 	*/
-	void (*endTransform)(const char * transformed[], unsigned int n, void * userData);
+	SourceTransformBegin beginTransform;
+
+	/**
+	Optional
+	TODO
+	*/
+	SourceTransformFinish finishTransform;
 
 	// Argh, this uniform stuff isn't ready to go :P
 
@@ -312,18 +340,6 @@ typedef struct CoronaShaderCallbacks {
 	*/
 	CoronaGraphicsToken attributes;
 } CoronaShaderCallbacks;
-
-/**
-TODO
-*/
-typedef struct CoronaShaderAttribute {
-	const char * name;
-	unsigned int offset;
-	unsigned int size;
-	unsigned int type;
-	unsigned int stride;
-	int normalized;
-} CoronaShaderAttribute;
 
 CORONA_API
 int CoronaShaderRegisterAttributes( lua_State * L, CoronaGraphicsToken * token, const CoronaShaderAttribute * attributes, unsigned int attributeCount ) CORONA_PUBLIC_SUFFIX;

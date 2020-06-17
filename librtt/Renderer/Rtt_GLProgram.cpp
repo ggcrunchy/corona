@@ -23,6 +23,9 @@
 	#include <GLES2/gl2ext.h>
 #endif
 
+// STEVE CHANGE
+#include "Display/Rtt_ShaderResource.h"
+// /STEVE CHANGE
 
 // To reduce memory consumption and startup cost, defer the
 // creation of GL shaders and programs until they're needed.
@@ -152,6 +155,15 @@ GLProgram::Destroy()
 			Reset( data );
 		}
 	}
+	// STEVE CHANGE
+	Program* program = static_cast<Program*>( fResource );
+	CoronaShaderCallbacks::SourceTransformStateCleanup cleanup = program->GetShaderResource()->GetCleanUpSourceTransform();
+
+	if (cleanup)
+	{
+		cleanup( program );
+	}
+	// /STEVE CHANGE
 }
 
 void
@@ -204,6 +216,33 @@ CountLines( const char **segments, int numSegments )
 	return result;
 }
 
+// STEVE CHANGE
+static void 
+SetShaderSource( GLuint shader, CoronaShaderSourceTransformParams & params, CoronaShaderCallbacks::SourceTransformBegin begin, CoronaShaderCallbacks::SourceTransformFinish finish, void * key )
+{
+	const char ** strings = params.sources, ** old = strings;
+
+	if (begin)
+	{
+		strings = begin( &params, key );
+
+		if (!strings)
+		{
+			strings = old;
+		}
+	}
+
+	glShaderSource( shader, params.nsources, strings, NULL );
+
+	if (finish && old != strings)
+	{
+		finish( strings, params.nsources, key );
+	}
+
+	GL_CHECK_ERROR();
+}
+// /STEVE CHANGE
+
 void
 GLProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data )
 {
@@ -240,26 +279,54 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 		data.fHeaderNumLines = CountLines( shader_source, numSegments );
 	}
 
+	// STEVE CHANGE
+	const char * hints[] = { "header", "highpSupport", "mask", "texCoordZ", NULL };
+	CoronaShaderSourceTransformParams params = {};
+
+	params.hints = hints;
+
+	CoronaShaderCallbacks::SourceTransformBegin beginTransform = program->GetShaderResource()->GetBeginSourceTransform();
+	CoronaShaderCallbacks::SourceTransformFinish finishTransform = program->GetShaderResource()->GetFinishSourceTransform();
+	// /STEVE CHANGE
+
 	// Vertex shader.
 	{
 		shader_source[4] = program->GetVertexShaderSource();
+// STEVE CHANGE
+		hints[4] = "vertexSource";
+		params.type = "vertex";
+		params.sources = shader_source;
+		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
+		SetShaderSource( data.fVertexShader, params, beginTransform, finishTransform, program );
+/*
 		glShaderSource( data.fVertexShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
 						shader_source,
 						NULL );
 		GL_CHECK_ERROR();
+*/
+// /STEVE CHANGE
 	}
 
 	// Fragment shader.
 	{
 		shader_source[4] = ( version == Program::kWireframe ) ? kWireframeSource : program->GetFragmentShaderSource();
+// STEVE CHANGE
+		hints[4] = "fragmentSource";
+		params.type = "fragment";
+		params.sources = shader_source;
+		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
+		SetShaderSource( data.fFragmentShader, params, beginTransform, finishTransform, program );
+/*
 		glShaderSource( data.fFragmentShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
 						shader_source,
 						NULL );
 		GL_CHECK_ERROR();
+*/
+// /STEVE CHANGE
 	}
 #endif
 }
