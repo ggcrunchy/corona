@@ -130,7 +130,12 @@ int ReadOnlyProjectSettings::GetContentHeight() const
 {
 	return fSettings.GetContentHeight();
 }
-
+// STEVE CHANGE
+int ReadOnlyProjectSettings::GetStencilBitsize() const
+{
+	return fSettings.GetStencilBitsize();
+}
+// /STEVE CHANGE
 int ReadOnlyProjectSettings::GetImageSuffixScaleCount() const
 {
 	return fSettings.GetImageSuffixScaleCount();

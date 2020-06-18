@@ -261,6 +261,18 @@ class ReadOnlyProjectSettings
 		 */
 		int GetContentHeight() const;
 
+		// STEVE CHANGE
+		/**
+		* Gets the stencil bitsize read provided by the "config.lua" file.
+		*
+		* @return
+		* Returns the "config.lua" file's stencil bitsize.
+		*
+		* Returns zero if the "config.lua" file was not found or if it is not set up for stencil buffers.
+		*/
+		int GetStencilBitsize() const;
+		// /STEVE CHANGE
+
 		/**
 		 * Fetches the number of image suffix scales provided by the project's "config.lua" file.
 		 *

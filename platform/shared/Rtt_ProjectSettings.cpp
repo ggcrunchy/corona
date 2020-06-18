@@ -369,7 +369,14 @@ bool ProjectSettings::LoadFromDirectory(const char* directoryPath)
 				}
 				lua_pop(luaStatePointer, 1);
 			}
-
+			// STEVE CHANGE
+			lua_getfield(luaStatePointer, -1, "stencilBitsize");
+			if (lua_isnumber(luaStatePointer, -1) && 8 == (int)lua_tointeger(luaStatePointer, -1)) // TODO: not sure how general we can make this
+			{
+				fStencilBitsize = 8;
+			}
+			lua_pop(luaStatePointer, 1);
+			// /STEVE CHANGE
 			// Fetch image suffix scales if content scaling is enabled.
 			if (scaleMode != Rtt::Display::kNone)
 			{
@@ -508,6 +515,9 @@ void ProjectSettings::ResetConfigLuaSettings()
 	fHasConfigLua = false;
 	fContentWidth = 0;
 	fContentHeight = 0;
+	// STEVE CHANGE
+	fStencilBitsize = 0;
+	// /STEVE CHANGE
 	fImageSuffixScaleSet.clear();
 }
 
@@ -709,6 +719,13 @@ int ProjectSettings::GetContentHeight() const
 {
 	return fContentHeight;
 }
+
+// STEVE CHANGE
+int ProjectSettings::GetStencilBitsize() const
+{
+	return fStencilBitsize;
+}
+// /STEVE CHANGE
 
 int ProjectSettings::GetImageSuffixScaleCount() const
 {

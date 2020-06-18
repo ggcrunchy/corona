@@ -290,9 +290,9 @@ RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment::CreationSetting
 		{
 			::SetWindowLongW(settings.RenderSurfaceHandle, GWL_STYLE, windowStyles | WS_CLIPCHILDREN);
 		}
-
+		
 		// Wrap the given control with our rendering surface adapter and set up event handlers.
-		fRenderSurfacePointer = new Interop::UI::RenderSurfaceControl(settings.RenderSurfaceHandle);
+		fRenderSurfacePointer = new Interop::UI::RenderSurfaceControl(settings.RenderSurfaceHandle, fReadOnlyProjectSettings.GetStencilBitsize()); // <- STEVE CHANGE
 		fRenderSurfacePointer->SetRenderFrameHandler(&fRenderFrameEventHandler);
 		fRenderSurfacePointer->GetDestroyingEventHandlers().Add(&fDestroyingSurfaceEventHandler);
 		fRenderSurfacePointer->GetResizedEventHandlers().Add(&fSurfaceResizedEventHandler);

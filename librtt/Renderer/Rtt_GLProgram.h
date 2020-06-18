@@ -16,6 +16,10 @@
 #include "Renderer/Rtt_Uniform.h"
 #include "Core/Rtt_Assert.h"
 
+// STEVE CHANGE
+#include "Corona/CoronaGraphics.h"
+// /STEVE CHANGE
+
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -79,6 +83,10 @@ class GLProgram : public GPUResource
 
 		VersionData fData[Program::kNumVersions];
 		CPUResource* fResource;
+
+		// STEVE CHANGE
+		CoronaShaderSourceTransformStateCleanup fCleanupSourceTransform;
+		// /STEVE CHANGE
 };
 
 // ----------------------------------------------------------------------------

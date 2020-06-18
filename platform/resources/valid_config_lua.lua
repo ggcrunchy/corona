@@ -34,6 +34,9 @@ application = {
 		imageSuffix = {
 		},
 		shaderPrecision = "",
+		-- STEVE CHANGE
+		stencilBitsize = 0,
+		-- /STEVE CHANGE
 	},
 
 	license = {

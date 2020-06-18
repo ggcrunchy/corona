@@ -106,6 +106,9 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 GLProgram::GLProgram()
+// STEVE CHANGE
+	: fCleanupSourceTransform( NULL )
+// /STEVE CHANGE
 {
 	for( U32 i = 0; i < Program::kNumVersions; ++i )
 	{
@@ -156,12 +159,9 @@ GLProgram::Destroy()
 		}
 	}
 	// STEVE CHANGE
-	Program* program = static_cast<Program*>( fResource );
-	const CoronaShaderSourceTransform * xform = program->GetShaderResource()->GetSourceTransform();
-
-	if (xform && xform->cleanup)
+	if (fCleanupSourceTransform)
 	{
-		xform->cleanup( program );
+		fCleanupSourceTransform( &fCleanupSourceTransform ); // n.b. used as own key
 	}
 	// /STEVE CHANGE
 }
@@ -283,6 +283,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 	const CoronaShaderSourceTransform * xform = program->GetShaderResource()->GetSourceTransform();
 	CoronaShaderSourceTransformParams params = {};
 	const char * hints[] = { "header", "highpSupport", "mask", "texCoordZ", NULL };
+	void * sourceTransformKey = &fCleanupSourceTransform; // n.b. done to make cleanup robust
 
 	params.hints = hints;
 	// /STEVE CHANGE
@@ -296,7 +297,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 		params.sources = shader_source;
 		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
-		SetShaderSource( data.fVertexShader, params, xform, program );
+		SetShaderSource( data.fVertexShader, params, xform, sourceTransformKey );
 /*
 		glShaderSource( data.fVertexShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
@@ -316,7 +317,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 		params.sources = shader_source;
 		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
-		SetShaderSource( data.fFragmentShader, params, xform, program );
+		SetShaderSource( data.fFragmentShader, params, xform, sourceTransformKey );
 /*
 		glShaderSource( data.fFragmentShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
@@ -423,6 +424,14 @@ GLProgram::Update( Program::Version version, VersionData& data )
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler2" ), Texture::kMask2 );
 	glUseProgram( 0 );
 	GL_CHECK_ERROR();
+// STEVE CHANGE
+	const CoronaShaderSourceTransform * xform = program->GetShaderResource()->GetSourceTransform();
+
+	if (xform)
+	{
+		fCleanupSourceTransform = xform->cleanup;
+	}
+// /STEVE CHANGE
 }
 
 void

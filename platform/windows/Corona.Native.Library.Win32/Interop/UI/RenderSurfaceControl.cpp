@@ -21,7 +21,7 @@
 namespace Interop { namespace UI {
 
 #pragma region Constructors/Destructors
-RenderSurfaceControl::RenderSurfaceControl(HWND windowHandle)
+RenderSurfaceControl::RenderSurfaceControl(HWND windowHandle, int stencilBitsize) // <- STEVE CHANGE
 :	Control(windowHandle),
 	fReceivedMessageEventHandler(this, &RenderSurfaceControl::OnReceivedMessage),
 	fRenderFrameEventHandlerPointer(nullptr),
@@ -33,7 +33,7 @@ RenderSurfaceControl::RenderSurfaceControl(HWND windowHandle)
 	GetReceivedMessageEventHandlers().Add(&fReceivedMessageEventHandler);
 
 	// Create an OpenGL context and bind it to the given control.
-	CreateContext();
+	CreateContext(stencilBitsize); // <- STEVE CHANGE
 }
 
 RenderSurfaceControl::~RenderSurfaceControl()
@@ -151,7 +151,7 @@ void RenderSurfaceControl::OnRaisedDestroyingEvent()
 
 
 #pragma region Private Methods
-void RenderSurfaceControl::CreateContext()
+void RenderSurfaceControl::CreateContext(int stencilBitsize) // <- STEVE CHANGE
 {
 	// Fetch this control's window handle.
 	auto windowHandle = GetWindowHandle();
@@ -164,7 +164,7 @@ void RenderSurfaceControl::CreateContext()
 	DestroyContext();
 
 	// Query the video hardware for multisampling result.
-	auto multisampleTestResult = FetchMultisampleFormat();
+	auto multisampleTestResult = FetchMultisampleFormat(stencilBitsize); // <- STEVE CHANGE
 
 	// Fetch the control's device context.
 	fMainDeviceContextHandle = ::GetDC(windowHandle);
@@ -290,7 +290,7 @@ static HMODULE GetLibraryModuleHandle()
 	return moduleHandle;
 }
 
-RenderSurfaceControl::FetchMultisampleFormatResult RenderSurfaceControl::FetchMultisampleFormat()
+RenderSurfaceControl::FetchMultisampleFormatResult RenderSurfaceControl::FetchMultisampleFormat(int stencilBitsize) // <- STEVE CHANGE
 {
 	// Initialize a result value to "not supported".
 	FetchMultisampleFormatResult result;
@@ -390,6 +390,9 @@ RenderSurfaceControl::FetchMultisampleFormatResult RenderSurfaceControl::FetchMu
 				WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
 				WGL_COLOR_BITS_ARB, 24,
 				WGL_DEPTH_BITS_ARB, 16,
+// STEVE CHANGE
+				WGL_STENCIL_BITS_ARB, stencilBitsize,
+// /STEVE CHANGE
 				WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
 				WGL_SAMPLE_BUFFERS_ARB, GL_TRUE,
 				WGL_SAMPLES_ARB, sampleCount,

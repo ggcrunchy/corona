@@ -160,19 +160,13 @@ PushFactory( lua_State * L, const char * name )
 static bool 
 CallNewFactory (lua_State * L, const char * name, void * func)
 {
-	int nargs = lua_gettop( L );
-
 	if (PushFactory( L, name ) ) // args[, factories, factory]
 	{
 		lua_pushlightuserdata( L, func ); // args, factories, factory, func
-		lua_rawseti( L, -2, lua_upvalueindex( 2 ) ); // args, factories, factory; factory.upvalue[2] = func
-		lua_pushvalue( L, -1 ); // args, factories, factory, factory
-		lua_insert( L, 1 ); // factory, args, factories, factory
-		lua_insert( L, 1 ); // factory, factory, args, factories
-		lua_pop( L, 1 ); // factory, factory, args
-		lua_call( L, nargs, 1 ); // factory, object?
-		lua_pushnil( L ); // factory, object?, nil
-		lua_rawseti( L, -3, lua_upvalueindex( 2 ) ); // factory, object?; factory.upvalue[2] = nil
+		lua_setupvalue( L, -2, 2 ); // args, factories, factory; factory.upvalue[2] = func
+		lua_insert( L, 1 ); // factory, args, factories
+		lua_pop( L, 1 ); // factory, args
+		lua_call( L, lua_gettop( L ) - 1, 1 ); // object?
 
 		return !lua_isnil( L, -1 );
 	}

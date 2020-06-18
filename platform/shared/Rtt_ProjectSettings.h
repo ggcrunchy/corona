@@ -311,6 +311,18 @@ class ProjectSettings
 		 */
 		int GetContentHeight() const;
 
+		// STEVE CHANGE
+		/**
+		* Gets the stencil bitsize read provided by the "config.lua" file.
+		*
+		 * @return
+		 * Returns the "config.lua" file's stencil bitsize.
+		 *
+		 * Returns zero if the "config.lua" file was not found or if it is not set up for stencil buffers.
+		*/
+		int GetStencilBitsize() const;
+		// /STEVE CHANGE
+
 		/**
 		 * Fetches the number of image suffix scales provided by the project's "config.lua" file.
 		 *
@@ -450,7 +462,14 @@ class ProjectSettings
 		 * Set to zero if the file was not loaded or if it is not configured for content scaling.
 		 */
 		int fContentHeight;
-
+// STEVE CHANGE
+		/**
+		* The stencil bitsize read from the Corona project's "config.lua" file.
+		*
+		* Set to zero if the file was not loaded or if the stencil buffer is unused.
+		*/
+		int fStencilBitsize;
+// /STEVE CHANGE
 		/** Set to true if the Corona window should display a close button. False to not show it.*/
 		bool fIsWindowCloseButtonEnabled;
 

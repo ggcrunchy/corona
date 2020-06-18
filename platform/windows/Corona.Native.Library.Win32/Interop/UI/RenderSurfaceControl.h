@@ -99,7 +99,11 @@ class RenderSurfaceControl : public Control
 		///  <para>Handle to a Windows control to render to.</para>
 		///  <para>Can be null, but then this render surface object will do nothing.</para>
 		/// </param>
-		RenderSurfaceControl(HWND windowHandle);
+		/// <param name="stencilBitsize">
+		///  <para>Request a stencil buffer with the given depth.</para>
+		///  <para>Can be 0, in which case no stencil buffer is requested.</para>
+		/// </param>
+		RenderSurfaceControl(HWND windowHandle, int stencilBitsize = 0); // <- STEVE CHANGE
 
 		/// <summary>Destroys this object.</summary>
 		virtual ~RenderSurfaceControl();
@@ -204,13 +208,13 @@ class RenderSurfaceControl : public Control
 		///  Determines if the rendering driver supports multisampling, and if so, provides the best pixel format.
 		/// </summary>
 		/// <returns>Returns the requested multisample format information.</returns>
-		FetchMultisampleFormatResult FetchMultisampleFormat();
+		FetchMultisampleFormatResult FetchMultisampleFormat(int stencilBitsize); // <- STEVE CHANGE
 
 		/// <summary>
 		///  <para>Creates a new rendering context for the currently referenced control.</para>
 		///  <para>Will destroy the last context if still active.</para>
 		/// </summary>
-		void CreateContext();
+		void CreateContext(int stencilBitsize); // <- STEVE CHANGE
 
 		/// <summary>Destroys the last created rendering context.</summary>
 		void DestroyContext();
