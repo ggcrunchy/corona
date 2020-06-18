@@ -222,14 +222,14 @@ Log2OfPower( U64 power )
 }
 
 template<typename T> void
-CallOps( Rtt::Array< Renderer::CustomOp > & ops, T flags )
+CallOps( Rtt::Renderer * renderer, Rtt::Array< Renderer::CustomOp > & ops, T flags )
 {
 	while (flags)
 	{
 		U32 lowest = LowestBit( flags );
 		Renderer::CustomOp & op = ops[ Log2OfPower( lowest ) ];
 
-		op.fAction( op.fUserData );
+		op.fAction( op.fUserData, &renderer );
 
 		flags -= lowest;
 	}
@@ -288,7 +288,7 @@ Renderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real c
 
 	fPendingCommands.Clear();
 
-	CallOps( fBeginFrameOps, fBeginFrameFlags );
+	CallOps( this, fBeginFrameOps, fBeginFrameFlags );
 
 	fBeginFrameFlags = 0U;
 	// /STEVE CHANGE
@@ -472,7 +472,7 @@ Renderer::Clear( Real r, Real g, Real b, Real a )
 	DEBUG_PRINT( "Clear: r=%f, g=%f, b=%f, a=%f\n", r, g, b, a );
 
 	// STEVE CHANGE
-	CallOps( fClearOps, fClearFlags );
+	CallOps( this, fClearOps, fClearFlags );
 	// /STEVE CHANGE
 }
 
@@ -805,7 +805,7 @@ Renderer::Insert( const RenderData* data )
 		--MaskCount();
 	}
 // STEVE CHANGE
-	CallOps( fStateOps, fStateFlags );
+	CallOps( this, fStateOps, fStateFlags );
 
 	fStateFlags = 0U;
 // /STEVE CHANGE
@@ -946,7 +946,7 @@ Renderer::AddCustomCommand( CoronaCustomCommandReader reader, CoronaCustomComman
 }
 
 static U16
-AddOp( Rtt::Array< Renderer::CustomOp > & arr, Renderer::CustomOp::Action action, void * userData, U16 max )
+AddOp( Rtt::Array< Renderer::CustomOp > & arr, CoronaRendererOp action, void * userData, U16 max )
 {
 	if (max == arr.Length())
 	{
@@ -963,19 +963,19 @@ AddOp( Rtt::Array< Renderer::CustomOp > & arr, Renderer::CustomOp::Action action
 #define MAX_ARRAY_ENTRIES(flags) sizeof(flags) * 8U
 
 U16
-Renderer::AddBeginFrameOp( CustomOp::Action action, void * userData )
+Renderer::AddBeginFrameOp( CoronaRendererOp action, void * userData )
 {
 	return AddOp( fBeginFrameOps, action, userData, MAX_ARRAY_ENTRIES( fBeginFrameFlags ) );
 }
 
 U16
-Renderer::AddClearOp( CustomOp::Action action, void * userData )
+Renderer::AddClearOp( CoronaRendererOp action, void * userData )
 {
 	return AddOp( fClearOps, action, userData, MAX_ARRAY_ENTRIES( fClearFlags ) );
 }
 
 U16
-Renderer::AddStateOp( CustomOp::Action action, void * userData )
+Renderer::AddStateOp( CoronaRendererOp action, void * userData )
 {
 	return AddOp( fStateOps, action, userData, MAX_ARRAY_ENTRIES( fStateFlags ) );
 }

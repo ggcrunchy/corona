@@ -126,7 +126,7 @@ SetFlagStyleToken( CoronaGraphicsToken * token, CoronaGraphicsTokenType type, U1
 }
 
 CORONA_API
-int CoronaRendererRegisterBeginFrameOp( lua_State * L, CoronaGraphicsToken * token, void (*onBeginFrame)(void *), void * userData )
+int CoronaRendererRegisterBeginFrameOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onBeginFrame, void * userData )
 {
 	U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddBeginFrameOp( onBeginFrame, userData );
 
@@ -148,28 +148,34 @@ ExtractFromToken( const CoronaGraphicsToken * token )
 	return result;
 }
 
+static Rtt::Renderer *
+GetRenderer (void * renderingContext)
+{
+	return static_cast< Rtt::Renderer *>( renderingContext );
+}
+
 CORONA_API
-int CoronaRendererScheduleForNextFrame( lua_State * L, const CoronaGraphicsToken * token, CoronaRenderBeginFrame action )
+int CoronaRendererScheduleForNextFrame( void * renderingContext, const CoronaGraphicsToken * token, CoronaRenderBeginFrame action )
 {
 	if (kTokenType_BeginFrameOp == token->tokenType)
 	{
-		Rtt::Renderer & renderer = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer();
+		Rtt::Renderer * renderer = GetRenderer( renderingContext );
 		U32 flag = ExtractFromToken< U32 >( token );
 
 		switch (action)
 		{
 		case kBeginFrame_Schedule:
-			renderer.SetBeginFrameFlags( renderer.GetBeginFrameFlags() | flag );
+			renderer->SetBeginFrameFlags( renderer->GetBeginFrameFlags() | flag );
 
 			break;
 		case kBeginFrame_Cancel:
-			flag &= ~renderer.GetDoNotCancelFlags();
+			flag &= ~renderer->GetDoNotCancelFlags();
 
-			renderer.SetBeginFrameFlags( renderer.GetBeginFrameFlags() & ~flag );
+			renderer->SetBeginFrameFlags( renderer->GetBeginFrameFlags() & ~flag );
 
 			break;
 		case kBeginFrame_Establish:
-			renderer.SetDoNotCancelFlags( renderer.GetDoNotCancelFlags() | flag );
+			renderer->SetDoNotCancelFlags( renderer->GetDoNotCancelFlags() | flag );
 
 			break;
 		}
@@ -181,7 +187,7 @@ int CoronaRendererScheduleForNextFrame( lua_State * L, const CoronaGraphicsToken
 }
 
 CORONA_API
-int CoronaRendererRegisterClearOp( lua_State * L, CoronaGraphicsToken * token, void (*onClear)(void *), void * userData )
+int CoronaRendererRegisterClearOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onClear, void * userData )
 {
 	U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddClearOp( onClear, userData );
 
@@ -194,14 +200,14 @@ int CoronaRendererRegisterClearOp( lua_State * L, CoronaGraphicsToken * token, v
 }
 
 CORONA_API
-int CoronaRendererEnableClear( lua_State * L, const CoronaGraphicsToken * token, int enable )
+int CoronaRendererEnableClear( void * renderingContext, const CoronaGraphicsToken * token, int enable )
 {
 	if (kTokenType_ClearOp == token->tokenType)
 	{
-		Rtt::Renderer & renderer = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer();
-		U32 flag = ExtractFromToken< U32 >( token ), clearFlags = renderer.GetClearFlags();
+		Rtt::Renderer * renderer = GetRenderer( renderingContext );
+		U32 flag = ExtractFromToken< U32 >( token ), clearFlags = renderer->GetClearFlags();
 
-		renderer.SetClearFlags( enable ? (clearFlags | flag) : (clearFlags & ~flag) );
+		renderer->SetClearFlags( enable ? (clearFlags | flag) : (clearFlags & ~flag) );
 
 		return 1;
 	}
@@ -210,7 +216,7 @@ int CoronaRendererEnableClear( lua_State * L, const CoronaGraphicsToken * token,
 }
 
 CORONA_API
-int CoronaRendererRegisterStateOp( lua_State * L, CoronaGraphicsToken * token, void (*onState)(void *), void * userData )
+int CoronaRendererRegisterStateOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onState, void * userData )
 {
 	U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddStateOp( onState, userData );
 
@@ -223,13 +229,13 @@ int CoronaRendererRegisterStateOp( lua_State * L, CoronaGraphicsToken * token, v
 }
 
 CORONA_API
-int CoronaRendererSetOperationStateDirty( lua_State * L, const CoronaGraphicsToken * token )
+int CoronaRendererSetOperationStateDirty( void * renderingContext, const CoronaGraphicsToken * token )
 {
 	if (kTokenType_StateOp == token->tokenType)
 	{
-		Rtt::Renderer & renderer = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer();
+		Rtt::Renderer * renderer = GetRenderer( renderingContext );
 
-		renderer.SetStateFlags( renderer.GetStateFlags() | ExtractFromToken< U64 >( token ) );
+		renderer->SetStateFlags( renderer->GetStateFlags() | ExtractFromToken< U64 >( token ) );
 
 		return 1;
 	}
@@ -257,20 +263,18 @@ int CoronaRendererRegisterCommand( lua_State * L, CoronaGraphicsToken * token, C
 }
 
 CORONA_API
-int CoronaRendererIssueCommand( lua_State * L, const CoronaGraphicsToken * token, void * data, unsigned int size )
+int CoronaRendererIssueCommand( void * renderingContext, const CoronaGraphicsToken * token, void * data, unsigned int size )
 {
 	if (kTokenType_Command == token->tokenType)
 	{
-		Rtt::Renderer & renderer = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer();
-
-		return renderer.IssueCustomCommand( ExtractFromToken< U16 >( token ), data, size );
+		return GetRenderer( renderingContext )->IssueCustomCommand( ExtractFromToken< U16 >( token ), data, size );
 	}
 
 	return 0;
 }
 
 CORONA_API
-int CoronaRendererSetFrustum( lua_State * L, const float * viewMatrix, const float * projectionMatrix )
+int CoronaRendererSetFrustum( void * renderingContext, const float * viewMatrix, const float * projectionMatrix )
 {
 	return 0;
 }

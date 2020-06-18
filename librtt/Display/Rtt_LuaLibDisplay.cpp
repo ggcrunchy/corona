@@ -208,10 +208,10 @@ static int BLARGH( lua_State * L )
 			// no payload to write
 		});
 
-		CoronaRendererRegisterStateOp( L, &t.state, [](void * userData) {
+		CoronaRendererRegisterStateOp( L, &t.state, [](void * userData, void * renderingContext) {
 			const CoronaGraphicsToken * command = static_cast< CoronaGraphicsToken * >( userData );
 
-			// CoronaRendererIssueCommand( L, command, nullptr, 0U ); // third param = data, fourth = size
+			CoronaRendererIssueCommand( renderingContext, command, nullptr, 0U ); // third param = data, fourth = size
 			// TODO: this is going to be common, so obviously should supply 'L' as convenience
 		}, &t.command );
 
@@ -228,11 +228,11 @@ static int BLARGH( lua_State * L )
 		};
 
 		p.inherited.ignoreOriginalDraw = true;
-		p.inherited.afterDraw = [](const void *, void * userData)
+		p.inherited.afterDraw = [](const void *, void * userData/*,  void * renderingContext */ )
 		{
 			const CoronaGraphicsToken * state = static_cast< CoronaGraphicsToken * >( userData );
 
-			// CoronaRendererSetOperationStateDirty( L, state );
+			// CoronaRendererSetOperationStateDirty( renderingContext, state );
 			// TODO: probably common, so also supply 'L'
 		};
 	}

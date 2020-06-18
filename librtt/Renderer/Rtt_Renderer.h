@@ -24,6 +24,7 @@
 
 // STEVE CHANGE
 #include "Corona/CoronaCustomCommand.h"
+#include "Corona/CoronaGraphics.h"
 // /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
@@ -230,16 +231,14 @@ class Renderer
 
 		// STEVE CHANGE
 		struct CustomOp {
-			typedef void (*Action)(void *);
-
-			Action fAction;
+			CoronaRendererOp fAction;
 			void * fUserData;
 		};
 
 		U16 AddCustomCommand( CoronaCustomCommandReader reader, CoronaCustomCommandWriter writer );
-		U16 AddBeginFrameOp( CustomOp::Action action, void * userData );
-		U16 AddClearOp( CustomOp::Action action, void * userData );
-		U16 AddStateOp( CustomOp::Action action, void * userData );
+		U16 AddBeginFrameOp( CoronaRendererOp action, void * userData );
+		U16 AddClearOp( CoronaRendererOp action, void * userData );
+		U16 AddStateOp( CoronaRendererOp action, void * userData );
 
 		bool IssueCustomCommand( U16 id, const void * data, U32 size );
 
