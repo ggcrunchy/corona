@@ -25,7 +25,7 @@
 #include "Display/Rtt_StageObject.h"
 
 static bool
-ValuePrologue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[], void * userData, const DisplayObjectParams & params, int * result )
+ValuePrologue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[], void * userData, const CoronaDisplayObjectParams & params, int * result )
 {
 	if (params.beforeValue)
 	{
@@ -43,7 +43,7 @@ ValuePrologue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[]
 }
 
 static int
-ValueEpilogue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[], void * userData, const DisplayObjectParams & params, int result )
+ValueEpilogue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[], void * userData, const CoronaDisplayObjectParams & params, int result )
 {
 	if (params.afterValue)
 	{
@@ -54,7 +54,7 @@ ValueEpilogue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[]
 }
 
 static bool
-SetValuePrologue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], int valueIndex, void * userData, const DisplayObjectParams & params, int * result )
+SetValuePrologue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], int valueIndex, void * userData, const CoronaDisplayObjectParams & params, int * result )
 {
 	if (params.beforeSetValue)
 	{
@@ -72,7 +72,7 @@ SetValuePrologue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], i
 }
 
 static bool
-SetValueEpilogue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], int valueIndex, void * userData, const DisplayObjectParams & params, int result )
+SetValueEpilogue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], int valueIndex, void * userData, const CoronaDisplayObjectParams & params, int result )
 {
 	if (params.afterSetValue)
 	{
@@ -100,7 +100,7 @@ public:																																	\
 	virtual int ValueForKey( lua_State *L, const Rtt::MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const \
 	{																																	\
 		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);	\
-		const DisplayObjectParams & params = TO_PARAMS;									\
+		const CoronaDisplayObjectParams & params = TO_PARAMS;							\
 		void * userData = const_cast<void *>( resolved.fUserData );						\
 		int result = 0;																	\
 																						\
@@ -120,7 +120,7 @@ public:																																	\
 	virtual bool SetValueForKey( lua_State *L, Rtt::MLuaProxyable& object, const char key[], int valueIndex ) const	\
 	{																												\
 		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);	\
-		const DisplayObjectParams & params = TO_PARAMS;									\
+		const CoronaDisplayObjectParams & params = TO_PARAMS;							\
 		void * userData = const_cast<void *>( resolved.fUserData );						\
 		int result = 0;																	\
 																						\
@@ -306,10 +306,10 @@ Copy3 (float * dst, const float * src)
 		CORONA_OBJECTS_METHOD_WITH_ARGS( AddedToParent, TO_PARAMS, L, parent )	\
 	}																			\
 																				\
-	virtual bool CanCull() const						\
-	{													\
-		const DisplayObjectParams & params = TO_PARAMS;	\
-														\
+	virtual bool CanCull() const								\
+	{															\
+		const CoronaDisplayObjectParams & params = TO_PARAMS;	\
+																\
 		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( CanCull, FIRST_ARGS )	\
 		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanCull ) 						\
 		CORONA_OBJECTS_METHOD_BOOKEND( after, CanCull, FIRST_ARGS, &result )	\
@@ -317,10 +317,10 @@ Copy3 (float * dst, const float * src)
 		return result;	\
 	}					\
 						\
-	virtual bool CanHitTest() const						\
-	{													\
-		const DisplayObjectParams & params = TO_PARAMS;	\
-														\
+	virtual bool CanHitTest() const								\
+	{															\
+		const CoronaDisplayObjectParams & params = TO_PARAMS;	\
+																\
 		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( CanHitTest, FIRST_ARGS )	\
 		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanHitTest )						\
 		CORONA_OBJECTS_METHOD_BOOKEND( after, CanHitTest, FIRST_ARGS, &result )		\
@@ -335,7 +335,7 @@ Copy3 (float * dst, const float * src)
 																\
 	virtual void DidUpdateTransform( Rtt::Matrix & srcToDst )	\
 	{															\
-		const DisplayObjectParams & params = TO_PARAMS;			\
+		const CoronaDisplayObjectParams & params = TO_PARAMS;	\
 																\
 		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( before, DidUpdateTransform )		\
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( DidUpdateTransform, srcToDst )	\
@@ -359,10 +359,10 @@ Copy3 (float * dst, const float * src)
 		Super::FinalizeSelf( L );	\
 	}								\
 									\
-	virtual void GetSelfBounds( Rtt::Rect & rect ) const	\
-	{														\
-		const DisplayObjectParams & params = TO_PARAMS;		\
-															\
+	virtual void GetSelfBounds( Rtt::Rect & rect ) const		\
+	{															\
+		const CoronaDisplayObjectParams & params = TO_PARAMS;	\
+																\
 		CORONA_OBJECTS_METHOD_BOOKEND( before, GetSelfBounds, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )	\
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBounds, rect )															\
 		CORONA_OBJECTS_METHOD_BOOKEND( after, GetSelfBounds, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )	\
@@ -370,7 +370,7 @@ Copy3 (float * dst, const float * src)
 																															\
 	virtual void GetSelfBoundsForAnchor( Rtt::Rect & rect ) const	\
 	{																\
-		const DisplayObjectParams & params = TO_PARAMS;				\
+		const CoronaDisplayObjectParams & params = TO_PARAMS;		\
 																	\
 		CORONA_OBJECTS_METHOD_BOOKEND( before, GetSelfBoundsForAnchor, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )	\
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBoundsForAnchor, rect )														\
@@ -379,7 +379,7 @@ Copy3 (float * dst, const float * src)
 																																	\
 	virtual bool HitTest( Rtt::Real contentX, Rtt::Real contentY )	\
 	{																\
-		const DisplayObjectParams & params = TO_PARAMS;				\
+		const CoronaDisplayObjectParams & params = TO_PARAMS;		\
 																	\
 		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( HitTest, FIRST_ARGS, contentX, contentY )	\
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( HitTest, contentX, contentY )				\
@@ -417,8 +417,8 @@ Copy3 (float * dst, const float * src)
 	{																		\
 		CORONA_OBJECTS_INIT_MATRIX( parentToDstSpace );						\
 																			\
-		const DisplayObjectParams & params = TO_PARAMS;	\
-														\
+		const CoronaDisplayObjectParams & params = TO_PARAMS;	\
+																\
 		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( UpdateTransform, FIRST_ARGS, matrix )	\
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( UpdateTransform, parentToDstSpace )	\
 		CORONA_OBJECTS_METHOD_BOOKEND( after, UpdateTransform, FIRST_ARGS, matrix, &result )	\
@@ -459,7 +459,7 @@ public:
 		CORONA_OBJECTS_METHOD( DidRemove, *fParams, ... )
 	}
 
-	CORONA_OBJECTS_INTERFACE( GroupParams, fParams->inherited );
+	CORONA_OBJECTS_INTERFACE( CoronaGroupObjectParams, fParams->inherited );
 };
 
 Group2::Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
@@ -479,9 +479,9 @@ NewGroup2 (Rtt_Allocator * allocator, Rtt::StageObject * stageObject)
 }
 
 CORONA_API
-int CoronaObjectsPushGroup (lua_State * L, void * userData, const GroupParams * params, int temporaryParams)
+int CoronaObjectsPushGroup (lua_State * L, void * userData, const CoronaGroupObjectParams * params, int temporaryParams)
 {
-	CORONA_OBJECTS_PUSH( Group, GroupParams, object->fParams->inherited );
+	CORONA_OBJECTS_PUSH( Group, CoronaGroupObjectParams, object->fParams->inherited );
 }
 
 /**
@@ -495,7 +495,7 @@ public:
 public:
 	Rect2( Rtt::RectPath * path );
 
-	CORONA_OBJECTS_INTERFACE( DisplayObjectParams, *fParams ); // TODO: should this be ShapeParams? could streamline macros if ALWAYS expecting `inherited`...
+	CORONA_OBJECTS_INTERFACE( CoronaDisplayObjectParams, *fParams ); // TODO: should this be ShapeParams? could streamline macros if ALWAYS expecting `inherited`...
 };
 
 Rect2::Rect2( Rtt::RectPath * path )
@@ -517,9 +517,9 @@ NewRect2( Rtt_Allocator* pAllocator, Rtt::Real width, Rtt::Real height )
 }
 
 CORONA_API
-int CoronaObjectsPushRect (lua_State * L, void * userData, const ShapeParams * params, int temporaryParams)
+int CoronaObjectsPushRect (lua_State * L, void * userData, const CoronaShapeObjectParams * params, int temporaryParams)
 {
-	CORONA_OBJECTS_PUSH( Rect, DisplayObjectParams, *object->fParams );
+	CORONA_OBJECTS_PUSH( Rect, CoronaDisplayObjectParams, *object->fParams );
 }
 
 /**
@@ -533,7 +533,7 @@ public:
 public:
 	Snapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real contentW, Rtt::Real contentH );
 
-	CORONA_OBJECTS_INTERFACE( SnapshotParams, fParams->inherited );
+	CORONA_OBJECTS_INTERFACE( CoronaSnapshotObjectParams, fParams->inherited );
 };
 
 Snapshot2::Snapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real contentW, Rtt::Real contentH )
@@ -553,9 +553,9 @@ NewSnapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real widt
 }
 
 CORONA_API
-int CoronaObjectsPushSnapshot (lua_State * L, void * userData, const SnapshotParams * params, int temporaryParams)
+int CoronaObjectsPushSnapshot (lua_State * L, void * userData, const CoronaSnapshotObjectParams * params, int temporaryParams)
 {
-	CORONA_OBJECTS_PUSH( Snapshot, SnapshotParams, object->fParams->inherited );
+	CORONA_OBJECTS_PUSH( Snapshot, CoronaSnapshotObjectParams, object->fParams->inherited );
 }
 
 CORONA_API

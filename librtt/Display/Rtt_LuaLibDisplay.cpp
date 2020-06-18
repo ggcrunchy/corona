@@ -184,7 +184,64 @@ DisplayLibrary::DisplayLibrary( Display& display )
 DisplayLibrary::~DisplayLibrary()
 {
 }
+// STEVE CHANGE (TEST HACK!!!!!)
+#include "Corona/CoronaGraphics.h"
+#include "Corona/CoronaObjects.h"
 
+static int BLARGH( lua_State * L )
+{
+	struct Tokens {
+		CoronaGraphicsToken state;
+		CoronaGraphicsToken command;
+	};
+
+	static CoronaShapeObjectParams p;
+	static Tokens t;
+
+	if (!p.inherited.beforeCanCull) // yet-to-be-assigned?
+	{
+		CoronaRendererRegisterCommand( L, &t.command, [](const U8 * data) {
+			// do actual OpenGL call
+
+			return 0U; // has no payload
+		}, [](U8 * out, const void * data, U32 size) {
+			// no payload to write
+		});
+
+		CoronaRendererRegisterStateOp( L, &t.state, [](void * userData) {
+			const CoronaGraphicsToken * command = static_cast< CoronaGraphicsToken * >( userData );
+
+			// CoronaRendererIssueCommand( L, command, nullptr, 0U ); // third param = data, fourth = size
+			// TODO: this is going to be common, so obviously should supply 'L' as convenience
+		}, &t.command );
+
+		p.inherited.earlyOutCanCullIfZero = true;
+		p.inherited.beforeCanCull = [](const void *, void *, int * result) // first param = actual object, second = userdata
+		{
+			*result = false;
+		};
+
+		p.inherited.earlyOutCanHitTestIfZero = true;
+		p.inherited.beforeCanHitTest = [](const void *, void *, int * result)
+		{
+			*result = false;
+		};
+
+		p.inherited.ignoreOriginalDraw = true;
+		p.inherited.afterDraw = [](const void *, void * userData)
+		{
+			const CoronaGraphicsToken * state = static_cast< CoronaGraphicsToken * >( userData );
+
+			// CoronaRendererSetOperationStateDirty( L, state );
+			// TODO: probably common, so also supply 'L'
+		};
+	}
+
+	CoronaObjectsPushRect( L, &t.state, &p, false ); // second param = userdata, last param = p is not a temporary (so don't make an internal copy)
+
+	return 0;
+}
+// /STEVE CHANGE
 int
 DisplayLibrary::Open( lua_State *L )
 {
@@ -226,7 +283,9 @@ DisplayLibrary::Open( lua_State *L )
 		{ "colorSample", colorSample },
 		{ "setDrawMode", setDrawMode },
 		{ "getSafeAreaInsets", getSafeAreaInsets },
-
+// STEVE CHANGE (TEST HACK!!!!!)
+		{ "blargh", BLARGH },
+// /STEVE CHANGE
 		{ NULL, NULL }
 	};
 
