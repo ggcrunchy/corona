@@ -74,15 +74,6 @@ class ShaderResource
 		~ShaderResource();
 
 	public:
-		// STEVE CHANGE
-		CoronaShaderCallbacks::SourceTransformBegin GetBeginSourceTransform() const { return fBeginSourceTransform; }
-		CoronaShaderCallbacks::SourceTransformFinish GetFinishSourceTransform() const { return fFinishSourceTransform; }
-		CoronaShaderCallbacks::SourceTransformStateCleanup GetCleanUpSourceTransform() const { return fCleanUpSourceTransform; }
-
-		void SetBeginSourceTransform( CoronaShaderCallbacks::SourceTransformBegin beginSourceTransform ) { fBeginSourceTransform = beginSourceTransform; }
-		void SetFinishSourceTransform( CoronaShaderCallbacks::SourceTransformFinish finishSourceTransform ) { fFinishSourceTransform = finishSourceTransform; }
-		void SetCleanUpSourceTransform( CoronaShaderCallbacks::SourceTransformStateCleanup cleanUpSourceTransform ) { fCleanUpSourceTransform = cleanUpSourceTransform; }
-		// /STEVE CHANGE
 		ShaderTypes::Category GetCategory() const { return fCategory; }
 		const std::string& GetName() const { return fName; }
 		const char *GetTag( int index ) const { return NULL; }
@@ -94,6 +85,11 @@ class ShaderResource
 
 		bool UsesTime() const { return fUsesTime; }
 		void SetUsesTime( bool newValue ) { fUsesTime = newValue; }
+
+		// STEVE CHANGE
+		const CoronaShaderSourceTransform * GetSourceTransform() const { return fSourceTransform; }
+		void SetSourceTransform( CoronaShaderSourceTransform * transform ) { fSourceTransform = transform; }
+		// /STEVE CHANGE
 
 		TimeTransform *GetTimeTransform() const { return fTimeTransform; }
 		void SetTimeTransform( TimeTransform *transform ) { fTimeTransform = transform; }
@@ -129,17 +125,14 @@ class ShaderResource
 
 	private:
 		Program *fPrograms[kNumProgramMods];
-		
-		// STEVE CHANGE
-		CoronaShaderCallbacks::SourceTransformBegin fBeginSourceTransform;
-		CoronaShaderCallbacks::SourceTransformFinish fFinishSourceTransform;
-		CoronaShaderCallbacks::SourceTransformStateCleanup fCleanUpSourceTransform;
-		// /STEVE CHANGE
 		ShaderTypes::Category fCategory;
 		std::string fName;
 		VertexDataMap fVertexDataMap;
 		UniformDataMap fUniformDataMap;
 		ShaderData *fDefaultData;
+		// STEVE CHANGE
+		CoronaShaderSourceTransform *fSourceTransform;
+		// /STEVE CHANGE
 		TimeTransform *fTimeTransform;
 		bool fUsesUniforms;
 		bool fUsesTime;

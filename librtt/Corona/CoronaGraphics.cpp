@@ -20,6 +20,7 @@
 #include "Rtt_Runtime.h"
 #include "Display/Rtt_Display.h"
 // STEVE CHANGE
+#include "Display/Rtt_ShaderFactory.h"
 #include "Renderer/Rtt_CommandBuffer.h"
 #include "Renderer/Rtt_Renderer.h"
 // /STEVE CHANGE
@@ -95,12 +96,9 @@ int CoronaShaderRegisterAttributes( lua_State * L, CoronaGraphicsToken * token, 
 }
 
 CORONA_API
-int CoronaShaderRegisterPolicy( lua_State * L, const char * name, const CoronaShaderCallbacks * callbacks, void * userData )
+int CoronaShaderRegisterCustomization( lua_State * L, const char * name, const CoronaShaderCallbacks * callbacks )
 {
-	// Add callbacks for later lookup using the name
-	// This is meant for `graphics.defineEffect()`, via say a `policy` field (better name?)
-
-	return 0;
+	return Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetShaderFactory().RegisterCustomization( name, *callbacks );
 }
 
 CORONA_API
@@ -141,13 +139,13 @@ int CoronaRendererRegisterBeginFrameOp( lua_State * L, CoronaGraphicsToken * tok
 }
 
 template<typename T> T
-GetFlagFromToken( const CoronaGraphicsToken * token )
+ExtractFromToken( const CoronaGraphicsToken * token )
 {
-	T flag;
+	T result;
 
-	memcpy( &flag, token->bytes, sizeof( flag ) );
+	memcpy( &result, token->bytes, sizeof( result ) );
 
-	return flag;
+	return result;
 }
 
 CORONA_API
@@ -156,7 +154,7 @@ int CoronaRendererScheduleForNextFrame( lua_State * L, const CoronaGraphicsToken
 	if (kTokenType_BeginFrameOp == token->tokenType)
 	{
 		Rtt::Renderer & renderer = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer();
-		U32 flag = GetFlagFromToken< U32 >( token );
+		U32 flag = ExtractFromToken< U32 >( token );
 
 		switch (action)
 		{
@@ -201,7 +199,7 @@ int CoronaRendererEnableClear( lua_State * L, const CoronaGraphicsToken * token,
 	if (kTokenType_ClearOp == token->tokenType)
 	{
 		Rtt::Renderer & renderer = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer();
-		U32 flag = GetFlagFromToken< U32 >( token ), clearFlags = renderer.GetClearFlags();
+		U32 flag = ExtractFromToken< U32 >( token ), clearFlags = renderer.GetClearFlags();
 
 		renderer.SetClearFlags( enable ? (clearFlags | flag) : (clearFlags & ~flag) );
 
@@ -231,7 +229,7 @@ int CoronaRendererSetOperationStateDirty( lua_State * L, const CoronaGraphicsTok
 	{
 		Rtt::Renderer & renderer = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer();
 
-		renderer.SetStateFlags( renderer.GetStateFlags() | GetFlagFromToken< U64 >( token ) );
+		renderer.SetStateFlags( renderer.GetStateFlags() | ExtractFromToken< U64 >( token ) );
 
 		return 1;
 	}
@@ -265,11 +263,7 @@ int CoronaRendererIssueCommand( lua_State * L, const CoronaGraphicsToken * token
 	{
 		Rtt::Renderer & renderer = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer();
 
-
-	// TODO!
-	//	Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().I
-
-		return 1;
+		return renderer.IssueCustomCommand( ExtractFromToken< U16 >( token ), data, size );
 	}
 
 	return 0;

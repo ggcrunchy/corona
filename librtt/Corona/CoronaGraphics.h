@@ -274,7 +274,34 @@ typedef struct CoronaShaderSourceTransformParams {
 	const CoronaShaderAttribute * attributes; // NYI
 	unsigned int nsources; // n.b. must agree with output after call
 	unsigned int nattribs;
-} CoronaShaderAttribute;
+} CoronaShaderSourceTransformParams;
+
+typedef const char ** (*CoronaShaderSourceTransformBegin)(CoronaShaderSourceTransformParams * params, void * key);
+typedef void (*CoronaShaderSourceTransformFinish)(const char * transformed[], unsigned int n, void * key);
+typedef void (*CoronaShaderSourceTransformStateCleanup)(void * key);
+
+/**
+TODO
+*/
+typedef struct CoronaShaderSourceTransform {
+	/**
+	Optional
+	TODO
+	*/
+	CoronaShaderSourceTransformBegin begin;
+
+	/**
+	Optional
+	TODO
+	*/
+	CoronaShaderSourceTransformFinish finish;
+
+	/**
+	Optional
+	TODO
+	*/
+	CoronaShaderSourceTransformStateCleanup cleanup;
+} CroonaShaderSourceTransform;
 
 /**
 TODO
@@ -286,21 +313,11 @@ typedef struct CoronaShaderCallbacks {
 	*/
 	unsigned long size;
 
-	typedef const char ** (*SourceTransformBegin)(CoronaShaderSourceTransformParams * params, void * key);
-	typedef void (*SourceTransformFinish)(const char * transformed[], unsigned int n, void * key);
-	typedef void (*SourceTransformStateCleanup)(void * key);
-
 	/**
-	Optional
+	Required
 	TODO
 	*/
-	SourceTransformBegin beginTransform;
-
-	/**
-	Optional
-	TODO
-	*/
-	SourceTransformFinish finishTransform;
+	CoronaShaderSourceTransform transform;
 
 	// Argh, this uniform stuff isn't ready to go :P
 
@@ -308,13 +325,13 @@ typedef struct CoronaShaderCallbacks {
 	Optional
 	TODO
 	*/
-	unsigned int (*getUniforms)(void * programContext, void * userData);
+	unsigned int (*getUniforms)(void * programContext);
 
 	/**
 	Optional
 	TODO
 	*/
-	void (*resetUniforms)(void * programContext, void * userData);
+	void (*resetUniforms)(void * programContext);
 
 	/**
 	Optional
@@ -329,12 +346,6 @@ typedef struct CoronaShaderCallbacks {
 	void (*updateUniform)(void * programContext, unsigned int index);
 
 	/**
-	Optional
-	TODO
-	*/
-	void (*onFinalize)(void * userData);
-
-	/**
 	Required
 	TODO
 	*/
@@ -345,7 +356,7 @@ CORONA_API
 int CoronaShaderRegisterAttributes( lua_State * L, CoronaGraphicsToken * token, const CoronaShaderAttribute * attributes, unsigned int attributeCount ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaShaderRegisterPolicy( lua_State * L, const char * name, const CoronaShaderCallbacks * callbacks, void * userData ) CORONA_PUBLIC_SUFFIX;
+int CoronaShaderRegisterCustomization( lua_State * L, const char * name, const CoronaShaderCallbacks * callbacks ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 CoronaRendererBackend CoronaRendererGetBackend( lua_State * L ) CORONA_PUBLIC_SUFFIX;
@@ -396,7 +407,6 @@ int CoronaRendererIssueCommand( lua_State * L, const CoronaGraphicsToken * token
 
 CORONA_API
 int CoronaRendererSetFrustum( lua_State * L, const float * viewMatrix, const float * projectionMatrix ) CORONA_PUBLIC_SUFFIX;
-
 // /STEVE CHANGE
 
 #endif // _CoronaGraphics_H__

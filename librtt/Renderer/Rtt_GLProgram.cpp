@@ -157,11 +157,11 @@ GLProgram::Destroy()
 	}
 	// STEVE CHANGE
 	Program* program = static_cast<Program*>( fResource );
-	CoronaShaderCallbacks::SourceTransformStateCleanup cleanup = program->GetShaderResource()->GetCleanUpSourceTransform();
+	const CoronaShaderSourceTransform * xform = program->GetShaderResource()->GetSourceTransform();
 
-	if (cleanup)
+	if (xform && xform->cleanup)
 	{
-		cleanup( program );
+		xform->cleanup( program );
 	}
 	// /STEVE CHANGE
 }
@@ -218,13 +218,13 @@ CountLines( const char **segments, int numSegments )
 
 // STEVE CHANGE
 static void 
-SetShaderSource( GLuint shader, CoronaShaderSourceTransformParams & params, CoronaShaderCallbacks::SourceTransformBegin begin, CoronaShaderCallbacks::SourceTransformFinish finish, void * key )
+SetShaderSource( GLuint shader, CoronaShaderSourceTransformParams & params, const CoronaShaderSourceTransform * xform, void * key )
 {
 	const char ** strings = params.sources, ** old = strings;
 
-	if (begin)
+	if (xform && xform->begin)
 	{
-		strings = begin( &params, key );
+		strings = xform->begin( &params, key );
 
 		if (!strings)
 		{
@@ -234,9 +234,9 @@ SetShaderSource( GLuint shader, CoronaShaderSourceTransformParams & params, Coro
 
 	glShaderSource( shader, params.nsources, strings, NULL );
 
-	if (finish && old != strings)
+	if (old != strings && xform && xform->finish)
 	{
-		finish( strings, params.nsources, key );
+		xform->finish( strings, params.nsources, key );
 	}
 
 	GL_CHECK_ERROR();
@@ -280,13 +280,11 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 	}
 
 	// STEVE CHANGE
-	const char * hints[] = { "header", "highpSupport", "mask", "texCoordZ", NULL };
+	const CoronaShaderSourceTransform * xform = program->GetShaderResource()->GetSourceTransform();
 	CoronaShaderSourceTransformParams params = {};
+	const char * hints[] = { "header", "highpSupport", "mask", "texCoordZ", NULL };
 
 	params.hints = hints;
-
-	CoronaShaderCallbacks::SourceTransformBegin beginTransform = program->GetShaderResource()->GetBeginSourceTransform();
-	CoronaShaderCallbacks::SourceTransformFinish finishTransform = program->GetShaderResource()->GetFinishSourceTransform();
 	// /STEVE CHANGE
 
 	// Vertex shader.
@@ -298,7 +296,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 		params.sources = shader_source;
 		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
-		SetShaderSource( data.fVertexShader, params, beginTransform, finishTransform, program );
+		SetShaderSource( data.fVertexShader, params, xform, program );
 /*
 		glShaderSource( data.fVertexShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
@@ -318,7 +316,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 		params.sources = shader_source;
 		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
-		SetShaderSource( data.fFragmentShader, params, beginTransform, finishTransform, program );
+		SetShaderSource( data.fFragmentShader, params, xform, program );
 /*
 		glShaderSource( data.fFragmentShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),

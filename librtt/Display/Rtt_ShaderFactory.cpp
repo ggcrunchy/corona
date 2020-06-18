@@ -517,6 +517,56 @@ ShaderFactory::BindUniformDataMap( lua_State *L, int index, const SharedPtr< Sha
 	return result;
 }
 
+// STEVE CHANGE
+static int sCustomizationsNonce;
+
+void
+ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< ShaderResource >& resource )
+{
+	Rtt_LUA_STACK_GUARD(L);
+
+	lua_getfield( L, index, "customization" ); // ..., name?
+
+	if (lua_isstring( L, -1 ))
+	{
+		lua_pushlightuserdata( L, &sCustomizationsNonce ); // ..., name, nonce
+		lua_rawget( L, LUA_REGISTRYINDEX ); // ..., name, customizations?
+
+		if (!lua_istable( L, -1 ))
+		{
+			CoronaLuaWarning( L, "No customizations registered" );
+			lua_pop( L, 1 ); // ..., name
+		}
+
+		else
+		{
+			const char * name = lua_tostring( L, -1 );
+
+			lua_insert( L, -2 ); // ..., customizations, name
+			lua_rawget( L, -2 ); // ..., customizations, customization?
+			lua_remove( L, -2 ); // ..., customization?
+
+			if (!lua_isnil( L, -1 ))
+			{
+				resource->SetSourceTransform( (CoronaShaderSourceTransform *)lua_touserdata( L, -1 ) );
+			}
+
+			else
+			{
+				CoronaLuaWarning( L, "No customization registered under '%s'", name );
+			}
+		}
+	}
+
+	else
+	{
+		CoronaLuaWarning( L, "Customization expected to be a string, got %s", luaL_typename( L, -1 ) );
+	}
+
+	lua_pop( L, 1 );
+}
+// /STEVE CHANGE
+
 static void
 Modulo( Real *x, Real range, Real, Real )
 {
@@ -650,6 +700,10 @@ ShaderFactory::InitializeBindings( lua_State *L, int shaderIndex, const SharedPt
 	ShaderName name( resource->GetCategory(), resource->GetName().c_str() );
 	ShaderData *defaultData = Rtt_NEW( fOwner.GetAllocator(), ShaderData( resource ) );
 	resource->SetDefaultData( defaultData );
+
+	// STEVE CHANGE
+	BindCustomization( L, shaderIndex, resource );
+	// /STEVE CHANGE
 
 	if (resource->UsesTime())
 	{
@@ -1114,6 +1168,47 @@ ShaderFactory::NewShaderGraph( lua_State *L, int index)
 	
 	return terminalNode;
 }
+
+// STEVE CHANGE
+bool
+ShaderFactory::RegisterCustomization( const char * name, const CoronaShaderCallbacks & callbacks )
+{
+	lua_State *L = fL;
+
+	lua_pushlightuserdata( L, &sCustomizationsNonce ); // ..., nonce
+	lua_rawget( L, LUA_REGISTRYINDEX ); // ..., customizations?
+
+	if (lua_isnil( L, -1 ))
+	{
+		lua_pop( L, 1 ); // ...
+		lua_newtable( L ); // ..., customizations
+		lua_pushlightuserdata( L, &sCustomizationsNonce ); // ..., customizations, nonce
+		lua_pushvalue( L, -2 ); // ..., customizations, nonce, customizations
+		lua_rawset( L, LUA_REGISTRYINDEX ); // ..., customizations; registry = { ..., [nonce] = customizations }
+	}
+
+	lua_getfield( L, -1, name ); // ..., customizations, customization?
+
+	if (!lua_isnil( L, -1 ))
+	{
+		lua_pop( L, 2 ); // ...
+
+		return false;
+	}
+
+	else
+	{
+		CoronaShaderSourceTransform * xform = (CoronaShaderSourceTransform *)lua_newuserdata( L, sizeof( CoronaShaderSourceTransform ) ); // ..., customizations, xform
+
+		memcpy( xform, &callbacks.transform, sizeof( CoronaShaderSourceTransform ) );
+
+		lua_setfield( L, -2, name ); // ..., customizations = { ..., [name] = xform }
+		lua_pop( L, 1 ); // ...
+
+		return true;
+	}
+}
+// /STEVE CHANGE
 
 const Shader *
 ShaderFactory::FindPrototype( ShaderTypes::Category category, const char *name ) const

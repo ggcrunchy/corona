@@ -57,14 +57,12 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fVertexDataMap(),
 	fUniformDataMap(),
 	fDefaultData( NULL ),
+// STEVE CHANGE
+	fSourceTransform( NULL ),
+// /STEVE CHANGE
 	fTimeTransform( NULL ),
 	fUsesUniforms( false ),
-	fUsesTime( false ),
-// STEVE CHANGE
-	fBeginSourceTransform( NULL ),
-	fFinishSourceTransform( NULL ),
-	fCleanUpSourceTransform( NULL )
-// /STEVE CHANGE
+	fUsesTime( false )
 {
 	Init(program);
 }
@@ -75,14 +73,12 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fVertexDataMap(),
 	fUniformDataMap(),
 	fDefaultData( NULL ),
+// STEVE CHANGE
+	fSourceTransform( NULL ),
+// /STEVE CHANGE
 	fTimeTransform( NULL ),
 	fUsesUniforms( false ),
-	fUsesTime( false ),
-	// STEVE CHANGE
-	fBeginSourceTransform( NULL ),
-	fFinishSourceTransform( NULL ),
-	fCleanUpSourceTransform( NULL )
-	// /STEVE CHANGE
+	fUsesTime( false )
 {
 	Init(program);
 }
