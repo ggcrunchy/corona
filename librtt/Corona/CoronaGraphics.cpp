@@ -113,14 +113,63 @@ CoronaRendererBackend CoronaRendererGetBackend( lua_State * )
 	#endif
 }
 
-template<typename T> int
-SetFlagStyleToken( CoronaGraphicsToken * token, CoronaGraphicsTokenType type, U16 index )
-{
-	token->tokenType = type;
+enum TokenType : unsigned char { kTokenType_None, kTokenType_Attribute, kTokenType_BeginFrameOp, kTokenType_ClearOp, kTokenType_Command, kTokenType_StateOp, kTokenType_Renderer = 0xFF };
 
+void CoronaGraphicsTokenWrite( CoronaGraphicsToken * tokens, unsigned char type, const void * data, unsigned int size )
+{
+	tokens->bytes[0] = type;
+
+	if (size)
+	{
+		memcpy( tokens->bytes + 1, data, size );
+	}
+}
+
+void CoronaGraphicsTokenRead( void * buffer, const CoronaGraphicsToken * tokens, unsigned int size )
+{
+	if (size)
+	{
+		memcpy( buffer, tokens->bytes + 1, size );
+	}
+}
+
+U8 CoronaGraphicsGetTokenType( const CoronaGraphicsToken * tokens )
+{
+	return tokens->bytes[0];
+}
+
+static U32 sIndex = ~0U;
+
+static const size_t MixedSize = sizeof( const void * ) + sizeof( int );
+
+static_assert( MixedSize <= sizeof( CoronaGraphicsToken ), "Mixed size too large" );
+
+void CoronaGraphicsEncodeAsTokens ( CoronaGraphicsToken tokens[], unsigned char type, const void * data )
+{
+	if (kTokenType_Renderer == type && data)
+	{
+		unsigned char mixed[MixedSize];
+
+		++sIndex; // invalidate last use
+
+		memcpy( mixed, &data, sizeof( data ) );
+		memcpy( mixed + sizeof( data ), &sIndex, sizeof( U32 ) );
+
+		CoronaGraphicsTokenWrite( tokens, type, mixed, MixedSize );
+	}
+
+	else
+	{
+		CoronaGraphicsTokenWrite( tokens, kTokenType_None, nullptr, 0U );
+	}
+}
+
+template<typename T> int
+SetFlagStyleToken( CoronaGraphicsToken * token, TokenType type, U16 index )
+{
 	T flag = 1U << (1 - index);
 
-	memcpy( token->bytes, &flag, sizeof( T ) );
+	CoronaGraphicsTokenWrite( token, type, &flag, sizeof( T ) );
 
 	return 1;
 }
@@ -143,44 +192,66 @@ ExtractFromToken( const CoronaGraphicsToken * token )
 {
 	T result;
 
-	memcpy( &result, token->bytes, sizeof( result ) );
+	CoronaGraphicsTokenRead( &result, token, sizeof( T ) );
 
 	return result;
 }
 
 static Rtt::Renderer *
-GetRenderer (void * renderingContext)
+GetRenderer( const CoronaGraphicsToken * tokens )
 {
-	return static_cast< Rtt::Renderer *>( renderingContext );
+	if (kTokenType_Renderer == CoronaGraphicsGetTokenType( tokens ))
+	{
+		unsigned char mixed[MixedSize];
+
+		CoronaGraphicsTokenRead( mixed, tokens, MixedSize );
+
+		void * data;
+		int index;
+
+		memcpy( &data, mixed, sizeof( data ) );
+		memcpy( &index, mixed + sizeof( data ), sizeof( U32 ) );
+
+		if (index == sIndex) // still the same "session"?
+		{
+			return static_cast< Rtt::Renderer *>( data );
+		}
+	}
+
+	return nullptr;
 }
 
 CORONA_API
-int CoronaRendererScheduleForNextFrame( void * renderingContext, const CoronaGraphicsToken * token, CoronaRenderBeginFrame action )
+int CoronaRendererScheduleForNextFrame( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token, CoronaRenderBeginFrame action )
 {
-	if (kTokenType_BeginFrameOp == token->tokenType)
+	if (kTokenType_BeginFrameOp == CoronaGraphicsGetTokenType( token ))
 	{
-		Rtt::Renderer * renderer = GetRenderer( renderingContext );
-		U32 flag = ExtractFromToken< U32 >( token );
+		Rtt::Renderer * renderer = GetRenderer( rendererToken );
 
-		switch (action)
+		if (renderer)
 		{
-		case kBeginFrame_Schedule:
-			renderer->SetBeginFrameFlags( renderer->GetBeginFrameFlags() | flag );
+			U32 flag = ExtractFromToken< U32 >( token );
 
-			break;
-		case kBeginFrame_Cancel:
-			flag &= ~renderer->GetDoNotCancelFlags();
+			switch (action)
+			{
+			case kBeginFrame_Schedule:
+				renderer->SetBeginFrameFlags( renderer->GetBeginFrameFlags() | flag );
 
-			renderer->SetBeginFrameFlags( renderer->GetBeginFrameFlags() & ~flag );
+				break;
+			case kBeginFrame_Cancel:
+				flag &= ~renderer->GetDoNotCancelFlags();
 
-			break;
-		case kBeginFrame_Establish:
-			renderer->SetDoNotCancelFlags( renderer->GetDoNotCancelFlags() | flag );
+				renderer->SetBeginFrameFlags( renderer->GetBeginFrameFlags() & ~flag );
 
-			break;
+				break;
+			case kBeginFrame_Establish:
+				renderer->SetDoNotCancelFlags( renderer->GetDoNotCancelFlags() | flag );
+
+				break;
+			}
+
+			return 1;
 		}
-
-		return 1;
 	}
 
 	return 0;
@@ -200,16 +271,20 @@ int CoronaRendererRegisterClearOp( lua_State * L, CoronaGraphicsToken * token, C
 }
 
 CORONA_API
-int CoronaRendererEnableClear( void * renderingContext, const CoronaGraphicsToken * token, int enable )
+int CoronaRendererEnableClear( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token, int enable )
 {
-	if (kTokenType_ClearOp == token->tokenType)
+	if (kTokenType_ClearOp == CoronaGraphicsGetTokenType( token ))
 	{
-		Rtt::Renderer * renderer = GetRenderer( renderingContext );
-		U32 flag = ExtractFromToken< U32 >( token ), clearFlags = renderer->GetClearFlags();
+		Rtt::Renderer * renderer = GetRenderer( rendererToken );
 
-		renderer->SetClearFlags( enable ? (clearFlags | flag) : (clearFlags & ~flag) );
+		if (renderer)
+		{
+			U32 flag = ExtractFromToken< U32 >( token ), clearFlags = renderer->GetClearFlags();
 
-		return 1;
+			renderer->SetClearFlags( enable ? (clearFlags | flag) : (clearFlags & ~flag) );
+
+			return 1;
+		}
 	}
 
 	return 0;
@@ -229,32 +304,33 @@ int CoronaRendererRegisterStateOp( lua_State * L, CoronaGraphicsToken * token, C
 }
 
 CORONA_API
-int CoronaRendererSetOperationStateDirty( void * renderingContext, const CoronaGraphicsToken * token )
+int CoronaRendererSetOperationStateDirty( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token )
 {
-	if (kTokenType_StateOp == token->tokenType)
+	if (kTokenType_StateOp == CoronaGraphicsGetTokenType( token ))
 	{
-		Rtt::Renderer * renderer = GetRenderer( renderingContext );
+		Rtt::Renderer * renderer = GetRenderer( rendererToken );
 
-		renderer->SetStateFlags( renderer->GetStateFlags() | ExtractFromToken< U64 >( token ) );
+		if (renderer)
+		{
+			renderer->SetStateFlags( renderer->GetStateFlags() | ExtractFromToken< U64 >( token ) );
 
-		return 1;
+			return 1;
+		}
 	}
 
 	return 0;
 }
 
 CORONA_API
-int CoronaRendererRegisterCommand( lua_State * L, CoronaGraphicsToken * token, CoronaCustomCommandReader reader, CoronaCustomCommandWriter writer )
+int CoronaRendererRegisterCommand( lua_State * L, CoronaGraphicsToken * token, const CoronaCommand * command )
 {
-	U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddCustomCommand( reader, writer );
+	U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddCustomCommand( *command );
 
 	if (index)
 	{
-		token->tokenType = kTokenType_Command;
-
 		--index;
 
-		memcpy( token->bytes, &index, sizeof( U16 ) );
+		CoronaGraphicsTokenWrite( token, kTokenType_Command, &index, sizeof( U16 ) );
 
 		return 1;
 	}
@@ -263,18 +339,23 @@ int CoronaRendererRegisterCommand( lua_State * L, CoronaGraphicsToken * token, C
 }
 
 CORONA_API
-int CoronaRendererIssueCommand( void * renderingContext, const CoronaGraphicsToken * token, void * data, unsigned int size )
+int CoronaRendererIssueCommand( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token, void * data, unsigned int size )
 {
-	if (kTokenType_Command == token->tokenType)
+	if (kTokenType_Command == CoronaGraphicsGetTokenType( token ))
 	{
-		return GetRenderer( renderingContext )->IssueCustomCommand( ExtractFromToken< U16 >( token ), data, size );
+		Rtt::Renderer * renderer = GetRenderer( rendererToken );
+		
+		if (renderer)
+		{
+			return renderer->IssueCustomCommand( ExtractFromToken< U16 >( token ), data, size );
+		}
 	}
 
 	return 0;
 }
 
 CORONA_API
-int CoronaRendererSetFrustum( void * renderingContext, const float * viewMatrix, const float * projectionMatrix )
+int CoronaRendererSetFrustum( const CoronaGraphicsToken * rendererToken, const float * viewMatrix, const float * projectionMatrix )
 {
 	return 0;
 }

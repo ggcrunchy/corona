@@ -38,6 +38,7 @@ typedef void (*CoronaObjectBasicBookend) (const void * object, void * userData);
 typedef void (*CoronaObjectAddedToParentBookend) (const void * object, void * userData, lua_State * L, void * groupObject);
 typedef void (*CoronaObjectBooleanResultBookend) (const void * object, void * userData, int * result);
 typedef void (*CoronaObjectMatrixBookend) (const void * object, void * userData, float matrix[6]);
+typedef void (*CoronaObjectDrawBookend) (const void * object, void * userData, const struct CoronaGraphicsToken * rendererToken);
 typedef void (*CoronaObjectRectResultBookend) (const void * object, void * userData, float * xMin, float * yMin, float * xMax, float * yMax);
 typedef void (*CoronaObjectBooleanResultPointBookend) (const void * object, void * userData, float x, float y, int * result);
 typedef void (*CoronaObjectRemovedFromParentBookend) (const void * object, void * userData, lua_State * L, void * groupObject);
@@ -78,8 +79,8 @@ typedef struct CoronaDisplayObjectParams {
     CoronaObjectMatrixBookend beforeDidUpdateTransform;
     CoronaObjectMatrixBookend afterDidUpdateTransform;
 
-    CoronaObjectBasicBookend beforeDraw;
-    CoronaObjectBasicBookend afterDraw;
+    CoronaObjectDrawBookend beforeDraw;
+    CoronaObjectDrawBookend afterDraw;
 
     // TODO:
 
@@ -149,10 +150,10 @@ typedef struct CoronaDisplayObjectParams {
     // put these last in case inheriting types can merge with them
     CoronaObjectFlags ignoreOriginalAddedToParent : 1; // only use before and / or after, ignoring the original method
 
-    CoronaObjectFlags earlyOutCanCullIfZero : 1; // in the case of boolean results, calls are assumed to early-out if "before" returned either true or false: use zero (false)?
+    CoronaObjectFlags earlyOutCanCullIfNonZero : 1; // in the case of boolean results, calls are assumed to early-out if "before" returned either true or false: use zero (false)?
     CoronaObjectFlags ignoreOriginalCanCull : 1;
 
-    CoronaObjectFlags earlyOutCanHitTestIfZero : 1;
+    CoronaObjectFlags earlyOutCanHitTestIfNonZero : 1;
     CoronaObjectFlags ignoreOriginalCanHitTest : 1;
 
     CoronaObjectFlags ignoreOriginalDidMoveOffscreen : 1;
@@ -161,7 +162,7 @@ typedef struct CoronaDisplayObjectParams {
     CoronaObjectFlags ignoreOriginalGetSelfBounds : 1;
     CoronaObjectFlags ignoreOriginalGetSelfBoundsForAnchor : 1;
 
-    CoronaObjectFlags earlyOutHitTestIfZero : 1;
+    CoronaObjectFlags earlyOutHitTestIfNonZero : 1;
     CoronaObjectFlags ignoreOriginalHitTest : 1;
 
     CoronaObjectFlags ignoreOriginalMoveOffscreen : 1;
@@ -175,7 +176,7 @@ typedef struct CoronaDisplayObjectParams {
 
     CoronaObjectFlags ignoreOriginalTranslate : 1;
 
-    CoronaObjectFlags earlyOutUpdateTransformIfZero : 1;
+    CoronaObjectFlags earlyOutUpdateTransformIfNonZero : 1;
     CoronaObjectFlags ignoreOriginalUpdateTransform : 1;
 
     CoronaObjectFlags valueDisallowEarlyOut : 1; // usually we want to early-out if we got a value, but we can suppress this, say if we want to transform the result

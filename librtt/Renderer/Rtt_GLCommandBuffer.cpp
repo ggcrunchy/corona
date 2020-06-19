@@ -667,10 +667,8 @@ GLCommandBuffer::GetCachedParam( CommandBuffer::QueryableParams param )
 		
 // STEVE CHANGE
 void
-GLCommandBuffer::AddCommand( CoronaCustomCommandReader reader, CoronaCustomCommandWriter writer )
+GLCommandBuffer::AddCommand( const CoronaCommand & command )
 {
-	CoronaCustomCommand command = { reader, writer };
-
 	fCustomCommands.Append( command );
 }
 

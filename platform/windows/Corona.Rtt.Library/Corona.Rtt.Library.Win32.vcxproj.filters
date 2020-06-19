@@ -1808,7 +1808,7 @@
     <ClInclude Include="..\..\..\librtt\Corona\CoronaObjects.h">
       <Filter>librtt\Corona</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\librtt\Corona\CoronaCustomCommand.h">
+    <ClInclude Include="..\..\..\librtt\Corona\CoronaGraphicsTypes.h">
       <Filter>librtt\Corona</Filter>
     </ClInclude>
   </ItemGroup>

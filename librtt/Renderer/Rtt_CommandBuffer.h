@@ -17,7 +17,7 @@
 #include "Core/Rtt_Real.h"
 
 // STEVE CHANGE
-#include "Corona/CoronaCustomCommand.h"
+#include "Corona/CoronaGraphicsTypes.h"
 // /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
@@ -93,7 +93,7 @@ class CommandBuffer
 		virtual S32 GetCachedParam( CommandBuffer::QueryableParams param ) = 0;
 
 		// STEVE CHANGE
-		virtual void AddCommand( CoronaCustomCommandReader reader, CoronaCustomCommandWriter writer ) = 0;
+		virtual void AddCommand( const CoronaCommand & command ) = 0;
 		virtual void IssueCommand( U16 id, const void * data, U32 size ) = 0;
 		// /STEVE CHANGE
 

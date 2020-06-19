@@ -62,7 +62,7 @@ class GLCommandBuffer : public CommandBuffer
 		virtual S32 GetCachedParam( CommandBuffer::QueryableParams param );
 		
 		// STEVE CHANGE
-		virtual void AddCommand( CoronaCustomCommandReader reader, CoronaCustomCommandWriter writer );
+		virtual void AddCommand( const CoronaCommand & command );
 		virtual void IssueCommand( U16 id, const void * data, U32 size );
 		// /STEVE CHANGE
 
@@ -111,7 +111,7 @@ class GLCommandBuffer : public CommandBuffer
 		S32 fCachedQuery[kNumQueryableParams];
 
 		// STEVE CHANGE
-		Array< CoronaCustomCommand > fCustomCommands;
+		Array< CoronaCommand > fCustomCommands;
 		// /STEVE CHANGE
 		
 };

@@ -24,6 +24,8 @@
 #include "Display/Rtt_SnapshotObject.h"
 #include "Display/Rtt_StageObject.h"
 
+#include "CoronaGraphicsTypes.h"
+
 static bool
 ValuePrologue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[], void * userData, const CoronaDisplayObjectParams & params, int * result )
 {
@@ -261,12 +263,12 @@ CopyParams( lua_State * L, const void * from, size_t size, bool isTemporary, int
 	CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( METHOD_NAME, __VA_ARGS__ )				\
 	CORONA_OBJECTS_METHOD_BOOKEND( after, METHOD_NAME, FIRST_ARGS, __VA_ARGS__ )
 
-#define CORONA_OBJECTS_EARLY_OUT_IF_APPROPRIATE(METHOD_NAME)		\
-	bool expectZeroResult = params.earlyOut##METHOD_NAME##IfZero;	\
-																	\
-	if (params.before##METHOD_NAME && expectZeroResult == !result)	\
-	{																\
-		return !!result;											\
+#define CORONA_OBJECTS_EARLY_OUT_IF_APPROPRIATE(METHOD_NAME)			\
+	bool expectNonZeroResult = params.earlyOut##METHOD_NAME##IfNonZero;	\
+																		\
+	if (params.before##METHOD_NAME && expectNonZeroResult == !!result)	\
+	{																	\
+		return !!result;												\
 	}
 
 #define CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT(METHOD_NAME, ...)	\
@@ -283,15 +285,15 @@ Copy3 (float * dst, const float * src)
 	memcpy(dst, src, 3 * sizeof(float));
 }
 
-#define CORONA_OBJECTS_INIT_MATRIX( SOURCE )	\
-	Rtt::Real matrix[6];						\
-												\
+#define CORONA_OBJECTS_INIT_MATRIX(SOURCE)	\
+	Rtt::Real matrix[6];					\
+											\
 	Copy3( matrix, SOURCE.Row0() );		\
 	Copy3( matrix + 3, SOURCE.Row1() )
 
-#define CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( WHEN, METHOD_NAME )	\
-	if (params.WHEN##METHOD_NAME)									\
-	{																\
+#define CORONA_OBJECTS_MATRIX_BOOKEND_METHOD(WHEN, METHOD_NAME)	\
+	if (params.WHEN##METHOD_NAME)								\
+	{															\
 		CORONA_OBJECTS_INIT_MATRIX( srcToDst );	\
 												\
 		params.WHEN##METHOD_NAME( FIRST_ARGS, matrix );	\
@@ -300,7 +302,17 @@ Copy3 (float * dst, const float * src)
 		Copy3(const_cast<float *>(srcToDst.Row1()), matrix + 3);	\
 	}
 
-#define CORONA_OBJECTS_INTERFACE( PARAMS_TYPE, TO_PARAMS )						\
+#define CORONA_OBJECTS_DRAW_BOOKEND_METHOD(WHEN, METHOD_NAME)	\
+	if (params.WHEN##METHOD_NAME)				\
+	{											\
+		CoronaGraphicsToken token;	\
+									\
+		CoronaGraphicsEncodeAsTokens( &token, 0xFF, &renderer );	\
+		params.WHEN##METHOD_NAME( FIRST_ARGS, &token );				\
+		CoronaGraphicsEncodeAsTokens( &token, 0xFF, nullptr );		\
+	}
+
+#define CORONA_OBJECTS_INTERFACE(PARAMS_TYPE, TO_PARAMS)						\
 	virtual void AddedToParent( lua_State * L, Rtt::GroupObject * parent )		\
 	{																			\
 		CORONA_OBJECTS_METHOD_WITH_ARGS( AddedToParent, TO_PARAMS, L, parent )	\
@@ -342,11 +354,15 @@ Copy3 (float * dst, const float * src)
 		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( after, DidUpdateTransform )		\
 	}																			\
 																				\
-	virtual void Draw(Rtt::Renderer & renderer) const						\
-	{																		\
-		CORONA_OBJECTS_METHOD_STRIP_ARGUMENT( Draw, TO_PARAMS, renderer )	\
-	}																		\
-																			\
+	virtual void Draw(Rtt::Renderer & renderer) const			\
+	{															\
+		const CoronaDisplayObjectParams & params = TO_PARAMS;	\
+																\
+		CORONA_OBJECTS_DRAW_BOOKEND_METHOD( before, Draw )		\
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( Draw, renderer )	\
+		CORONA_OBJECTS_DRAW_BOOKEND_METHOD( after, Draw )		\
+	}															\
+																\
 	virtual void FinalizeSelf( lua_State * L )				\
 	{														\
 		if (( TO_PARAMS ).onFinalize)						\

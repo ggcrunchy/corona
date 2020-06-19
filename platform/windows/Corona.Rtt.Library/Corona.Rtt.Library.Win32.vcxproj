@@ -343,7 +343,7 @@
     <ClInclude Include="..\..\..\librtt\Core\Rtt_WeakCount.h" />
     <ClInclude Include="..\..\..\librtt\Core\Rtt_WeakPtr.h" />
     <ClInclude Include="..\..\..\librtt\Corona\CoronaAssert.h" />
-    <ClInclude Include="..\..\..\librtt\Corona\CoronaCustomCommand.h" />
+    <ClInclude Include="..\..\..\librtt\Corona\CoronaGraphicsTypes.h" />
     <ClInclude Include="..\..\..\librtt\Corona\CoronaEvent.h" />
     <ClInclude Include="..\..\..\librtt\Corona\CoronaLibrary.h" />
     <ClInclude Include="..\..\..\librtt\Corona\CoronaLog.h" />

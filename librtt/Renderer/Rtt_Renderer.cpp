@@ -224,14 +224,23 @@ Log2OfPower( U64 power )
 template<typename T> void
 CallOps( Rtt::Renderer * renderer, Rtt::Array< Renderer::CustomOp > & ops, T flags )
 {
-	while (flags)
+	if (flags)
 	{
-		U32 lowest = LowestBit( flags );
-		Renderer::CustomOp & op = ops[ Log2OfPower( lowest ) ];
+		CoronaGraphicsToken token;
 
-		op.fAction( op.fUserData, &renderer );
+		CoronaGraphicsEncodeAsTokens( &token, 0xFF, renderer );
 
-		flags -= lowest;
+		while (flags)
+		{
+			U32 lowest = LowestBit( flags );
+			Renderer::CustomOp & op = ops[ Log2OfPower( lowest ) ];
+
+			op.fAction( &token, op.fUserData );
+
+			flags -= lowest;
+		}
+
+		CoronaGraphicsEncodeAsTokens( &token, 0xFF, nullptr );
 	}
 }
 
@@ -281,9 +290,7 @@ Renderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real c
 	// Add pending commands
 	for (int i = 0; i < fPendingCommands.Length(); ++i)
 	{
-		const CoronaCustomCommand & command = fPendingCommands[i];
-
-		fBackCommandBuffer->AddCommand( command.fReader, command.fWriter );
+		fBackCommandBuffer->AddCommand( fPendingCommands[i] );
 	}
 
 	fPendingCommands.Clear();
@@ -929,16 +936,14 @@ Renderer::TallyTimeDependency( bool usesTime )
 
 // STEVE CHANGE
 U16
-Renderer::AddCustomCommand( CoronaCustomCommandReader reader, CoronaCustomCommandWriter writer )
+Renderer::AddCustomCommand( const CoronaCommand & command )
 {
 	if (0xFFFF == fCommandCount)
 	{
 		return 0U;
 	}
 
-	fFrontCommandBuffer->AddCommand( reader, writer );
-
-	CoronaCustomCommand command = { reader, writer };
+	fFrontCommandBuffer->AddCommand( command );
 
 	fPendingCommands.Append( command );
 

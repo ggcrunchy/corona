@@ -190,54 +190,52 @@ DisplayLibrary::~DisplayLibrary()
 
 static int BLARGH( lua_State * L )
 {
-	struct Tokens {
-		CoronaGraphicsToken state;
-		CoronaGraphicsToken command;
-	};
-
 	static CoronaShapeObjectParams p;
-	static Tokens t;
+	static CoronaGraphicsToken commandToken, stateToken;
 
-	if (!p.inherited.beforeCanCull) // yet-to-be-assigned?
+	if (!p.inherited.beforeCanCull) // yet-to-be-assigned? upvalues might be preferred since statics seem to survive relaunch on Mac
 	{
-		CoronaRendererRegisterCommand( L, &t.command, [](const U8 * data) {
-			// do actual OpenGL call
+		CoronaCommand command = {
+			[](const U8 * data) {
+				// do actual OpenGL call
 
-			return 0U; // has no payload
-		}, [](U8 * out, const void * data, U32 size) {
-			// no payload to write
-		});
-
-		CoronaRendererRegisterStateOp( L, &t.state, [](void * userData, void * renderingContext) {
-			const CoronaGraphicsToken * command = static_cast< CoronaGraphicsToken * >( userData );
-
-			CoronaRendererIssueCommand( renderingContext, command, nullptr, 0U ); // third param = data, fourth = size
-			// TODO: this is going to be common, so obviously should supply 'L' as convenience
-		}, &t.command );
-
-		p.inherited.earlyOutCanCullIfZero = true;
-		p.inherited.beforeCanCull = [](const void *, void *, int * result) // first param = actual object, second = userdata
-		{
-			*result = false;
+				return 0U; // has no payload, so no need to advance post-ID memory
+			},
+			[](U8 * out, const void * data, U32 size) {
+				// size = 0 (see `CoronaRendererIssueCommand` below), i.e. no payload to write
+			}
 		};
 
-		p.inherited.earlyOutCanHitTestIfZero = true;
+		CoronaRendererRegisterCommand( L, &commandToken, &command );
+
+		CoronaRendererRegisterStateOp( L, &stateToken, []( CoronaGraphicsToken * rendererToken, void * userData ) {
+			const CoronaGraphicsToken * command = static_cast< CoronaGraphicsToken * >( userData ); // get the command token...
+
+			CoronaRendererIssueCommand( rendererToken, command, nullptr, 0U ); // third param = data, fourth = size
+		}, &commandToken ); // ...that we pass in here
+
+	//	p.inherited.earlyOutCanCullIfNonZero = false: we get this be default if we zero out the params...
+		p.inherited.beforeCanCull = [](const void *, void *, int * result) // first param = actual object, second = userdata
+		{
+			*result = false; // ...so instead we early out when getting zero, so never do the "real" `canCull`
+		};
+
+	//	p.inherited.earlyOutCanHitTestIfNonZero = false: ditto
 		p.inherited.beforeCanHitTest = [](const void *, void *, int * result)
 		{
-			*result = false;
+			*result = false; // as per `canCull`
 		};
 
 		p.inherited.ignoreOriginalDraw = true;
-		p.inherited.afterDraw = [](const void *, void * userData/*,  void * renderingContext */ )
+		p.inherited.afterDraw = [](const void *, void * userData, const CoronaGraphicsToken * rendererToken )
 		{
-			const CoronaGraphicsToken * state = static_cast< CoronaGraphicsToken * >( userData );
+			const CoronaGraphicsToken * stateToken = static_cast< CoronaGraphicsToken * >( userData ); // user data we pushed rect with, see below
 
-			// CoronaRendererSetOperationStateDirty( renderingContext, state );
-			// TODO: probably common, so also supply 'L'
+			CoronaRendererSetOperationStateDirty( rendererToken, stateToken ); // cut a batch while rendering, update state (see above)
 		};
 	}
 
-	CoronaObjectsPushRect( L, &t.state, &p, false ); // second param = userdata, last param = p is not a temporary (so don't make an internal copy)
+	CoronaObjectsPushRect( L, &stateToken, &p, false ); // second param = userdata, last param = p is not a temporary (so don't make an internal copy)
 
 	return 0;
 }

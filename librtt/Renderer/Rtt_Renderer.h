@@ -23,8 +23,7 @@
 #include "Core/Rtt_Time.h"
 
 // STEVE CHANGE
-#include "Corona/CoronaCustomCommand.h"
-#include "Corona/CoronaGraphics.h"
+#include "Corona/CoronaGraphicsTypes.h"
 // /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
@@ -235,7 +234,7 @@ class Renderer
 			void * fUserData;
 		};
 
-		U16 AddCustomCommand( CoronaCustomCommandReader reader, CoronaCustomCommandWriter writer );
+		U16 AddCustomCommand( const CoronaCommand & command );
 		U16 AddBeginFrameOp( CoronaRendererOp action, void * userData );
 		U16 AddClearOp( CoronaRendererOp action, void * userData );
 		U16 AddStateOp( CoronaRendererOp action, void * userData );
@@ -341,7 +340,7 @@ class Renderer
 		U32 fTimeDependencyCount;
 
 		// STEVE CHANGE
-		Array< CoronaCustomCommand > fPendingCommands;
+		Array< CoronaCommand > fPendingCommands;
 		Array< CustomOp > fBeginFrameOps;
 		Array< CustomOp > fClearOps;
 		Array< CustomOp > fStateOps;
