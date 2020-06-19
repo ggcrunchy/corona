@@ -33,6 +33,6 @@ unsigned char CoronaGraphicsGetTokenType( const CoronaGraphicsToken * tokens );
 
 void CoronaGraphicsEncodeAsTokens ( CoronaGraphicsToken token[], unsigned char type, const void * data );
 
-typedef void (*CoronaRendererOp)(CoronaGraphicsToken *, void *);
+typedef void (*CoronaRendererOp)(const CoronaGraphicsToken *, void *);
 
 #endif // _CoronaGraphicsTypes_H__

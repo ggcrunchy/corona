@@ -208,7 +208,7 @@ static int BLARGH( lua_State * L )
 
 		CoronaRendererRegisterCommand( L, &commandToken, &command );
 
-		CoronaRendererRegisterStateOp( L, &stateToken, []( CoronaGraphicsToken * rendererToken, void * userData ) {
+		CoronaRendererRegisterStateOp( L, &stateToken, []( const CoronaGraphicsToken * rendererToken, void * userData ) {
 			const CoronaGraphicsToken * command = static_cast< CoronaGraphicsToken * >( userData ); // get the command token...
 
 			CoronaRendererIssueCommand( rendererToken, command, nullptr, 0U ); // third param = data, fourth = size
