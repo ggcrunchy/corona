@@ -216,7 +216,7 @@ static void NoPayloadState ( const CoronaGraphicsToken * rendererToken, void * u
 }
 
 struct StencilInfo {
-	int clear{0}, func{GL_ALWAYS}, func_ref{0}, fail{GL_KEEP}, zfail{GL_KEEP}, zpass{GL_KEEP};
+	int func{GL_ALWAYS}, func_ref{0}, fail{GL_KEEP}, zfail{GL_KEEP}, zpass{GL_KEEP};
 	unsigned int func_mask{~0U}, mask{~0U};
 	bool enabled{false};
 };
@@ -225,7 +225,26 @@ struct StencilState {
 	StencilInfo current, working;
 	std::vector<StencilInfo> stack;
 	CoronaGraphicsToken beginFrameToken, stateToken;
-	int scopeID;
+	int clear, scopeID;
+};
+
+struct StencilChanges {
+	int clear, func, func_ref, fail, zfail, zpass;
+	unsigned int func_mask, mask;
+	bool enabled;
+	U8 hasFunc : 1;
+	U8 hasFuncRef : 1;
+	U8 hasFail : 1;
+	U8 hasZFail : 1;
+	U8 hasZPass : 1;
+	U8 hasFuncMask : 1;
+	U8 hasMask : 1;
+	U8 hasEnabled : 1;
+};
+
+struct StencilClearChanges {
+	int clear;
+	bool hasClear;
 };
 
 static int ScopeGroup( lua_State * L )
@@ -1590,10 +1609,10 @@ DisplayLibrary::newEmbossedText( lua_State *L )
 }
 
 // STEVE CHANGE
-static Rtt::GroupObject *
+static GroupObject *
 NewGroup( Rtt_Allocator * context )
 {
-	return Rtt_NEW( context, Rtt::GroupObject( context, NULL ) );
+	return Rtt_NEW( context, GroupObject( context, NULL ) );
 }
 // STEVE CHANGE
 
@@ -1706,8 +1725,8 @@ DisplayLibrary::_newContainer( lua_State *L )
 }
 
 // STEVE CHANGE
-static Rtt::SnapshotObject *
-NewSnapshot( Rtt_Allocator * context, Rtt::Display & display, Real w, Real h )
+static SnapshotObject *
+NewSnapshot( Rtt_Allocator * context, Display & display, Real w, Real h )
 {
 	return Rtt_NEW( context, SnapshotObject( context, display, w, h ) );
 }
