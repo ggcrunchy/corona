@@ -142,6 +142,7 @@ typedef struct CoronaDisplayObjectParams {
 
     void (*onCreate) (const void * object, void * userData);
     void (*onFinalize) (const void * object, void * userData);
+    void (*onMessage) (const void * object, void * userData, const char * message, const void * data, unsigned int size);
 
     //
     // Flags
@@ -206,14 +207,14 @@ typedef struct CoronaGroupObjectParams {
 // TODO: allow params to be shared / reused, i.e. what we almost always want
 
 CORONA_API
-int CoronaObjectsPushGroup (lua_State * L, void * userData, const CoronaGroupObjectParams * params, int temporaryParams) CORONA_PUBLIC_SUFFIX;
+int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaGroupObjectParams * params, int temporaryParams ) CORONA_PUBLIC_SUFFIX;
 
 typedef struct CoronaShapeObjectParams {
     CoronaDisplayObjectParams inherited;
 } CoronaShapeObjectParams;
 
 CORONA_API
-int CoronaObjectsPushRect (lua_State * L, void * userData, const CoronaShapeObjectParams * params, int temporaryParams) CORONA_PUBLIC_SUFFIX;
+int CoronaObjectsPushRect( lua_State * L, void * userData, const CoronaShapeObjectParams * params, int temporaryParams ) CORONA_PUBLIC_SUFFIX;
 
 typedef struct CoronaSnapshotObjectParams {
     CoronaDisplayObjectParams inherited;
@@ -221,9 +222,21 @@ typedef struct CoronaSnapshotObjectParams {
 } CoronaSnapshotObjectParams;
 
 CORONA_API
-int CoronaObjectsPushSnapshot (lua_State * L, void * userData, const CoronaSnapshotObjectParams * params, int temporaryParams) CORONA_PUBLIC_SUFFIX;
+int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaSnapshotObjectParams * params, int temporaryParams ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaObjectsShouldDraw (void * object, int * shouldDraw) CORONA_PUBLIC_SUFFIX;
+int CoronaObjectsShouldDraw( void * object, int * shouldDraw ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+void * CoronaObjectGetParent( void * object ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+void * CoronaGroupObjectGetChild( void * groupObject, int index ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaGroupObjectGetNumChildren( void * groupObject ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectSendMessage ( void * object, const char * message, const void * payload, unsigned int size ) CORONA_PUBLIC_SUFFIX;
 
 #endif // _CoronaObjects_H__

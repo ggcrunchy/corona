@@ -424,6 +424,14 @@ Copy3 (float * dst, const float * src)
 		CORONA_OBJECTS_METHOD_WITH_ARGS( Scale, TO_PARAMS, sx, sy, isNewValue )		\
 	}																				\
 																					\
+	virtual void SendMessage( const char * message, const void * payload, U32 size )	\
+	{																					\
+		if (( TO_PARAMS ).onMessage)													\
+		{																				\
+			( TO_PARAMS ).onMessage( FIRST_ARGS, message, payload, size );				\
+		}																				\
+	}																					\
+																						\
 	virtual void Translate( Rtt::Real deltaX, Rtt::Real deltaY )				\
 	{																			\
 		CORONA_OBJECTS_METHOD_WITH_ARGS( Translate, TO_PARAMS, deltaX, deltaY )	\
@@ -581,6 +589,34 @@ int CoronaObjectsShouldDraw (void * object, int * shouldDraw)
     // If so, then *shouldDraw = ((DisplayObject *)object)->shouldDraw()
 
     return 0;
+}
+
+CORONA_API
+void * CoronaObjectGetParent( void * object )
+{
+	return static_cast< Rtt::DisplayObject *>( object )->GetParent(); // TODO: validation?
+}
+
+CORONA_API
+void * CoronaGroupObjectGetChild( void * groupObject, int index )
+{
+	Rtt::GroupObject * group = static_cast< Rtt::GroupObject *>( groupObject );
+
+	return (index >= 0 && index < group->NumChildren()) ? &group->ChildAt( index ) : nullptr;
+}
+
+CORONA_API
+int CoronaGroupObjectGetNumChildren( void * groupObject )
+{
+	return static_cast< Rtt::GroupObject *>( groupObject )->NumChildren();
+}
+
+CORONA_API
+int CoronaObjectSendMessage( void * object, const char * message, const void * payload, unsigned int size )
+{
+	static_cast< Rtt::DisplayObject *>( object )->SendMessage( message, payload, size );
+
+	return 1;
 }
 
 #undef FIRST_ARGS

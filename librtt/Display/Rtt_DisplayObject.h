@@ -195,6 +195,9 @@ class DisplayObject : public MDrawable, public MLuaProxyable
 		virtual void AddedToParent( lua_State * L, GroupObject * parent );
 		virtual void RemovedFromParent( lua_State * L, GroupObject * parent );
 
+		// STEVE CHANGE
+		virtual void SendMessage( const char * message, const void * payload, U32 size ) {}
+		// /STEVE CHANGE
 	public:
 		virtual const LuaProxyVTable& ProxyVTable() const;
 		

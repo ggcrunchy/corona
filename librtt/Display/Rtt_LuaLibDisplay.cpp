@@ -187,46 +187,82 @@ DisplayLibrary::~DisplayLibrary()
 // STEVE CHANGE (TEST HACK!!!!!)
 #include "Corona/CoronaGraphics.h"
 #include "Corona/CoronaObjects.h"
+#include "Renderer/Rtt_GL.h"
+#include <vector>
+
+static void EarlyOutPredicate (const void *, void *, int * result)
+{
+	*result = false;
+}
+
+static void DisableCullAndHitTest (CoronaDisplayObjectParams & params)
+{
+	params.beforeCanCull = EarlyOutPredicate;
+	params.beforeCanHitTest = EarlyOutPredicate;
+}
+
+static void DisableOriginalDraw (CoronaDisplayObjectParams & params)
+{
+	params.ignoreOriginalDraw = true;
+}
+
+static void DummyWriter (U8 *, const void *, U32) {}
+
+static void NoPayloadState ( const CoronaGraphicsToken * rendererToken, void * userData )
+{
+	const CoronaGraphicsToken * command = static_cast< CoronaGraphicsToken * >( userData );
+
+	CoronaRendererIssueCommand( rendererToken, command, nullptr, 0U );
+}
+
+struct StencilInfo {
+	int clear{0}, func{GL_ALWAYS}, func_ref{0}, fail{GL_KEEP}, zfail{GL_KEEP}, zpass{GL_KEEP};
+	unsigned int func_mask{~0U}, mask{~0U};
+	bool enabled{false};
+};
+
+struct StencilState {
+	StencilInfo current, working;
+	std::vector<StencilInfo> stack;
+	CoronaGraphicsToken beginFrameToken, stateToken;
+	int scopeID;
+};
+
+static int ScopeGroup( lua_State * L )
+{
+	// beforeDraw: increment ID
+		// for each object
+			// Send "begin scope" message with ID payload
+			// Probably only first object of a given type, e.g. stencil state, will want to handle the message (scopeID ! id)
+	// afterDraw:
+		// for each object (in reverse)
+			// Send "end scope" message with ID payload
+			// Probably only last object of a given type will want to handle the message (scopeID == id)
+}
 
 static int BLARGH( lua_State * L )
 {
 	static CoronaShapeObjectParams p;
 	static CoronaGraphicsToken commandToken, stateToken;
 
-	if (!p.inherited.beforeCanCull) // yet-to-be-assigned? upvalues might be preferred since statics seem to survive relaunch on Mac
+	if (!p.inherited.afterDraw) // yet-to-be-assigned? upvalues might be preferred since statics seem to survive relaunch on Mac
 	{
 		CoronaCommand command = {
 			[](const U8 * data) {
-				// do actual OpenGL call
-
+				glClear( GL_STENCIL_BUFFER_BIT );
+				// glClearStencil(
+				// glStencilFunc( func, ref, mask )
+				// glStencilMask( mask )
+				// glStencilOp( fail, zfail, zpass );
 				return 0U; // has no payload, so no need to advance post-ID memory
-			},
-			[](U8 * out, const void * data, U32 size) {
-				// size = 0 (see `CoronaRendererIssueCommand` below), i.e. no payload to write
-			}
+			}, DummyWriter
 		};
 
 		CoronaRendererRegisterCommand( L, &commandToken, &command );
+		CoronaRendererRegisterStateOp( L, &stateToken, NoPayloadState, &commandToken );
+		DisableCullAndHitTest( p.inherited );
+		DisableOriginalDraw( p.inherited );
 
-		CoronaRendererRegisterStateOp( L, &stateToken, []( const CoronaGraphicsToken * rendererToken, void * userData ) {
-			const CoronaGraphicsToken * command = static_cast< CoronaGraphicsToken * >( userData ); // get the command token...
-
-			CoronaRendererIssueCommand( rendererToken, command, nullptr, 0U ); // third param = data, fourth = size
-		}, &commandToken ); // ...that we pass in here
-
-	//	p.inherited.earlyOutCanCullIfNonZero = false: we get this be default if we zero out the params...
-		p.inherited.beforeCanCull = [](const void *, void *, int * result) // first param = actual object, second = userdata
-		{
-			*result = false; // ...so instead we early out when getting zero, so never do the "real" `canCull`
-		};
-
-	//	p.inherited.earlyOutCanHitTestIfNonZero = false: ditto
-		p.inherited.beforeCanHitTest = [](const void *, void *, int * result)
-		{
-			*result = false; // as per `canCull`
-		};
-
-		p.inherited.ignoreOriginalDraw = true;
 		p.inherited.afterDraw = [](const void *, void * userData, const CoronaGraphicsToken * rendererToken )
 		{
 			const CoronaGraphicsToken * stateToken = static_cast< CoronaGraphicsToken * >( userData ); // user data we pushed rect with, see below
