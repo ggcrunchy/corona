@@ -196,7 +196,7 @@ template<typename T> struct Boxed {
 };
 
 template<typename T> Boxed< T >
-GetOrNew( lua_State * L, void * nonce, bool clear = true )
+GetOrNew( lua_State * L, void * nonce, bool construct = false )
 {
 	Boxed< T > boxed;
 
@@ -216,7 +216,12 @@ GetOrNew( lua_State * L, void * nonce, bool clear = true )
 		boxed.object = (T *)lua_newuserdata( L, sizeof( T ) ); // ..., nil, nonce, object
 		boxed.isNew = true;
 
-		if (clear)
+		if (construct)
+		{
+			new ( boxed.object ) T;
+		}
+
+		else
 		{
 			memset( boxed.object, 0, sizeof( T ) );
 		}
@@ -228,6 +233,11 @@ GetOrNew( lua_State * L, void * nonce, bool clear = true )
 
 	return boxed;
 }
+
+struct ScopeMessagePayload {
+	const CoronaGraphicsToken * rendererToken;
+	U32 drawSessionID;
+};
 
 static int ScopeGroupObject( lua_State * L )
 {
@@ -242,22 +252,24 @@ static int ScopeGroupObject( lua_State * L )
 	//	params->afterDidInsert = [](void * groupObject, void * userData, int childParentChanged ) {}
 	//	params->afterDidRemove = [](void * groupObject, void * userData ) {}
 	// ^^ TODO: double-check these
-		params.object->inherited.beforeDraw = [](const void * groupObject, void * userData, const struct CoronaGraphicsToken *)
+		params.object->inherited.beforeDraw = [](const void * groupObject, void * userData, const CoronaGraphicsToken * rendererToken)
 		{
+			ScopeMessagePayload payload = { rendererToken, sScopeDrawSessionID };
+
 			for (int i = 0, n = CoronaGroupObjectGetNumChildren( groupObject ); i < n; ++i)
 			{
-				CoronaObjectSendMessage( CoronaGroupObjectGetChild( groupObject, i ), "willDraw", &sScopeDrawSessionID, sizeof( U32 ) );
+				CoronaObjectSendMessage( CoronaGroupObjectGetChild( groupObject, i ), "willDraw", &payload, sizeof( ScopeMessagePayload ) );
 			}
 		};
 
-		params.object->inherited.afterDraw = [](const void * groupObject, void * userData, const struct CoronaGraphicsToken *)
+		params.object->inherited.afterDraw = [](const void * groupObject, void * userData, const CoronaGraphicsToken *  rendererToken)
 		{
+			ScopeMessagePayload payload = { rendererToken, sScopeDrawSessionID++ };
+
 			for (int i = CoronaGroupObjectGetNumChildren( groupObject ) - 1; i; --i)
 			{
-				CoronaObjectSendMessage( CoronaGroupObjectGetChild( groupObject, i - 1 ), "didDraw", &sScopeDrawSessionID, sizeof( U32 ) );
+				CoronaObjectSendMessage( CoronaGroupObjectGetChild( groupObject, i - 1 ), "didDraw", &payload, sizeof( ScopeMessagePayload ) );
 			}
-
-			++sScopeDrawSessionID;
 		};
 	}
 
@@ -305,24 +317,24 @@ struct StencilInfo {
 	StencilSettings settings;
 };
 
-struct StencilState {
+struct SharedStencilState {
 	StencilInfo current, working;
 	std::vector<StencilInfo> stack;
 	CoronaGraphicsToken beginFrameToken, clearToken, commandToken;
+	U32 id;
 	int clear{0}; // TODO: should add some way to set this, too...
 	bool anySinceClear{false};
+	bool hasSetID{false};
 };
 
-static StencilState * InitStencilState( lua_State * L )
+static SharedStencilState * InitSharedStencilState( lua_State * L )
 {
 	static int sNonce;
 
-	auto state = GetOrNew< StencilState >( L, &sNonce, false );
+	auto state = GetOrNew< SharedStencilState >( L, &sNonce, true );
 
 	if (state.isNew)
 	{
-		new (state.object) StencilState;
-
 		CoronaCommand command = {
 			[](const U8 * data) {
 				int clear;
@@ -339,7 +351,7 @@ static StencilState * InitStencilState( lua_State * L )
 		CoronaRendererRegisterCommand( L, &state.object->commandToken, &command );
 
 		CoronaRendererOp clear = [](const CoronaGraphicsToken * rendererToken, void * userData) {
-			StencilState * state = static_cast< StencilState * >( userData );
+			SharedStencilState * state = static_cast< SharedStencilState * >( userData );
 
 			CoronaRendererIssueCommand ( rendererToken, &state->commandToken, &state->clear, sizeof( int ) );
 		};
@@ -355,49 +367,53 @@ static int StencilClearObject( lua_State * L )
 {
 	static int sNonce;
 
-	struct StencilClearData {
+	struct SharedStencilClearData {
 		CoronaGraphicsToken stateToken;
 		CoronaShapeObjectParams shapeParams;
-		StencilState * state;
+		SharedStencilState * state;
+	};
+
+	struct InstancedStencilClearData {
+		SharedStencilClearData * shared;
 		int clear;
 		bool hasClear;
 	};
 
-	auto clearData = GetOrNew< StencilClearData >(L, &sNonce );
+	auto sharedClearData = GetOrNew< SharedStencilClearData >(L, &sNonce );
 
-	if (clearData.isNew)
+	if (sharedClearData.isNew)
 	{
-		StencilState * state = InitStencilState( L );
+		SharedStencilState * state = InitSharedStencilState( L );
 
-		clearData.object->state = state;
+		sharedClearData.object->state = state;
 
-		CoronaRendererRegisterStateOp( L, &clearData.object->stateToken, [](const CoronaGraphicsToken * rendererToken, void * userData) {
-			StencilState * state = static_cast< StencilState * >( userData );
+		CoronaRendererRegisterStateOp( L, &sharedClearData.object->stateToken, [](const CoronaGraphicsToken * rendererToken, void * userData) {
+			SharedStencilState * state = static_cast< SharedStencilState * >( userData );
 
 			CoronaRendererIssueCommand( rendererToken, &state->commandToken, &state->current.clear, sizeof( int ) ); // TODO: could pass in current and working, compare...
 
 			state->anySinceClear = false; // TODO: MIGHT be usable to avoid unnecessary clears
 		}, state );
-		DisableCullAndHitTest( clearData.object->shapeParams.inherited );
-		DisableOriginalDraw( clearData.object->shapeParams.inherited );
+		DisableCullAndHitTest( sharedClearData.object->shapeParams.inherited );
+		DisableOriginalDraw( sharedClearData.object->shapeParams.inherited );
 
-		clearData.object->shapeParams.inherited.afterDraw = [](const void *, void * userData, const struct CoronaGraphicsToken * rendererToken)
+		sharedClearData.object->shapeParams.inherited.afterDraw = [](const void *, void * userData, const struct CoronaGraphicsToken * rendererToken)
 		{
-			StencilClearData * clearData = static_cast< StencilClearData *>( userData );
+			InstancedStencilClearData * clearData = static_cast< InstancedStencilClearData * >( userData );
 
 			if (clearData->hasClear)
 			{
-				clearData->state->current.clear = clearData->clear;
+				clearData->shared->state->current.clear = clearData->clear;
 			}
 
-			CoronaRendererSetOperationStateDirty( rendererToken, &clearData->stateToken );
+			CoronaRendererSetOperationStateDirty( rendererToken, &clearData->shared->stateToken );
 		};
 
-		clearData.object->shapeParams.inherited.beforeSetValue = [](const void *, void * userData, lua_State * L, const char key[], int valueIndex, int * result)
+		sharedClearData.object->shapeParams.inherited.beforeSetValue = [](const void *, void * userData, lua_State * L, const char key[], int valueIndex, int * result)
 		{
 			if (strcmp( key, "value" ) == 0)
 			{
-				StencilClearData * clearData = static_cast< StencilClearData *>( userData );
+				InstancedStencilClearData * clearData = static_cast< InstancedStencilClearData * >( userData );
 
 				if (lua_isnil( L, valueIndex ))
 				{
@@ -418,9 +434,20 @@ static int StencilClearObject( lua_State * L )
 				*result = true;
 			}
 		};
+
+		sharedClearData.object->shapeParams.inherited.onFinalize = [](const void *, void * userData)
+		{
+			delete static_cast< InstancedStencilClearData * >( userData );
+		};
 	}
 
-	return CoronaObjectsPushRect( L, clearData.object, &clearData.object->shapeParams, false );
+	InstancedStencilClearData * clearData = new InstancedStencilClearData;
+
+	memset( clearData, 0, sizeof( InstancedStencilClearData ) );
+
+	clearData->shared = sharedClearData.object;
+
+	return CoronaObjectsPushRect( L, clearData, &sharedClearData.object->shapeParams, false );
 }
 
 static int FindName( lua_State * L, int valueIndex, const char * list[] )
@@ -440,10 +467,14 @@ static int StencilStateObject( lua_State * L )
 {
 	static int sNonce;
 
-	struct StencilStateData {
+	struct SharedStencilStateData {
 		CoronaGraphicsToken commandToken, stateToken;
 		CoronaShapeObjectParams shapeParams;
-		StencilState * state;
+		SharedStencilState * state;
+	};
+
+	struct InstancedStencilStateData {
+		SharedStencilStateData * shared;
 		StencilSettings settings;
 		U8 hasFunc : 1;
 		U8 hasFuncRef : 1;
@@ -455,13 +486,13 @@ static int StencilStateObject( lua_State * L )
 		U8 hasEnabled : 1;
 	};
 
-	auto stateData = GetOrNew< StencilStateData >(L, &sNonce );
+	auto sharedStateData = GetOrNew< SharedStencilStateData >(L, &sNonce );
 
-	if (stateData.isNew)
+	if (sharedStateData.isNew)
 	{
-		StencilState * state = InitStencilState( L );
+		SharedStencilState * state = InitSharedStencilState( L );
 
-		stateData.object->state = state;
+		sharedStateData.object->state = state;
 
 		CoronaCommand command = {
 			[](const U8 * data) {
@@ -495,10 +526,10 @@ static int StencilStateObject( lua_State * L )
 			}, CopyWriter
 		};
 
-		CoronaRendererRegisterCommand( L, &stateData.object->commandToken, &command );
-		CoronaRendererRegisterStateOp( L, &stateData.object->stateToken, [](const CoronaGraphicsToken * rendererToken, void * userData) {
-			StencilStateData * stateData = static_cast< StencilStateData * >( userData );
-			StencilState * state = stateData->state;
+		CoronaRendererRegisterCommand( L, &sharedStateData.object->commandToken, &command );
+		CoronaRendererRegisterStateOp( L, &sharedStateData.object->stateToken, [](const CoronaGraphicsToken * rendererToken, void * userData) {
+			SharedStencilStateData * stateData = static_cast< SharedStencilStateData * >( userData );
+			SharedStencilState * state = stateData->state;
 
 			StencilSettings settings[] = { state->current.settings, state->working.settings };
 
@@ -508,14 +539,14 @@ static int StencilStateObject( lua_State * L )
 
 			state->current = state->working;
 			state->anySinceClear = true;
-		}, state );
-		DisableCullAndHitTest( stateData.object->shapeParams.inherited );
-		DisableOriginalDraw( stateData.object->shapeParams.inherited );
+		}, sharedStateData.object );
+		DisableCullAndHitTest( sharedStateData.object->shapeParams.inherited );
+		DisableOriginalDraw( sharedStateData.object->shapeParams.inherited );
 
-		stateData.object->shapeParams.inherited.afterDraw = [](const void *, void * userData, const struct CoronaGraphicsToken * rendererToken)
+		sharedStateData.object->shapeParams.inherited.afterDraw = [](const void *, void * userData, const struct CoronaGraphicsToken * rendererToken)
 		{
-			StencilStateData * stateData = static_cast< StencilStateData *>( userData );
-			StencilState * state = stateData->state;
+			InstancedStencilStateData * stateData = static_cast< InstancedStencilStateData * >( userData );
+			SharedStencilState * state = stateData->shared->state;
 
 			if (stateData->hasFunc)
 			{
@@ -559,13 +590,13 @@ static int StencilStateObject( lua_State * L )
 
 			if (memcmp( &state->current.settings, &state->working.settings, sizeof( StencilSettings ) ) == 0)
 			{
-				CoronaRendererSetOperationStateDirty( rendererToken, &stateData->stateToken );
+				CoronaRendererSetOperationStateDirty( rendererToken, &stateData->shared->stateToken );
 			}
 		};
 
-		stateData.object->shapeParams.inherited.beforeSetValue = [](const void *, void * userData, lua_State * L, const char key[], int valueIndex, int * result)
+		sharedStateData.object->shapeParams.inherited.beforeSetValue = [](const void *, void * userData, lua_State * L, const char key[], int valueIndex, int * result)
 		{
-			StencilStateData * stateData = static_cast< StencilStateData *>( userData );
+			InstancedStencilStateData * stateData = static_cast< InstancedStencilStateData * >( userData );
 			const char * expected = nullptr;
 
 			*result = true;
@@ -577,15 +608,10 @@ static int StencilStateObject( lua_State * L )
 					stateData->hasEnabled = false;
 				}
 
-				else if (lua_isboolean( L, valueIndex ))
+				else
 				{
 					stateData->settings.enabled = lua_toboolean( L, valueIndex );
 					stateData->hasEnabled;
-				}
-
-				else
-				{
-					expected = "boolean";
 				}
 			}
 
@@ -754,103 +780,287 @@ static int StencilStateObject( lua_State * L )
 				CoronaLuaWarning( L, "Expected %s or nil for '%s', got %s", expected, key, luaL_typename( L, valueIndex ) );
 			}
 		};
+
+		sharedStateData.object->shapeParams.inherited.onMessage = [](const void *, void * userData, const char * message, const void * payload, U32 size) {
+			InstancedStencilStateData * stateData = static_cast< InstancedStencilStateData * >( userData );
+			SharedStencilState * state = stateData->shared->state;
+
+			if (strcmp( message, "willDraw" ) == 0 || strcmp( message, "didDraw" ) == 0)
+			{
+				if (size >= sizeof( ScopeMessagePayload ) )
+				{
+					const ScopeMessagePayload * payload = static_cast< const ScopeMessagePayload * >( payload );
+
+					if ('w' == message[0] && !state->hasSetID)
+					{
+						state->stack.push_back( state->working );
+
+						state->id = payload->drawSessionID;
+						state->hasSetID = true;
+					}
+
+					else if (state->hasSetID && payload->drawSessionID == state->id)
+					{
+						state->hasSetID = false;
+
+						if (!state->stack.empty())
+						{
+							state->working = state->stack.back();
+
+							state->stack.pop_back();
+
+							if (memcmp( &state->working.settings, &state->current.settings, sizeof( StencilSettings ) ) == 0)
+							{
+								CoronaRendererSetOperationStateDirty( payload->rendererToken, &stateData->shared->stateToken );
+							}
+						}
+
+						else
+						{
+							CoronaLog( "Unbalanced 'didDraw' " );
+						}
+					}
+				}
+				
+				else
+				{
+					CoronaLog( "'%s' message's payload too small", message );
+				}
+			}
+		};
+
+		sharedStateData.object->shapeParams.inherited.onFinalize = [](const void *, void * userData)
+		{
+			delete static_cast< InstancedStencilStateData * >( userData );
+		};
 	}
 
-	return CoronaObjectsPushRect( L, stateData.object, &stateData.object->shapeParams, false );
+	InstancedStencilStateData * stateData = new InstancedStencilStateData;
+
+	memset( stateData, 0, sizeof( InstancedStencilStateData ) );
+
+	stateData->shared = sharedStateData.object;
+
+	return CoronaObjectsPushRect( L, stateData, &sharedStateData.object->shapeParams, false );
 }
-
-struct ColorMaskState {
-	bool red, green, blue, alpha;
-};
-
-struct ColorMaskChanges {
-	CoronaGraphicsToken beginFrameToken, commandToken, stateToken;
-	ColorMaskState settings;
-	U8 hasRed : 1;
-	U8 hasGreen : 1;
-	U8 hasBlue : 1;
-	U8 hasAlpha : 1;
-};
 
 static int ColorMaskObject( lua_State * L )
 {
-/*
-	static U32 sScopeDrawSessionID;
+	int sNonce;
+	
+	struct ColorMaskSettings {
+		bool red{true}, green{true}, blue{true}, alpha{true};
+	};
 
-	CoronaGroupObjectParams * params;
+	struct SharedColorMaskData {
+		CoronaGraphicsToken beginFrameToken, commandToken, stateToken;
+		CoronaShapeObjectParams shapeParams;
+		ColorMaskSettings current, working;
+		std::vector< ColorMaskSettings > stack;
+		U32 id;
+		bool hasSetID{false};
+	};
 
-	lua_pushlightuserdata( L, &sScopeDrawSessionID ); // ..., nonce
-	lua_rawget( L, LUA_REGISTRYINDEX ); // ..., scopeGroupParams?
+	struct InstancedColorMaskData {
+		SharedColorMaskData * shared;
+		ColorMaskSettings settings;
+		U8 hasRed : 1;
+		U8 hasGreen : 1;
+		U8 hasBlue : 1;
+		U8 hasAlpha : 1;
+	};
 
-	if (lua_isnil( L, -1 ))
-	{
-		params = (CoronaGroupObjectParams *)lua_newuserdata( L, sizeof( CoronaGroupObjectParams ) ); // ..., nil, scopeGroupParams
+	auto sharedColorMaskData = GetOrNew< SharedColorMaskData >( L, &sNonce, true );
 
-		memset( params, 0, sizeof( CoronaGroupObjectParams ) );
-
-		lua_pushlightuserdata( L, &sScopeDrawSessionID ); // ..., nil, scopeGroupParams, nonce
-		lua_replace( L, -2 ); // ..., nonce, scopeGroupParams
-		lua_rawset( L, LUA_REGISTRYINDEX ); // ...; registry = { ..., [nonce] = scopeGroupParams }
-
-	//	params->afterDidInsert = [](void * groupObject, void * userData, int childParentChanged ) {}
-	//	params->afterDidRemove = [](void * groupObject, void * userData ) {}
-	// ^^ TODO: double-check these
-		params->inherited.beforeDraw = [](const void * groupObject, void * userData, const struct CoronaGraphicsToken *)
-		{
-			for (int i = 0, n = CoronaGroupObjectGetNumChildren( groupObject ); i < n; ++i)
-			{
-				CoronaObjectSendMessage( CoronaGroupObjectGetChild( groupObject, i ), "willDraw", &sScopeDrawSessionID, sizeof( U32 ) );
-			}
-		};
-
-		params->inherited.afterDraw = [](const void * groupObject, void * userData, const struct CoronaGraphicsToken *)
-		{
-			for (int i = CoronaGroupObjectGetNumChildren( groupObject ) - 1; i; --i)
-			{
-				CoronaObjectSendMessage( CoronaGroupObjectGetChild( groupObject, i - 1 ), "didDraw", &sScopeDrawSessionID, sizeof( U32 ) );
-			}
-
-			++sScopeDrawSessionID;
-		};
-	}
-
-	else
-	{
-		params = (CoronaGroupObjectParams *)lua_touserdata( L, -1 );
-	}
-
-	return CoronaObjectsPushGroup( L, nullptr, params, false ); // ...[, scopeGroupParams][, scopeGroup]
-*/
-	static CoronaShapeObjectParams p;
-	static CoronaGraphicsToken commandToken, stateToken;
-
-	if (!p.inherited.afterDraw) // yet-to-be-assigned? upvalues might be preferred since statics seem to survive relaunch on Mac
+	if (sharedColorMaskData.isNew)
 	{
 		CoronaCommand command = {
 			[](const U8 * data) {
-				glClear( GL_STENCIL_BUFFER_BIT );
-				// glClearStencil(
-				// glStencilFunc( func, ref, mask )
-				// glStencilMask( mask )
-				// glStencilOp( fail, zfail, zpass );
-				return 0U; // has no payload, so no need to advance post-ID memory
-			}, DummyWriter
+				ColorMaskSettings mask;
+
+				memcpy( &mask, data, sizeof( ColorMaskSettings ) );
+
+				glColorMask( mask.red, mask.green, mask.blue, mask.alpha );
+
+				return sizeof( ColorMaskSettings );
+			}, CopyWriter
 		};
 
-		CoronaRendererRegisterCommand( L, &commandToken, &command );
-		CoronaRendererRegisterStateOp( L, &stateToken, NoPayloadState, &commandToken );
-		DisableCullAndHitTest( p.inherited );
-		DisableOriginalDraw( p.inherited );
+		CoronaRendererRegisterCommand( L, &sharedColorMaskData.object->commandToken, &command );
+		CoronaRendererRegisterBeginFrameOp( L, &sharedColorMaskData.object->beginFrameToken, [](const CoronaGraphicsToken * rendererToken, void * userData) {
+			SharedColorMaskData * colorMaskData = static_cast< SharedColorMaskData * >( userData );
+			ColorMaskSettings defSettings; // TODO: configurable?
 
-		p.inherited.afterDraw = [](const void *, void * userData, const CoronaGraphicsToken * rendererToken )
+			CoronaRendererIssueCommand ( rendererToken, &colorMaskData->commandToken, &defSettings, sizeof( ColorMaskSettings ) );
+		}, sharedColorMaskData.object );
+		CoronaRendererRegisterStateOp( L, &sharedColorMaskData.object->stateToken, [](const CoronaGraphicsToken * rendererToken, void * userData ) {
+			SharedColorMaskData * colorMaskData = static_cast< SharedColorMaskData * >( userData );
+
+			CoronaRendererIssueCommand ( rendererToken, &colorMaskData->commandToken, &colorMaskData->working, sizeof( ColorMaskSettings ) );
+		}, sharedColorMaskData.object );
+
+		DisableCullAndHitTest( sharedColorMaskData.object->shapeParams.inherited );
+		DisableOriginalDraw( sharedColorMaskData.object->shapeParams.inherited );
+
+		sharedColorMaskData.object->shapeParams.inherited.afterDraw = [](const void *, void * userData, const CoronaGraphicsToken * rendererToken)
 		{
-			const CoronaGraphicsToken * stateToken = static_cast< CoronaGraphicsToken * >( userData ); // user data we pushed rect with, see below
+			InstancedColorMaskData * colorMaskData = static_cast< InstancedColorMaskData * >( userData );
 
-			CoronaRendererSetOperationStateDirty( rendererToken, stateToken ); // cut a batch while rendering, update state (see above)
+			if (colorMaskData->hasRed)
+			{
+				colorMaskData->shared->working.red = colorMaskData->settings.red;
+			}
+
+			if (colorMaskData->hasGreen)
+			{
+				colorMaskData->shared->working.green = colorMaskData->settings.green;
+			}
+
+			if (colorMaskData->hasBlue)
+			{
+				colorMaskData->shared->working.blue = colorMaskData->settings.blue;
+			}
+
+			if (colorMaskData->hasAlpha)
+			{
+				colorMaskData->shared->working.alpha = colorMaskData->settings.alpha;
+			}
+
+			if (memcmp( &colorMaskData->shared->current, &colorMaskData->shared->working, sizeof( ColorMaskSettings ) ) == 0)
+			{
+				CoronaRendererSetOperationStateDirty( rendererToken, &colorMaskData->shared->stateToken );
+			}
+		};
+
+		sharedColorMaskData.object->shapeParams.inherited.beforeSetValue = [](const void *, void * userData, lua_State * L, const char key[], int valueIndex, int * result)
+		{
+			InstancedColorMaskData * colorMaskData = static_cast< InstancedColorMaskData * >( userData );
+
+			if (strcmp( key, "red" ) == 0 || strcmp( key, "green" ) == 0 || strcmp( key, "blue" ) == 0 || strcmp( key, "alpha" ) == 0)
+			{
+				int index = key[1] != 'l' ? key[0] < 'r' : 2 + (key[0] < 'b');
+
+				*result = true;
+
+				if (lua_isnil( L, valueIndex ))
+				{
+					switch (index)
+					{
+					case 0:
+						colorMaskData->hasRed = false;
+
+						break;
+					case 1:
+						colorMaskData->hasGreen = false;
+
+						break;
+					case 2:
+						colorMaskData->hasBlue = false;
+
+						break;
+					case 3:
+						colorMaskData->hasAlpha = false;
+
+						break;
+					default:
+						Rtt_ASSERT_NOT_REACHED();
+					}
+				}
+
+				else
+				{
+					int enable = lua_toboolean( L, valueIndex );
+
+					switch (index)
+					{
+					case 0:
+						colorMaskData->settings.red = enable;
+						colorMaskData->hasRed = true;
+
+						break;
+					case 1:
+						colorMaskData->settings.green = enable;
+						colorMaskData->hasRed = true;
+
+						break;
+					case 2:
+						colorMaskData->settings.blue = enable;
+						colorMaskData->hasRed = true;
+
+						break;
+					case 3:
+						colorMaskData->settings.alpha = enable;
+						colorMaskData->hasRed = true;
+
+						break;
+					default:
+						Rtt_ASSERT_NOT_REACHED();
+					}
+				}
+			}
+		};
+
+		sharedColorMaskData.object->shapeParams.inherited.onMessage = [](const void *, void * userData, const char * message, const void * data, U32 size)
+		{
+			SharedColorMaskData * sharedColorMaskData = static_cast< InstancedColorMaskData * >( userData )->shared;
+
+			if (strcmp( message, "willDraw" ) == 0 || strcmp( message, "didDraw" ) == 0)
+			{
+				if (size >= sizeof( ScopeMessagePayload ) )
+				{
+					const ScopeMessagePayload * payload = static_cast< const ScopeMessagePayload * >( payload );
+
+					if ('w' == message[0] && !sharedColorMaskData->hasSetID)
+					{
+						sharedColorMaskData->stack.push_back( sharedColorMaskData->working );
+
+						sharedColorMaskData->id = payload->drawSessionID;
+						sharedColorMaskData->hasSetID = true;
+					}
+
+					else if (sharedColorMaskData->hasSetID && payload->drawSessionID == sharedColorMaskData->id)
+					{
+						sharedColorMaskData->hasSetID = false;
+
+						if (!sharedColorMaskData->stack.empty())
+						{
+							sharedColorMaskData->working = sharedColorMaskData->stack.back();
+
+							sharedColorMaskData->stack.pop_back();
+
+							if (memcmp( &sharedColorMaskData->working, &sharedColorMaskData->current, sizeof( ColorMaskSettings ) ) == 0)
+							{
+								CoronaRendererSetOperationStateDirty( payload->rendererToken, &sharedColorMaskData->stateToken );
+							}
+						}
+
+						else
+						{
+							CoronaLog( "Unbalanced 'didDraw' " );
+						}
+					}
+				}
+				
+				else
+				{
+					CoronaLog( "'%s' message's payload too small", message );
+				}
+			}
+		};
+
+		sharedColorMaskData.object->shapeParams.inherited.onFinalize = [](const void *, void * userData)
+		{
+			delete static_cast< InstancedColorMaskData * >( userData );
 		};
 	}
 
-	CoronaObjectsPushRect( L, &stateToken, &p, false ); // second param = userdata, last param = p is not a temporary (so don't make an internal copy)
+	InstancedColorMaskData * colorMaskData = new InstancedColorMaskData;
+
+	memset( colorMaskData, 0, sizeof( InstancedColorMaskData ) );
+
+	colorMaskData->shared = sharedColorMaskData.object;
+
+	CoronaObjectsPushRect( L, colorMaskData, &sharedColorMaskData.object->shapeParams, false );
 
 	return 0;
 }
