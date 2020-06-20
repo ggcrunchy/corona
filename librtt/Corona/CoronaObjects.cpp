@@ -424,14 +424,14 @@ Copy3 (float * dst, const float * src)
 		CORONA_OBJECTS_METHOD_WITH_ARGS( Scale, TO_PARAMS, sx, sy, isNewValue )		\
 	}																				\
 																					\
-	virtual void SendMessage( const char * message, const void * payload, U32 size )	\
-	{																					\
-		if (( TO_PARAMS ).onMessage)													\
-		{																				\
-			( TO_PARAMS ).onMessage( FIRST_ARGS, message, payload, size );				\
-		}																				\
-	}																					\
-																						\
+	virtual void SendMessage( const char * message, const void * payload, U32 size ) const	\
+	{																						\
+		if (( TO_PARAMS ).onMessage)														\
+		{																					\
+			( TO_PARAMS ).onMessage( FIRST_ARGS, message, payload, size );					\
+		}																					\
+	}																						\
+																							\
 	virtual void Translate( Rtt::Real deltaX, Rtt::Real deltaY )				\
 	{																			\
 		CORONA_OBJECTS_METHOD_WITH_ARGS( Translate, TO_PARAMS, deltaX, deltaY )	\
@@ -457,9 +457,9 @@ Copy3 (float * dst, const float * src)
 																\
 	virtual const Rtt::LuaProxyVTable& ProxyVTable() const;	\
 															\
-	PARAMS_TYPE * fParams;	\
-	int fRef;				\
-	void * fUserData
+	PARAMS_TYPE * fParams;		\
+	int fRef;					\
+	mutable void * fUserData
 
 /**
 TODO
@@ -497,13 +497,13 @@ Group2::Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
 CORONA_OBJECTS_VTABLE( Group, Group, resolved.fParams->inherited )
 
 static Rtt::GroupObject *
-NewGroup2 (Rtt_Allocator * allocator, Rtt::StageObject * stageObject)
+NewGroup2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
 {
     return Rtt_NEW( allocator, Group2( allocator, NULL ) );
 }
 
 CORONA_API
-int CoronaObjectsPushGroup (lua_State * L, void * userData, const CoronaGroupObjectParams * params, int temporaryParams)
+int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaGroupObjectParams * params, int temporaryParams )
 {
 	CORONA_OBJECTS_PUSH( Group, CoronaGroupObjectParams, object->fParams->inherited );
 }
@@ -577,13 +577,13 @@ NewSnapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real widt
 }
 
 CORONA_API
-int CoronaObjectsPushSnapshot (lua_State * L, void * userData, const CoronaSnapshotObjectParams * params, int temporaryParams)
+int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaSnapshotObjectParams * params, int temporaryParams )
 {
 	CORONA_OBJECTS_PUSH( Snapshot, CoronaSnapshotObjectParams, object->fParams->inherited );
 }
 
 CORONA_API
-int CoronaObjectsShouldDraw (void * object, int * shouldDraw)
+int CoronaObjectsShouldDraw( const void * object, int * shouldDraw )
 {
     // TODO: look for proxy on stack, validate object?
     // If so, then *shouldDraw = ((DisplayObject *)object)->shouldDraw()
@@ -592,29 +592,29 @@ int CoronaObjectsShouldDraw (void * object, int * shouldDraw)
 }
 
 CORONA_API
-void * CoronaObjectGetParent( void * object )
+const void * CoronaObjectGetParent( const void * object )
 {
-	return static_cast< Rtt::DisplayObject *>( object )->GetParent(); // TODO: validation?
+	return static_cast< const Rtt::DisplayObject *>( object )->GetParent(); // TODO: validation?
 }
 
 CORONA_API
-void * CoronaGroupObjectGetChild( void * groupObject, int index )
+const void * CoronaGroupObjectGetChild( const void * groupObject, int index )
 {
-	Rtt::GroupObject * group = static_cast< Rtt::GroupObject *>( groupObject );
+	const Rtt::GroupObject * group = static_cast< const Rtt::GroupObject *>( groupObject );
 
 	return (index >= 0 && index < group->NumChildren()) ? &group->ChildAt( index ) : nullptr;
 }
 
 CORONA_API
-int CoronaGroupObjectGetNumChildren( void * groupObject )
+int CoronaGroupObjectGetNumChildren( const void * groupObject )
 {
-	return static_cast< Rtt::GroupObject *>( groupObject )->NumChildren();
+	return static_cast< const Rtt::GroupObject *>( groupObject )->NumChildren();
 }
 
 CORONA_API
-int CoronaObjectSendMessage( void * object, const char * message, const void * payload, unsigned int size )
+int CoronaObjectSendMessage( const void * object, const char * message, const void * payload, unsigned int size )
 {
-	static_cast< Rtt::DisplayObject *>( object )->SendMessage( message, payload, size );
+	static_cast< const Rtt::DisplayObject *>( object )->SendMessage( message, payload, size );
 
 	return 1;
 }

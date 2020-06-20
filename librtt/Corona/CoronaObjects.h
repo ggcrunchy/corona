@@ -225,18 +225,18 @@ CORONA_API
 int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaSnapshotObjectParams * params, int temporaryParams ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaObjectsShouldDraw( void * object, int * shouldDraw ) CORONA_PUBLIC_SUFFIX;
+int CoronaObjectsShouldDraw( const void * object, int * shouldDraw ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-void * CoronaObjectGetParent( void * object ) CORONA_PUBLIC_SUFFIX;
+const void * CoronaObjectGetParent( const void * object ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-void * CoronaGroupObjectGetChild( void * groupObject, int index ) CORONA_PUBLIC_SUFFIX;
+const void * CoronaGroupObjectGetChild( const void * groupObject, int index ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaGroupObjectGetNumChildren( void * groupObject ) CORONA_PUBLIC_SUFFIX;
+int CoronaGroupObjectGetNumChildren( const void * groupObject ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaObjectSendMessage ( void * object, const char * message, const void * payload, unsigned int size ) CORONA_PUBLIC_SUFFIX;
+int CoronaObjectSendMessage( const void * object, const char * message, const void * payload, unsigned int size ) CORONA_PUBLIC_SUFFIX;
 
 #endif // _CoronaObjects_H__

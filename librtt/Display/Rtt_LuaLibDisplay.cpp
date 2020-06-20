@@ -190,77 +190,637 @@ DisplayLibrary::~DisplayLibrary()
 #include "Renderer/Rtt_GL.h"
 #include <vector>
 
-static void EarlyOutPredicate (const void *, void *, int * result)
+template<typename T> struct Boxed {
+	T * object;
+	bool isNew;
+};
+
+template<typename T> Boxed< T >
+GetOrNew( lua_State * L, void * nonce, bool clear = true )
+{
+	Boxed< T > boxed;
+
+	lua_pushlightuserdata( L, nonce ); // ..., nonce
+	lua_rawget( L, LUA_REGISTRYINDEX ); // ..., object?
+
+	if (!lua_isnil( L, -1 ))
+	{
+		boxed.object = (T *)lua_touserdata( L, -1 );
+		boxed.isNew = false;
+	}
+
+	else
+	{
+		lua_pushlightuserdata( L, nonce ); // ..., nil, nonce
+
+		boxed.object = (T *)lua_newuserdata( L, sizeof( T ) ); // ..., nil, nonce, object
+		boxed.isNew = true;
+
+		if (clear)
+		{
+			memset( boxed.object, 0, sizeof( T ) );
+		}
+
+		lua_rawset( L, LUA_REGISTRYINDEX ); // ..., nil; registry = { ..., [nonce] = object }
+	}
+
+	lua_pop( L, 1 ); // ...
+
+	return boxed;
+}
+
+static int ScopeGroupObject( lua_State * L )
+{
+	static U32 sScopeDrawSessionID;
+
+	auto params = GetOrNew< CoronaGroupObjectParams >( L, &sScopeDrawSessionID );
+
+	if (params.isNew)
+	{
+		memset( params.object, 0, sizeof( CoronaGroupObjectParams ) );
+
+	//	params->afterDidInsert = [](void * groupObject, void * userData, int childParentChanged ) {}
+	//	params->afterDidRemove = [](void * groupObject, void * userData ) {}
+	// ^^ TODO: double-check these
+		params.object->inherited.beforeDraw = [](const void * groupObject, void * userData, const struct CoronaGraphicsToken *)
+		{
+			for (int i = 0, n = CoronaGroupObjectGetNumChildren( groupObject ); i < n; ++i)
+			{
+				CoronaObjectSendMessage( CoronaGroupObjectGetChild( groupObject, i ), "willDraw", &sScopeDrawSessionID, sizeof( U32 ) );
+			}
+		};
+
+		params.object->inherited.afterDraw = [](const void * groupObject, void * userData, const struct CoronaGraphicsToken *)
+		{
+			for (int i = CoronaGroupObjectGetNumChildren( groupObject ) - 1; i; --i)
+			{
+				CoronaObjectSendMessage( CoronaGroupObjectGetChild( groupObject, i - 1 ), "didDraw", &sScopeDrawSessionID, sizeof( U32 ) );
+			}
+
+			++sScopeDrawSessionID;
+		};
+	}
+
+	return CoronaObjectsPushGroup( L, nullptr, params.object, false ); // ...[, scopeGroup]
+}
+
+static void EarlyOutPredicate( const void *, void *, int * result )
 {
 	*result = false;
 }
 
-static void DisableCullAndHitTest (CoronaDisplayObjectParams & params)
+static void DisableCullAndHitTest( CoronaDisplayObjectParams & params )
 {
 	params.beforeCanCull = EarlyOutPredicate;
 	params.beforeCanHitTest = EarlyOutPredicate;
 }
 
-static void DisableOriginalDraw (CoronaDisplayObjectParams & params)
+static void DisableOriginalDraw( CoronaDisplayObjectParams & params )
 {
 	params.ignoreOriginalDraw = true;
 }
 
-static void DummyWriter (U8 *, const void *, U32) {}
+static void CopyWriter( U8 * out, const void * data, U32 size )
+{
+	memcpy( out, data, size );
+}
 
-static void NoPayloadState ( const CoronaGraphicsToken * rendererToken, void * userData )
+static void DummyWriter( U8 *, const void *, U32 ) {}
+
+static void NoPayloadState( const CoronaGraphicsToken * rendererToken, void * userData )
 {
 	const CoronaGraphicsToken * command = static_cast< CoronaGraphicsToken * >( userData );
 
 	CoronaRendererIssueCommand( rendererToken, command, nullptr, 0U );
 }
 
-struct StencilInfo {
-	int func{GL_ALWAYS}, func_ref{0}, fail{GL_KEEP}, zfail{GL_KEEP}, zpass{GL_KEEP};
-	unsigned int func_mask{~0U}, mask{~0U};
+struct StencilSettings {
+	int func{GL_ALWAYS}, funcRef{0}, fail{GL_KEEP}, zfail{GL_KEEP}, zpass{GL_KEEP};
+	unsigned int funcMask{~0U}, mask{~0U};
 	bool enabled{false};
+};
+
+struct StencilInfo {
+	int clear{0};
+	StencilSettings settings;
 };
 
 struct StencilState {
 	StencilInfo current, working;
 	std::vector<StencilInfo> stack;
-	CoronaGraphicsToken beginFrameToken, stateToken;
-	int clear, scopeID;
+	CoronaGraphicsToken beginFrameToken, clearToken, commandToken;
+	int clear{0}; // TODO: should add some way to set this, too...
+	bool anySinceClear{false};
 };
 
-struct StencilChanges {
-	int clear, func, func_ref, fail, zfail, zpass;
-	unsigned int func_mask, mask;
-	bool enabled;
-	U8 hasFunc : 1;
-	U8 hasFuncRef : 1;
-	U8 hasFail : 1;
-	U8 hasZFail : 1;
-	U8 hasZPass : 1;
-	U8 hasFuncMask : 1;
-	U8 hasMask : 1;
-	U8 hasEnabled : 1;
-};
-
-struct StencilClearChanges {
-	int clear;
-	bool hasClear;
-};
-
-static int ScopeGroup( lua_State * L )
+static StencilState * InitStencilState( lua_State * L )
 {
-	// beforeDraw: increment ID
-		// for each object
-			// Send "begin scope" message with ID payload
-			// Probably only first object of a given type, e.g. stencil state, will want to handle the message (scopeID ! id)
-	// afterDraw:
-		// for each object (in reverse)
-			// Send "end scope" message with ID payload
-			// Probably only last object of a given type will want to handle the message (scopeID == id)
+	static int sNonce;
+
+	auto state = GetOrNew< StencilState >( L, &sNonce, false );
+
+	if (state.isNew)
+	{
+		new (state.object) StencilState;
+
+		CoronaCommand command = {
+			[](const U8 * data) {
+				int clear;
+
+				memcpy( &clear, data, sizeof( int ) );
+
+				glClearStencil( GLint( clear ) ); // TODO: is this expensive? if so, avoid when possible...
+				glClear( GL_STENCIL_BUFFER_BIT );
+
+				return sizeof( int );
+			}, CopyWriter
+		};
+
+		CoronaRendererRegisterCommand( L, &state.object->commandToken, &command );
+
+		CoronaRendererOp clear = [](const CoronaGraphicsToken * rendererToken, void * userData) {
+			StencilState * state = static_cast< StencilState * >( userData );
+
+			CoronaRendererIssueCommand ( rendererToken, &state->commandToken, &state->clear, sizeof( int ) );
+		};
+		
+		CoronaRendererRegisterBeginFrameOp( L, &state.object->beginFrameToken, clear, state.object );
+		CoronaRendererRegisterClearOp( L, &state.object->clearToken, clear, state.object );
+	}
+
+	return state.object;
 }
 
-static int BLARGH( lua_State * L )
+static int StencilClearObject( lua_State * L )
 {
+	static int sNonce;
+
+	struct StencilClearData {
+		CoronaGraphicsToken stateToken;
+		CoronaShapeObjectParams shapeParams;
+		StencilState * state;
+		int clear;
+		bool hasClear;
+	};
+
+	auto clearData = GetOrNew< StencilClearData >(L, &sNonce );
+
+	if (clearData.isNew)
+	{
+		StencilState * state = InitStencilState( L );
+
+		clearData.object->state = state;
+
+		CoronaRendererRegisterStateOp( L, &clearData.object->stateToken, [](const CoronaGraphicsToken * rendererToken, void * userData) {
+			StencilState * state = static_cast< StencilState * >( userData );
+
+			CoronaRendererIssueCommand( rendererToken, &state->commandToken, &state->current.clear, sizeof( int ) ); // TODO: could pass in current and working, compare...
+
+			state->anySinceClear = false; // TODO: MIGHT be usable to avoid unnecessary clears
+		}, state );
+		DisableCullAndHitTest( clearData.object->shapeParams.inherited );
+		DisableOriginalDraw( clearData.object->shapeParams.inherited );
+
+		clearData.object->shapeParams.inherited.afterDraw = [](const void *, void * userData, const struct CoronaGraphicsToken * rendererToken)
+		{
+			StencilClearData * clearData = static_cast< StencilClearData *>( userData );
+
+			if (clearData->hasClear)
+			{
+				clearData->state->current.clear = clearData->clear;
+			}
+
+			CoronaRendererSetOperationStateDirty( rendererToken, &clearData->stateToken );
+		};
+
+		clearData.object->shapeParams.inherited.beforeSetValue = [](const void *, void * userData, lua_State * L, const char key[], int valueIndex, int * result)
+		{
+			if (strcmp( key, "value" ) == 0)
+			{
+				StencilClearData * clearData = static_cast< StencilClearData *>( userData );
+
+				if (lua_isnil( L, valueIndex ))
+				{
+					clearData->hasClear = false;
+				}
+
+				else if (lua_isnumber( L, valueIndex ))
+				{
+					clearData->clear = lua_tointeger( L, valueIndex ); // TODO: could validate
+					clearData->hasClear = true;
+				}
+
+				else
+				{
+					CoronaLuaWarning( L, "Expected number or nil for 'value', got %s", luaL_typename( L, valueIndex ) );
+				}
+
+				*result = true;
+			}
+		};
+	}
+
+	return CoronaObjectsPushRect( L, clearData.object, &clearData.object->shapeParams, false );
+}
+
+static int FindName( lua_State * L, int valueIndex, const char * list[] )
+{
+	const char * name = lua_tostring( L, valueIndex );
+	int index = 0;
+
+	while (list[index] && strcmp( list[index], name ) != 0 )
+	{
+		++index;
+	}
+
+	return index;
+}
+
+static int StencilStateObject( lua_State * L )
+{
+	static int sNonce;
+
+	struct StencilStateData {
+		CoronaGraphicsToken commandToken, stateToken;
+		CoronaShapeObjectParams shapeParams;
+		StencilState * state;
+		StencilSettings settings;
+		U8 hasFunc : 1;
+		U8 hasFuncRef : 1;
+		U8 hasFail : 1;
+		U8 hasZFail : 1;
+		U8 hasZPass : 1;
+		U8 hasFuncMask : 1;
+		U8 hasMask : 1;
+		U8 hasEnabled : 1;
+	};
+
+	auto stateData = GetOrNew< StencilStateData >(L, &sNonce );
+
+	if (stateData.isNew)
+	{
+		StencilState * state = InitStencilState( L );
+
+		stateData.object->state = state;
+
+		CoronaCommand command = {
+			[](const U8 * data) {
+				StencilSettings settings[2];
+
+				memcpy( settings, data, sizeof( settings ) );
+
+				const StencilSettings & current = settings[0], & working = settings[1];
+
+				if (current.func != working.func || current.funcRef != working.funcRef || current.funcMask != working.funcMask)
+				{
+					glStencilFunc( working.func, working.funcRef, working.funcMask );
+				}
+
+				if (current.mask != working.mask)
+				{
+					glStencilMask( working.mask );
+				}
+
+				if (current.fail != working.fail || current.zfail != working.zfail || current.zpass != working.zpass)
+				{
+					glStencilOp( working.fail, working.zfail, working.zpass );
+				}
+
+				if (current.enabled != working.enabled)
+				{
+					(working.enabled ? glEnable : glDisable)( GL_STENCIL_TEST );
+				}
+
+				return sizeof( StencilSettings );
+			}, CopyWriter
+		};
+
+		CoronaRendererRegisterCommand( L, &stateData.object->commandToken, &command );
+		CoronaRendererRegisterStateOp( L, &stateData.object->stateToken, [](const CoronaGraphicsToken * rendererToken, void * userData) {
+			StencilStateData * stateData = static_cast< StencilStateData * >( userData );
+			StencilState * state = stateData->state;
+
+			StencilSettings settings[] = { state->current.settings, state->working.settings };
+
+			CoronaRendererIssueCommand( rendererToken, &stateData->commandToken, settings, sizeof( settings ) );
+			CoronaRendererEnableClear( rendererToken, &state->clearToken, true );
+			CoronaRendererScheduleForNextFrame( rendererToken, &state->beginFrameToken, kBeginFrame_Schedule );
+
+			state->current = state->working;
+			state->anySinceClear = true;
+		}, state );
+		DisableCullAndHitTest( stateData.object->shapeParams.inherited );
+		DisableOriginalDraw( stateData.object->shapeParams.inherited );
+
+		stateData.object->shapeParams.inherited.afterDraw = [](const void *, void * userData, const struct CoronaGraphicsToken * rendererToken)
+		{
+			StencilStateData * stateData = static_cast< StencilStateData *>( userData );
+			StencilState * state = stateData->state;
+
+			if (stateData->hasFunc)
+			{
+				state->working.settings.func = stateData->settings.func;
+			}
+
+			if (stateData->hasFuncRef)
+			{
+				state->working.settings.funcRef = stateData->settings.funcRef;
+			}
+
+			if (stateData->hasFuncMask)
+			{
+				state->working.settings.funcMask = stateData->settings.funcMask;
+			}
+
+			if (stateData->hasMask)
+			{
+				state->working.settings.mask = stateData->settings.mask;
+			}
+
+			if (stateData->hasFail)
+			{
+				state->working.settings.fail = stateData->settings.fail;
+			}
+
+			if (stateData->hasZFail)
+			{
+				state->working.settings.zfail = stateData->settings.zfail;
+			}
+
+			if (stateData->hasZPass)
+			{
+				state->working.settings.zpass = stateData->settings.zpass;
+			}
+
+			if (stateData->hasEnabled)
+			{
+				state->working.settings.enabled = stateData->settings.enabled;
+			}
+
+			if (memcmp( &state->current.settings, &state->working.settings, sizeof( StencilSettings ) ) == 0)
+			{
+				CoronaRendererSetOperationStateDirty( rendererToken, &stateData->stateToken );
+			}
+		};
+
+		stateData.object->shapeParams.inherited.beforeSetValue = [](const void *, void * userData, lua_State * L, const char key[], int valueIndex, int * result)
+		{
+			StencilStateData * stateData = static_cast< StencilStateData *>( userData );
+			const char * expected = nullptr;
+
+			*result = true;
+
+			if (strcmp( key, "enabled" ) == 0)
+			{
+				if (lua_isnil( L, valueIndex ))
+				{
+					stateData->hasEnabled = false;
+				}
+
+				else if (lua_isboolean( L, valueIndex ))
+				{
+					stateData->settings.enabled = lua_toboolean( L, valueIndex );
+					stateData->hasEnabled;
+				}
+
+				else
+				{
+					expected = "boolean";
+				}
+			}
+
+			else if (strcmp( key, "func" ) == 0)
+			{
+				if (lua_isnil( L, valueIndex ))
+				{
+					stateData->hasFunc = false;
+				}
+
+				else if (lua_isstring( L, valueIndex ))
+				{
+					const char * names[] = { "NEVER", "LESS", "EQUAL", "GREATER", "GEQUAL", "LEQUAL", "NOTEQUAL", "ALWAYS", nullptr };
+					int index = FindName( L, valueIndex, names );
+
+					if (names[index])
+					{
+						const GLenum funcs[] = { GL_NEVER, GL_LESS, GL_EQUAL, GL_GREATER, GL_GEQUAL, GL_LEQUAL, GL_NOTEQUAL, GL_ALWAYS };
+
+						stateData->settings.func = funcs[index];
+						stateData->hasFunc = true;
+					}
+
+					else
+					{
+						CoronaLuaWarning( L, "'%s' is not a supported stencil function", lua_tostring( L, valueIndex ) );
+					}
+				}
+
+				else
+				{
+					expected = "string";
+				}
+			}
+
+			else if (strcmp( key, "fail" ) == 0 || strcmp( key, "zfail" ) == 0 || strcmp( key, "zpass" ) == 0)
+			{
+				int index = ('z' == key[0]) + ('p' == key[1]);
+
+				if (lua_isnil( L, valueIndex ))
+				{
+					switch (index)
+					{
+					case 0:
+						stateData->hasFail = false;
+
+						break;
+					case 1:
+						stateData->hasZFail = false;
+
+						break;
+					case 2:
+						stateData->hasZPass = false;
+
+						break;
+					default:
+						Rtt_ASSERT_NOT_REACHED();
+					}
+				}
+
+				else if (lua_isstring( L, valueIndex ))
+				{
+					const char * names[] = { "KEEP", "ZERO", "REPLACE", "INCR", "INCR_WRAP", "DECR", "DECR_WRAP", "INVERT", nullptr };
+					int index = FindName( L, valueIndex, names );
+
+					if (names[index])
+					{
+						const GLenum ops[] = { GL_KEEP, GL_ZERO, GL_REPLACE, GL_INCR, GL_INCR_WRAP, GL_DECR, GL_DECR_WRAP, GL_INVERT };
+
+						switch (index)
+						{
+						case 0:							
+							stateData->settings.fail = ops[index];
+							stateData->hasFail = true;
+
+							break;
+						case 1:
+							stateData->settings.zfail = ops[index];
+							stateData->hasZFail = true;
+
+							break;
+						case 2:
+							stateData->settings.zpass = ops[index];
+							stateData->hasZPass = true;
+
+							break;
+						default:
+							Rtt_ASSERT_NOT_REACHED();
+						}
+					}
+
+					else
+					{
+						CoronaLuaWarning( L, "'%s' is not a supported stencil op", lua_tostring( L, valueIndex ) );
+					}
+				}
+
+				else
+				{
+					expected = "string";
+				}
+			}
+
+			else if (strcmp( key, "funcRef" ) == 0 || strcmp( key, "funcMask" ) == 0 || strcmp( key, "mask" ) == 0)
+			{
+				int index = 'f' == key[0] ? 'M' == key[4] : 2;
+
+				if (lua_isnil( L, valueIndex ))
+				{
+					switch (index)
+					{
+					case 0:
+						stateData->hasFuncRef = false;
+
+						break;
+					case 1:
+						stateData->hasFuncMask = false;
+
+						break;
+					case 2:
+						stateData->hasMask = false;
+
+						break;
+					default:
+						Rtt_ASSERT_NOT_REACHED();
+					}
+				}
+
+				else if (lua_isnumber( L, valueIndex ))
+				{
+					switch (index)
+					{
+					case 0:
+						stateData->settings.funcRef = (int)lua_tointeger( L, valueIndex );
+						stateData->hasFuncRef = true;
+
+						break;
+					case 1:
+						stateData->settings.funcMask = (unsigned int)lua_tonumber( L, valueIndex );
+						stateData->hasFuncMask = true;
+
+						break;
+					case 2:
+						stateData->settings.mask = (unsigned int)lua_tonumber( L, valueIndex );
+						stateData->hasMask = true;
+
+						break;
+					default:
+						Rtt_ASSERT_NOT_REACHED();
+					}
+				}
+
+				else
+				{
+					expected = "number";
+				}
+			}
+
+			else
+			{
+				*result = false;
+			}
+
+			if (expected)
+			{
+				CoronaLuaWarning( L, "Expected %s or nil for '%s', got %s", expected, key, luaL_typename( L, valueIndex ) );
+			}
+		};
+	}
+
+	return CoronaObjectsPushRect( L, stateData.object, &stateData.object->shapeParams, false );
+}
+
+struct ColorMaskState {
+	bool red, green, blue, alpha;
+};
+
+struct ColorMaskChanges {
+	CoronaGraphicsToken beginFrameToken, commandToken, stateToken;
+	ColorMaskState settings;
+	U8 hasRed : 1;
+	U8 hasGreen : 1;
+	U8 hasBlue : 1;
+	U8 hasAlpha : 1;
+};
+
+static int ColorMaskObject( lua_State * L )
+{
+/*
+	static U32 sScopeDrawSessionID;
+
+	CoronaGroupObjectParams * params;
+
+	lua_pushlightuserdata( L, &sScopeDrawSessionID ); // ..., nonce
+	lua_rawget( L, LUA_REGISTRYINDEX ); // ..., scopeGroupParams?
+
+	if (lua_isnil( L, -1 ))
+	{
+		params = (CoronaGroupObjectParams *)lua_newuserdata( L, sizeof( CoronaGroupObjectParams ) ); // ..., nil, scopeGroupParams
+
+		memset( params, 0, sizeof( CoronaGroupObjectParams ) );
+
+		lua_pushlightuserdata( L, &sScopeDrawSessionID ); // ..., nil, scopeGroupParams, nonce
+		lua_replace( L, -2 ); // ..., nonce, scopeGroupParams
+		lua_rawset( L, LUA_REGISTRYINDEX ); // ...; registry = { ..., [nonce] = scopeGroupParams }
+
+	//	params->afterDidInsert = [](void * groupObject, void * userData, int childParentChanged ) {}
+	//	params->afterDidRemove = [](void * groupObject, void * userData ) {}
+	// ^^ TODO: double-check these
+		params->inherited.beforeDraw = [](const void * groupObject, void * userData, const struct CoronaGraphicsToken *)
+		{
+			for (int i = 0, n = CoronaGroupObjectGetNumChildren( groupObject ); i < n; ++i)
+			{
+				CoronaObjectSendMessage( CoronaGroupObjectGetChild( groupObject, i ), "willDraw", &sScopeDrawSessionID, sizeof( U32 ) );
+			}
+		};
+
+		params->inherited.afterDraw = [](const void * groupObject, void * userData, const struct CoronaGraphicsToken *)
+		{
+			for (int i = CoronaGroupObjectGetNumChildren( groupObject ) - 1; i; --i)
+			{
+				CoronaObjectSendMessage( CoronaGroupObjectGetChild( groupObject, i - 1 ), "didDraw", &sScopeDrawSessionID, sizeof( U32 ) );
+			}
+
+			++sScopeDrawSessionID;
+		};
+	}
+
+	else
+	{
+		params = (CoronaGroupObjectParams *)lua_touserdata( L, -1 );
+	}
+
+	return CoronaObjectsPushGroup( L, nullptr, params, false ); // ...[, scopeGroupParams][, scopeGroup]
+*/
 	static CoronaShapeObjectParams p;
 	static CoronaGraphicsToken commandToken, stateToken;
 
@@ -294,6 +854,7 @@ static int BLARGH( lua_State * L )
 
 	return 0;
 }
+
 // /STEVE CHANGE
 int
 DisplayLibrary::Open( lua_State *L )
@@ -337,7 +898,9 @@ DisplayLibrary::Open( lua_State *L )
 		{ "setDrawMode", setDrawMode },
 		{ "getSafeAreaInsets", getSafeAreaInsets },
 // STEVE CHANGE (TEST HACK!!!!!)
-		{ "blargh", BLARGH },
+		{ "ScopeGroupObject", ScopeGroupObject },
+		{ "StencilClearObject", StencilClearObject },
+		{ "StencilStateObject", StencilStateObject },
 // /STEVE CHANGE
 		{ NULL, NULL }
 	};
