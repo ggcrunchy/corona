@@ -26,14 +26,69 @@
 
 #include "CoronaGraphicsTypes.h"
 
-static bool
-ValuePrologue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[], void * userData, const CoronaDisplayObjectParams & params, int * result )
-{
-	if (params.beforeValue)
-	{
-		params.beforeValue( &object, userData, L, key, result );
+#include <algorithm>
+#include <vector>
+#include <stddef.h>
 
-		bool canEarlyOut = !params.valueDisallowEarlyOut, expectsNonZero = !params.valueEarlyOutIfZero;
+#define SIZE_MINUS_OFFSET(TYPE, OFFSET) sizeof( TYPE ) - OFFSET
+#define OFFSET_OF_MEMBER(NAME, MEMBER_NAME) offsetof( CoronaObject##NAME##Params, MEMBER_NAME )
+#define SIZE_FROM_MEMBER(NAME, MEMBER_NAME) struct { unsigned char _[SIZE_MINUS_OFFSET( CoronaObject##NAME##Params, OFFSET_OF_MEMBER( NAME, MEMBER_NAME ) ) ]; } NAME
+#define SIZE_AFTER_HEADER(NAME) SIZE_FROM_MEMBER( NAME, ignoreOriginal )
+#define OFFSET_AFTER_HEADER(NAME) OFFSET_OF_MEMBER( NAME, ignoreOriginal )
+
+union GenericParams {
+	SIZE_AFTER_HEADER( Basic );
+	SIZE_AFTER_HEADER( AddedToParent );
+	SIZE_AFTER_HEADER( DidInsert );
+	SIZE_AFTER_HEADER( Matrix );
+	SIZE_AFTER_HEADER( Draw );
+	SIZE_AFTER_HEADER( RectResult );
+	SIZE_AFTER_HEADER( RemovedFromParent );
+	SIZE_AFTER_HEADER( Rotate );
+	SIZE_AFTER_HEADER( Scale );
+	SIZE_AFTER_HEADER( Translate );
+
+	SIZE_AFTER_HEADER( BooleanResult );
+	SIZE_AFTER_HEADER( BooleanResultPoint );
+	SIZE_AFTER_HEADER( BooleanResultMatrix );
+
+	SIZE_AFTER_HEADER( SetValue );
+	SIZE_AFTER_HEADER( Value );
+
+	SIZE_FROM_MEMBER( Lifetime, action );
+	SIZE_FROM_MEMBER( OnMessage, action );
+};
+
+template<typename T> T
+FindParams( const unsigned char * stream, unsigned short method, size_t offset )
+{
+	static_assert( kAugmentedMethod_Count < 256, "Stream assumes byte-sized methods" );
+
+	unsigned int count = *stream++;
+	
+	T out = {};
+
+	for (unsigned int i = 0, n = (std::min)(count, method); i < n; ++i) // methods are sorted, so cannot take more than `method` steps
+	{
+		if (stream[i] == method)
+		{
+			memcpy( reinterpret_cast< unsigned char *>( out ) + offset, stream + count + i * sizeof( GenericParams ), SIZE_MINUS_OFFSET( T, offset ) );
+
+			break;
+		}
+	}
+
+	return out;
+}
+
+static bool
+ValuePrologue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[], void * userData, const CoronaObjectValueParams & params, int * result )
+{
+	if (params.before)
+	{
+		params.before( &object, userData, L, key, result );
+
+		bool canEarlyOut = !params.disallowEarlyOut, expectsNonZero = !params.earlyOutIfZero;
 
 		if (canEarlyOut && expectsNonZero == !!result)
 		{
@@ -45,24 +100,24 @@ ValuePrologue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[]
 }
 
 static int
-ValueEpilogue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[], void * userData, const CoronaDisplayObjectParams & params, int result )
+ValueEpilogue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[], void * userData, const CoronaObjectValueParams & params, int result )
 {
-	if (params.afterValue)
+	if (params.after)
 	{
-		params.afterValue( &object, userData, L, key, &result ); // n.b. `result` previous values still on stack
+		params.after( &object, userData, L, key, &result ); // n.b. `result` previous values still on stack
 	}
 
 	return result;
 }
 
 static bool
-SetValuePrologue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], int valueIndex, void * userData, const CoronaDisplayObjectParams & params, int * result )
+SetValuePrologue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], int valueIndex, void * userData, const CoronaObjectSetValueParams & params, int * result )
 {
-	if (params.beforeSetValue)
+	if (params.before)
 	{
-		params.beforeSetValue( &object, userData, L, key, valueIndex, result );
+		params.before( &object, userData, L, key, valueIndex, result );
 
-		bool canEarlyOut = !params.setValueDisallowEarlyOut;
+		bool canEarlyOut = !params.disallowEarlyOut;
 
 		if (canEarlyOut && result)
 		{
@@ -74,18 +129,18 @@ SetValuePrologue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], i
 }
 
 static bool
-SetValueEpilogue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], int valueIndex, void * userData, const CoronaDisplayObjectParams & params, int result )
+SetValueEpilogue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], int valueIndex, void * userData, const CoronaObjectSetValueParams & params, int result )
 {
-	if (params.afterSetValue)
+	if (params.after)
 	{
-		params.afterSetValue( &object, userData, L, key, valueIndex, &result );
+		params.after( &object, userData, L, key, valueIndex, &result );
 	}
 
 	return result;
 }
 
-#define CORONA_OBJECTS_VTABLE(OBJECT_KIND, PROXY_KIND, TO_PARAMS)	\
-								 									\
+#define CORONA_OBJECTS_VTABLE(OBJECT_KIND, PROXY_KIND)	\
+								 						\
 class OBJECT_KIND##2ProxyVTable : public Rtt::Lua##PROXY_KIND##ObjectProxyVTable	\
 {																					\
 public:																				\
@@ -98,20 +153,20 @@ public:																			 \
 protected:							\
 	OBJECT_KIND##2ProxyVTable() {}	\
 									\
-public:																																	\
-	virtual int ValueForKey( lua_State *L, const Rtt::MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const \
-	{																																	\
-		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);	\
-		const CoronaDisplayObjectParams & params = TO_PARAMS;							\
-		void * userData = const_cast<void *>( resolved.fUserData );						\
-		int result = 0;																	\
-																						\
+public:																																			\
+	virtual int ValueForKey( lua_State *L, const Rtt::MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const			\
+	{																																			\
+		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);															\
+		const auto params = FindParams< CoronaObjectValueParams >( resolved.fStream, kAugmentedMethod_Value, OFFSET_AFTER_HEADER( Value ) );	\
+		void * userData = const_cast<void *>( resolved.fUserData );																				\
+		int result = 0;																															\
+																																				\
 		if (!ValuePrologue( L, object, key, userData, params, &result ))	\
 		{																	\
 			return result;													\
 		}																	\
 																			\
-		else if (!params.ignoreOriginalValue)												\
+		else if (!params.ignoreOriginal)													\
 		{																					\
 			result += Super::Constant().ValueForKey( L, object, key, overrideRestriction );	\
 		}																					\
@@ -119,19 +174,19 @@ public:																																	\
 		return ValueEpilogue( L, object, key, userData, params, result );	\
 	}																		\
 																			\
-	virtual bool SetValueForKey( lua_State *L, Rtt::MLuaProxyable& object, const char key[], int valueIndex ) const	\
-	{																												\
-		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);	\
-		const CoronaDisplayObjectParams & params = TO_PARAMS;							\
-		void * userData = const_cast<void *>( resolved.fUserData );						\
-		int result = 0;																	\
-																						\
+	virtual bool SetValueForKey( lua_State *L, Rtt::MLuaProxyable& object, const char key[], int valueIndex ) const										\
+	{																																					\
+		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);																	\
+		const auto params = FindParams< CoronaObjectSetValueParams >( resolved.fStream, kAugmentedMethod_SetValue, OFFSET_AFTER_HEADER( SetValue ) );	\
+		void * userData = const_cast<void *>( resolved.fUserData );																						\
+		int result = 0;																																	\
+																																						\
 		if (!SetValuePrologue( L, object, key, valueIndex, userData, params, &result ))	\
 		{																				\
 			return result;																\
 		}																				\
 																						\
-		else if (!params.ignoreOriginalSetValue)									\
+		else if (!params.ignoreOriginal)											\
 		{																			\
 			result = Super::Constant().SetValueForKey( L, object, key, valueIndex );\
 		}																			\
@@ -309,7 +364,7 @@ Copy3 (float * dst, const float * src)
 									\
 		CoronaGraphicsEncodeAsTokens( &token, 0xFF, &renderer );	\
 		params.WHEN##METHOD_NAME( FIRST_ARGS, &token );				\
-		CoronaGraphicsEncodeAsTokens( &token, 0xFF, nullptr );		\
+		CoronaGraphicsEncodeAsTokens( &token, 0xFF, NULL );			\
 	}
 
 #define CORONA_OBJECTS_INTERFACE(PARAMS_TYPE, TO_PARAMS)						\
@@ -457,9 +512,138 @@ Copy3 (float * dst, const float * src)
 																\
 	virtual const Rtt::LuaProxyVTable& ProxyVTable() const;	\
 															\
-	PARAMS_TYPE * fParams;		\
+	unsigned char * fStream;	\
+	mutable void * fUserData;	\
 	int fRef;					\
-	mutable void * fUserData
+	bool fTempStream
+
+
+static void
+GetSizes( unsigned short method, size_t & fullSize, size_t & paramSize )
+{
+#define GET_SIZES(NAME)									\
+	fullSize = sizeof( CoronaObject##NAME##Params );	\
+	paramSize = sizeof( GenericParams::NAME )
+#define UNIQUE_METHOD(NAME)		\
+	kAugmentedMethod_##NAME:	\
+		GET_SIZES(NAME)
+
+	switch (method)
+	{
+	case kAugmentedMethod_DidMoveOffscreen:
+	case kAugmentedMethod_Prepare:
+	case kAugmentedMethod_WillMoveOnscreen:
+	case kAugmentedMethod_DidRemove:
+		GET_SIZES( Basic );
+
+		break;
+	case kAugmentedMethod_CanCull:
+	case kAugmentedMethod_CanHitTest:
+		GET_SIZES( BooleanResult );
+
+		break;
+	case kAugmentedMethod_OnCreate:
+	case kAugmentedMethod_OnFinalize:
+		GET_SIZES( Lifetime );
+
+		break;
+	case kAugmentedMethod_GetSelfBounds:
+	case kAugmentedMethod_GetSelfBoundsForAnchor:
+		GET_SIZES( RectResult );
+
+		break;
+	case kAugmentedMethod_DidUpdateTransform:
+		GET_SIZES( Matrix );
+
+		break;
+	case kAugmentedMethod_HitTest:
+		GET_SIZES( BooleanResultPoint );
+
+		break;
+	case kAugmentedMethod_UpdateTransform:
+		GET_SIZES( BooleanResultMatrix );
+
+		break;
+	case UNIQUE_METHOD( AddedToParent );
+		break;
+	case UNIQUE_METHOD( DidInsert );
+		break;
+	case UNIQUE_METHOD( Draw );
+		break;
+	case UNIQUE_METHOD( OnMessage );
+		break;
+	case UNIQUE_METHOD( RemovedFromParent );
+		break;
+	case UNIQUE_METHOD( Rotate );
+		break;
+	case UNIQUE_METHOD( Scale );
+		break;
+	case UNIQUE_METHOD( SetValue );
+		break;
+	case UNIQUE_METHOD( Translate );
+		break;
+	case UNIQUE_METHOD( Value );
+		break;
+	default:
+		Rtt_ASSERT_NOT_REACHED();
+	}
+
+#undef GET_SIZES
+#undef UNIQUE_METHOD
+}
+
+CORONA_API
+int CoronaObjectsBuildMethodStream( lua_State * L, const CoronaObjectParamsHeader * head )
+{
+	if (!head)
+	{
+		return LUA_REFNIL;
+	}
+
+	std::vector< const CoronaObjectParamsHeader * > params;
+
+	for (const CoronaObjectParamsHeader * cur = head; cur; cur = cur->next)
+	{
+		params.push_back( cur );
+	}
+
+	std::sort( params.begin(), params.end(), [](const CoronaObjectParamsHeader * p1, const CoronaObjectParamsHeader * p2) { return p1->method < p2->method; });
+
+	if (params.back()->method >= (unsigned short)( kAugmentedMethod_Count ))
+	{
+		return LUA_REFNIL;
+	}
+
+	unsigned short prev = ~0U;
+
+	for ( const CoronaObjectParamsHeader * header : params )
+	{
+		if (header->method == prev)
+		{
+			return LUA_REFNIL;
+		}
+
+		prev = header->method;
+	}
+
+	unsigned char * stream = (unsigned char *)lua_newuserdata( L, 1U + (1U + sizeof( GenericParams )) * params.size() ); // ..., methods
+
+	*stream++ = (unsigned char)( params.size() );
+
+	GenericParams * genericParams = reinterpret_cast< GenericParams * >( stream + params.size() );
+
+	for ( const CoronaObjectParamsHeader * header : params )
+	{
+		*stream++ = header->method;
+
+		size_t fullSize, paramSize;
+
+		GetSizes( header->method, fullSize, paramSize );
+		memcpy( genericParams++, reinterpret_cast< const unsigned char * >( header ) + (fullSize - paramSize), paramSize );
+	}
+
+	return luaL_ref( L, LUA_REGISTRYINDEX ); // ...
+}
 
 /**
 TODO
@@ -486,15 +670,15 @@ public:
 	CORONA_OBJECTS_INTERFACE( CoronaGroupObjectParams, fParams->inherited );
 };
 
+#define CORONA_OBJECTS_DEFAULT_INITIALIZATION() fParams( NULL ), fUserData( NULL ), fStream( NULL ), fRef( LUA_NOREF ), fTempStream( false )
+
 Group2::Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
 	: GroupObject( allocator, stageObject ),
-		fParams( NULL ),
-		fRef( LUA_NOREF ),
-		fUserData( NULL )
+	CORONA_OBJECTS_DEFAULT_INITIALIZATION()
 {
 }
 
-CORONA_OBJECTS_VTABLE( Group, Group, resolved.fParams->inherited )
+CORONA_OBJECTS_VTABLE( Group, Group )
 
 static Rtt::GroupObject *
 NewGroup2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
@@ -503,7 +687,7 @@ NewGroup2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
 }
 
 CORONA_API
-int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaGroupObjectParams * params, int temporaryParams )
+int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaObjectParams * params )
 {
 	CORONA_OBJECTS_PUSH( Group, CoronaGroupObjectParams, object->fParams->inherited );
 }
@@ -524,13 +708,10 @@ public:
 
 Rect2::Rect2( Rtt::RectPath * path )
 	: RectObject( path ),
-	fParams( NULL ),
-	fRef( LUA_NOREF ),
-	fUserData( NULL )
-{
+	CORONA_OBJECTS_DEFAULT_INITIALIZATION()
 }
 
-CORONA_OBJECTS_VTABLE( Rect, Shape, *resolved.fParams )
+CORONA_OBJECTS_VTABLE( Rect, Shape )
 
 static Rtt::RectObject *
 NewRect2( Rtt_Allocator* pAllocator, Rtt::Real width, Rtt::Real height )
@@ -541,7 +722,7 @@ NewRect2( Rtt_Allocator* pAllocator, Rtt::Real width, Rtt::Real height )
 }
 
 CORONA_API
-int CoronaObjectsPushRect (lua_State * L, void * userData, const CoronaShapeObjectParams * params, int temporaryParams)
+int CoronaObjectsPushRect( lua_State * L, void * userData, const CoronaObjectParams * params )
 {
 	CORONA_OBJECTS_PUSH( Rect, CoronaDisplayObjectParams, *object->fParams );
 }
@@ -562,13 +743,11 @@ public:
 
 Snapshot2::Snapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real contentW, Rtt::Real contentH )
 	: SnapshotObject( pAllocator, display, contentW, contentH ),
-	fParams( NULL ),
-	fRef( LUA_NOREF ),
-	fUserData( NULL )
+	CORONA_OBJECTS_DEFAULT_INITIALIZATION()
 {
 }
 
-CORONA_OBJECTS_VTABLE( Snapshot, Snapshot, resolved.fParams->inherited )
+CORONA_OBJECTS_VTABLE( Snapshot, Snapshot )
 
 static Rtt::SnapshotObject *
 NewSnapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real width, Rtt::Real height )
@@ -577,7 +756,7 @@ NewSnapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real widt
 }
 
 CORONA_API
-int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaSnapshotObjectParams * params, int temporaryParams )
+int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaObjectParams * params )
 {
 	CORONA_OBJECTS_PUSH( Snapshot, CoronaSnapshotObjectParams, object->fParams->inherited );
 }
@@ -602,7 +781,7 @@ const void * CoronaGroupObjectGetChild( const void * groupObject, int index )
 {
 	const Rtt::GroupObject * group = static_cast< const Rtt::GroupObject *>( groupObject );
 
-	return (index >= 0 && index < group->NumChildren()) ? &group->ChildAt( index ) : nullptr;
+	return (index >= 0 && index < group->NumChildren()) ? &group->ChildAt( index ) : NULL;
 }
 
 CORONA_API
@@ -619,4 +798,9 @@ int CoronaObjectSendMessage( const void * object, const char * message, const vo
 	return 1;
 }
 
+#undef SIZE_MINUS_OFFSET
+#undef OFFSET_OF_MEMBER
+#undef SIZE_FROM_MEMBER
+#undef SIZE_AFTER_HEADER
+#undef OFFSET_AFTER_HEADER
 #undef FIRST_ARGS

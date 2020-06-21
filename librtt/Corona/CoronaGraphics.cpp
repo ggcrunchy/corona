@@ -84,7 +84,7 @@ int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format)
 			return 4;
 	}
 }
-
+// STEVE CHANGE
 CORONA_API
 int CoronaShaderRegisterAttributes( lua_State * L, CoronaGraphicsToken * token, const CoronaShaderAttribute * attributes, unsigned int attributeCount )
 {
@@ -160,7 +160,7 @@ void CoronaGraphicsEncodeAsTokens ( CoronaGraphicsToken tokens[], unsigned char 
 
 	else
 	{
-		CoronaGraphicsTokenWrite( tokens, kTokenType_None, nullptr, 0U );
+		CoronaGraphicsTokenWrite( tokens, kTokenType_None, NULL, 0U );
 	}
 }
 
@@ -218,7 +218,7 @@ GetRenderer( const CoronaGraphicsToken * tokens )
 		}
 	}
 
-	return nullptr;
+	return NULL;
 }
 
 CORONA_API
@@ -359,6 +359,6 @@ int CoronaRendererSetFrustum( const CoronaGraphicsToken * rendererToken, const f
 {
 	return 0;
 }
-
+// /STEVE CHANGE
 // ----------------------------------------------------------------------------
 

@@ -34,195 +34,124 @@ extern "C" {
  TODO: backend, e.g. texture / FBO stuff
 */
 
-typedef void (*CoronaObjectBasicBookend) (const void * object, void * userData);
-typedef void (*CoronaObjectAddedToParentBookend) (const void * object, void * userData, lua_State * L, void * groupObject);
-typedef void (*CoronaObjectBooleanResultBookend) (const void * object, void * userData, int * result);
-typedef void (*CoronaObjectMatrixBookend) (const void * object, void * userData, float matrix[6]);
-typedef void (*CoronaObjectDrawBookend) (const void * object, void * userData, const struct CoronaGraphicsToken * rendererToken);
-typedef void (*CoronaObjectRectResultBookend) (const void * object, void * userData, float * xMin, float * yMin, float * xMax, float * yMax);
-typedef void (*CoronaObjectBooleanResultPointBookend) (const void * object, void * userData, float x, float y, int * result);
-typedef void (*CoronaObjectRemovedFromParentBookend) (const void * object, void * userData, lua_State * L, void * groupObject);
-typedef void (*CoronaObjectRotateBookend) (const void * object, void * userData, float delta);
-typedef void (*CoronaObjectScaleBookend) (const void * object, void * userData, float sx, float sy, int isNew);
-typedef void (*CoronaObjectSetValueBookend) (const void * object, void * userData, lua_State * L, const char key[], int valueIndex, int * result);
-typedef void (*CoronaObjectTranslateBookend) (const void * object, void * userData, float x, float y);
-typedef void (*CoronaObjectBooleanResultMatrixBookend) (const void * object, void * userData, const float matrix[6], int * result);
-typedef void (*CoronaObjectValueBookend) (const const void * object, void * userData, lua_State * L, const char key[], int * result);
-
 typedef unsigned long long CoronaObjectFlags;
 
-typedef struct CoronaDisplayObjectParams {
-    //
-    // Bookends
-    //
+typedef enum {
+    /* The first few seem to come up most often in tests, so favor them in sorts */
+    kAugmentedMethod_Draw, // uses "own" type, i.e. `CoronaObjectDrawParams`
+    kAugmentedMethod_CanCull, // BooleanResult, i.e. uses `CoronaObjectBooleanResultParams` type
+    kAugmentedMethod_CanHitTest, // BooleanResult
+    kAugmentedMethod_OnMessage,
+    kAugmentedMethod_SetValue,
+    kAugmentedMethod_Value,
+    kAugmentedMethod_OnFinalize, // Lifetime
 
-    // TODO:
+    /* No clear pattern for the rest */
+    kAugmentedMethod_AddedToParent,
+    kAugmentedMethod_DidMoveOffscreen, // Basic
+    kAugmentedMethod_DidUpdateTransform, // Matrix
+    kAugmentedMethod_GetSelfBounds, // RectResult
+    kAugmentedMethod_GetSelfBoundsForAnchor, // RectResult
+    kAugmentedMethod_HitTest, // BooleanResultPoint
+    kAugmentedMethod_OnCreate, // Lifetime
+    kAugmentedMethod_Prepare, // Basic
+    kAugmentedMethod_RemovedFromParent,
+    kAugmentedMethod_Rotate,
+    kAugmentedMethod_Scale,
+    kAugmentedMethod_Translate,
+    kAugmentedMethod_UpdateTransform, // BooleanResultMatrix
+    kAugmentedMethod_WillMoveOnscreen, // Basic
 
-    CoronaObjectAddedToParentBookend beforeAddedToParent;
-    CoronaObjectAddedToParentBookend afterAddedToParent;
+    /* These are relevant to groups */
+    kAugmentedMethod_DidInsert,
+    kAugmentedMethod_DidRemove, // Basic
 
-    // TODO:
+    kAugmentedMethod_Count
+} CoronaObjectAugmentedMethod;
 
-    CoronaObjectBooleanResultBookend beforeCanCull;
-    CoronaObjectBooleanResultBookend afterCanCull;
+typedef struct CoronaObjectParamsHeader {
+    struct CoronaObjectParamsHeader * next;
+    unsigned short method; // n.b. quite generous: all methods fit easily within a byte)
+} CoronaObjectParamsHeader;
 
-    CoronaObjectBooleanResultBookend beforeCanHitTest;
-    CoronaObjectBooleanResultBookend afterCanHitTest;
+#define CORONA_OBJECTS_BOOKENDED_PARAMS(NAME, ...)                \
+    typedef void (*CoronaObject##NAME##Bookend) (__VA_ARGS__);    \
+                                                                  \
+    typedef struct CoronaObject##NAME##Params {     \
+        CoronaObjectParamsHeader header;            \
+        unsigned short ignoreOriginal;              \
+        CoronaObject##NAME##Bookend before, after;  \
+    } CoronaObject##NAME##Params
 
-    // TODO:
+CORONA_OBJECTS_BOOKENDED_PARAMS( Basic, const void * object, void * userData ); // CoronaObjectBasicBookend, CoronaObjectBasicParams...
+CORONA_OBJECTS_BOOKENDED_PARAMS( AddedToParent, const void * object, void * userData, lua_State * L, void * groupObject ); // ...and so on
+CORONA_OBJECTS_BOOKENDED_PARAMS( Matrix, const void * object, void * userData, float matrix[6] );
+CORONA_OBJECTS_BOOKENDED_PARAMS( Draw, const void * object, void * userData, const struct CoronaGraphicsToken * rendererToken );
+CORONA_OBJECTS_BOOKENDED_PARAMS( RectResult, const void * object, void * userData, float * xMin, float * yMin, float * xMax, float * yMax );
+CORONA_OBJECTS_BOOKENDED_PARAMS( RemovedFromParent, const void * object, void * userData, lua_State * L, void * groupObject );
+CORONA_OBJECTS_BOOKENDED_PARAMS( Rotate, const void * object, void * userData, float delta );
+CORONA_OBJECTS_BOOKENDED_PARAMS( Scale, const void * object, void * userData, float sx, float sy, int isNew );
+CORONA_OBJECTS_BOOKENDED_PARAMS( Translate, const void * object, void * userData, float x, float y );
+CORONA_OBJECTS_BOOKENDED_PARAMS( DidInsert, void * groupObject, void * userData, int childParentChanged );
 
-    CoronaObjectBasicBookend beforeDidMoveOffscreen;
-    CoronaObjectBasicBookend afterDidMoveOffscreen;
+#define CORONA_OBJECTS_EARLY_OUTABLE_BOOKENDED_PARAMS(NAME, ...)    \
+    typedef void (*CoronaObject##NAME##Bookend) (__VA_ARGS__);      \
+                                                                    \
+    typedef struct CoronaObject##NAME##Params {             \
+        CoronaObjectParamsHeader header;                    \
+        unsigned char ignoreOriginal, earlyOutIfNonZero;    \
+        CoronaObject##NAME##Bookend before, after;          \
+    } CoronaObject##NAME##Params
 
-    // TODO:
+CORONA_OBJECTS_EARLY_OUTABLE_BOOKENDED_PARAMS( BooleanResult, const void * object, void * userData, int * result );
+CORONA_OBJECTS_EARLY_OUTABLE_BOOKENDED_PARAMS( BooleanResultPoint, const void * object, void * userData, float x, float y, int * result );
+CORONA_OBJECTS_EARLY_OUTABLE_BOOKENDED_PARAMS( BooleanResultMatrix, const void * object, void * userData, const float matrix[6], int * result );
 
-    CoronaObjectMatrixBookend beforeDidUpdateTransform;
-    CoronaObjectMatrixBookend afterDidUpdateTransform;
+typedef void (*CoronaObjectSetValueBookend) (const void * object, void * userData, lua_State * L, const char key[], int valueIndex, int * result );
 
-    CoronaObjectDrawBookend beforeDraw;
-    CoronaObjectDrawBookend afterDraw;
+typedef struct CoronaObjectSetValueParams {
+    CoronaObjectParamsHeader header;
+    unsigned char ignoreOriginal, disallowEarlyOut;
+    CoronaObjectSetValueBookend before, after;
+} CoronaObjectSetValueParams;
 
-    // TODO:
+typedef void (*CoronaObjectValueBookend) (const const void * object, void * userData, lua_State * L, const char key[], int * result );
 
-    CoronaObjectRectResultBookend beforeGetSelfBounds;
-    CoronaObjectRectResultBookend afterGetSelfBounds;
+typedef struct CoronaObjectValueParams {
+    CoronaObjectParamsHeader header;
+    unsigned char ignoreOriginal, disallowEarlyOut : 1, earlyOutIfZero : 1;
+    CoronaObjectValueBookend before, after;
+} CoronaObjectValueParams;
 
-    CoronaObjectRectResultBookend beforeGetSelfBoundsForAnchor;
-    CoronaObjectRectResultBookend afterGetSelfBoundsForAnchor;
+typedef struct CoronaObjectLifetimeParams {
+    CoronaObjectParamsHeader header;
+    CoronaObjectBasicBookend action;
+};
 
-    // TODO:
+typedef struct CoronaObjectOnMessageParams {
+    CoronaObjectParamsHeader header;
+    void (*action)(const void * object, void * userData, const char * message, const void * data, unsigned int size);
+};
 
-    CoronaObjectBooleanResultPointBookend beforeHitTest;
-    CoronaObjectBooleanResultPointBookend afterHitTest;
-
-    CoronaObjectBasicBookend beforePrepare;
-    CoronaObjectBasicBookend afterPrepare;
-
-    // TODO:
-
-    CoronaObjectRemovedFromParentBookend beforeRemovedFromParent;
-    CoronaObjectRemovedFromParentBookend afterRemovedFromParent;
-
-    // TODO:
-
-    CoronaObjectRotateBookend beforeRotate;
-    CoronaObjectRotateBookend afterRotate;
-
-    // TODO:
-
-    CoronaObjectScaleBookend beforeScale;
-    CoronaObjectScaleBookend afterScale;
-
-    // TODO:
-
-    CoronaObjectSetValueBookend beforeSetValue;
-    CoronaObjectSetValueBookend afterSetValue;
-
-    // TODO:
-
-    CoronaObjectTranslateBookend beforeTranslate;
-    CoronaObjectTranslateBookend afterTranslate;
-
-    // TODO:
-
-    CoronaObjectBooleanResultMatrixBookend beforeUpdateTransform;
-    CoronaObjectBooleanResultMatrixBookend afterUpdateTransform;
-
-    // TODO:
-
-    CoronaObjectValueBookend beforeValue;
-    CoronaObjectValueBookend afterValue;
-
-    CoronaObjectBasicBookend beforeWillMoveOnscreen;
-    CoronaObjectBasicBookend afterWillMoveOnscreen;
-
-    //
-    // Lifetime and custom state
-    //
-
-    void (*onCreate) (const void * object, void * userData);
-    void (*onFinalize) (const void * object, void * userData);
-    void (*onMessage) (const void * object, void * userData, const char * message, const void * data, unsigned int size);
-
-    //
-    // Flags
-    //
-
-    // put these last in case inheriting types can merge with them
-    CoronaObjectFlags ignoreOriginalAddedToParent : 1; // only use before and / or after, ignoring the original method
-
-    CoronaObjectFlags earlyOutCanCullIfNonZero : 1; // in the case of boolean results, calls are assumed to early-out if "before" returned either true or false: use zero (false)?
-    CoronaObjectFlags ignoreOriginalCanCull : 1;
-
-    CoronaObjectFlags earlyOutCanHitTestIfNonZero : 1;
-    CoronaObjectFlags ignoreOriginalCanHitTest : 1;
-
-    CoronaObjectFlags ignoreOriginalDidMoveOffscreen : 1;
-    CoronaObjectFlags ignoreOriginalDidUpdateTransform : 1;
-    CoronaObjectFlags ignoreOriginalDraw : 1;
-    CoronaObjectFlags ignoreOriginalGetSelfBounds : 1;
-    CoronaObjectFlags ignoreOriginalGetSelfBoundsForAnchor : 1;
-
-    CoronaObjectFlags earlyOutHitTestIfNonZero : 1;
-    CoronaObjectFlags ignoreOriginalHitTest : 1;
-
-    CoronaObjectFlags ignoreOriginalMoveOffscreen : 1;
-    CoronaObjectFlags ignoreOriginalPrepare : 1;
-    CoronaObjectFlags ignoreOriginalRemovedFromParent : 1;
-    CoronaObjectFlags ignoreOriginalRotate : 1;
-    CoronaObjectFlags ignoreOriginalScale : 1;
-
-    CoronaObjectFlags setValueDisallowEarlyOut : 1; // usually want to early-out if we set a value, but we can suppress this, say if we just wanted a side effect
-    CoronaObjectFlags ignoreOriginalSetValue : 1;
-
-    CoronaObjectFlags ignoreOriginalTranslate : 1;
-
-    CoronaObjectFlags earlyOutUpdateTransformIfNonZero : 1;
-    CoronaObjectFlags ignoreOriginalUpdateTransform : 1;
-
-    CoronaObjectFlags valueDisallowEarlyOut : 1; // usually we want to early-out if we got a value, but we can suppress this, say if we want to transform the result
-    CoronaObjectFlags valueEarlyOutIfZero : 1;
-    CoronaObjectFlags ignoreOriginalValue : 1;
-
-    CoronaObjectFlags ignoreOriginalWillMoveOnscreen : 1;
-} CoronaDisplayObjectParams;
-
-typedef void (*GroupObjectDidInsertBookend) (void * groupObject, void * userData, int childParentChanged);
-
-typedef struct CoronaGroupObjectParams {
-    CoronaDisplayObjectParams inherited;
-
-    // put these here in case they can be merged into the inherited bitfields
-    CoronaObjectFlags ignoreOriginalDidInsert : 1;
-    CoronaObjectFlags ignoreOriginalDidRemove : 1;
-
-    // TODO:
-    GroupObjectDidInsertBookend beforeDidInsert;
-    GroupObjectDidInsertBookend afterDidInsert;
-
-    CoronaObjectBasicBookend beforeDidRemove;
-    CoronaObjectBasicBookend afterDidRemove;
-} CoronaGroupObjectParams;
-
-// TODO: allow params to be shared / reused, i.e. what we almost always want
+typedef struct CoronaObjectParams {
+    union {
+        CoronaObjectParamsHeader head;
+        int ref;
+    } u;
+    int useRef;
+} CoronaObjectsParams;
 
 CORONA_API
-int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaGroupObjectParams * params, int temporaryParams ) CORONA_PUBLIC_SUFFIX;
-
-typedef struct CoronaShapeObjectParams {
-    CoronaDisplayObjectParams inherited;
-} CoronaShapeObjectParams;
+int CoronaObjectsBuildMethodStream( lua_State * L, const CoronaObjectParamsHeader * head ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaObjectsPushRect( lua_State * L, void * userData, const CoronaShapeObjectParams * params, int temporaryParams ) CORONA_PUBLIC_SUFFIX;
-
-typedef struct CoronaSnapshotObjectParams {
-    CoronaDisplayObjectParams inherited;
-    // TODO: render format
-} CoronaSnapshotObjectParams;
+int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaSnapshotObjectParams * params, int temporaryParams ) CORONA_PUBLIC_SUFFIX;
+int CoronaObjectsPushRect( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 int CoronaObjectsShouldDraw( const void * object, int * shouldDraw ) CORONA_PUBLIC_SUFFIX;
