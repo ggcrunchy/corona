@@ -115,7 +115,7 @@ typedef struct CoronaObjectSetValueParams {
     CoronaObjectSetValueBookend before, after;
 } CoronaObjectSetValueParams;
 
-typedef void (*CoronaObjectValueBookend) (const const void * object, void * userData, lua_State * L, const char key[], int * result );
+typedef void (*CoronaObjectValueBookend) (const void * object, void * userData, lua_State * L, const char key[], int * result );
 
 typedef struct CoronaObjectValueParams {
     CoronaObjectParamsHeader header;
@@ -126,16 +126,16 @@ typedef struct CoronaObjectValueParams {
 typedef struct CoronaObjectLifetimeParams {
     CoronaObjectParamsHeader header;
     CoronaObjectBasicBookend action;
-};
+} CoronaObjectLifetimeParams;
 
 typedef struct CoronaObjectOnMessageParams {
     CoronaObjectParamsHeader header;
     void (*action)(const void * object, void * userData, const char * message, const void * data, unsigned int size);
-};
+} CoronaObjectOnMessageParams;
 
 typedef struct CoronaObjectParams {
     union {
-        CoronaObjectParamsHeader head;
+        CoronaObjectParamsHeader * head;
         int ref;
     } u;
     int useRef;
