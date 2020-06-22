@@ -273,6 +273,8 @@ static int ScopeGroupObject( lua_State * L )
 			}
 		};
 
+		drawParams.header.method = kAugmentedMethod_Draw;
+
 		params.object->useRef = true;
 		params.object->u.ref = CoronaObjectsBuildMethodStream( L, &drawParams.header );
 	}
@@ -1179,6 +1181,7 @@ DisplayLibrary::Open( lua_State *L )
 		{ "setDrawMode", setDrawMode },
 		{ "getSafeAreaInsets", getSafeAreaInsets },
 // STEVE CHANGE (TEST HACK!!!!!)
+		{ "ColorMaskObject", ColorMaskObject },
 		{ "ScopeGroupObject", ScopeGroupObject },
 		{ "StencilClearObject", StencilClearObject },
 		{ "StencilStateObject", StencilStateObject },

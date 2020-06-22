@@ -37,6 +37,8 @@ extern "C" {
 typedef unsigned long long CoronaObjectFlags;
 
 typedef enum {
+    kAugmentedMethod_None,
+
     /* The first few seem to come up most often in tests, so favor them in sorts */
     kAugmentedMethod_Draw, // uses "own" type, i.e. `CoronaObjectDrawParams`
     kAugmentedMethod_CanCull, // BooleanResult, i.e. uses `CoronaObjectBooleanResultParams` type

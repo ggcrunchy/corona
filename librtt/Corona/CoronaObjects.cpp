@@ -14,6 +14,7 @@
 #include "CoronaLua.h"
 
 #include "Rtt_LuaContext.h"
+#include "Rtt_LuaProxy.h"
 #include "Rtt_LuaProxyVTable.h"
 #include "Rtt_Runtime.h"
 
@@ -211,28 +212,43 @@ PushFactory( lua_State * L, const char * name )
 {
 	Rtt::Display & display = Rtt::LuaContext::GetRuntime( L )->GetDisplay();
 
-	if (!display.PushObjectFactories()) // ...[, factories]
+	if (!display.PushObjectFactories()) // stream, ...[, factories]
 	{
 		return false;
 	}
 
-	lua_getfield( L, -1, name ); // ..., factories, factory
+	lua_getfield( L, -1, name ); // stream, ..., factories, factory
 
 	return true;
 }
 
+struct StreamAndUserData {
+	unsigned char * stream;
+	void * userData;
+};
+
+static StreamAndUserData sStreamAndUserData;
+
+#define CORONA_OBJECTS_BIND_STREAM_AND_USER_DATA(INDEX)							\
+	sStreamAndUserData.stream = (unsigned char *)lua_touserdata( L, INDEX );	\
+	sStreamAndUserData.userData = userData
+
+#define CORONA_OBJECTS_ASSIGN_STREAM_AND_USER_DATA(OBJECT)	\
+	OBJECT->fStream = sStreamAndUserData.stream;			\
+	OBJECT->fUserData = sStreamAndUserData.userData
+
 static bool 
 CallNewFactory (lua_State * L, const char * name, void * func)
 {
-	if (PushFactory( L, name ) ) // args[, factories, factory]
+	if (PushFactory( L, name ) ) // stream, ...[, factories, factory]
 	{
-		lua_pushlightuserdata( L, func ); // args, factories, factory, func
-		lua_setupvalue( L, -2, 2 ); // args, factories, factory; factory.upvalue[2] = func
-		lua_insert( L, 1 ); // factory, args, factories
-		lua_pop( L, 1 ); // factory, args
-		lua_call( L, lua_gettop( L ) - 1, 1 ); // object?
+		lua_pushlightuserdata( L, func ); // stream, ..., factories, factory, func
+		lua_setupvalue( L, -2, 2 ); // stream, ..., factories, factory; factory.upvalue[2] = func
+		lua_insert( L, 2 ); // stream, factory, ..., factories
+		lua_pop( L, 1 ); // stream, factory, ...
+		lua_call( L, lua_gettop( L ) - 2, 1 ); // stream, object?
 
-		return !lua_isnil( L, -1 );
+		return !lua_isnil( L, 2 );
 	}
 
 	return false;
@@ -323,14 +339,22 @@ BuildMethodStream( lua_State * L, const CoronaObjectParamsHeader * head )
 
 	std::vector< const CoronaObjectParamsHeader * > params;
 
-	for (const CoronaObjectParamsHeader * cur = head; cur; cur = cur->next)
+	for (const CoronaObjectParamsHeader * cur = head->method != kAugmentedMethod_None ? head : head->next; cur; cur = cur->next)
 	{
-		params.push_back( cur );
+		if (cur->method != kAugmentedMethod_None)
+		{
+			params.push_back( cur );
+		}
+	}
+
+	if (params.empty())
+	{
+		return false;
 	}
 
 	std::sort( params.begin(), params.end(), [](const CoronaObjectParamsHeader * p1, const CoronaObjectParamsHeader * p2) { return p1->method < p2->method; });
 
-	if (params.back()->method >= (unsigned short)( kAugmentedMethod_Count ))
+	if ((unsigned short)( kAugmentedMethod_None ) == params.front()->method || params.back()->method >= (unsigned short)( kAugmentedMethod_Count ))
 	{
 		return false;
 	}
@@ -410,14 +434,16 @@ GetStream( lua_State * L, const CoronaObjectsParams * params )
 		return 0;										\
 	}	\
 		\
-	if (CallNewFactory( L, "new" #OBJECT_KIND, &New##OBJECT_KIND##2) ) /* ..., stream[, object] */	\
-	{																								\
-		OBJECT_KIND##2 * object = (OBJECT_KIND##2 *)lua_touserdata( L, -1 );	\
-																				\
-		lua_insert( L, -2 ); /* ..., object, stream */	\
-														\
-		object->fStream = (unsigned char *)lua_touserdata( L, -1 );												\
-		object->fUserData = userData;																			\
+	lua_insert( L, 1 ); /* stream, ... */	\
+											\
+	CORONA_OBJECTS_BIND_STREAM_AND_USER_DATA( 1 );	\
+													\
+	if (CallNewFactory( L, "new" #OBJECT_KIND, &New##OBJECT_KIND##2) ) /* stream[, object] */	\
+	{																							\
+		OBJECT_KIND##2 * object = (OBJECT_KIND##2 *)Rtt::LuaProxy::GetProxyableObject( L, 2 );	\
+																							\
+		lua_insert( L, 1 ); /* object, stream */	\
+													\
 		object->fRef = luaL_ref( L, LUA_REGISTRYINDEX ); /* ..., object; registry = { ..., [ref] = stream } */	\
 																												\
 		const auto params = FindParams< CoronaObjectLifetimeParams >( object->fStream, kAugmentedMethod_OnCreate, sizeof( CoronaObjectLifetimeParams ) - sizeof( GenericParams::Lifetime ) );	\
@@ -740,7 +766,11 @@ CORONA_OBJECTS_VTABLE( Group, Group )
 static Rtt::GroupObject *
 NewGroup2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
 {
-    return Rtt_NEW( allocator, Group2( allocator, NULL ) );
+    Group2 * group = Rtt_NEW( allocator, Group2( allocator, NULL ) );
+
+	CORONA_OBJECTS_ASSIGN_STREAM_AND_USER_DATA( group );
+
+	return group;
 }
 
 CORONA_API
@@ -774,9 +804,12 @@ CORONA_OBJECTS_VTABLE( Rect, Shape )
 static Rtt::RectObject *
 NewRect2( Rtt_Allocator* pAllocator, Rtt::Real width, Rtt::Real height )
 {
-	Rtt::RectPath* path = Rtt::RectPath::NewRect( pAllocator, width, height );
+	Rtt::RectPath * path = Rtt::RectPath::NewRect( pAllocator, width, height );
+	Rect2 * rect = Rtt_NEW( pAllocator, Rect2( path ) );
 
-	return Rtt_NEW( pAllocator, Rect2( path ) );
+	CORONA_OBJECTS_ASSIGN_STREAM_AND_USER_DATA( rect );
+
+	return rect;
 }
 
 CORONA_API
@@ -810,7 +843,11 @@ CORONA_OBJECTS_VTABLE( Snapshot, Snapshot )
 static Rtt::SnapshotObject *
 NewSnapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real width, Rtt::Real height )
 {
-	return Rtt_NEW( pAllocator, Snapshot2( pAllocator, display, width, height ) );
+	Snapshot2 * snapshot = Rtt_NEW( pAllocator, Snapshot2( pAllocator, display, width, height ) );
+
+	CORONA_OBJECTS_ASSIGN_STREAM_AND_USER_DATA( snapshot );
+
+	return snapshot;
 }
 
 CORONA_API
