@@ -166,7 +166,7 @@ public:																																			\
 	{																																			\
 		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);															\
 		const auto params = FindParams< CoronaObjectValueParams >( resolved.fStream, kAugmentedMethod_Value, OFFSET_AFTER_HEADER( Value ) );	\
-		void * userData = const_cast<void *>( resolved.fUserData );																				\
+		void * userData = const_cast< void * >( resolved.fUserData );																			\
 		int result = 0;																															\
 																																				\
 		if (!ValuePrologue( L, object, key, userData, params, &result ))	\
@@ -186,7 +186,7 @@ public:																																			\
 	{																																					\
 		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);																	\
 		const auto params = FindParams< CoronaObjectSetValueParams >( resolved.fStream, kAugmentedMethod_SetValue, OFFSET_AFTER_HEADER( SetValue ) );	\
-		void * userData = const_cast<void *>( resolved.fUserData );																						\
+		void * userData = const_cast< void * >( resolved.fUserData );																					\
 		int result = 0;																																	\
 																																						\
 		if (!SetValuePrologue( L, object, key, valueIndex, userData, params, &result ))	\
@@ -544,8 +544,8 @@ Copy3 (float * dst, const float * src)
 												\
 		params.WHEN( FIRST_ARGS, matrix );	\
 											\
-		Copy3(const_cast<float *>(srcToDst.Row0()), matrix);		\
-		Copy3(const_cast<float *>(srcToDst.Row1()), matrix + 3);	\
+		Copy3(const_cast< float * >(srcToDst.Row0()), matrix);		\
+		Copy3(const_cast< float * >(srcToDst.Row1()), matrix + 3);	\
 	}
 
 #define CORONA_OBJECTS_DRAW_BOOKEND_METHOD(WHEN)	\
@@ -868,13 +868,13 @@ int CoronaObjectsShouldDraw( const void * object, int * shouldDraw )
 CORONA_API
 const void * CoronaObjectGetParent( const void * object )
 {
-	return static_cast< const Rtt::DisplayObject *>( object )->GetParent(); // TODO: validation?
+	return static_cast< const Rtt::DisplayObject * >( object )->GetParent(); // TODO: validation?
 }
 
 CORONA_API
 const void * CoronaGroupObjectGetChild( const void * groupObject, int index )
 {
-	const Rtt::GroupObject * group = static_cast< const Rtt::GroupObject *>( groupObject );
+	const Rtt::GroupObject * group = static_cast< const Rtt::GroupObject * >( groupObject );
 
 	return (index >= 0 && index < group->NumChildren()) ? &group->ChildAt( index ) : NULL;
 }
@@ -882,13 +882,13 @@ const void * CoronaGroupObjectGetChild( const void * groupObject, int index )
 CORONA_API
 int CoronaGroupObjectGetNumChildren( const void * groupObject )
 {
-	return static_cast< const Rtt::GroupObject *>( groupObject )->NumChildren();
+	return static_cast< const Rtt::GroupObject * >( groupObject )->NumChildren();
 }
 
 CORONA_API
 int CoronaObjectSendMessage( const void * object, const char * message, const void * payload, unsigned int size )
 {
-	static_cast< const Rtt::DisplayObject *>( object )->SendMessage( message, payload, size );
+	static_cast< const Rtt::DisplayObject * >( object )->SendMessage( message, payload, size );
 
 	return 1;
 }

@@ -375,8 +375,19 @@ static SharedStencilState * InitSharedStencilState( lua_State * L )
 	return state.object;
 }
 
+static void DummyArgs( lua_State * L )
+{
+	lua_settop( L, lua_istable( L, 1 ) ); // [group]
+	lua_pushinteger( L, 0 ); // [group, ]x
+	lua_pushinteger( L, 0 ); // [group, ]x, y
+	lua_pushinteger( L, 1 ); // [group, ]x, y, w
+	lua_pushinteger( L, 1 ); // [group, ]x, y, w, h
+}
+
 static int StencilClearObject( lua_State * L )
 {
+	DummyArgs( L ); // [group, ]x, y, w, h
+
 	static int sNonce;
 
 	struct SharedStencilClearData {
@@ -495,6 +506,8 @@ static int FindName( lua_State * L, int valueIndex, const char * list[] )
 
 static int StencilStateObject( lua_State * L )
 {
+	DummyArgs( L ); // [group, ]x, y, w, h
+
 	static int sNonce;
 
 	struct SharedStencilStateData {
@@ -898,6 +911,8 @@ static int StencilStateObject( lua_State * L )
 
 static int ColorMaskObject( lua_State * L )
 {
+	DummyArgs( L ); // [group, ]x, y, w, h
+
 	int sNonce;
 	
 	struct ColorMaskSettings {
