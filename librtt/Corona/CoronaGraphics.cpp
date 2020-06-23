@@ -167,7 +167,7 @@ void CoronaGraphicsEncodeAsTokens ( CoronaGraphicsToken tokens[], unsigned char 
 template<typename T> int
 SetFlagStyleToken( CoronaGraphicsToken * token, TokenType type, U16 index )
 {
-	T flag = 1U << (1 - index);
+	T flag = 1U << (index - 1U);
 
 	CoronaGraphicsTokenWrite( token, type, &flag, sizeof( T ) );
 

@@ -11,7 +11,7 @@
 #ifndef _CoronaGraphicsTypes_H__
 #define _CoronaGraphicsTypes_H__
 
-typedef unsigned int (*CoronaCommandReader)(const unsigned char *);
+typedef void (*CoronaCommandReader)(const unsigned char *, unsigned int);
 typedef void (*CoronaCommandWriter)(unsigned char *, const void *, unsigned int);
 
 typedef struct CoronaCommand {
@@ -24,7 +24,7 @@ typedef struct CoronaCommand {
 TODO
 */
 typedef struct CoronaGraphicsToken {
-	unsigned char bytes[2 * sizeof(void *)];
+	unsigned char bytes[3 * sizeof(void *)];
 } CoronaGraphicsToken;
 
 void CoronaGraphicsTokenWrite( CoronaGraphicsToken * tokens, unsigned char type, const void * data, unsigned int size );

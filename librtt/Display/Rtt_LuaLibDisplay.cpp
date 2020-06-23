@@ -348,15 +348,15 @@ static SharedStencilState * InitSharedStencilState( lua_State * L )
 	if (state.isNew)
 	{
 		CoronaCommand command = {
-			[](const U8 * data) {
+			[](const U8 * data, unsigned int size) {
 				int clear;
+
+				Rtt_ASSERT( size >= sizeof( int ) );
 
 				memcpy( &clear, data, sizeof( int ) );
 
 				glClearStencil( GLint( clear ) ); // TODO: is this expensive? if so, avoid when possible...
 				glClear( GL_STENCIL_BUFFER_BIT );
-
-				return sizeof( int );
 			}, CopyWriter
 		};
 
@@ -538,8 +538,10 @@ static int StencilStateObject( lua_State * L )
 		sharedStateData.object->state = state;
 
 		CoronaCommand command = {
-			[](const U8 * data) {
+			[](const U8 * data, unsigned int size) {
 				StencilSettings settings[2];
+
+				Rtt_ASSERT( size >= sizeof( settings ) );
 
 				memcpy( settings, data, sizeof( settings ) );
 
@@ -564,8 +566,6 @@ static int StencilStateObject( lua_State * L )
 				{
 					(working.enabled ? glEnable : glDisable)( GL_STENCIL_TEST );
 				}
-
-				return sizeof( StencilSettings );
 			}, CopyWriter
 		};
 
@@ -636,7 +636,7 @@ static int StencilStateObject( lua_State * L )
 				state->working.settings.enabled = stateData->settings.enabled;
 			}
 
-			if (memcmp( &state->current.settings, &state->working.settings, sizeof( StencilSettings ) ) == 0)
+			if (memcmp( &state->current.settings, &state->working.settings, sizeof( StencilSettings ) ) != 0)
 			{
 				CoronaRendererSetOperationStateDirty( rendererToken, &stateData->shared->stateToken );
 			}
@@ -837,7 +837,7 @@ static int StencilStateObject( lua_State * L )
 
 		CoronaObjectOnMessageParams onMessageParams = {};
 
-		onMessageParams.action = [](const void *, void * userData, const char * message, const void * payload, U32 size) {
+		onMessageParams.action = [](const void *, void * userData, const char * message, const void * data, U32 size) {
 			InstancedStencilStateData * stateData = static_cast< InstancedStencilStateData * >( userData );
 			SharedStencilState * state = stateData->shared->state;
 
@@ -845,7 +845,7 @@ static int StencilStateObject( lua_State * L )
 			{
 				if (size >= sizeof( ScopeMessagePayload ) )
 				{
-					const ScopeMessagePayload * payload = static_cast< const ScopeMessagePayload * >( payload );
+					const ScopeMessagePayload * payload = static_cast< const ScopeMessagePayload * >( data );
 
 					if ('w' == message[0] && !state->hasSetID)
 					{
@@ -865,7 +865,7 @@ static int StencilStateObject( lua_State * L )
 
 							state->stack.pop_back();
 
-							if (memcmp( &state->working.settings, &state->current.settings, sizeof( StencilSettings ) ) == 0)
+							if (memcmp( &state->working.settings, &state->current.settings, sizeof( StencilSettings ) ) != 0)
 							{
 								CoronaRendererSetOperationStateDirty( payload->rendererToken, &stateData->shared->stateToken );
 							}
@@ -942,14 +942,14 @@ static int ColorMaskObject( lua_State * L )
 	if (sharedColorMaskData.isNew)
 	{
 		CoronaCommand command = {
-			[](const U8 * data) {
+			[](const U8 * data, unsigned int size) {
 				ColorMaskSettings mask;
+
+				Rtt_ASSERT( size >= sizeof( ColorMaskSettings ) );
 
 				memcpy( &mask, data, sizeof( ColorMaskSettings ) );
 
 				glColorMask( mask.red, mask.green, mask.blue, mask.alpha );
-
-				return sizeof( ColorMaskSettings );
 			}, CopyWriter
 		};
 
@@ -997,7 +997,7 @@ static int ColorMaskObject( lua_State * L )
 				colorMaskData->shared->working.alpha = colorMaskData->settings.alpha;
 			}
 
-			if (memcmp( &colorMaskData->shared->current, &colorMaskData->shared->working, sizeof( ColorMaskSettings ) ) == 0)
+			if (memcmp( &colorMaskData->shared->current, &colorMaskData->shared->working, sizeof( ColorMaskSettings ) ) != 0)
 			{
 				CoronaRendererSetOperationStateDirty( rendererToken, &colorMaskData->shared->stateToken );
 			}
@@ -1087,7 +1087,7 @@ static int ColorMaskObject( lua_State * L )
 			{
 				if (size >= sizeof( ScopeMessagePayload ) )
 				{
-					const ScopeMessagePayload * payload = static_cast< const ScopeMessagePayload * >( payload );
+					const ScopeMessagePayload * payload = static_cast< const ScopeMessagePayload * >( data );
 
 					if ('w' == message[0] && !sharedColorMaskData->hasSetID)
 					{
@@ -1107,7 +1107,7 @@ static int ColorMaskObject( lua_State * L )
 
 							sharedColorMaskData->stack.pop_back();
 
-							if (memcmp( &sharedColorMaskData->working, &sharedColorMaskData->current, sizeof( ColorMaskSettings ) ) == 0)
+							if (memcmp( &sharedColorMaskData->working, &sharedColorMaskData->current, sizeof( ColorMaskSettings ) ) != 0)
 							{
 								CoronaRendererSetOperationStateDirty( payload->rendererToken, &sharedColorMaskData->stateToken );
 							}

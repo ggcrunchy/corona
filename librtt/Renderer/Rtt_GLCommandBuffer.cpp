@@ -678,6 +678,7 @@ GLCommandBuffer::IssueCommand( U16 id, const void * data, U32 size )
 	Command custom = Command( kNumCommands + id );
 
 	WRITE_COMMAND( custom );
+	Write< U32 >( size );
 
 	U8 * buffer = Reserve( size );
 
@@ -969,7 +970,11 @@ GLCommandBuffer::Execute( bool measureGPU )
 
 				if (id < fCustomCommands.Length())
 				{
-					fOffset += fCustomCommands[id].fReader( fOffset );
+					U32 size = Read< U32 >();
+
+					fCustomCommands[id].fReader( fOffset, size );
+
+					fOffset += size;
 				}
 
 				else

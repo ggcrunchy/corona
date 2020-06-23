@@ -232,7 +232,7 @@ CallOps( Rtt::Renderer * renderer, Rtt::Array< Renderer::CustomOp > & ops, T fla
 
 		while (flags)
 		{
-			U32 lowest = LowestBit( flags );
+			T lowest = LowestBit( flags );
 			Renderer::CustomOp & op = ops[ Log2OfPower( lowest ) ];
 
 			op.fAction( &token, op.fUserData );
