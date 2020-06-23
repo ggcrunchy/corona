@@ -34,53 +34,56 @@
 
 #define SIZE_MINUS_OFFSET(TYPE, OFFSET) sizeof( TYPE ) - OFFSET
 #define OFFSET_OF_MEMBER(NAME, MEMBER_NAME) offsetof( CoronaObject##NAME##Params, MEMBER_NAME )
-#define SIZE_FROM_MEMBER(NAME, MEMBER_NAME)																									\
-	struct NAME##Struct { unsigned char _[ SIZE_MINUS_OFFSET( CoronaObject##NAME##Params, OFFSET_OF_MEMBER( NAME, MEMBER_NAME ) ) ]; } NAME
-#define SIZE_AFTER_HEADER(NAME) SIZE_FROM_MEMBER( NAME, ignoreOriginal )
-#define OFFSET_AFTER_HEADER(NAME) OFFSET_OF_MEMBER( NAME, ignoreOriginal )
+#define AFTER_HEADER_STRUCT(NAME, MEMBER_NAME)																									\
+	struct NAME##Struct { unsigned char bytes[ SIZE_MINUS_OFFSET( CoronaObject##NAME##Params, OFFSET_OF_MEMBER( NAME, MEMBER_NAME ) ) ]; } NAME
+#define AFTER_HEADER_FLAG(NAME) AFTER_HEADER_STRUCT( NAME, ignoreOriginal )
+#define AFTER_HEADER_ACTION(NAME) AFTER_HEADER_STRUCT( NAME, action )
+#define AFTER_HEADER_FLAG_OFFSET(NAME) OFFSET_OF_MEMBER( NAME, ignoreOriginal )
+#define AFTER_HEADER_ACTION_OFFSET(NAME) OFFSET_OF_MEMBER( NAME, action )
 
 union GenericParams {
-	SIZE_AFTER_HEADER( Basic );
-	SIZE_AFTER_HEADER( AddedToParent );
-	SIZE_AFTER_HEADER( DidInsert );
-	SIZE_AFTER_HEADER( Matrix );
-	SIZE_AFTER_HEADER( Draw );
-	SIZE_AFTER_HEADER( RectResult );
-	SIZE_AFTER_HEADER( RemovedFromParent );
-	SIZE_AFTER_HEADER( Rotate );
-	SIZE_AFTER_HEADER( Scale );
-	SIZE_AFTER_HEADER( Translate );
+	AFTER_HEADER_FLAG( Basic );
+	AFTER_HEADER_FLAG( AddedToParent );
+	AFTER_HEADER_FLAG( DidInsert );
+	AFTER_HEADER_FLAG( Matrix );
+	AFTER_HEADER_FLAG( Draw );
+	AFTER_HEADER_FLAG( RectResult );
+	AFTER_HEADER_FLAG( RemovedFromParent );
+	AFTER_HEADER_FLAG( Rotate );
+	AFTER_HEADER_FLAG( Scale );
+	AFTER_HEADER_FLAG( Translate );
 
-	SIZE_AFTER_HEADER( BooleanResult );
-	SIZE_AFTER_HEADER( BooleanResultPoint );
-	SIZE_AFTER_HEADER( BooleanResultMatrix );
+	AFTER_HEADER_FLAG( BooleanResult );
+	AFTER_HEADER_FLAG( BooleanResultPoint );
+	AFTER_HEADER_FLAG( BooleanResultMatrix );
 
-	SIZE_AFTER_HEADER( SetValue );
-	SIZE_AFTER_HEADER( Value );
+	AFTER_HEADER_FLAG( SetValue );
+	AFTER_HEADER_FLAG( Value );
 
-	SIZE_FROM_MEMBER( Lifetime, action );
-	SIZE_FROM_MEMBER( OnMessage, action );
+	AFTER_HEADER_ACTION( Lifetime );
+	AFTER_HEADER_ACTION( OnMessage );
 };
 
 template<typename T> T
 FindParams( const unsigned char * stream, unsigned short method, size_t offset )
 {
 	static_assert( kAugmentedMethod_Count < 256, "Stream assumes byte-sized methods" );
-
-	unsigned int count = *stream++;
 	
 	T out = {};
+
+	unsigned int count = *stream;
+	const unsigned char * methods = stream + 1, * genericParams = methods + count;
 
 	if (method < count) // methods are sorted, so cannot take more than `method` steps
 	{
 		count = method;
 	}
 
-	for (unsigned int i = 0, n = count; i < n; ++i) 
+	for (unsigned int i = 0; i < count; ++i, genericParams += sizeof( GenericParams )) 
 	{
-		if (stream[i] == method)
+		if (methods[i] == method)
 		{
-			memcpy( reinterpret_cast< unsigned char * >( &out ) + offset, stream + count + i * sizeof( GenericParams ), SIZE_MINUS_OFFSET( T, offset ) );
+			memcpy( reinterpret_cast< unsigned char * >( &out ) + offset, genericParams, SIZE_MINUS_OFFSET( T, offset ) );
 
 			break;
 		}
@@ -147,65 +150,67 @@ SetValueEpilogue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], i
 	return result;
 }
 
-#define CORONA_OBJECTS_VTABLE(OBJECT_KIND, PROXY_KIND)	\
-								 						\
-class OBJECT_KIND##2ProxyVTable : public Rtt::Lua##PROXY_KIND##ObjectProxyVTable	\
-{																					\
-public:																				\
-	typedef OBJECT_KIND##2ProxyVTable Self;				\
-	typedef Lua##PROXY_KIND##ObjectProxyVTable Super;	\
-														\
-public:																			 \
-	static const Self& Constant() { static const Self kVTable; return kVTable; } \
-																				 \
-protected:							\
-	OBJECT_KIND##2ProxyVTable() {}	\
-									\
-public:																																			\
-	virtual int ValueForKey( lua_State *L, const Rtt::MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const			\
-	{																																			\
-		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);															\
-		const auto params = FindParams< CoronaObjectValueParams >( resolved.fStream, kAugmentedMethod_Value, OFFSET_AFTER_HEADER( Value ) );	\
-		void * userData = const_cast< void * >( resolved.fUserData );																			\
-		int result = 0;																															\
-																																				\
-		if (!ValuePrologue( L, object, key, userData, params, &result ))	\
-		{																	\
-			return result;													\
-		}																	\
-																			\
-		else if (!params.ignoreOriginal)													\
-		{																					\
-			result += Super::Constant().ValueForKey( L, object, key, overrideRestriction );	\
-		}																					\
-																							\
-		return ValueEpilogue( L, object, key, userData, params, result );	\
-	}																		\
-																			\
-	virtual bool SetValueForKey( lua_State *L, Rtt::MLuaProxyable& object, const char key[], int valueIndex ) const										\
-	{																																					\
-		const OBJECT_KIND##2 & resolved = static_cast<const OBJECT_KIND##2 &>(object);																	\
-		const auto params = FindParams< CoronaObjectSetValueParams >( resolved.fStream, kAugmentedMethod_SetValue, OFFSET_AFTER_HEADER( SetValue ) );	\
-		void * userData = const_cast< void * >( resolved.fUserData );																					\
-		int result = 0;																																	\
-																																						\
-		if (!SetValuePrologue( L, object, key, valueIndex, userData, params, &result ))	\
-		{																				\
-			return result;																\
-		}																				\
-																						\
-		else if (!params.ignoreOriginal)											\
-		{																			\
-			result = Super::Constant().SetValueForKey( L, object, key, valueIndex );\
-		}																			\
-																					\
-		return SetValueEpilogue( L, object, key, valueIndex, userData, params, result );	\
-	}																						\
-																							\
-	virtual const LuaProxyVTable& Parent() const { return Super::Constant(); }	\
-};																				\
-																				\
-const Rtt::LuaProxyVTable& OBJECT_KIND##2::ProxyVTable() const { return OBJECT_KIND##2ProxyVTable::Constant(); }
+template<typename Proxy2, typename BaseProxyVTable>
+class Proxy2VTable : public BaseProxyVTable
+{
+public:
+	typedef Proxy2VTable Self;
+	typedef BaseProxyVTable Super;
+
+public:
+	static const Self& Constant() { static const Self kVTable; return kVTable; }
+
+protected:
+	Proxy2VTable() {}
+
+public:
+	virtual int ValueForKey( lua_State *L, const Rtt::MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const
+	{
+		const Proxy2 & resolved = static_cast< const Proxy2 & >( object );
+		const auto params = FindParams< CoronaObjectValueParams >( resolved.fStream, kAugmentedMethod_Value, AFTER_HEADER_FLAG_OFFSET( Value ) );
+		void * userData = const_cast< void * >( resolved.fUserData );
+		int result = 0;
+
+		if (!ValuePrologue( L, object, key, userData, params, &result ))
+		{
+			return result;
+		}
+
+		else if (!params.ignoreOriginal)
+		{
+			result += Super::Constant().ValueForKey( L, object, key, overrideRestriction );
+		}
+
+		return ValueEpilogue( L, object, key, userData, params, result );
+	}
+
+	virtual bool SetValueForKey( lua_State *L, Rtt::MLuaProxyable& object, const char key[], int valueIndex ) const
+	{
+		const Proxy2 & resolved = static_cast< const Proxy2 & >( object );
+		const auto params = FindParams< CoronaObjectSetValueParams >( resolved.fStream, kAugmentedMethod_SetValue, AFTER_HEADER_FLAG_OFFSET( SetValue ) );
+		void * userData = const_cast< void * >( resolved.fUserData );
+		int result = 0;
+
+		if (!SetValuePrologue( L, object, key, valueIndex, userData, params, &result ))
+		{
+			return result;
+		}
+
+		else if (!params.ignoreOriginal)
+		{
+			result = Super::Constant().SetValueForKey( L, object, key, valueIndex );
+		}
+
+		return SetValueEpilogue( L, object, key, valueIndex, userData, params, result );
+	}
+
+	virtual const Rtt::LuaProxyVTable& Parent() const { return Super::Constant(); }
+	virtual const Rtt::LuaProxyVTable& ProxyVTable() const { return Self::Constant(); }
+};
+
+#define CORONA_OBJECTS_VTABLE(OBJECT_KIND, PROXY_KIND)															\
+	class OBJECT_KIND##2;																						\
+	typedef Proxy2VTable< OBJECT_KIND##2, Rtt::Lua##PROXY_KIND##ObjectProxyVTable > OBJECT_KIND##2ProxyVTable
 
 static bool
 PushFactory( lua_State * L, const char * name )
@@ -229,13 +234,29 @@ struct StreamAndUserData {
 
 static StreamAndUserData sStreamAndUserData;
 
+static void
+OnCreate( const void * object, void * userData, const unsigned char * stream )
+{
+	const auto params = FindParams< CoronaObjectLifetimeParams >( stream, kAugmentedMethod_OnCreate, sizeof( CoronaObjectLifetimeParams ) - sizeof( GenericParams::Lifetime ) );
+
+	if (params.action)
+	{
+		params.action( object, userData );
+	}
+}
+
 #define CORONA_OBJECTS_BIND_STREAM_AND_USER_DATA(INDEX)							\
 	sStreamAndUserData.stream = (unsigned char *)lua_touserdata( L, INDEX );	\
 	sStreamAndUserData.userData = userData
 
-#define CORONA_OBJECTS_ASSIGN_STREAM_AND_USER_DATA(OBJECT)	\
-	OBJECT->fStream = sStreamAndUserData.stream;			\
-	OBJECT->fUserData = sStreamAndUserData.userData
+#define CORONA_OBJECTS_ON_CREATE(OBJECT)				\
+	OBJECT->fStream = sStreamAndUserData.stream;		\
+	OBJECT->fUserData = sStreamAndUserData.userData;	\
+														\
+	sStreamAndUserData.stream = NULL;	\
+	sStreamAndUserData.userData = NULL;	\
+										\
+	OnCreate( OBJECT, OBJECT->fUserData, OBJECT->fStream )
 
 static bool 
 CallNewFactory (lua_State * L, const char * name, void * func)
@@ -259,7 +280,7 @@ GetSizes( unsigned short method, size_t & fullSize, size_t & paramSize )
 {
 #define GET_SIZES(NAME)									\
 	fullSize = sizeof( CoronaObject##NAME##Params );	\
-	paramSize = sizeof( GenericParams::NAME )
+	paramSize = sizeof( GenericParams::NAME.bytes )
 
 #define UNIQUE_METHOD(NAME)		\
 	kAugmentedMethod_##NAME:	\
@@ -339,9 +360,9 @@ BuildMethodStream( lua_State * L, const CoronaObjectParamsHeader * head )
 
 	std::vector< const CoronaObjectParamsHeader * > params;
 
-	for (const CoronaObjectParamsHeader * cur = head->method != kAugmentedMethod_None ? head : head->next; cur; cur = cur->next)
+	for (const CoronaObjectParamsHeader * cur = head; cur; cur = cur->next)
 	{
-		if (cur->method != kAugmentedMethod_None)
+		if (cur->method != kAugmentedMethod_None) // allow these as a convenience, mainly for the head
 		{
 			params.push_back( cur );
 		}
@@ -352,13 +373,15 @@ BuildMethodStream( lua_State * L, const CoronaObjectParamsHeader * head )
 		return false;
 	}
 
+	// After being built, the stream is immutable, so sort by method to allow some additional optimizations.
 	std::sort( params.begin(), params.end(), [](const CoronaObjectParamsHeader * p1, const CoronaObjectParamsHeader * p2) { return p1->method < p2->method; });
 
-	if ((unsigned short)( kAugmentedMethod_None ) == params.front()->method || params.back()->method >= (unsigned short)( kAugmentedMethod_Count ))
+	if (params.back()->method >= (unsigned short)( kAugmentedMethod_Count )) // has bogus method(s)?
 	{
 		return false;
 	}
 
+	// Check for duplicates.
 	unsigned short prev = (unsigned short)~0U;
 
 	for ( const CoronaObjectParamsHeader * header : params )
@@ -376,18 +399,18 @@ BuildMethodStream( lua_State * L, const CoronaObjectParamsHeader * head )
 	luaL_newmetatable( L, CORONA_OBJECTS_STREAM_METATABLE_NAME ); // ..., stream, mt
 	lua_setmetatable( L, -2 ); // ..., stream; stream.metatable = mt
 
-	*stream++ = (unsigned char)( params.size() );
+	*stream = (unsigned char)( params.size() );
 
-	GenericParams * genericParams = reinterpret_cast< GenericParams * >( stream + params.size() );
+	unsigned char * methods = stream + 1, * genericParams = methods + params.size();
 
-	for ( const CoronaObjectParamsHeader * header : params )
+	for (size_t i = 0; i < params.size(); ++i, genericParams += sizeof( GenericParams ))
 	{
-		*stream++ = (unsigned char)header->method;
+		methods[i] = (unsigned char)params[i]->method;
 
 		size_t fullSize, paramSize;
 
-		GetSizes( header->method, fullSize, paramSize );
-		memcpy( genericParams++, reinterpret_cast< const unsigned char * >( header ) + (fullSize - paramSize), paramSize );
+		GetSizes( params[i]->method, fullSize, paramSize ); // we no longer need the next pointers and have the methods in front, so only want the post-header size...
+		memcpy( genericParams, reinterpret_cast< const unsigned char * >( params[i] ) + (fullSize - paramSize), paramSize ); // ...and content
 	}
 
 	return true;
@@ -428,40 +451,48 @@ GetStream( lua_State * L, const CoronaObjectsParams * params )
 	return hasStream;
 }
 
-#define CORONA_OBJECTS_PUSH(OBJECT_KIND)				\
-	if (!GetStream( L, params )) /* ...[, stream] */	\
-	{													\
-		return 0;										\
-	}	\
-		\
-	lua_insert( L, 1 ); /* stream, ... */	\
-											\
-	CORONA_OBJECTS_BIND_STREAM_AND_USER_DATA( 1 );	\
-													\
-	if (CallNewFactory( L, "new" #OBJECT_KIND, &New##OBJECT_KIND##2) ) /* stream[, object] */	\
-	{																							\
-		OBJECT_KIND##2 * object = (OBJECT_KIND##2 *)Rtt::LuaProxy::GetProxyableObject( L, 2 );	\
-																							\
-		lua_insert( L, 1 ); /* object, stream */	\
-													\
-		object->fRef = luaL_ref( L, LUA_REGISTRYINDEX ); /* ..., object; registry = { ..., [ref] = stream } */	\
-																												\
-		const auto params = FindParams< CoronaObjectLifetimeParams >( object->fStream, kAugmentedMethod_OnCreate, sizeof( CoronaObjectLifetimeParams ) - sizeof( GenericParams::Lifetime ) );	\
-																																																\
-		if (params.action)						\
-		{										\
-			params.action( object, userData );	\
-		}										\
-					\
-		return 1;	\
-	}	\
-		\
-	else							\
-	{								\
-		lua_pop( L, 1 ); /* ... */	\
-	}	\
-		\
-	return 0
+template<typename T>
+int PushObject( lua_State * L, void * userData, const CoronaObjectParams * params, const char * name, void * func )
+{
+	if (!GetStream( L, params )) // ...[, stream]
+	{
+		return 0;
+	}
+
+	lua_insert( L, 1 ); // stream, ...
+
+	CORONA_OBJECTS_BIND_STREAM_AND_USER_DATA( 1 );
+
+	if (CallNewFactory( L, name, func )) // stream[, object]
+	{
+		T * object = (T *)Rtt::LuaProxy::GetProxyableObject( L, 2 );
+
+		lua_insert( L, 1 ); // object, stream
+
+		if (!params->useRef) // temporary?
+		{
+			object->fRef = luaL_ref( L, LUA_REGISTRYINDEX ); // object; registry = { ..., [ref] = stream }
+		}
+		
+		else // guard stream in case reference is dropped; this is redundant after the first object using the stream, but harmless
+		{
+			lua_pushlightuserdata( L, lua_touserdata( L, -1 ) ); // object, stream, stream_ptr
+			lua_insert( L, 2 ); // object, stream_ptr, stream
+			lua_rawset( L, LUA_REGISTRYINDEX ); // object; registry = { [stream_ptr] = stream }
+		}
+
+		return 1;
+	}
+
+	else
+	{
+		lua_pop( L, 1 ); // ...
+	}
+
+	return 0;
+}
+
+#define CORONA_OBJECTS_PUSH(OBJECT_KIND) return PushObject< OBJECT_KIND##2 >( L, userData, params, "new" #OBJECT_KIND, &New##OBJECT_KIND##2 )
 
 #define FIRST_ARGS this, fUserData
 #define CORONA_OBJECTS_METHOD_BOOKEND(WHEN, ...)	\
@@ -563,7 +594,7 @@ Copy3 (float * dst, const float * src)
 
 #define CORONA_OBJECTS_GET_PARAMS(PARAMS_TYPE) CORONA_OBJECTS_GET_PARAMS_SPECIFIC(PARAMS_TYPE, PARAMS_TYPE)
 
-#define CORONA_OBJECTS_INTERFACE()											\
+#define CORONA_OBJECTS_INTERFACE(OBJECT_KIND)								\
 	virtual void AddedToParent( lua_State * L, Rtt::GroupObject * parent )	\
 	{																		\
 		CORONA_OBJECTS_GET_PARAMS( AddedToParent );					\
@@ -709,8 +740,8 @@ Copy3 (float * dst, const float * src)
 		CORONA_OBJECTS_METHOD( WillMoveOnscreen )						\
 	}	\
 		\
-	virtual const Rtt::LuaProxyVTable& ProxyVTable() const;	\
-															\
+	virtual const Rtt::LuaProxyVTable& ProxyVTable() const { return OBJECT_KIND##2ProxyVTable::Constant(); }	\
+																												\
 	unsigned char * fStream;	\
 	mutable void * fUserData;	\
 	int fRef
@@ -726,9 +757,13 @@ int CoronaObjectsBuildMethodStream( lua_State * L, const CoronaObjectParamsHeade
 	return LUA_REFNIL;
 }
 
+#define CORONA_OBJECTS_DEFAULT_INITIALIZATION() fStream( NULL ), fUserData( NULL ), fRef( LUA_NOREF )
+
 /**
 TODO
 */
+CORONA_OBJECTS_VTABLE( Group, Group );
+
 class Group2 : public Rtt::GroupObject {
 public:
 	typedef Group2 Self;
@@ -736,7 +771,11 @@ public:
 
 public:
 
-	Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject );
+	Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
+		: GroupObject( allocator, stageObject ),
+		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
+	{
+	}
 
 	virtual void DidInsert( bool childParentChanged )
 	{
@@ -750,25 +789,15 @@ public:
 		CORONA_OBJECTS_METHOD( DidRemove )
 	}
 
-	CORONA_OBJECTS_INTERFACE();
+	CORONA_OBJECTS_INTERFACE( Group );
 };
-
-#define CORONA_OBJECTS_DEFAULT_INITIALIZATION() fStream( NULL ), fUserData( NULL ), fRef( LUA_NOREF )
-
-Group2::Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
-	: GroupObject( allocator, stageObject ),
-	CORONA_OBJECTS_DEFAULT_INITIALIZATION()
-{
-}
-
-CORONA_OBJECTS_VTABLE( Group, Group )
 
 static Rtt::GroupObject *
 NewGroup2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
 {
     Group2 * group = Rtt_NEW( allocator, Group2( allocator, NULL ) );
 
-	CORONA_OBJECTS_ASSIGN_STREAM_AND_USER_DATA( group );
+	CORONA_OBJECTS_ON_CREATE( group );
 
 	return group;
 }
@@ -782,24 +811,22 @@ int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaObjectPa
 /**
 TODO
 */
+CORONA_OBJECTS_VTABLE( Rect, Shape );
+
 class Rect2 : public Rtt::RectObject {
 public:
 	typedef Rect2 Self;
 	typedef Rtt::RectObject Super;
 
 public:
-	Rect2( Rtt::RectPath * path );
+	Rect2( Rtt::RectPath * path )
+		: RectObject( path ),
+		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
+	{
+	}
 
-	CORONA_OBJECTS_INTERFACE();
+	CORONA_OBJECTS_INTERFACE( Rect );
 };
-
-Rect2::Rect2( Rtt::RectPath * path )
-	: RectObject( path ),
-	CORONA_OBJECTS_DEFAULT_INITIALIZATION()
-{
-}
-
-CORONA_OBJECTS_VTABLE( Rect, Shape )
 
 static Rtt::RectObject *
 NewRect2( Rtt_Allocator* pAllocator, Rtt::Real width, Rtt::Real height )
@@ -807,7 +834,7 @@ NewRect2( Rtt_Allocator* pAllocator, Rtt::Real width, Rtt::Real height )
 	Rtt::RectPath * path = Rtt::RectPath::NewRect( pAllocator, width, height );
 	Rect2 * rect = Rtt_NEW( pAllocator, Rect2( path ) );
 
-	CORONA_OBJECTS_ASSIGN_STREAM_AND_USER_DATA( rect );
+	CORONA_OBJECTS_ON_CREATE( rect );
 
 	return rect;
 }
@@ -821,31 +848,29 @@ int CoronaObjectsPushRect( lua_State * L, void * userData, const CoronaObjectPar
 /**
 TODO
 */
+CORONA_OBJECTS_VTABLE( Snapshot, Snapshot );
+
 class Snapshot2 : public Rtt::SnapshotObject {
 public:
 	typedef Snapshot2 Self;
 	typedef Rtt::SnapshotObject Super;
 
 public:
-	Snapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real contentW, Rtt::Real contentH );
+	Snapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real contentW, Rtt::Real contentH )
+		: SnapshotObject( pAllocator, display, contentW, contentH ),
+		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
+	{
+	}
 
-	CORONA_OBJECTS_INTERFACE();
+	CORONA_OBJECTS_INTERFACE( Snapshot );
 };
-
-Snapshot2::Snapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real contentW, Rtt::Real contentH )
-	: SnapshotObject( pAllocator, display, contentW, contentH ),
-	CORONA_OBJECTS_DEFAULT_INITIALIZATION()
-{
-}
-
-CORONA_OBJECTS_VTABLE( Snapshot, Snapshot )
 
 static Rtt::SnapshotObject *
 NewSnapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real width, Rtt::Real height )
 {
 	Snapshot2 * snapshot = Rtt_NEW( pAllocator, Snapshot2( pAllocator, display, width, height ) );
 
-	CORONA_OBJECTS_ASSIGN_STREAM_AND_USER_DATA( snapshot );
+	CORONA_OBJECTS_ON_CREATE( snapshot );
 
 	return snapshot;
 }
@@ -895,7 +920,9 @@ int CoronaObjectSendMessage( const void * object, const char * message, const vo
 
 #undef SIZE_MINUS_OFFSET
 #undef OFFSET_OF_MEMBER
-#undef SIZE_FROM_MEMBER
-#undef SIZE_AFTER_HEADER
-#undef OFFSET_AFTER_HEADER
+#undef AFTER_HEADER_STRUCT
+#undef AFTER_HEADER_FLAG
+#undef AFTER_HEADER_ACTION
+#undef AFTER_HEADER_FLAG_OFFSET
+#undef AFTER_HEADER_ACTION_OFFSET
 #undef FIRST_ARGS

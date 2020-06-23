@@ -1148,9 +1148,7 @@ static int ColorMaskObject( lua_State * L )
 
 	colorMaskData->shared = sharedColorMaskData.object;
 
-	CoronaObjectsPushRect( L, colorMaskData, &sharedColorMaskData.object->params );
-
-	return 0;
+	return CoronaObjectsPushRect( L, colorMaskData, &sharedColorMaskData.object->params );
 }
 
 // /STEVE CHANGE
