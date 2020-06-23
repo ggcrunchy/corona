@@ -287,14 +287,6 @@ Renderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real c
 	fBackCommandBuffer->SetBlendEquation( fPrevious.fBlendEquation );
 
 	// STEVE CHANGE
-	// Add pending commands
-	for (int i = 0; i < fPendingCommands.Length(); ++i)
-	{
-		fBackCommandBuffer->AddCommand( fPendingCommands[i] );
-	}
-
-	fPendingCommands.Clear();
-
 	CallOps( this, fBeginFrameOps, fBeginFrameFlags );
 
 	fBeginFrameFlags = 0U;
@@ -888,6 +880,15 @@ Renderer::Swap()
 	fFrontCommandBuffer = fBackCommandBuffer;
 	fBackCommandBuffer = temp;
 	fGeometryPool->Swap();
+// STEVE CHANGE
+	// Add pending commands
+	for (int i = 0; i < fPendingCommands.Length(); ++i)
+	{
+		fBackCommandBuffer->AddCommand( fPendingCommands[i] );
+	}
+
+	fPendingCommands.Clear();
+// /STEVE CHANGE
 }
 
 void
@@ -943,7 +944,7 @@ Renderer::AddCustomCommand( const CoronaCommand & command )
 		return 0U;
 	}
 
-	fFrontCommandBuffer->AddCommand( command );
+	fBackCommandBuffer->AddCommand( command );
 
 	fPendingCommands.Append( command );
 
@@ -992,7 +993,7 @@ Renderer::IssueCustomCommand( U16 id, const void * data, U32 size )
 {
 	if (id < fCommandCount)
 	{
-		fFrontCommandBuffer->IssueCommand( id, data, size );
+		fBackCommandBuffer->IssueCommand( id, data, size );
 
 		return true;
 	}

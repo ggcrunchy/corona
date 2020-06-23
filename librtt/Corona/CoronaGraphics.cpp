@@ -22,7 +22,9 @@
 // STEVE CHANGE
 #include "Display/Rtt_ShaderFactory.h"
 #include "Renderer/Rtt_CommandBuffer.h"
+#include "Renderer/Rtt_Geometry_Renderer.h"
 #include "Renderer/Rtt_Renderer.h"
+#include "Renderer/Rtt_RenderData.h"
 // /STEVE CHANGE
 
 #include "Display/Rtt_TextureResourceExternalAdapter.h"
@@ -167,7 +169,7 @@ void CoronaGraphicsEncodeAsTokens ( CoronaGraphicsToken tokens[], unsigned char 
 template<typename T> int
 SetFlagStyleToken( CoronaGraphicsToken * token, TokenType type, U16 index )
 {
-	T flag = 1U << (index - 1U);
+	T flag = T(1U) << (index - 1U);
 
 	CoronaGraphicsTokenWrite( token, type, &flag, sizeof( T ) );
 

@@ -558,7 +558,7 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 		}
 	}
 
-	else
+	else if (!lua_isnil( L, -1 ))
 	{
 		CoronaLuaWarning( L, "Customization expected to be a string, got %s", luaL_typename( L, -1 ) );
 	}

@@ -267,7 +267,7 @@ static int ScopeGroupObject( lua_State * L )
 		{
 			ScopeMessagePayload payload = { rendererToken, sScopeDrawSessionID++ };
 
-			for (int i = CoronaGroupObjectGetNumChildren( groupObject ) - 1; i; --i)
+			for (int i = CoronaGroupObjectGetNumChildren( groupObject ); i; --i)
 			{
 				CoronaObjectSendMessage( CoronaGroupObjectGetChild( groupObject, i - 1 ), "didDraw", &payload, sizeof( ScopeMessagePayload ) );
 			}
@@ -362,14 +362,17 @@ static SharedStencilState * InitSharedStencilState( lua_State * L )
 
 		CoronaRendererRegisterCommand( L, &state.object->commandToken, &command );
 
-		CoronaRendererOp clear = [](const CoronaGraphicsToken * rendererToken, void * userData) {
+		CoronaRendererRegisterBeginFrameOp( L, &state.object->beginFrameToken, [](const CoronaGraphicsToken * rendererToken, void * userData) {
+			SharedStencilState * state = static_cast< SharedStencilState * >( userData );
+			int clear = 0;
+
+			CoronaRendererIssueCommand( rendererToken, &state->commandToken, &clear, sizeof( int ) );
+		}, state.object );
+		CoronaRendererRegisterClearOp( L, &state.object->clearToken, [](const CoronaGraphicsToken * rendererToken, void * userData) {
 			SharedStencilState * state = static_cast< SharedStencilState * >( userData );
 
-			CoronaRendererIssueCommand ( rendererToken, &state->commandToken, &state->clear, sizeof( int ) );
-		};
-		
-		CoronaRendererRegisterBeginFrameOp( L, &state.object->beginFrameToken, clear, state.object );
-		CoronaRendererRegisterClearOp( L, &state.object->clearToken, clear, state.object );
+			CoronaRendererIssueCommand( rendererToken, &state->commandToken, &state->clear, sizeof( int ) );
+		}, state.object );
 	}
 
 	return state.object;
@@ -511,7 +514,7 @@ static int StencilStateObject( lua_State * L )
 	static int sNonce;
 
 	struct SharedStencilStateData {
-		CoronaGraphicsToken commandToken, stateToken;
+		CoronaGraphicsToken beginFrameToken, commandToken, stateToken;
 		CoronaObjectParams params;
 		SharedStencilState * state;
 	};
@@ -570,6 +573,15 @@ static int StencilStateObject( lua_State * L )
 		};
 
 		CoronaRendererRegisterCommand( L, &sharedStateData.object->commandToken, &command );
+		CoronaRendererRegisterBeginFrameOp( L, &sharedStateData.object->beginFrameToken, [](const CoronaGraphicsToken * rendererToken, void * userData) {
+			SharedStencilStateData * stateData = static_cast< SharedStencilStateData * >( userData );
+			SharedStencilState * state = stateData->state;
+			StencilSettings settings[] = { state->current.settings, StencilSettings{} };
+
+			CoronaRendererIssueCommand( rendererToken, &stateData->commandToken, &settings, sizeof( settings ) );
+
+			state->current.settings = state->working.settings = StencilSettings{};
+		}, sharedStateData.object );
 		CoronaRendererRegisterStateOp( L, &sharedStateData.object->stateToken, [](const CoronaGraphicsToken * rendererToken, void * userData) {
 			SharedStencilStateData * stateData = static_cast< SharedStencilStateData * >( userData );
 			SharedStencilState * state = stateData->state;
@@ -579,6 +591,7 @@ static int StencilStateObject( lua_State * L )
 			CoronaRendererIssueCommand( rendererToken, &stateData->commandToken, settings, sizeof( settings ) );
 			CoronaRendererEnableClear( rendererToken, &state->clearToken, true );
 			CoronaRendererScheduleForNextFrame( rendererToken, &state->beginFrameToken, kBeginFrame_Schedule );
+			CoronaRendererScheduleForNextFrame( rendererToken, &stateData->beginFrameToken, kBeginFrame_Schedule );
 
 			state->current = state->working;
 			state->anySinceClear = true;
@@ -676,7 +689,7 @@ static int StencilStateObject( lua_State * L )
 
 				else if (lua_isstring( L, valueIndex ))
 				{
-					const char * names[] = { "NEVER", "LESS", "EQUAL", "GREATER", "GEQUAL", "LEQUAL", "NOTEQUAL", "ALWAYS", nullptr };
+					const char * names[] = { "never", "less", "equal", "greater", "greaterThanOrEqual", "lessThanOrEqual", "notEqual", "always", nullptr };
 					int index = FindName( L, valueIndex, names );
 
 					if (names[index])
@@ -726,7 +739,7 @@ static int StencilStateObject( lua_State * L )
 
 				else if (lua_isstring( L, valueIndex ))
 				{
-					const char * names[] = { "KEEP", "ZERO", "REPLACE", "INCR", "INCR_WRAP", "DECR", "DECR_WRAP", "INVERT", nullptr };
+					const char * names[] = { "keep", "zero", "replace", "increment", "incrementWrap", "decrement", "decrementWrap", "invert", nullptr };
 					int index = FindName( L, valueIndex, names );
 
 					if (names[index])
@@ -958,12 +971,17 @@ static int ColorMaskObject( lua_State * L )
 			SharedColorMaskData * colorMaskData = static_cast< SharedColorMaskData * >( userData );
 			ColorMaskSettings defSettings; // TODO: configurable?
 
-			CoronaRendererIssueCommand ( rendererToken, &colorMaskData->commandToken, &defSettings, sizeof( ColorMaskSettings ) );
+			CoronaRendererIssueCommand( rendererToken, &colorMaskData->commandToken, &defSettings, sizeof( ColorMaskSettings ) );
+
+			colorMaskData->current = colorMaskData->working = defSettings;
 		}, sharedColorMaskData.object );
 		CoronaRendererRegisterStateOp( L, &sharedColorMaskData.object->stateToken, [](const CoronaGraphicsToken * rendererToken, void * userData ) {
 			SharedColorMaskData * colorMaskData = static_cast< SharedColorMaskData * >( userData );
 
-			CoronaRendererIssueCommand ( rendererToken, &colorMaskData->commandToken, &colorMaskData->working, sizeof( ColorMaskSettings ) );
+			CoronaRendererIssueCommand( rendererToken, &colorMaskData->commandToken, &colorMaskData->working, sizeof( ColorMaskSettings ) );
+			CoronaRendererScheduleForNextFrame( rendererToken, &colorMaskData->beginFrameToken, kBeginFrame_Schedule );
+			
+			colorMaskData->current = colorMaskData->working;
 		}, sharedColorMaskData.object );
 
 		CoronaObjectParamsHeader paramsList = {};
@@ -1055,17 +1073,17 @@ static int ColorMaskObject( lua_State * L )
 						break;
 					case 1:
 						colorMaskData->settings.green = enable;
-						colorMaskData->hasRed = true;
+						colorMaskData->hasGreen = true;
 
 						break;
 					case 2:
 						colorMaskData->settings.blue = enable;
-						colorMaskData->hasRed = true;
+						colorMaskData->hasBlue = true;
 
 						break;
 					case 3:
 						colorMaskData->settings.alpha = enable;
-						colorMaskData->hasRed = true;
+						colorMaskData->hasAlpha = true;
 
 						break;
 					default:
