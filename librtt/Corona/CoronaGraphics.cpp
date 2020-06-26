@@ -361,6 +361,62 @@ int CoronaRendererSetFrustum( const CoronaGraphicsToken * rendererToken, const f
 {
 	return 0;
 }
+
+CORONA_API
+unsigned int CoronaGeometryCopyData( CoronaShaderMapping * dst, const CoronaShaderMapping * src )
+{
+	if (!dst || !dst->data || !dst->layout || !dst->layout->stride || !src || !src->data || !src->layout)
+	{
+		return 0U;
+	}
+
+	if (dst->layout->count != src->layout->count || dst->layout->type != src->layout->type)
+	{
+		return 0U;
+	}
+
+	U32 valuesSize = 0U;
+
+	switch (dst->layout->type)
+	{
+	case kAttributeType_Byte:
+		valuesSize = 1U;
+		break;
+	case kAttributeType_Float:
+		valuesSize = 4U;
+		break;
+	default:
+		return 0U;
+	}
+
+	valuesSize *= dst->layout->count;
+
+	if (dst->layout->offset + valuesSize > dst->layout->stride || src->layout->offset + valuesSize > src->layout->stride)
+	{
+		return 0U;
+	}
+
+	U32 n = dst->size / dst->layout->stride;
+
+	if (src->layout->stride)
+	{
+		U32 n2 = src->size / src->layout->stride;
+
+		if (n2 < n)
+		{
+			n = n2;
+		}
+	}
+
+	U8 * dstData = reinterpret_cast< U8 * >( dst->data );
+
+	for (const U8 * srcData = reinterpret_cast< const U8 * >( src->data ); n; --n, srcData += src->layout->stride, dstData += dst->layout->stride)
+	{
+		memcpy( dstData, srcData, valuesSize );
+	}
+
+	return n;
+}
 // /STEVE CHANGE
 // ----------------------------------------------------------------------------
 

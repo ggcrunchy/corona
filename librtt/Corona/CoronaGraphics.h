@@ -215,12 +215,36 @@ typedef enum {
 /**
 TODO
 */
-typedef struct CoronaShaderAttribute {
-	const char * name;
+typedef enum {
+	/**
+	TODO
+	*/
+	kAttributeType_Byte,
+
+	/**
+	TODO
+	*/
+	kAttributeType_Float,
+
+	/**
+	TODO
+	*/
+	kAttributeType_Count
+} CoronaShaderAttributeType;
+
+typedef struct CoronaShaderAttributeData {
+	unsigned int count;
 	unsigned int offset;
-	unsigned int size;
-	unsigned int type;
 	unsigned int stride;
+	CoronaShaderAttributeType type;
+} CoronaShaderAttributeData;
+
+/**
+TODO
+*/
+typedef struct CoronaShaderAttribute {
+	CoronaShaderAttributeData data;
+	const char * name;
 	int normalized;
 } CoronaShaderAttribute;
 
@@ -239,6 +263,12 @@ typedef struct CoronaShaderSourceTransformParams {
 typedef const char ** (*CoronaShaderSourceTransformBegin)(CoronaShaderSourceTransformParams * params, void * key);
 typedef void (*CoronaShaderSourceTransformFinish)(const char * transformed[], unsigned int n, void * key);
 typedef void (*CoronaShaderSourceTransformStateCleanup)(void * key);
+
+typedef struct CoronaShaderMapping {
+	void * data;
+	const CoronaShaderAttributeData * layout;
+	unsigned int size;
+} CoronaShaderMapping;
 
 /**
 TODO
@@ -261,7 +291,27 @@ typedef struct CoronaShaderSourceTransform {
 	TODO
 	*/
 	CoronaShaderSourceTransformStateCleanup cleanup;
-} CroonaShaderSourceTransform;
+} CoronaShaderSourceTransform;
+
+typedef struct CoronaShaderParamsHeader {
+	struct CoronaShaderParamsHeader * next;
+	unsigned short method;
+} CoronaShaderParamsHeader;
+
+typedef void (*CoronaShaderPrepareBookend)(const void * shader, void * userData, void * renderData, int w, int h, int mod);
+typedef void (*CoronaShaderDrawBookend)(const void * shader, void * userData, const CoronaGraphicsToken * rendererToken, const void * renderData);
+
+typedef struct CoronaShaderPrepareParams {
+	CoronaShaderParamsHeader header;
+	unsigned short ignoreOriginal;
+	CoronaShaderPrepareBookend before, after;
+} CoronaShaderPrepareParams;
+
+typedef struct CoronaShaderDrawParams {
+	CoronaShaderParamsHeader header;
+	unsigned short ignoreOriginal;
+	CoronaShaderDrawBookend before, after;
+} CoronaShaderDrawParams;
 
 /**
 TODO
@@ -310,6 +360,12 @@ typedef struct CoronaShaderCallbacks {
 	TODO
 	*/
 	CoronaGraphicsToken * attributes;
+
+	/**
+	Required
+	TODO
+	*/
+	CoronaShaderParamsHeader * shaderParams;
 } CoronaShaderCallbacks;
 
 CORONA_API
@@ -367,6 +423,9 @@ int CoronaRendererIssueCommand( const CoronaGraphicsToken * rendererToken, const
 
 CORONA_API
 int CoronaRendererSetFrustum( const CoronaGraphicsToken * rendererToken, const float * viewMatrix, const float * projectionMatrix ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+unsigned int CoronaGeometryCopyData( CoronaShaderMapping * dst, const CoronaShaderMapping * src ) CORONA_PUBLIC_SUFFIX;
 // /STEVE CHANGE
 
 #endif // _CoronaGraphics_H__
