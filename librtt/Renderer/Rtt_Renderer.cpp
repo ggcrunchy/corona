@@ -190,7 +190,7 @@ Renderer::Initialize()
 template<typename T> T
 LowestBit( T x )
 {
-	return x & -x;
+	return x & (~x + T( 1 )); // -x (silence some warnings, since unsigned)
 }
 
 // https://graphics.stanford.edu/~seander/bithacks.html#IntegerLogDeBruijn with power of 2
@@ -216,7 +216,7 @@ Log2OfPower( U64 power )
 
 	v.power = power;
 
-	U32 index = !v.arr[0]; // if 0, choose 1
+	U64 index = !v.arr[0]; // if 0, choose 1
 
 	return (index << 32) + Log2OfPower( v.arr[index] );
 }

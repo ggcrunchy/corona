@@ -32,6 +32,10 @@
 #include "Display/Rtt_ShaderProxy.h"
 #include "Rtt_LuaContainer.h"
 
+// STEVE CHANGE
+#include "Corona/CoronaGraphics.h"
+// /STEVE CHANGE
+
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -548,7 +552,49 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 
 			if (!lua_isnil( L, -1 ))
 			{
-				resource->SetSourceTransform( (CoronaShaderSourceTransform *)lua_touserdata( L, -1 ) );
+				CoronaShaderSourceTransform * sourceTransform = (CoronaShaderSourceTransform *)lua_touserdata( L, -1 );
+
+				lua_getfield( L, index, "customizationDetails" ); // ..., customizations, details?
+
+				if (lua_istable( L, -1 ))
+				{
+					for (lua_pushnil( L ); lua_next( L, -2 ); lua_pop( L, 1 ))
+					{
+						bool isKeyString = lua_isstring( L, -2 ), isValueString = lua_isstring( L, -1 ) || lua_isnumber( L, -1 );
+
+						if (isKeyString && isValueString)
+						{
+							resource->AddSourceTransformDetails( lua_tostring( L, -2 ), lua_tostring( L, -2 ) );
+						}
+
+						else
+						{
+							if (isKeyString)
+							{
+								CoronaLuaWarning( L, "Invalid customization details: expected string, but got '%s' key (value = %s)", luaL_typename( L, -2 ), lua_tostring( L, -1 ) ); 
+							}
+
+							else if (isValueString)
+							{
+								CoronaLuaWarning( L, "Invalid customization details: expected string, but got '%s' value (key = %s)", luaL_typename( L, -1 ), lua_tostring( L, -2 ) ); 
+							}
+
+							else
+							{
+								CoronaLuaWarning( L, "Invalid customization details: expected strings, got '%s' key and '%s' value", luaL_typename( L, -2 ), luaL_typename( L, -1 ) );
+							}
+						}
+					}
+				}
+
+				else if (!lua_isnil( L, -1 ))
+				{
+					CoronaLuaWarning( L, "Expected details table, got %s", luaL_typename( L, -1 ) );
+				}
+					
+				lua_pop( L, 1 ); // ..., customizations
+
+				resource->SetSourceTransform( sourceTransform );
 			}
 
 			else
@@ -869,6 +915,59 @@ ShaderFactory::LoadCompiledShaderVersions(lua_State *L, int modeTableIndex, Shad
 
 #endif
 
+// STEVE CHANGE
+class OverloadedShader : public Shader // this largely follows ShaderProxy
+{
+public:
+	OverloadedShader( const CoronaShaderPrepare & prepare, const CoronaShaderDrawParams & drawParams )
+		: Shader(),
+		fPrepare( prepare ),
+		fDrawParams( drawParams )
+	{
+	}
+
+	virtual ~OverloadedShader() {}
+	
+public:
+	void SetShader(SharedPtr<Shader> inputShader) { fInputShader = inputShader; }
+
+	//Treat as protected
+	virtual void Log(std::string prepend, bool last)
+	{
+		if (fInputShader.NotNull())
+		{
+			fInputShader->Log( prepend, last );
+		}
+	}
+
+	virtual void SetTextureBounds( const TextureInfo& textureInfo ) { fInputShader->SetTextureBounds( textureInfo ); }
+	virtual bool HasChildren() { return fInputShader->HasChildren(); }
+	virtual void UpdateCache( const TextureInfo& textureInfo, const RenderData& objectData ) { fInputShader->UpdateCache( textureInfo, objectData ); }
+	virtual Texture *GetTexture() const { return fInputShader->GetTexture(); }
+	virtual void RenderToTexture( Renderer& renderer, Geometry& cache ) const { fInputShader->RenderToTexture( renderer, cache ); }
+	
+	// TODO: how to forward to adapter?
+
+	virtual void Prepare( RenderData& objectData, int w, int h, ShaderResource::ProgramMod mod )
+	{
+		fInputShader->Prepare( objectData, w, h, mod );
+
+		if (fPrepare)
+		{
+			fPrepare( this, NULL, &objectData, w, h, mod );
+		}
+	}
+
+	virtual void Draw( Renderer& renderer, const RenderData& objectData ) const
+	{
+	}
+
+private:
+	SharedPtr<Shader> fInputShader;
+	CoronaShaderPrepare fPrepare;
+	CoronaShaderDrawParams fDrawParams;
+};
+// /STEVE CHANGE
 
 ShaderComposite *
 ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *name)
@@ -960,7 +1059,9 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
 		}
 		lua_pop( L, 1 );
 	}
-
+	// STEVE CHANGE
+	// TODO: if we have prepare or draw, wrap with a forwarding shader (basically a proxy but does that logic)
+	// /STEVE CHANGE
 	return result;	
 }
 

@@ -27,12 +27,14 @@ typedef struct CoronaGraphicsToken {
 	unsigned char bytes[3 * sizeof(void *)];
 } CoronaGraphicsToken;
 
+typedef void (*CoronaRendererOp)(const CoronaGraphicsToken *, void *);
+
+// Internal
 void CoronaGraphicsTokenWrite( CoronaGraphicsToken * tokens, unsigned char type, const void * data, unsigned int size );
 void CoronaGraphicsTokenRead( void * buffer, const CoronaGraphicsToken * tokens, unsigned int size );
 unsigned char CoronaGraphicsGetTokenType( const CoronaGraphicsToken * tokens );
 
-void CoronaGraphicsEncodeAsTokens ( CoronaGraphicsToken token[], unsigned char type, const void * data );
-
-typedef void (*CoronaRendererOp)(const CoronaGraphicsToken *, void *);
+void CoronaGraphicsEncodeAsTokens( CoronaGraphicsToken token[], unsigned char type, const void * data );
+void * GetRenderer( const CoronaGraphicsToken tokens[] );
 
 #endif // _CoronaGraphicsTypes_H__

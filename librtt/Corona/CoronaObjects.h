@@ -170,4 +170,7 @@ int CoronaGroupObjectGetNumChildren( const void * groupObject ) CORONA_PUBLIC_SU
 CORONA_API
 int CoronaObjectSendMessage( const void * object, const char * message, const void * payload, unsigned int size ) CORONA_PUBLIC_SUFFIX;
 
+CORONA_API
+int CoronaObjectRawDraw( const void * object, const struct CoronaGraphicsToken * rendererToken ) CORONA_PUBLIC_SUFFIX;
+
 #endif // _CoronaObjects_H__

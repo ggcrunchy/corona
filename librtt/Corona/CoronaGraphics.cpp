@@ -25,6 +25,8 @@
 #include "Renderer/Rtt_Geometry_Renderer.h"
 #include "Renderer/Rtt_Renderer.h"
 #include "Renderer/Rtt_RenderData.h"
+
+#include <stddef.h>
 // /STEVE CHANGE
 
 #include "Display/Rtt_TextureResourceExternalAdapter.h"
@@ -179,11 +181,14 @@ SetFlagStyleToken( CoronaGraphicsToken * token, TokenType type, U16 index )
 CORONA_API
 int CoronaRendererRegisterBeginFrameOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onBeginFrame, void * userData )
 {
-	U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddBeginFrameOp( onBeginFrame, userData );
-
-	if (index)
+	if (onBeginFrame)
 	{
-		return SetFlagStyleToken< U32 >( token, kTokenType_BeginFrameOp, index );
+		U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddBeginFrameOp( onBeginFrame, userData );
+
+		if (index)
+		{
+			return SetFlagStyleToken< U32 >( token, kTokenType_BeginFrameOp, index );
+		}
 	}
 
 	return 0;
@@ -199,8 +204,8 @@ ExtractFromToken( const CoronaGraphicsToken * token )
 	return result;
 }
 
-static Rtt::Renderer *
-GetRenderer( const CoronaGraphicsToken * tokens )
+void *
+GetRenderer( const CoronaGraphicsToken tokens[] )
 {
 	if (kTokenType_Renderer == CoronaGraphicsGetTokenType( tokens ))
 	{
@@ -216,7 +221,7 @@ GetRenderer( const CoronaGraphicsToken * tokens )
 
 		if (index == sIndex) // still the same "session"?
 		{
-			return static_cast< Rtt::Renderer *>( data );
+			return data;
 		}
 	}
 
@@ -228,7 +233,7 @@ int CoronaRendererScheduleForNextFrame( const CoronaGraphicsToken * rendererToke
 {
 	if (kTokenType_BeginFrameOp == CoronaGraphicsGetTokenType( token ))
 	{
-		Rtt::Renderer * renderer = GetRenderer( rendererToken );
+		Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( GetRenderer( rendererToken ) );
 
 		if (renderer)
 		{
@@ -262,11 +267,14 @@ int CoronaRendererScheduleForNextFrame( const CoronaGraphicsToken * rendererToke
 CORONA_API
 int CoronaRendererRegisterClearOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onClear, void * userData )
 {
-	U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddClearOp( onClear, userData );
-
-	if (index)
+	if (onClear)
 	{
-		return SetFlagStyleToken< U32 >( token, kTokenType_ClearOp, index );
+		U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddClearOp( onClear, userData );
+
+		if (index)
+		{
+			return SetFlagStyleToken< U32 >( token, kTokenType_ClearOp, index );
+		}
 	}
 
 	return 0;
@@ -277,7 +285,7 @@ int CoronaRendererEnableClear( const CoronaGraphicsToken * rendererToken, const 
 {
 	if (kTokenType_ClearOp == CoronaGraphicsGetTokenType( token ))
 	{
-		Rtt::Renderer * renderer = GetRenderer( rendererToken );
+		Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( GetRenderer( rendererToken ) );
 
 		if (renderer)
 		{
@@ -295,7 +303,41 @@ int CoronaRendererEnableClear( const CoronaGraphicsToken * rendererToken, const 
 CORONA_API
 int CoronaRendererRegisterStateOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onState, void * userData )
 {
-	U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddStateOp( onState, userData );
+	U16 index = 0U;
+
+	if (onState)
+	{
+		index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddStateOp( onState, userData );
+	}
+
+	else // dummy state (does nothing, but will force a batch)
+	{
+		static U16 sNoOpIndex;
+
+		lua_pushlightuserdata( L, &sNoOpIndex ); // ..., nonce
+		lua_rawget( L, LUA_REGISTRYINDEX ); // ..., used?
+
+		if (!lua_isnil( L, -1 ))
+		{
+			index = sNoOpIndex;
+		}
+
+		else
+		{
+			index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddStateOp( [](const CoronaGraphicsToken *, void *){}, NULL );
+
+			if (index)
+			{
+				lua_pushlightuserdata( L, &sNoOpIndex ); // ..., nil, nonce
+				lua_pushboolean( L, true ); // ..., nil, nonce, true
+				lua_rawset( L, LUA_REGISTRYINDEX ); // ..., nil; registry = { ..., [nonce] = true }
+
+				sNoOpIndex = index;
+			}
+		}
+
+		lua_pop( L, 1 ); // ...
+	}
 
 	if (index)
 	{
@@ -310,7 +352,7 @@ int CoronaRendererSetOperationStateDirty( const CoronaGraphicsToken * rendererTo
 {
 	if (kTokenType_StateOp == CoronaGraphicsGetTokenType( token ))
 	{
-		Rtt::Renderer * renderer = GetRenderer( rendererToken );
+		Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( GetRenderer( rendererToken ) );
 
 		if (renderer)
 		{
@@ -345,7 +387,7 @@ int CoronaRendererIssueCommand( const CoronaGraphicsToken * rendererToken, const
 {
 	if (kTokenType_Command == CoronaGraphicsGetTokenType( token ))
 	{
-		Rtt::Renderer * renderer = GetRenderer( rendererToken );
+		Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( GetRenderer( rendererToken ) );
 		
 		if (renderer)
 		{
@@ -363,21 +405,21 @@ int CoronaRendererSetFrustum( const CoronaGraphicsToken * rendererToken, const f
 }
 
 CORONA_API
-unsigned int CoronaGeometryCopyData( CoronaShaderMapping * dst, const CoronaShaderMapping * src )
+unsigned int CoronaGeometryCopyData( void * dst, const CoronaShaderMappingLayout * dstLayout, const void * src, const CoronaShaderMappingLayout * srcLayout )
 {
-	if (!dst || !dst->data || !dst->layout || !dst->layout->stride || !src || !src->data || !src->layout)
+	if (!dst || !dstLayout || !src || !srcLayout)
 	{
 		return 0U;
 	}
 
-	if (dst->layout->count != src->layout->count || dst->layout->type != src->layout->type)
+	if (!dstLayout->data.stride || dstLayout->data.count != srcLayout->data.count || dstLayout->data.type != srcLayout->data.type)
 	{
 		return 0U;
 	}
 
 	U32 valuesSize = 0U;
 
-	switch (dst->layout->type)
+	switch (dstLayout->data.type)
 	{
 	case kAttributeType_Byte:
 		valuesSize = 1U;
@@ -389,18 +431,20 @@ unsigned int CoronaGeometryCopyData( CoronaShaderMapping * dst, const CoronaShad
 		return 0U;
 	}
 
-	valuesSize *= dst->layout->count;
+	valuesSize *= dstLayout->data.count;
 
-	if (dst->layout->offset + valuesSize > dst->layout->stride || src->layout->offset + valuesSize > src->layout->stride)
+	U32 srcDatumSize = srcLayout->data.stride ? srcLayout->data.stride : srcLayout->size;
+
+	if (dstLayout->data.offset + valuesSize > dstLayout->data.stride || srcLayout->data.offset + valuesSize > srcDatumSize)
 	{
 		return 0U;
 	}
 
-	U32 n = dst->size / dst->layout->stride;
+	U32 n = dstLayout->size / dstLayout->data.stride;
 
-	if (src->layout->stride)
+	if (srcLayout->data.stride)
 	{
-		U32 n2 = src->size / src->layout->stride;
+		U32 n2 = srcLayout->size / srcLayout->data.stride;
 
 		if (n2 < n)
 		{
@@ -408,15 +452,119 @@ unsigned int CoronaGeometryCopyData( CoronaShaderMapping * dst, const CoronaShad
 		}
 	}
 
-	U8 * dstData = reinterpret_cast< U8 * >( dst->data );
+	U8 * dstData = reinterpret_cast< U8 * >( dst );
 
-	for (const U8 * srcData = reinterpret_cast< const U8 * >( src->data ); n; --n, srcData += src->layout->stride, dstData += dst->layout->stride)
+	for (const U8 * srcData = reinterpret_cast< const U8 * >( src ); n; --n, srcData += srcLayout->data.stride, dstData += dstLayout->data.stride)
 	{
 		memcpy( dstData, srcData, valuesSize );
 	}
 
 	return n;
 }
+
+static bool GetLayout( const Rtt::Geometry * geometry, const char * name, CoronaShaderMappingLayout * layout )
+{
+	if (!name || !name[0])
+	{
+		return false;
+	}
+
+	if (name[1])
+	{
+		if (strcmp( name, "position" ) == 0)
+		{
+			layout->data.count = 3U;
+			layout->data.offset = offsetof( Rtt::Geometry::Vertex, x );
+			layout->data.type = kAttributeType_Float;
+		}
+
+		else if (strcmp( name, "texture" ) == 0)
+		{
+			layout->data.count = 3U;
+			layout->data.offset = offsetof( Rtt::Geometry::Vertex, u );
+			layout->data.type = kAttributeType_Float;
+		}
+
+		else if (strcmp( name, "color" ) == 0)
+		{
+			layout->data.count = 4U;
+			layout->data.offset = offsetof( Rtt::Geometry::Vertex, rs );
+			layout->data.type = kAttributeType_Byte;
+		}
+
+		else if (strcmp( name, "userdata" ) == 0)
+		{
+			layout->data.count = 4U;
+			layout->data.offset = offsetof( Rtt::Geometry::Vertex, ux );
+			layout->data.type = kAttributeType_Float;
+		}
+
+		else
+		{
+			return false;
+		}
+	}
+
+	else
+	{
+		U32 offset = 0U;
+
+		switch (*name)
+		{
+		case 'x':
+		case 'y':
+		case 'z':
+			layout->data.type = kAttributeType_Float;
+			layout->data.offset = offsetof( Rtt::Geometry::Vertex, x ) + (*name - 'x');
+
+			break;
+		case 'u':
+		case 'v':
+		case 'q':
+			layout->data.type = kAttributeType_Float;
+			layout->data.offset = offsetof( Rtt::Geometry::Vertex, u ) + (*name != 'q' ? (*name - 'u') : 2U);
+
+			break;
+		case 'a':
+			++offset; // n.b. fallthrough...
+		case 'b':
+			++offset; // ...again...
+		case 'g':
+			++offset; // ...again...
+		case 'r':
+			layout->data.type = kAttributeType_Byte;
+			layout->data.offset = offsetof( Rtt::Geometry::Vertex, rs ) + offset;
+
+			break;
+		default:
+			return false;
+		}
+
+		layout->data.count = 1U;
+	}
+
+	layout->data.stride = sizeof( Rtt::Geometry::Vertex );
+	layout->size = sizeof( Rtt::Geometry::Vertex ) * geometry->GetVerticesUsed();
+
+	return true;
+}
+
+CORONA_API
+void * CoronaGeometryGetMappingFromRenderData( void * renderData, const char * name, CoronaShaderMappingLayout * layout )
+{
+	Rtt::Geometry * geometry = static_cast< Rtt::RenderData * >( renderData )->fGeometry;
+
+	return GetLayout( geometry, name, layout) ? geometry->GetVertexData() : NULL;
+}
+
+CORONA_API
+const void * CoronaGeometryGetMappingFromConstantRenderData( const void * renderData, const char * name, CoronaShaderMappingLayout * layout )
+{
+	const Rtt::Geometry * geometry = static_cast< const Rtt::RenderData * >( renderData )->fGeometry;
+
+	return GetLayout( geometry, name, layout) ? const_cast< Rtt::Geometry * >( geometry )->GetVertexData() : NULL;
+}
+
 // /STEVE CHANGE
 // ----------------------------------------------------------------------------
 

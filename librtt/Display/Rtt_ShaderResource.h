@@ -89,6 +89,8 @@ class ShaderResource
 		// STEVE CHANGE
 		const CoronaShaderSourceTransform * GetSourceTransform() const { return fSourceTransform; }
 		void SetSourceTransform( CoronaShaderSourceTransform * transform ) { fSourceTransform = transform; }
+		void AddSourceTransformDetails( const char * key, const char * value ) { fDetails[key] = value; }
+		const std::map< std::string, std::string > & GetTransformDetails() const { return fDetails; }
 		// /STEVE CHANGE
 
 		TimeTransform *GetTimeTransform() const { return fTimeTransform; }
@@ -132,6 +134,7 @@ class ShaderResource
 		ShaderData *fDefaultData;
 		// STEVE CHANGE
 		CoronaShaderSourceTransform *fSourceTransform;
+		std::map< std::string, std::string > fDetails;
 		// /STEVE CHANGE
 		TimeTransform *fTimeTransform;
 		bool fUsesUniforms;

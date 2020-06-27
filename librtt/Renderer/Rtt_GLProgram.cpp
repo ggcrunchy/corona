@@ -25,6 +25,7 @@
 
 // STEVE CHANGE
 #include "Display/Rtt_ShaderResource.h"
+#include <vector>
 // /STEVE CHANGE
 
 // To reduce memory consumption and startup cost, defer the
@@ -280,12 +281,30 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 	}
 
 	// STEVE CHANGE
-	const CoronaShaderSourceTransform * xform = program->GetShaderResource()->GetSourceTransform();
+	ShaderResource * shaderResource = program->GetShaderResource();
+	const auto & details = shaderResource->GetTransformDetails();
+	const CoronaShaderSourceTransform * xform = shaderResource->GetSourceTransform();
 	CoronaShaderSourceTransformParams params = {};
 	const char * hints[] = { "header", "highpSupport", "mask", "texCoordZ", NULL };
 	void * sourceTransformKey = &fCleanupSourceTransform; // n.b. done to make cleanup robust
 
 	params.hints = hints;
+
+	if (!details.empty())
+	{
+		std::vector< const char * > names( details.size() ), values( details.size() );
+
+		for (auto && iter : details)
+		{
+			names.push_back( iter.first.c_str() );
+			values.push_back( iter.second.c_str() );
+		}
+
+		params.detailNames = names.data();
+		params.detailValues = values.data();
+		params.ndetails = details.size();
+	}
+
 	// /STEVE CHANGE
 
 	// Vertex shader.
