@@ -552,19 +552,20 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 
 			if (!lua_isnil( L, -1 ))
 			{
-				CoronaShaderSourceTransform * sourceTransform = (CoronaShaderSourceTransform *)lua_touserdata( L, -1 );
-
 				lua_getfield( L, index, "customizationDetails" ); // ..., customizations, details?
 
 				if (lua_istable( L, -1 ))
 				{
-					for (lua_pushnil( L ); lua_next( L, -2 ); lua_pop( L, 1 ))
+					lua_newtable( L ); // ..., customizations, details, strings
+					lua_pushnil( L ); // ..., customizations, details, strings, nil
+
+					while (lua_next( L, -3 )) // ..., customizations, details, strings[, key, value]
 					{
 						bool isKeyString = lua_isstring( L, -2 ), isValueString = lua_isstring( L, -1 ) || lua_isnumber( L, -1 );
 
 						if (isKeyString && isValueString)
 						{
-							resource->AddSourceTransformDetails( lua_tostring( L, -2 ), lua_tostring( L, -2 ) );
+							lua_setfield( L, -3, lua_tostring( L, -2 ) ); // ..., customizations, details, strings = { ..., key = value }, key
 						}
 
 						else
@@ -583,8 +584,28 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 							{
 								CoronaLuaWarning( L, "Invalid customization details: expected strings, got '%s' key and '%s' value", luaL_typename( L, -2 ), luaL_typename( L, -1 ) );
 							}
+
+							lua_pop( L, 1 ); // ..., customizations, details, strings, key
 						}
 					}
+
+					U32 detailsCount = lua_objlen( L, -1 ) / 2;
+
+					const char ** strings = (const char **)lua_newuserdata( L, lua_objlen( L, -1 ) * sizeof( const char * ) ); // ..., customizations, details, strings, stringsUserdata
+
+					for (int i = 0; i < detailsCount; ++i, lua_pop( L, 2 ))
+					{
+						lua_rawgeti( L, -2, i + 1 ); // ..., customizations, details, strings, stringsUserdata, name
+						lua_rawgeti( L, -3, i + 1 + detailsCount ); // ..., customizations, details, strings, stringsUserdata, name, value
+
+						strings[i] = lua_tostring( L, -2 );
+						strings[i + detailsCount] = lua_tostring( L, -1 );
+					}
+
+					resource->AddSourceTransformDetails( strings, strings + detailsCount, detailsCount );
+
+					luaL_ref( L, LUA_REGISTRYINDEX ); // ..., customizations, details, strings; registry = { ..., [ref] = stringsUserdata }
+					lua_pop( L, 1 ); // ..., customizations, details
 				}
 
 				else if (!lua_isnil( L, -1 ))
@@ -593,8 +614,10 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 				}
 					
 				lua_pop( L, 1 ); // ..., customizations
+				
+				CoronaShaderCallbacks * callbacks = (CoronaShaderCallbacks *)lua_touserdata( L, -1 );
 
-				resource->SetSourceTransform( sourceTransform );
+				resource->SetShaderCallbacks( callbacks );
 			}
 
 			else
@@ -609,7 +632,7 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 		CoronaLuaWarning( L, "Customization expected to be a string, got %s", luaL_typename( L, -1 ) );
 	}
 
-	lua_pop( L, 1 );
+	lua_pop( L, 1 ); // ...
 }
 // /STEVE CHANGE
 
@@ -915,60 +938,6 @@ ShaderFactory::LoadCompiledShaderVersions(lua_State *L, int modeTableIndex, Shad
 
 #endif
 
-// STEVE CHANGE
-class OverloadedShader : public Shader // this largely follows ShaderProxy
-{
-public:
-	OverloadedShader( const CoronaShaderPrepare & prepare, const CoronaShaderDrawParams & drawParams )
-		: Shader(),
-		fPrepare( prepare ),
-		fDrawParams( drawParams )
-	{
-	}
-
-	virtual ~OverloadedShader() {}
-	
-public:
-	void SetShader(SharedPtr<Shader> inputShader) { fInputShader = inputShader; }
-
-	//Treat as protected
-	virtual void Log(std::string prepend, bool last)
-	{
-		if (fInputShader.NotNull())
-		{
-			fInputShader->Log( prepend, last );
-		}
-	}
-
-	virtual void SetTextureBounds( const TextureInfo& textureInfo ) { fInputShader->SetTextureBounds( textureInfo ); }
-	virtual bool HasChildren() { return fInputShader->HasChildren(); }
-	virtual void UpdateCache( const TextureInfo& textureInfo, const RenderData& objectData ) { fInputShader->UpdateCache( textureInfo, objectData ); }
-	virtual Texture *GetTexture() const { return fInputShader->GetTexture(); }
-	virtual void RenderToTexture( Renderer& renderer, Geometry& cache ) const { fInputShader->RenderToTexture( renderer, cache ); }
-	
-	// TODO: how to forward to adapter?
-
-	virtual void Prepare( RenderData& objectData, int w, int h, ShaderResource::ProgramMod mod )
-	{
-		fInputShader->Prepare( objectData, w, h, mod );
-
-		if (fPrepare)
-		{
-			fPrepare( this, NULL, &objectData, w, h, mod );
-		}
-	}
-
-	virtual void Draw( Renderer& renderer, const RenderData& objectData ) const
-	{
-	}
-
-private:
-	SharedPtr<Shader> fInputShader;
-	CoronaShaderPrepare fPrepare;
-	CoronaShaderDrawParams fDrawParams;
-};
-// /STEVE CHANGE
-
 ShaderComposite *
 ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *name)
 {
@@ -1059,9 +1028,7 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
 		}
 		lua_pop( L, 1 );
 	}
-	// STEVE CHANGE
-	// TODO: if we have prepare or draw, wrap with a forwarding shader (basically a proxy but does that logic)
-	// /STEVE CHANGE
+
 	return result;	
 }
 
@@ -1299,11 +1266,11 @@ ShaderFactory::RegisterCustomization( const char * name, const CoronaShaderCallb
 
 	else
 	{
-		CoronaShaderSourceTransform * xform = (CoronaShaderSourceTransform *)lua_newuserdata( L, sizeof( CoronaShaderSourceTransform ) ); // ..., customizations, xform
+		void * out = lua_newuserdata( L, sizeof( CoronaShaderCallbacks ) ); // ..., customizations, callbacks
 
-		memcpy( xform, &callbacks.transform, sizeof( CoronaShaderSourceTransform ) );
+		memcpy( out, &callbacks, sizeof( CoronaShaderCallbacks ) );
 
-		lua_setfield( L, -2, name ); // ..., customizations = { ..., [name] = xform }
+		lua_setfield( L, -2, name ); // ..., customizations = { ..., [name] = callbacks }
 		lua_pop( L, 1 ); // ...
 
 		return true;

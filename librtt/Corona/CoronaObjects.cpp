@@ -64,8 +64,6 @@ union GenericParams {
 	AFTER_HEADER_ACTION( OnMessage );
 };
 
-static unsigned int sInverseMask;
-
 template<typename T> T
 FindParams( const unsigned char * stream, unsigned short method, size_t offset )
 {
@@ -80,8 +78,6 @@ FindParams( const unsigned char * stream, unsigned short method, size_t offset )
 	{
 		count = method;
 	}
-
-	count &= ~sInverseMask;
 
 	for (unsigned int i = 0; i < count; ++i, genericParams += sizeof( GenericParams )) 
 	{
@@ -920,27 +916,6 @@ int CoronaObjectSendMessage( const void * object, const char * message, const vo
 	static_cast< const Rtt::DisplayObject * >( object )->SendMessage( message, payload, size );
 
 	return 1;
-}
-
-CORONA_API
-int CoronaObjectRawDraw( const void * object, const CoronaGraphicsToken * rendererToken )
-{
-	Rtt::Renderer * renderer = static_cast< Rtt::Renderer * >( GetRenderer( rendererToken ) );
-
-	if (renderer)
-	{
-		struct RestoreMask {
-			~RestoreMask() { sInverseMask = 0U; }
-		} restore;
-
-		sInverseMask = ~0U; // temporarily disable overloading
-
-		static_cast< const Rtt::DisplayObject * >( object )->Draw( *renderer );
-
-		return 1;
-	}
-
-	return 0;
 }
 
 #undef SIZE_MINUS_OFFSET

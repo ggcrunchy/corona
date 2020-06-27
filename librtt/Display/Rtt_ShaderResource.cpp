@@ -58,7 +58,10 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fUniformDataMap(),
 	fDefaultData( NULL ),
 // STEVE CHANGE
-	fSourceTransform( NULL ),
+	fShaderCallbacks( NULL ),
+	fDetailNames( NULL ),
+	fDetailValues( NULL ),
+	fDetailsCount( 0U ),
 // /STEVE CHANGE
 	fTimeTransform( NULL ),
 	fUsesUniforms( false ),
@@ -74,7 +77,10 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fUniformDataMap(),
 	fDefaultData( NULL ),
 // STEVE CHANGE
-	fSourceTransform( NULL ),
+	fShaderCallbacks( NULL ),
+	fDetailNames( NULL ),
+	fDetailValues( NULL ),
+	fDetailsCount( 0U ),
 // /STEVE CHANGE
 	fTimeTransform( NULL ),
 	fUsesUniforms( false ),
@@ -113,6 +119,24 @@ ShaderResource::~ShaderResource()
 		Rtt_DELETE( fTimeTransform );
 	}
 }
+
+// STEVE CHANGE
+void
+ShaderResource::AddSourceTransformDetails( const char ** names, const char ** values, U32 count )
+{
+	fDetailNames = names; // n.b. owned by Lua
+	fDetailValues = values; // ditto
+	fDetailsCount = count;
+}
+
+CoronaShaderSourceTransformDetails
+ShaderResource::GetSourceTransformDetails() const
+{
+	CoronaShaderSourceTransformDetails details = { fDetailNames, fDetailValues, fDetailsCount };
+
+	return details;
+}
+// /STEVE CHANGE
 
 void
 ShaderResource::SetProgramMod(ProgramMod mod, Program *program)
@@ -158,7 +182,12 @@ ShaderResource::GetDataIndex( const char *key ) const
 			}
 		}
 	}
-
+// STEVE CHANGE
+	if (-1 == result && fShaderCallbacks && fShaderCallbacks->getDataIndex)
+	{
+		result = ShaderData::kNumData + fShaderCallbacks->getDataIndex( key );
+	}
+// /STEVE CHANGE
 	return result;
 }
 

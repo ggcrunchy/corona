@@ -20,6 +20,7 @@
 #include "Rtt_Runtime.h"
 #include "Display/Rtt_Display.h"
 // STEVE CHANGE
+#include "Display/Rtt_ShaderData.h"
 #include "Display/Rtt_ShaderFactory.h"
 #include "Renderer/Rtt_CommandBuffer.h"
 #include "Renderer/Rtt_Geometry_Renderer.h"
@@ -103,6 +104,49 @@ CORONA_API
 int CoronaShaderRegisterCustomization( lua_State * L, const char * name, const CoronaShaderCallbacks * callbacks )
 {
 	return Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetShaderFactory().RegisterCustomization( name, *callbacks );
+}
+
+CORONA_API
+int CoronaShaderRegisterProgramMod( int * mod, const char ** details, unsigned int detailsCount )
+{
+	Rtt_ASSERT_NOT_IMPLEMENTED();
+
+	return 0;
+}
+
+CORONA_API
+unsigned int CoronaShaderGetProgramModCount()
+{
+	Rtt_ASSERT_NOT_IMPLEMENTED();
+
+	return 2U;
+}
+
+CORONA_API
+int CoronaShaderRawDraw( const void * shaderObject, const void * renderData, const CoronaGraphicsToken * rendererToken )
+{
+	Rtt::Renderer * renderer = static_cast< Rtt::Renderer * >( GetRenderer( rendererToken ) );
+
+	if (renderer)
+	{
+		const Rtt::Shader * shader = static_cast< const Rtt::Shader * >( shaderObject );
+
+		shader->Draw( *renderer, *static_cast< const Rtt::RenderData * >( renderData ) );
+
+		return 1;
+	}
+
+	return 0;
+}
+
+CORONA_API
+CoronaShaderSourceTransformDetails CoronaShaderGetSourceTransformDetails( const void * shaderObject )
+{
+	const Rtt::ShaderData * data = static_cast< const Rtt::Shader * >( shaderObject )->GetData();
+
+	Rtt::SharedPtr< Rtt::ShaderResource > resource( data->GetShaderResource() );
+
+	return resource->GetSourceTransformDetails();
 }
 
 CORONA_API

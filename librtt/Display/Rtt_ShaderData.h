@@ -12,6 +12,7 @@
 
 #include "Core/Rtt_WeakPtr.h"
 
+
 #include "Renderer/Rtt_Uniform.h"
 
 // ----------------------------------------------------------------------------
@@ -88,6 +89,10 @@ class ShaderData
 		Uniform *GetUniform( DataIndex index ) const;
 		void DidUpdateUniform( DataIndex index );
 
+		// STEVE CHANGE
+		U8 * GetExtraSpace() const { return fExtraSpace; }
+		U32 GetExtraCount() const { return fExtraCount; }
+		// /STEVE CHANGE
 	public:
 		WeakPtr< ShaderResource >& GetShaderResource() { return fShaderResource; }
 		const WeakPtr< ShaderResource >& GetShaderResource() const { return fShaderResource; }
@@ -102,6 +107,10 @@ class ShaderData
 		Real fVertexData[kNumData];
 		Uniform *fUniformData[kNumData];
 		WeakPtr< ShaderResource > fShaderResource;
+		// STEVE CHANGE
+		mutable U8 * fExtraSpace;
+		U32 fExtraCount;
+		// /STEVE CHANGE
 		const Shader *fOwner;
 		U8 fDirtyFlags;
 };

@@ -282,28 +282,13 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 
 	// STEVE CHANGE
 	ShaderResource * shaderResource = program->GetShaderResource();
-	const auto & details = shaderResource->GetTransformDetails();
-	const CoronaShaderSourceTransform * xform = shaderResource->GetSourceTransform();
+	const CoronaShaderCallbacks * callbacks = shaderResource->GetShaderCallbacks();
 	CoronaShaderSourceTransformParams params = {};
 	const char * hints[] = { "header", "highpSupport", "mask", "texCoordZ", NULL };
 	void * sourceTransformKey = &fCleanupSourceTransform; // n.b. done to make cleanup robust
 
+	params.details = shaderResource->GetSourceTransformDetails();
 	params.hints = hints;
-
-	if (!details.empty())
-	{
-		std::vector< const char * > names( details.size() ), values( details.size() );
-
-		for (auto && iter : details)
-		{
-			names.push_back( iter.first.c_str() );
-			values.push_back( iter.second.c_str() );
-		}
-
-		params.detailNames = names.data();
-		params.detailValues = values.data();
-		params.ndetails = details.size();
-	}
 
 	// /STEVE CHANGE
 
@@ -316,7 +301,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 		params.sources = shader_source;
 		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
-		SetShaderSource( data.fVertexShader, params, xform, sourceTransformKey );
+		SetShaderSource( data.fVertexShader, params, callbacks ? &callbacks->transform : NULL, sourceTransformKey );
 /*
 		glShaderSource( data.fVertexShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
@@ -336,7 +321,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 		params.sources = shader_source;
 		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
-		SetShaderSource( data.fFragmentShader, params, xform, sourceTransformKey );
+		SetShaderSource( data.fFragmentShader, params, callbacks ? &callbacks->transform : NULL, sourceTransformKey );
 /*
 		glShaderSource( data.fFragmentShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
@@ -444,11 +429,11 @@ GLProgram::Update( Program::Version version, VersionData& data )
 	glUseProgram( 0 );
 	GL_CHECK_ERROR();
 // STEVE CHANGE
-	const CoronaShaderSourceTransform * xform = program->GetShaderResource()->GetSourceTransform();
+	const CoronaShaderCallbacks * callbacks = program->GetShaderResource()->GetShaderCallbacks();
 
-	if (xform)
+	if (callbacks && callbacks->transform.cleanup)
 	{
-		fCleanupSourceTransform = xform->cleanup;
+		fCleanupSourceTransform = callbacks->transform.cleanup;
 	}
 // /STEVE CHANGE
 }

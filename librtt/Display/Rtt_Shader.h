@@ -103,6 +103,22 @@ class Shader
 		void SetRoot( const Shader *root ) { fRoot = root; }
 		bool IsOutermostTerminal() const { return NULL != fOwner; }
 
+		// STEVE CHANGE
+		class DrawState {
+		public:
+			DrawState( const CoronaShaderCallbacks * callbacks, bool & drawing );
+			~DrawState();
+
+		public:
+			CoronaShaderDrawParams params;
+		private:
+			bool & fDrawing;
+			bool fWasDrawing;
+		};
+
+		bool DoAnyBeforeDrawAndThenOriginal( const DrawState & state, Renderer & renderer, const RenderData & objectData ) const;
+		void DoAnyAfterDraw( const DrawState & state, Renderer & renderer, const RenderData & objectData ) const;
+		// /STEVE CHANGE
 	protected:
 		SharedPtr< ShaderResource > fResource;
 		Rtt_Allocator *fAllocator;
@@ -118,10 +134,14 @@ class Shader
 		mutable RenderData *fRenderData;
 		mutable bool fOutputReady;
 		mutable bool fDirty;
+		// STEVE CHANGE
+		mutable bool fIsDrawing;
+		// /STEVE CHANGE
 
 	// TODO: Figure out better alternative
 	friend class ShaderComposite;
 };
+
 
 // ----------------------------------------------------------------------------
 

@@ -43,7 +43,10 @@ Shader::Shader( Rtt_Allocator *allocator, const SharedPtr< ShaderResource >& res
 	fRoot( NULL ),
 	fRenderData( NULL ),
 	fOutputReady( false ),
-	fDirty(false)
+	fDirty(false),
+	// STEVE CHANGE
+	fIsDrawing( false )
+	// /STEVE CHANGE
 {
 	Rtt_ASSERT( resource.NotNull() );
 	if ( data )
@@ -64,7 +67,10 @@ Shader::Shader()
 	fRoot( NULL ),
 	fRenderData( NULL ),
 	fOutputReady( false ),
-	fDirty(false)
+	fDirty(false),
+	// STEVE CHANGE
+	fIsDrawing( false )
+	// /STEVE CHANGE
 {
 
 }
@@ -244,14 +250,33 @@ Shader::Prepare( RenderData& objectData, int w, int h, ShaderResource::ProgramMo
 	Program *program = fResource->GetProgramMod(mod);
 	
 	objectData.fProgram = program;
+// STEVE CHANGE
+	const CoronaShaderCallbacks * callbacks = fResource->GetShaderCallbacks();
+
+	if (callbacks && callbacks->prepare)
+	{
+		callbacks->prepare( this, fData->GetExtraSpace(), &objectData, w, h, int( mod ) );
+	}
+// /STEVE CHANGE
 }
 
 void
 Shader::Draw( Renderer& renderer, const RenderData& objectData ) const
 {
+// STEVE CHANGE
+	DrawState state( fResource->GetShaderCallbacks(), fIsDrawing );
+
+	if (DoAnyBeforeDrawAndThenOriginal( state, renderer, objectData ))
+	{
+// /STEVE CHANGE
 	// No-op
 	renderer.TallyTimeDependency( fResource->UsesTime() );
 	renderer.Insert( & objectData );
+// STEVE CHANGE
+	}
+
+	DoAnyAfterDraw( state, renderer, objectData );
+// /STEVE CHANGE
 }
 
 void
@@ -292,6 +317,60 @@ Shader::IsTerminal(Shader *shader) const
 {
 	return (this==shader);
 }
+
+// STEVE CHANGE
+Shader::DrawState::DrawState( const CoronaShaderCallbacks * callbacks, bool & drawing )
+:	fDrawing( drawing ),
+	fWasDrawing( drawing )
+{
+	fDrawing = true;
+
+	const CoronaShaderDrawParams drawParams = {};
+
+	if (!fWasDrawing && callbacks && memcmp( &callbacks->drawParams, &drawParams, sizeof( CoronaShaderDrawParams ) ) != 0)
+	{
+		params = callbacks->drawParams;
+	}
+
+	else
+	{
+		params = drawParams;
+	}
+}
+
+Shader::DrawState::~DrawState()
+{
+	fDrawing = fWasDrawing;
+}
+
+bool
+Shader::DoAnyBeforeDrawAndThenOriginal( const DrawState & state, Renderer & renderer, const RenderData & objectData ) const
+{
+	if (state.params.before)
+	{
+		CoronaGraphicsToken rendererToken;
+
+		CoronaGraphicsEncodeAsTokens( &rendererToken, 0xFF, &renderer );
+		state.params.before( this, fData->GetExtraSpace(), &rendererToken, &objectData );
+		CoronaGraphicsEncodeAsTokens( &rendererToken, 0xFF, NULL );	
+	}
+
+	return !state.params.ignoreOriginal;
+}
+
+void
+Shader::DoAnyAfterDraw( const DrawState & state, Renderer & renderer, const RenderData & objectData ) const
+{
+	if (state.params.after)
+	{
+		CoronaGraphicsToken rendererToken;
+
+		CoronaGraphicsEncodeAsTokens( &rendererToken, 0xFF, &renderer );
+		state.params.after( this, fData->GetExtraSpace(), &rendererToken, &objectData );
+		CoronaGraphicsEncodeAsTokens( &rendererToken, 0xFF, NULL );	
+	}
+}
+// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
 

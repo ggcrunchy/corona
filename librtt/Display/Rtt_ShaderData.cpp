@@ -32,10 +32,29 @@ namespace Rtt
 ShaderData::ShaderData( const WeakPtr< ShaderResource >& resource )
 :	fProxy( NULL ),
 	fShaderResource( resource ),
+	// STEVE CHANGE
+	fExtraSpace( NULL ),
+	fExtraCount( 0U ),
+	// /STEVE CHANGE
 	fOwner( NULL )
 {
 	memset( fVertexData, 0, sizeof( fVertexData ) );
 	memset( fUniformData, 0, sizeof( fUniformData ) );
+// STEVE CHANGE
+	SharedPtr< ShaderResource > res( fShaderResource );
+	if ( res.NotNull() )
+	{
+		const CoronaShaderCallbacks * callbacks = res->GetShaderCallbacks();
+
+		if (callbacks && callbacks->extraSpace)
+		{
+			fExtraSpace = Rtt_NEW( NULL, U8( callbacks->extraSpace ) );
+			fExtraCount = callbacks->extraSpace;
+
+			memset( fExtraSpace, 0, fExtraCount );
+		}
+	}
+// /STEVE CHANGE
 }
 
 ShaderData::~ShaderData()
@@ -44,6 +63,9 @@ ShaderData::~ShaderData()
 	{
 		fProxy->DetachUserdata();
 	}
+// STEVE CHANGE
+	Rtt_DELETE( fExtraSpace );
+// /STEVE CHANGE
 }
 
 void
@@ -91,6 +113,16 @@ ShaderData::Clone( Rtt_Allocator *allocator )
 			memcpy( result->fVertexData, fVertexData, sizeof( fVertexData ) );
 		}
 	}
+
+	// STEVE CHANGE
+	if (fExtraCount)
+	{
+		result->fExtraSpace = Rtt_NEW( NULL, U8( fExtraCount ) );
+		result->fExtraCount = fExtraCount;
+
+		memcpy( result->fExtraSpace, fExtraSpace, fExtraCount );
+	}
+	// /STEVE CHANGE
 
 	return result;
 }

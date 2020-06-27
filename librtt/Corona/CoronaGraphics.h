@@ -251,16 +251,23 @@ typedef struct CoronaShaderAttribute {
 /**
 TODO
 */
+typedef struct CoronaShaderSourceTransformDetails {
+	const char ** names;
+	const char ** values;
+	unsigned int count;
+} CoronaShaderSourceTransformDetails;
+
+/**
+TODO
+*/
 typedef struct CoronaShaderSourceTransformParams {
 	const char * type;
 	const char ** sources;
 	const char ** hints; // originally same size as sources
-	const char ** detailNames;
-	const char ** detailValues;
+	CoronaShaderSourceTransformDetails details;
 	const CoronaShaderAttribute * attributes; // NYI
 	unsigned int nsources; // n.b. must agree with output after call
 	unsigned int nattribs;
-	unsigned int ndetails;
 } CoronaShaderSourceTransformParams;
 
 typedef const char ** (*CoronaShaderSourceTransformBegin)(CoronaShaderSourceTransformParams * params, void * key);
@@ -299,6 +306,8 @@ typedef struct CoronaShaderSourceTransform {
 
 typedef void (*CoronaShaderPrepare)(const void * shader, void * userData, void * renderData, int w, int h, int mod);
 typedef void (*CoronaShaderDrawBookend)(const void * shader, void * userData, const CoronaGraphicsToken * rendererToken, const void * renderData);
+typedef int (*CoronaShaderNameToIndex)(const char * name);
+typedef int (*CoronaShaderDataAction)(lua_State * L, int dataIndex, void * data, int * pushedError);
 
 typedef struct CoronaShaderDrawParams {
 	unsigned short ignoreOriginal;
@@ -316,28 +325,52 @@ typedef struct CoronaShaderCallbacks {
 	unsigned long size;
 
 	/**
-	Required
+	Optional
 	TODO
 	*/
 	CoronaShaderSourceTransform transform;
 
 	/**
 	Required
-	TODO
+	Optional
 	*/
 	CoronaGraphicsToken * attributes;
 
 	/**
-	Required
+	Optional
 	TODO
 	*/
 	CoronaShaderPrepare prepare;
 
 	/**
-	Required
+	Optional
 	TODO
 	*/
 	CoronaShaderDrawParams drawParams;
+
+	/**
+	Optional
+	TODO
+	*/
+	CoronaShaderNameToIndex getDataIndex;
+
+	/**
+	Optional
+	TODO
+	*/
+	CoronaShaderDataAction getData;
+
+	/**
+	Optional
+	TODO
+	*/
+	CoronaShaderDataAction setData;
+
+	/**
+	Optional
+	TODO
+	*/
+	unsigned int extraSpace;
 } CoronaShaderCallbacks;
 
 CORONA_API
@@ -351,6 +384,12 @@ int CoronaShaderRegisterProgramMod( int * mod, const char ** details, unsigned i
 
 CORONA_API
 unsigned int CoronaShaderGetProgramModCount() CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaShaderRawDraw( const void * shaderObject, const void * renderData, const CoronaGraphicsToken * rendererToken ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+CoronaShaderSourceTransformDetails CoronaShaderGetSourceTransformDetails( const void * shaderObject ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 CoronaRendererBackend CoronaRendererGetBackend( lua_State * L ) CORONA_PUBLIC_SUFFIX;
