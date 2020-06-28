@@ -25,6 +25,10 @@
 
 #include <string.h>
 
+// STEVE CHANGE
+#include "Corona/CoronaPluginSupportInternal.h"
+// /STEVE CHANGE
+
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -255,7 +259,10 @@ Shader::Prepare( RenderData& objectData, int w, int h, ShaderResource::ProgramMo
 
 	if (callbacks && callbacks->prepare)
 	{
-		callbacks->prepare( this, fData->GetExtraSpace(), &objectData, w, h, int( mod ) );
+		auto shaderStored = CoronaInternalStoreShader( this );
+		auto objectDataStored = CoronaInternalStoreRenderData( &objectData );
+
+		callbacks->prepare( shaderStored.GetHandle(), fData->GetExtraSpace(), objectDataStored.GetHandle(), w, h, int( mod ) );
 	}
 // /STEVE CHANGE
 }
@@ -348,11 +355,11 @@ Shader::DoAnyBeforeDrawAndThenOriginal( const DrawState & state, Renderer & rend
 {
 	if (state.params.before)
 	{
-		CoronaGraphicsToken rendererToken;
+		auto shaderStored = CoronaInternalStoreShader( this );
+		auto rendererStored = CoronaInternalStoreRenderer( &renderer );
+		auto objectDataStored = CoronaInternalStoreRenderData( &objectData );
 
-		CoronaGraphicsEncodeAsTokens( &rendererToken, 0xFF, &renderer );
-		state.params.before( this, fData->GetExtraSpace(), &rendererToken, &objectData );
-		CoronaGraphicsEncodeAsTokens( &rendererToken, 0xFF, NULL );	
+		state.params.before( shaderStored.GetHandle(), fData->GetExtraSpace(), rendererStored.GetHandle(), objectDataStored.GetHandle() );
 	}
 
 	return !state.params.ignoreOriginal;
@@ -363,11 +370,11 @@ Shader::DoAnyAfterDraw( const DrawState & state, Renderer & renderer, const Rend
 {
 	if (state.params.after)
 	{
-		CoronaGraphicsToken rendererToken;
+		auto shaderStored = CoronaInternalStoreShader( this );
+		auto rendererStored = CoronaInternalStoreRenderer( &renderer );
+		auto objectDataStored = CoronaInternalStoreRenderData( &objectData );
 
-		CoronaGraphicsEncodeAsTokens( &rendererToken, 0xFF, &renderer );
-		state.params.after( this, fData->GetExtraSpace(), &rendererToken, &objectData );
-		CoronaGraphicsEncodeAsTokens( &rendererToken, 0xFF, NULL );	
+		state.params.after( shaderStored.GetHandle(), fData->GetExtraSpace(), rendererStored.GetHandle(), objectDataStored.GetHandle() );
 	}
 }
 // /STEVE CHANGE

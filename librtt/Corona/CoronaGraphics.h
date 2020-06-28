@@ -13,7 +13,7 @@
 
 #include "CoronaMacros.h"
 // STEVE CHANGE
-#include "CoronaGraphicsTypes.h"
+#include "CoronaPublicTypes.h"
 // /STEVE CHANGE
 
 
@@ -304,15 +304,17 @@ typedef struct CoronaShaderSourceTransform {
 
 
 
-typedef void (*CoronaShaderPrepare)(const void * shader, void * userData, void * renderData, int w, int h, int mod);
-typedef void (*CoronaShaderDrawBookend)(const void * shader, void * userData, const CoronaGraphicsToken * rendererToken, const void * renderData);
+typedef void (*CoronaShaderPrepare)(const CoronaShaderHandle shader, void * userData, CoronaRenderDataHandle renderData, int w, int h, int mod);
+typedef void (*CoronaShaderDrawBookend)(const CoronaShaderHandle shader, void * userData, const CoronaRendererHandle renderer, const CoronaRenderDataHandle renderData);
 typedef int (*CoronaShaderNameToIndex)(const char * name);
-typedef int (*CoronaShaderDataAction)(lua_State * L, int dataIndex, void * data, int * pushedError);
+typedef int (*CoronaShaderDataAction)(lua_State * L, int dataIndex, void * userData, int * pushedError);
 
 typedef struct CoronaShaderDrawParams {
 	unsigned short ignoreOriginal;
 	CoronaShaderDrawBookend before, after;
 } CoronaShaderDrawParams;
+
+typedef struct { long _; } CoronaAttributesHandle;
 
 /**
 TODO
@@ -334,7 +336,7 @@ typedef struct CoronaShaderCallbacks {
 	Required
 	Optional
 	*/
-	CoronaGraphicsToken * attributes;
+	CoronaAttributesHandle attributes;
 
 	/**
 	Optional
@@ -374,7 +376,7 @@ typedef struct CoronaShaderCallbacks {
 } CoronaShaderCallbacks;
 
 CORONA_API
-int CoronaShaderRegisterAttributes( lua_State * L, CoronaGraphicsToken * token, const CoronaShaderAttribute * attributes, unsigned int attributeCount ) CORONA_PUBLIC_SUFFIX;
+int CoronaShaderRegisterAttributeSet( lua_State * L, CoronaAttributesHandle * out, const CoronaShaderAttribute * attributes, unsigned int attributeCount ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 int CoronaShaderRegisterCustomization( lua_State * L, const char * name, const CoronaShaderCallbacks * callbacks ) CORONA_PUBLIC_SUFFIX;
@@ -386,16 +388,18 @@ CORONA_API
 unsigned int CoronaShaderGetProgramModCount() CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaShaderRawDraw( const void * shaderObject, const void * renderData, const CoronaGraphicsToken * rendererToken ) CORONA_PUBLIC_SUFFIX;
+int CoronaShaderRawDraw( const CoronaShaderHandle shader, const CoronaRenderDataHandle renderData, CoronaRendererHandle renderer ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-CoronaShaderSourceTransformDetails CoronaShaderGetSourceTransformDetails( const void * shaderObject ) CORONA_PUBLIC_SUFFIX;
+CoronaShaderSourceTransformDetails CoronaShaderGetSourceTransformDetails( const CoronaShaderHandle shader ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 CoronaRendererBackend CoronaRendererGetBackend( lua_State * L ) CORONA_PUBLIC_SUFFIX;
 
+typedef struct { long _; } CoronaBeginFrameOpHandle;
+
 CORONA_API
-int CoronaRendererRegisterBeginFrameOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onBeginFrame, void * userData ) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererRegisterBeginFrameOp( lua_State * L, CoronaBeginFrameOpHandle * out, CoronaRendererOp onBeginFrame, void * userData ) CORONA_PUBLIC_SUFFIX;
 
 /**
  TODO
@@ -418,37 +422,43 @@ typedef enum {
 } CoronaRenderBeginFrame;
 
 CORONA_API
-int CoronaRendererScheduleForNextFrame( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token, CoronaRenderBeginFrame action ) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererScheduleForNextFrame( CoronaRendererHandle renderer, CoronaBeginFrameOpHandle op, CoronaRenderBeginFrame action ) CORONA_PUBLIC_SUFFIX;
+
+typedef struct { long _; } CoronaClearOpHandle;
 
 CORONA_API
-int CoronaRendererRegisterClearOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onClear, void * userData ) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererRegisterClearOp( lua_State * L, CoronaClearOpHandle * out, CoronaRendererOp onClear, void * userData ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererEnableClear( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token, int enable ) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererEnableClear( CoronaRendererHandle renderer, CoronaClearOpHandle op, int enable ) CORONA_PUBLIC_SUFFIX;
+
+typedef struct { long _; } CoronaStateOpHandle;
 
 CORONA_API
-int CoronaRendererRegisterStateOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onState, void * userData ) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererRegisterStateOp( lua_State * L, CoronaStateOpHandle * out, CoronaRendererOp onState, void * userData ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererSetOperationStateDirty( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token ) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererSetOperationStateDirty( CoronaRendererHandle renderer, CoronaStateOpHandle op ) CORONA_PUBLIC_SUFFIX;
+
+typedef struct { long _; } CoronaCommandHandle;
 
 CORONA_API
-int CoronaRendererRegisterCommand( lua_State * L, CoronaGraphicsToken * token, const CoronaCommand * command ) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererRegisterCommand( lua_State * L, CoronaCommandHandle * out, const CoronaCommand * command ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererIssueCommand( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token, void * data, unsigned int size ) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererIssueCommand( const CoronaRendererHandle renderer, CoronaCommandHandle command, void * data, unsigned int size ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererSetFrustum( const CoronaGraphicsToken * rendererToken, const float * viewMatrix, const float * projectionMatrix ) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererSetFrustum( const CoronaRendererHandle renderer, const float * viewMatrix, const float * projectionMatrix ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 unsigned int CoronaGeometryCopyData( void * dst, const CoronaShaderMappingLayout * dstLayout, const void * src, const CoronaShaderMappingLayout * srcLayout ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-void * CoronaGeometryGetMappingFromRenderData( void * renderData, const char * name, CoronaShaderMappingLayout * layout ) CORONA_PUBLIC_SUFFIX;
+void * CoronaGeometryGetMappingFromRenderData( CoronaRenderDataHandle renderData, const char * name, CoronaShaderMappingLayout * layout ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-const void * CoronaGeometryGetMappingFromConstantRenderData( const void * renderData, const char * name, CoronaShaderMappingLayout * layout ) CORONA_PUBLIC_SUFFIX;
+const void * CoronaGeometryGetMappingFromConstantRenderData( const CoronaRenderDataHandle renderData, const char * name, CoronaShaderMappingLayout * layout ) CORONA_PUBLIC_SUFFIX;
 // /STEVE CHANGE
 
 #endif // _CoronaGraphics_H__

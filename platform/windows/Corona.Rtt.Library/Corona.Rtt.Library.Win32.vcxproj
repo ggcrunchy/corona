@@ -60,6 +60,7 @@
     <ClCompile Include="..\..\..\librtt\Corona\CoronaLog.c" />
     <ClCompile Include="..\..\..\librtt\Corona\CoronaLua.cpp" />
     <ClCompile Include="..\..\..\librtt\Corona\CoronaObjects.cpp" />
+    <ClCompile Include="..\..\..\librtt\Corona\CoronaPluginSupport.cpp" />
     <ClCompile Include="..\..\..\librtt\Corona\CoronaVersion.c" />
     <ClCompile Include="..\..\..\librtt\Corona\CoronaGraphics.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_BitmapMask.cpp" />
@@ -343,8 +344,9 @@
     <ClInclude Include="..\..\..\librtt\Core\Rtt_WeakCount.h" />
     <ClInclude Include="..\..\..\librtt\Core\Rtt_WeakPtr.h" />
     <ClInclude Include="..\..\..\librtt\Corona\CoronaAssert.h" />
-    <ClInclude Include="..\..\..\librtt\Corona\CoronaGraphicsTypes.h" />
+    <ClInclude Include="..\..\..\librtt\Corona\CoronaPublicTypes.h" />
     <ClInclude Include="..\..\..\librtt\Corona\CoronaEvent.h" />
+    <ClInclude Include="..\..\..\librtt\Corona\CoronaPluginSupportInternal.h" />
     <ClInclude Include="..\..\..\librtt\Corona\CoronaLibrary.h" />
     <ClInclude Include="..\..\..\librtt\Corona\CoronaLog.h" />
     <ClInclude Include="..\..\..\librtt\Corona\CoronaLua.h" />

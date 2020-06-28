@@ -17,7 +17,7 @@
 #include "Core/Rtt_Real.h"
 
 // STEVE CHANGE
-#include "Corona/CoronaGraphicsTypes.h"
+#include "Corona/CoronaPublicTypes.h"
 // /STEVE CHANGE
 
 // ----------------------------------------------------------------------------

@@ -23,7 +23,7 @@
 #include "Core/Rtt_Time.h"
 
 // STEVE CHANGE
-#include "Corona/CoronaGraphicsTypes.h"
+#include "Corona/CoronaPublicTypes.h"
 // /STEVE CHANGE
 
 // ----------------------------------------------------------------------------

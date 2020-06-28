@@ -903,6 +903,9 @@
     <ClCompile Include="..\..\..\librtt\Corona\CoronaObjects.cpp">
       <Filter>librtt\Corona</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\librtt\Corona\CoronaPluginSupport.cpp">
+      <Filter>librtt\Corona</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\external\ALmixer\luaal.h">
@@ -1808,7 +1811,10 @@
     <ClInclude Include="..\..\..\librtt\Corona\CoronaObjects.h">
       <Filter>librtt\Corona</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\librtt\Corona\CoronaGraphicsTypes.h">
+    <ClInclude Include="..\..\..\librtt\Corona\CoronaPluginSupportInternal.h">
+      <Filter>librtt\Corona</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\librtt\Corona\CoronaPublicTypes.h">
       <Filter>librtt\Corona</Filter>
     </ClInclude>
   </ItemGroup>

@@ -20,6 +20,7 @@
 #include "Rtt_Runtime.h"
 #include "Display/Rtt_Display.h"
 // STEVE CHANGE
+#include "Corona/CoronaPluginSupportInternal.h"
 #include "Display/Rtt_ShaderData.h"
 #include "Display/Rtt_ShaderFactory.h"
 #include "Renderer/Rtt_CommandBuffer.h"
@@ -91,7 +92,7 @@ int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format)
 }
 // STEVE CHANGE
 CORONA_API
-int CoronaShaderRegisterAttributes( lua_State * L, CoronaGraphicsToken * token, const CoronaShaderAttribute * attributes, unsigned int attributeCount )
+int CoronaShaderRegisterAttributeSet( lua_State * L, CoronaAttributesHandle * out, const CoronaShaderAttribute * attributes, unsigned int attributeCount )
 {
 	Rtt_ASSERT_NOT_IMPLEMENTED();
 
@@ -123,15 +124,15 @@ unsigned int CoronaShaderGetProgramModCount()
 }
 
 CORONA_API
-int CoronaShaderRawDraw( const void * shaderObject, const void * renderData, const CoronaGraphicsToken * rendererToken )
+int CoronaShaderRawDraw( const CoronaShaderHandle shaderHandle, const CoronaRenderDataHandle renderDataHandle, CoronaRendererHandle rendererHandle )
 {
-	Rtt::Renderer * renderer = static_cast< Rtt::Renderer * >( GetRenderer( rendererToken ) );
+	const Rtt::Shader * shader = static_cast< const Rtt::Shader * >( CoronaExtractConstantShader( shaderHandle ) );
+	const Rtt::RenderData * renderData = static_cast< const Rtt::RenderData * >( CoronaExtractConstantRenderData( renderDataHandle ) );
+	Rtt::Renderer * renderer = static_cast< Rtt::Renderer * >( CoronaExtractRenderer( rendererHandle ) );
 
-	if (renderer)
+	if (shader && renderData && renderer)
 	{
-		const Rtt::Shader * shader = static_cast< const Rtt::Shader * >( shaderObject );
-
-		shader->Draw( *renderer, *static_cast< const Rtt::RenderData * >( renderData ) );
+		shader->Draw( *renderer, *renderData );
 
 		return 1;
 	}
@@ -140,13 +141,20 @@ int CoronaShaderRawDraw( const void * shaderObject, const void * renderData, con
 }
 
 CORONA_API
-CoronaShaderSourceTransformDetails CoronaShaderGetSourceTransformDetails( const void * shaderObject )
+CoronaShaderSourceTransformDetails CoronaShaderGetSourceTransformDetails( const CoronaShaderHandle shaderHandle )
 {
-	const Rtt::ShaderData * data = static_cast< const Rtt::Shader * >( shaderObject )->GetData();
+	const Rtt::Shader * shader = static_cast< const Rtt::Shader * >( CoronaExtractConstantShader( shaderHandle ) );
 
-	Rtt::SharedPtr< Rtt::ShaderResource > resource( data->GetShaderResource() );
+	if (shader)
+	{
+		const Rtt::ShaderData * data = shader->GetData();
 
-	return resource->GetSourceTransformDetails();
+		Rtt::SharedPtr< Rtt::ShaderResource > resource( data->GetShaderResource() );
+	}
+
+	const CoronaShaderSourceTransformDetails details = {};
+
+	return details;
 }
 
 CORONA_API
@@ -161,193 +169,114 @@ CoronaRendererBackend CoronaRendererGetBackend( lua_State * )
 	#endif
 }
 
-enum TokenType : unsigned char { kTokenType_None, kTokenType_Attribute, kTokenType_BeginFrameOp, kTokenType_ClearOp, kTokenType_Command, kTokenType_StateOp, kTokenType_Renderer = 0xFF };
-
-void CoronaGraphicsTokenWrite( CoronaGraphicsToken * tokens, unsigned char type, const void * data, unsigned int size )
+static bool
+EncodeIndex( void * out, U16 index )
 {
-	tokens->bytes[0] = type;
-
-	if (size)
+	if (index)
 	{
-		memcpy( tokens->bytes + 1, data, size );
-	}
-}
+		memcpy( out, &index, sizeof( U16 ) );
 
-void CoronaGraphicsTokenRead( void * buffer, const CoronaGraphicsToken * tokens, unsigned int size )
-{
-	if (size)
-	{
-		memcpy( buffer, tokens->bytes + 1, size );
-	}
-}
-
-U8 CoronaGraphicsGetTokenType( const CoronaGraphicsToken * tokens )
-{
-	return tokens->bytes[0];
-}
-
-static U32 sIndex = ~0U;
-
-static const size_t MixedSize = sizeof( const void * ) + sizeof( int );
-
-static_assert( MixedSize <= sizeof( CoronaGraphicsToken ), "Mixed size too large" );
-
-void CoronaGraphicsEncodeAsTokens ( CoronaGraphicsToken tokens[], unsigned char type, const void * data )
-{
-	if (kTokenType_Renderer == type && data)
-	{
-		unsigned char mixed[MixedSize];
-
-		++sIndex; // invalidate last use
-
-		memcpy( mixed, &data, sizeof( data ) );
-		memcpy( mixed + sizeof( data ), &sIndex, sizeof( U32 ) );
-
-		CoronaGraphicsTokenWrite( tokens, type, mixed, MixedSize );
+		return true;
 	}
 
-	else
-	{
-		CoronaGraphicsTokenWrite( tokens, kTokenType_None, NULL, 0U );
-	}
-}
-
-template<typename T> int
-SetFlagStyleToken( CoronaGraphicsToken * token, TokenType type, U16 index )
-{
-	T flag = T(1U) << (index - 1U);
-
-	CoronaGraphicsTokenWrite( token, type, &flag, sizeof( T ) );
-
-	return 1;
+	return false;
 }
 
 CORONA_API
-int CoronaRendererRegisterBeginFrameOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onBeginFrame, void * userData )
+int CoronaRendererRegisterBeginFrameOp( lua_State * L, CoronaBeginFrameOpHandle * out, CoronaRendererOp onBeginFrame, void * userData )
 {
-	if (onBeginFrame)
-	{
-		U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddBeginFrameOp( onBeginFrame, userData );
+	const CoronaBeginFrameOpHandle wipe = {};
 
-		if (index)
-		{
-			return SetFlagStyleToken< U32 >( token, kTokenType_BeginFrameOp, index );
-		}
-	}
+	*out = wipe;
 
-	return 0;
+	return onBeginFrame && EncodeIndex( out, Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddBeginFrameOp( onBeginFrame, userData ) );
+}
+
+static U16
+DecodeIndex( const void * data )
+{
+	U16 index;
+
+	memcpy( &index, data, sizeof( U16 ) );
+
+	return index;
 }
 
 template<typename T> T
-ExtractFromToken( const CoronaGraphicsToken * token )
+IndexToFlag( U16 index )
 {
-	T result;
-
-	CoronaGraphicsTokenRead( &result, token, sizeof( T ) );
-
-	return result;
-}
-
-void *
-GetRenderer( const CoronaGraphicsToken tokens[] )
-{
-	if (kTokenType_Renderer == CoronaGraphicsGetTokenType( tokens ))
-	{
-		unsigned char mixed[MixedSize];
-
-		CoronaGraphicsTokenRead( mixed, tokens, MixedSize );
-
-		void * data;
-		int index;
-
-		memcpy( &data, mixed, sizeof( data ) );
-		memcpy( &index, mixed + sizeof( data ), sizeof( U32 ) );
-
-		if (index == sIndex) // still the same "session"?
-		{
-			return data;
-		}
-	}
-
-	return NULL;
+	return T(1) << (index - 1U);
 }
 
 CORONA_API
-int CoronaRendererScheduleForNextFrame( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token, CoronaRenderBeginFrame action )
+int CoronaRendererScheduleForNextFrame( CoronaRendererHandle rendererHandle, CoronaBeginFrameOpHandle op, CoronaRenderBeginFrame action )
 {
-	if (kTokenType_BeginFrameOp == CoronaGraphicsGetTokenType( token ))
+	Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( CoronaExtractRenderer( rendererHandle ) );
+	U16 index = DecodeIndex( &op );
+
+	if (renderer && index)
 	{
-		Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( GetRenderer( rendererToken ) );
+		U32 flag = IndexToFlag< U32 >( index );
 
-		if (renderer)
+		switch (action)
 		{
-			U32 flag = ExtractFromToken< U32 >( token );
+		case kBeginFrame_Schedule:
+			renderer->SetBeginFrameFlags( renderer->GetBeginFrameFlags() | flag );
 
-			switch (action)
-			{
-			case kBeginFrame_Schedule:
-				renderer->SetBeginFrameFlags( renderer->GetBeginFrameFlags() | flag );
+			break;
+		case kBeginFrame_Cancel:
+			flag &= ~renderer->GetDoNotCancelFlags();
 
-				break;
-			case kBeginFrame_Cancel:
-				flag &= ~renderer->GetDoNotCancelFlags();
+			renderer->SetBeginFrameFlags( renderer->GetBeginFrameFlags() & ~flag );
 
-				renderer->SetBeginFrameFlags( renderer->GetBeginFrameFlags() & ~flag );
+			break;
+		case kBeginFrame_Establish:
+			renderer->SetDoNotCancelFlags( renderer->GetDoNotCancelFlags() | flag );
 
-				break;
-			case kBeginFrame_Establish:
-				renderer->SetDoNotCancelFlags( renderer->GetDoNotCancelFlags() | flag );
-
-				break;
-			}
-
-			return 1;
+			break;
 		}
+
+		return 1;
 	}
 
 	return 0;
 }
 
 CORONA_API
-int CoronaRendererRegisterClearOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onClear, void * userData )
+int CoronaRendererRegisterClearOp( lua_State * L, CoronaClearOpHandle * out, CoronaRendererOp onClear, void * userData )
 {
-	if (onClear)
-	{
-		U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddClearOp( onClear, userData );
+	const CoronaClearOpHandle wipe = {};
 
-		if (index)
-		{
-			return SetFlagStyleToken< U32 >( token, kTokenType_ClearOp, index );
-		}
+	*out = wipe;
+
+	return onClear && EncodeIndex( out, Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddClearOp( onClear, userData ) );
+}
+
+CORONA_API
+int CoronaRendererEnableClear( CoronaRendererHandle rendererHandle, CoronaClearOpHandle op, int enable )
+{
+	Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( CoronaExtractRenderer( rendererHandle ) );
+	U16 index = DecodeIndex( &op );
+
+	if (renderer && index)
+	{
+		U32 flag = IndexToFlag< U32 >( index ), clearFlags = renderer->GetClearFlags();
+
+		renderer->SetClearFlags( enable ? (clearFlags | flag) : (clearFlags & ~flag) );
+
+		return 1;
 	}
 
 	return 0;
 }
 
 CORONA_API
-int CoronaRendererEnableClear( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token, int enable )
+int CoronaRendererRegisterStateOp( lua_State * L, CoronaStateOpHandle * out, CoronaRendererOp onState, void * userData )
 {
-	if (kTokenType_ClearOp == CoronaGraphicsGetTokenType( token ))
-	{
-		Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( GetRenderer( rendererToken ) );
-
-		if (renderer)
-		{
-			U32 flag = ExtractFromToken< U32 >( token ), clearFlags = renderer->GetClearFlags();
-
-			renderer->SetClearFlags( enable ? (clearFlags | flag) : (clearFlags & ~flag) );
-
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-CORONA_API
-int CoronaRendererRegisterStateOp( lua_State * L, CoronaGraphicsToken * token, CoronaRendererOp onState, void * userData )
-{
+	const CoronaStateOpHandle wipe = {};
 	U16 index = 0U;
+
+	*out = wipe;
 
 	if (onState)
 	{
@@ -368,7 +297,7 @@ int CoronaRendererRegisterStateOp( lua_State * L, CoronaGraphicsToken * token, C
 
 		else
 		{
-			index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddStateOp( [](const CoronaGraphicsToken *, void *){}, NULL );
+			index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddStateOp( [](CoronaRendererHandle, void *){}, NULL );
 
 			if (index)
 			{
@@ -383,42 +312,18 @@ int CoronaRendererRegisterStateOp( lua_State * L, CoronaGraphicsToken * token, C
 		lua_pop( L, 1 ); // ...
 	}
 
-	if (index)
-	{
-		return SetFlagStyleToken< U64 >( token, kTokenType_StateOp, index );
-	}
-
-	return 0;
+	return index && EncodeIndex( out, index );
 }
 
 CORONA_API
-int CoronaRendererSetOperationStateDirty( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token )
+int CoronaRendererSetOperationStateDirty( CoronaRendererHandle rendererHandle, CoronaStateOpHandle op )
 {
-	if (kTokenType_StateOp == CoronaGraphicsGetTokenType( token ))
+	Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( CoronaExtractRenderer( rendererHandle ) );
+	U16 index = DecodeIndex( &op );
+
+	if (renderer && index)
 	{
-		Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( GetRenderer( rendererToken ) );
-
-		if (renderer)
-		{
-			renderer->SetStateFlags( renderer->GetStateFlags() | ExtractFromToken< U64 >( token ) );
-
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-CORONA_API
-int CoronaRendererRegisterCommand( lua_State * L, CoronaGraphicsToken * token, const CoronaCommand * command )
-{
-	U16 index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddCustomCommand( *command );
-
-	if (index)
-	{
-		--index;
-
-		CoronaGraphicsTokenWrite( token, kTokenType_Command, &index, sizeof( U16 ) );
+		renderer->SetStateFlags( renderer->GetStateFlags() | IndexToFlag< U64 >( index ) );
 
 		return 1;
 	}
@@ -427,23 +332,31 @@ int CoronaRendererRegisterCommand( lua_State * L, CoronaGraphicsToken * token, c
 }
 
 CORONA_API
-int CoronaRendererIssueCommand( const CoronaGraphicsToken * rendererToken, const CoronaGraphicsToken * token, void * data, unsigned int size )
+int CoronaRendererRegisterCommand( lua_State * L, CoronaCommandHandle * out, const CoronaCommand * command )
 {
-	if (kTokenType_Command == CoronaGraphicsGetTokenType( token ))
-	{
-		Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( GetRenderer( rendererToken ) );
+	CoronaCommandHandle wipe = {};
+
+	*out = wipe;
+
+	return command && EncodeIndex( out, Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddCustomCommand( *command ) ); // TODO: will fall one short...
+}
+
+CORONA_API
+int CoronaRendererIssueCommand( CoronaRendererHandle rendererHandle, CoronaCommandHandle command, void * data, unsigned int size )
+{
+	Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( CoronaExtractRenderer( rendererHandle ) );
+	U16 index = DecodeIndex( &command );
 		
-		if (renderer)
-		{
-			return renderer->IssueCustomCommand( ExtractFromToken< U16 >( token ), data, size );
-		}
+	if (renderer && index)
+	{
+		return renderer->IssueCustomCommand( index - 1U, data, size );
 	}
 
 	return 0;
 }
 
 CORONA_API
-int CoronaRendererSetFrustum( const CoronaGraphicsToken * rendererToken, const float * viewMatrix, const float * projectionMatrix )
+int CoronaRendererSetFrustum( CoronaRendererHandle rendererHandle, const float * viewMatrix, const float * projectionMatrix )
 {
 	return 0;
 }
@@ -594,19 +507,29 @@ static bool GetLayout( const Rtt::Geometry * geometry, const char * name, Corona
 }
 
 CORONA_API
-void * CoronaGeometryGetMappingFromRenderData( void * renderData, const char * name, CoronaShaderMappingLayout * layout )
+void * CoronaGeometryGetMappingFromRenderData( CoronaRenderDataHandle renderDataHandle, const char * name, CoronaShaderMappingLayout * layout )
 {
-	Rtt::Geometry * geometry = static_cast< Rtt::RenderData * >( renderData )->fGeometry;
+	Rtt::RenderData * renderData = static_cast< Rtt::RenderData * >( CoronaExtractRenderData( renderDataHandle ) );
 
-	return GetLayout( geometry, name, layout) ? geometry->GetVertexData() : NULL;
+	if (renderData && GetLayout( renderData->fGeometry, name, layout ))
+	{
+		return renderData->fGeometry->GetVertexData();
+	}
+
+	return NULL;
 }
 
 CORONA_API
-const void * CoronaGeometryGetMappingFromConstantRenderData( const void * renderData, const char * name, CoronaShaderMappingLayout * layout )
+const void * CoronaGeometryGetMappingFromConstantRenderData( const CoronaRenderDataHandle renderDataHandle, const char * name, CoronaShaderMappingLayout * layout )
 {
-	const Rtt::Geometry * geometry = static_cast< const Rtt::RenderData * >( renderData )->fGeometry;
+	const Rtt::RenderData * renderData = static_cast< const Rtt::RenderData * >( CoronaExtractConstantRenderData( renderDataHandle ) );
 
-	return GetLayout( geometry, name, layout) ? const_cast< Rtt::Geometry * >( geometry )->GetVertexData() : NULL;
+	if (renderData && GetLayout( renderData->fGeometry, name, layout ))
+	{
+		return renderData->fGeometry->GetVertexData();
+	}
+
+	return NULL;
 }
 
 // /STEVE CHANGE

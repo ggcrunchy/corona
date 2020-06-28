@@ -31,6 +31,10 @@
 
 #include <limits>
 
+// STEVE CHANGE
+#include "Corona/CoronaPluginSupportInternal.h"
+// /STEVE CHANGE
+
 // ----------------------------------------------------------------------------
 
 namespace /*anonymous*/ 
@@ -206,7 +210,7 @@ Log2OfPower( U32 power )
 	return MultiplyDeBruijnBitPosition2[(power * 0x077CB531U) >> 27];
 }
 
-static U64
+static U32
 Log2OfPower( U64 power )
 {
 	union {
@@ -218,7 +222,7 @@ Log2OfPower( U64 power )
 
 	U64 index = !v.arr[0]; // if 0, choose 1
 
-	return (index << 32) + Log2OfPower( v.arr[index] );
+	return index * 32U + Log2OfPower( v.arr[index] );
 }
 
 template<typename T> void
@@ -226,21 +230,17 @@ CallOps( Rtt::Renderer * renderer, Rtt::Array< Renderer::CustomOp > & ops, T fla
 {
 	if (flags)
 	{
-		CoronaGraphicsToken token;
-
-		CoronaGraphicsEncodeAsTokens( &token, 0xFF, renderer );
+		auto ref = CoronaInternalStoreRenderer( renderer );
 
 		while (flags)
 		{
 			T lowest = LowestBit( flags );
 			Renderer::CustomOp & op = ops[ Log2OfPower( lowest ) ];
 
-			op.fAction( &token, op.fUserData );
+			op.fAction( ref.GetHandle(), op.fUserData );
 
 			flags -= lowest;
 		}
-
-		CoronaGraphicsEncodeAsTokens( &token, 0xFF, nullptr );
 	}
 }
 
