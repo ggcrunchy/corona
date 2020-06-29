@@ -53,27 +53,6 @@ ShaderDataAdapter::GetHash( lua_State *L ) const
 	return &sHash;
 }
 
-// STEVE CHANGE
-template<typename R> void
-CallCustomAccessor( lua_State * L, int index, CoronaShaderDataAction action, const ShaderData * object, R * result )
-{
-	int pushedError = 0, top = lua_gettop( L );
-
-	*result = action( L, index - ShaderData::kNumData, object->GetExtraSpace(), &pushedError ); // ...[, object / err]
-
-	if (pushedError)
-	{
-		bool isString = lua_isstring( L, -1 );
-
-		CoronaLuaWarning( L, "Error in 'getData()'%s%s", isString ? ": " : "", isString ? lua_tostring( L, -1 ) : "" );
-
-		lua_settop( L, top ); // ...
-
-		*result = 0;
-	}
-}
-// /STEVE CHANGE
-
 int
 ShaderDataAdapter::ValueForKey(
 	const LuaUserdataProxy& sender,
@@ -103,7 +82,20 @@ ShaderDataAdapter::ValueForKey(
 
 			if (callbacks && callbacks->getData)
 			{
-				CallCustomAccessor( L, index, callbacks->getData, object, &result );
+				int pushedError = 0, top = lua_gettop( L );
+
+				result = callbacks->getData( L, index - ShaderData::kNumData, object->GetExtraSpace(), &pushedError ); // ...[, object / err]
+
+				if (pushedError)
+				{
+					bool isString = lua_isstring( L, -1 );
+
+					CoronaLuaWarning( L, "Error in 'getData()'%s%s", isString ? ": " : "", isString ? lua_tostring( L, -1 ) : "" );
+
+					lua_settop( L, top ); // ...
+
+					result = 0;
+				}
 
 				return result;
 			}
@@ -154,7 +146,20 @@ ShaderDataAdapter::SetValueForKey(
 
 			if (callbacks && callbacks->setData)
 			{
-				CallCustomAccessor( L, index, callbacks->setData, object, &result );
+				int pushedError = 0, top = lua_gettop( L );
+
+				result = callbacks->setData( L, index - ShaderData::kNumData, valueIndex, object->GetExtraSpace(), &pushedError ); // ...[, err]
+
+				if (pushedError)
+				{
+					bool isString = lua_isstring( L, -1 );
+
+					CoronaLuaWarning( L, "Error in 'setData()'%s%s", isString ? ": " : "", isString ? lua_tostring( L, -1 ) : "" );
+
+					lua_settop( L, top ); // ...
+
+					result = false;
+				}
 
 				return result;
 			}

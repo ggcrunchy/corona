@@ -108,7 +108,7 @@ class ShaderData
 		Uniform *fUniformData[kNumData];
 		WeakPtr< ShaderResource > fShaderResource;
 		// STEVE CHANGE
-		mutable U8 * fExtraSpace;
+		U8 * fExtraSpace;
 		U32 fExtraCount;
 		// /STEVE CHANGE
 		const Shader *fOwner;

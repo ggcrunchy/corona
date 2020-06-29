@@ -185,7 +185,12 @@ ShaderResource::GetDataIndex( const char *key ) const
 // STEVE CHANGE
 	if (-1 == result && fShaderCallbacks && fShaderCallbacks->getDataIndex)
 	{
-		result = ShaderData::kNumData + fShaderCallbacks->getDataIndex( key );
+		result = fShaderCallbacks->getDataIndex( key );
+
+		if (result != -1)
+		{
+			result += ShaderData::kNumData;
+		}
 	}
 // /STEVE CHANGE
 	return result;

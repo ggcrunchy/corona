@@ -64,7 +64,7 @@ ShaderData::~ShaderData()
 		fProxy->DetachUserdata();
 	}
 // STEVE CHANGE
-	Rtt_DELETE( fExtraSpace );
+//	Rtt_DELETE( fExtraSpace );
 // /STEVE CHANGE
 }
 
@@ -117,10 +117,7 @@ ShaderData::Clone( Rtt_Allocator *allocator )
 	// STEVE CHANGE
 	if (fExtraCount)
 	{
-		result->fExtraSpace = Rtt_NEW( NULL, U8( fExtraCount ) );
-		result->fExtraCount = fExtraCount;
-
-		memcpy( result->fExtraSpace, fExtraSpace, fExtraCount );
+//		memcpy( result->fExtraSpace, fExtraSpace, fExtraCount );
 	}
 	// /STEVE CHANGE
 

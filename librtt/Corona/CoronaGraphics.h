@@ -305,9 +305,10 @@ typedef struct CoronaShaderSourceTransform {
 
 
 typedef void (*CoronaShaderPrepare)(const CoronaShaderHandle shader, void * userData, CoronaRenderDataHandle renderData, int w, int h, int mod);
-typedef void (*CoronaShaderDrawBookend)(const CoronaShaderHandle shader, void * userData, const CoronaRendererHandle renderer, const CoronaRenderDataHandle renderData);
+typedef void (*CoronaShaderDrawBookend)(const CoronaShaderHandle shader, void * userData, CoronaRendererHandle renderer, const CoronaRenderDataHandle renderData);
 typedef int (*CoronaShaderNameToIndex)(const char * name);
-typedef int (*CoronaShaderDataAction)(lua_State * L, int dataIndex, void * userData, int * pushedError);
+typedef int (*CoronaShaderGetData)(lua_State * L, int dataIndex, void * userData, int * pushedError);
+typedef int (*CoronaShaderSetData)(lua_State * L, int dataIndex, int valueIndex, void * userData, int * pushedError);
 
 typedef struct CoronaShaderDrawParams {
 	unsigned short ignoreOriginal;
@@ -360,13 +361,13 @@ typedef struct CoronaShaderCallbacks {
 	Optional
 	TODO
 	*/
-	CoronaShaderDataAction getData;
+	CoronaShaderGetData getData;
 
 	/**
 	Optional
 	TODO
 	*/
-	CoronaShaderDataAction setData;
+	CoronaShaderSetData setData;
 
 	/**
 	Optional

@@ -539,12 +539,13 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 		if (!lua_istable( L, -1 ))
 		{
 			CoronaLuaWarning( L, "No customizations registered" );
+
 			lua_pop( L, 1 ); // ..., name
 		}
 
 		else
 		{
-			const char * name = lua_tostring( L, -1 );
+			const char * name = lua_tostring( L, -2 );
 
 			lua_insert( L, -2 ); // ..., customizations, name
 			lua_rawget( L, -2 ); // ..., customizations, customization?
@@ -559,6 +560,8 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 					lua_newtable( L ); // ..., customizations, details, strings
 					lua_pushnil( L ); // ..., customizations, details, strings, nil
 
+					size_t detailsCount = 0U;
+
 					while (lua_next( L, -3 )) // ..., customizations, details, strings[, key, value]
 					{
 						bool isKeyString = lua_isstring( L, -2 ), isValueString = lua_isstring( L, -1 ) || lua_isnumber( L, -1 );
@@ -566,6 +569,8 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 						if (isKeyString && isValueString)
 						{
 							lua_setfield( L, -3, lua_tostring( L, -2 ) ); // ..., customizations, details, strings = { ..., key = value }, key
+
+							++detailsCount;
 						}
 
 						else
@@ -589,23 +594,19 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 						}
 					}
 
-					U32 detailsCount = lua_objlen( L, -1 ) / 2;
+					const char ** strings = (const char **)lua_newuserdata( L, 2U * detailsCount * sizeof( const char * ) ); // ..., customizations, details, strings, stringsUserdata
+					int index = 0;
 
-					const char ** strings = (const char **)lua_newuserdata( L, lua_objlen( L, -1 ) * sizeof( const char * ) ); // ..., customizations, details, strings, stringsUserdata
-
-					for (int i = 0; i < detailsCount; ++i, lua_pop( L, 2 ))
+					for (lua_pushnil( L ); lua_next( L, -3 ); lua_pop( L, 1 ), ++index)
 					{
-						lua_rawgeti( L, -2, i + 1 ); // ..., customizations, details, strings, stringsUserdata, name
-						lua_rawgeti( L, -3, i + 1 + detailsCount ); // ..., customizations, details, strings, stringsUserdata, name, value
-
-						strings[i] = lua_tostring( L, -2 );
-						strings[i + detailsCount] = lua_tostring( L, -1 );
+						strings[index] = lua_tostring( L, -2 );
+						strings[index + detailsCount] = lua_tostring( L, -1 );
+// TODO: put a string back in if value was a number...
 					}
 
 					resource->AddSourceTransformDetails( strings, strings + detailsCount, detailsCount );
 
-					luaL_ref( L, LUA_REGISTRYINDEX ); // ..., customizations, details, strings; registry = { ..., [ref] = stringsUserdata }
-					lua_pop( L, 1 ); // ..., customizations, details
+					lua_rawset( L, LUA_REGISTRYINDEX ); // ..., customizations, details; registry = { ..., [strings] = stringsUserdata }
 				}
 
 				else if (!lua_isnil( L, -1 ))
@@ -1266,12 +1267,12 @@ ShaderFactory::RegisterCustomization( const char * name, const CoronaShaderCallb
 
 	else
 	{
-		void * out = lua_newuserdata( L, sizeof( CoronaShaderCallbacks ) ); // ..., customizations, callbacks
+		void * out = lua_newuserdata( L, sizeof( CoronaShaderCallbacks ) + 20U ); // ..., customizations, nil, callbacks
 
 		memcpy( out, &callbacks, sizeof( CoronaShaderCallbacks ) );
 
-		lua_setfield( L, -2, name ); // ..., customizations = { ..., [name] = callbacks }
-		lua_pop( L, 1 ); // ...
+		lua_setfield( L, -3, name ); // ..., customizations = { ..., [name] = callbacks }, nil
+		lua_pop( L, 2 ); // ...
 
 		return true;
 	}

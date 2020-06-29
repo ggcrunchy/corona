@@ -150,6 +150,11 @@ CoronaShaderSourceTransformDetails CoronaShaderGetSourceTransformDetails( const 
 		const Rtt::ShaderData * data = shader->GetData();
 
 		Rtt::SharedPtr< Rtt::ShaderResource > resource( data->GetShaderResource() );
+
+		if (resource.NotNull())
+		{
+			return resource->GetSourceTransformDetails();
+		}
 	}
 
 	const CoronaShaderSourceTransformDetails details = {};
@@ -408,12 +413,13 @@ unsigned int CoronaGeometryCopyData( void * dst, const CoronaShaderMappingLayout
 			n = n2;
 		}
 	}
+	
+	const U8 * srcData = reinterpret_cast< const U8 * >( src ) + srcLayout->data.offset;
+	U8 * dstData = reinterpret_cast< U8 * >( dst ) + dstLayout->data.offset;
 
-	U8 * dstData = reinterpret_cast< U8 * >( dst );
-
-	for (const U8 * srcData = reinterpret_cast< const U8 * >( src ); n; --n, srcData += srcLayout->data.stride, dstData += dstLayout->data.stride)
+	for (size_t i = 0U; i < n; ++i)
 	{
-		memcpy( dstData, srcData, valuesSize );
+		memcpy( dstData + i * dstLayout->data.stride, srcData + i * srcLayout->data.stride, valuesSize );
 	}
 
 	return n;
@@ -472,14 +478,14 @@ static bool GetLayout( const Rtt::Geometry * geometry, const char * name, Corona
 		case 'y':
 		case 'z':
 			layout->data.type = kAttributeType_Float;
-			layout->data.offset = offsetof( Rtt::Geometry::Vertex, x ) + (*name - 'x');
+			layout->data.offset = offsetof( Rtt::Geometry::Vertex, x ) + (*name - 'x') * sizeof( float );
 
 			break;
 		case 'u':
 		case 'v':
 		case 'q':
 			layout->data.type = kAttributeType_Float;
-			layout->data.offset = offsetof( Rtt::Geometry::Vertex, u ) + (*name != 'q' ? (*name - 'u') : 2U);
+			layout->data.offset = offsetof( Rtt::Geometry::Vertex, u ) + (*name != 'q' ? (*name - 'u') : 2U) * sizeof( float );
 
 			break;
 		case 'a':

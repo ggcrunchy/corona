@@ -188,6 +188,7 @@ DisplayLibrary::~DisplayLibrary()
 #include "Corona/CoronaGraphics.h"
 #include "Corona/CoronaObjects.h"
 #include "Renderer/Rtt_GL.h"
+#include <string>
 #include <vector>
 
 template<typename T> struct Boxed {
@@ -1172,6 +1173,193 @@ static int ColorMaskObject( lua_State * L )
 	return CoronaObjectsPushRect( L, colorMaskData, &sharedColorMaskData.object->params );
 }
 
+static int RegisterCustomization( lua_State * L)
+{
+	CoronaShaderCallbacks callbacks = {};
+
+	callbacks.size = sizeof( CoronaShaderCallbacks );
+
+	struct InstancingData {
+		CoronaShaderMappingLayout dstLayout;
+		void * out;
+		int count;
+	};
+
+	callbacks.extraSpace = sizeof( InstancingData );
+	
+	callbacks.getDataIndex = [](const char * name)
+	{
+		if (strcmp( name, "instanceCount" ) == 0)
+		{
+			return 0;
+		}
+
+		return -1;
+	};
+
+	callbacks.getData = [](lua_State * L, int dataIndex, void * userData, int * pushedError)
+	{
+		if (0 == dataIndex)
+		{
+			InstancingData * instancingData = static_cast< InstancingData * >( userData );
+
+			lua_pushinteger( L, instancingData->count ); // ..., count
+
+			return 1;
+		}
+
+		else
+		{
+			lua_pushliteral( L, "getData given bad index: %i", dataIndex ); // ..., err
+
+			*pushedError = true;
+
+			return 0;
+		}
+	};
+
+	callbacks.setData = [](lua_State * L, int dataIndex, int valueIndex, void * userData, int * pushedError)
+	{
+		int instanceCount = lua_tointeger( L, valueIndex );
+
+		if (0 == dataIndex && instanceCount >= 0)
+		{
+			InstancingData * instancingData = static_cast< InstancingData * >( userData );
+
+			instancingData->count = instanceCount;
+
+			return 1;
+		}
+
+		else
+		{
+			if (dataIndex)
+			{
+				lua_pushfstring( L, "setData given bad index: %i", dataIndex ); // ..., err
+			}
+
+			else
+			{
+				lua_pushfstring( L, "Invalid instance count: %i", instanceCount ); // ..., err
+			}
+
+			*pushedError = true;
+
+			return 0;
+		}
+	};
+
+	callbacks.drawParams.ignoreOriginal = true;
+	callbacks.drawParams.after = [](const CoronaShaderHandle shader, void * userData, CoronaRendererHandle renderer, const CoronaRenderDataHandle renderData)
+	{	
+		InstancingData * instancingData = static_cast< InstancingData * >( userData );
+
+		if (instancingData->out && instancingData->count > 1U)
+		{
+			CoronaShaderMappingLayout srcLayout;
+
+			srcLayout.data.count = 1U;
+			srcLayout.data.offset = 0U;
+			srcLayout.data.stride = 0U;
+			srcLayout.data.type = kAttributeType_Float;
+			srcLayout.size = sizeof( float );
+
+			CoronaShaderRawDraw( shader, renderData, renderer );
+
+			for (size_t i = 1; i < instancingData->count; ++i)
+			{
+				const float instance = float( i );
+
+				CoronaGeometryCopyData( instancingData->out, &instancingData->dstLayout, &instance, &srcLayout );
+				CoronaShaderRawDraw( shader, renderData, renderer );
+			}
+
+			const float zero = 0.f;
+
+			CoronaGeometryCopyData( instancingData->out, &instancingData->dstLayout, &zero, &srcLayout );
+		}
+
+		else
+		{
+			CoronaShaderRawDraw( shader, renderData, renderer );
+		}
+	};
+
+	callbacks.prepare = [](const CoronaShaderHandle shader, void * userData, CoronaRenderDataHandle renderData, int w, int h, int mod)
+	{
+		InstancingData * instancingData = static_cast< InstancingData * >( userData );
+
+		instancingData->out = NULL;
+
+		CoronaShaderSourceTransformDetails details = CoronaShaderGetSourceTransformDetails( shader );
+
+		for (size_t i = 0; i < details.count; ++i)
+		{
+			if (strcmp( details.names[i], "supportsInstancing" ) == 0)
+			{
+				instancingData->out = CoronaGeometryGetMappingFromRenderData( renderData, details.values[i], &instancingData->dstLayout );
+			}
+		}
+	};
+	/*
+	static std::vector< const char * > sStrings;
+	static std::string sUpdated;
+
+	callbacks.transform.begin = [](CoronaShaderSourceTransformParams * params, void *)
+	{
+		for (size_t i = 0; i < params->nsources; ++i)
+		{
+			bool isVertexSource = strcmp( params->hints[i], "vertexSource" ) == 0;
+
+			if (isVertexSource || strcmp( params->hints[i], "fragmentSource" ) == 0)
+			{
+				sUpdated.assign( params->sources[i] );
+
+				const std::string positionVarying = "vec2 v_Position;";
+				size_t pvPos = sUpdated.find( positionVarying );
+
+				sUpdated.replace( pvPos, positionVarying.size(), "float v_InstanceIndex;\n\n#define CoronaInstanceIndex int( v_InstanceIndex )\n#define CoronaInstanceFloat v_InstanceIndex\n" );
+
+				if (isVertexSource)
+				{
+					const std::string positionAttribute = "vec2 a_Position";
+					size_t paPos = sUpdated.find( positionAttribute );
+
+					sUpdated.replace( paPos, positionAttribute.size(), "vec3 a_Position" );
+
+					const std::string assignUserdata = "v_UserData = a_UserData;";
+					size_t auPos = sUpdated.find( assignUserdata );
+
+					sUpdated.insert( auPos + assignUserdata.size(), "\n\tv_InstanceIndex = a_Position.z;\n" );
+
+					const std::string passPosition = "( a_Position )";
+					size_t ppPos = sUpdated.find( passPosition );
+
+					sUpdated.replace( ppPos, passPosition.size(), "( a_Position.xy )" );
+				}
+
+				sStrings.push_back( sUpdated.c_str() );
+			}
+
+			else
+			{
+				sStrings.push_back( params->sources[i] );
+			}
+		}
+
+		return sStrings.data();
+	};
+
+	callbacks.transform.finish = [](const char * transformed[], unsigned int n, void *)
+	{
+		sStrings.clear();
+		sUpdated.clear();
+	};
+	*/
+	lua_pushboolean( L, CoronaShaderRegisterCustomization( L, "instances", &callbacks ) ); // ..., ok?
+
+	return 1;
+}
 // /STEVE CHANGE
 int
 DisplayLibrary::Open( lua_State *L )
@@ -1219,6 +1407,7 @@ DisplayLibrary::Open( lua_State *L )
 		{ "ScopeGroupObject", ScopeGroupObject },
 		{ "StencilClearObject", StencilClearObject },
 		{ "StencilStateObject", StencilStateObject },
+		{ "RegisterCustomization", RegisterCustomization },
 // /STEVE CHANGE
 		{ NULL, NULL }
 	};
