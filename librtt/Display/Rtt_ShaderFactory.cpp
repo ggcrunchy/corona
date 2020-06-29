@@ -557,56 +557,34 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 
 				if (lua_istable( L, -1 ))
 				{
-					lua_newtable( L ); // ..., customizations, details, strings
-					lua_pushnil( L ); // ..., customizations, details, strings, nil
-
-					size_t detailsCount = 0U;
-
-					while (lua_next( L, -3 )) // ..., customizations, details, strings[, key, value]
+					for (lua_pushnil( L ); lua_next( L, -2 ); lua_pop( L, 1 )) // ..., customizations, details[, key, value]
 					{
 						bool isKeyString = lua_isstring( L, -2 ), isValueString = lua_isstring( L, -1 ) || lua_isnumber( L, -1 );
 
 						if (isKeyString && isValueString)
 						{
-							lua_setfield( L, -3, lua_tostring( L, -2 ) ); // ..., customizations, details, strings = { ..., key = value }, key
+							lua_pushvalue( L, -1 );	// ..., customizations, details, key, value, value
 
-							++detailsCount;
+							resource->AddSourceTransformDetail( lua_tostring( L, -3 ), lua_tostring( L, -1 ) );	// ..., customizations, details, key, value, value (might now be string)
+
+							lua_pop( L, 1 ); // ..., customizations, details, key, value 
+						}
+
+						else if (isKeyString)
+						{
+							CoronaLuaWarning( L, "Invalid customization details: expected string, but got '%s' key (value = %s)", luaL_typename( L, -2 ), lua_tostring( L, -1 ) ); 
+						}
+
+						else if (isValueString)
+						{
+							CoronaLuaWarning( L, "Invalid customization details: expected string, but got '%s' value (key = %s)", luaL_typename( L, -1 ), lua_tostring( L, -2 ) ); 
 						}
 
 						else
 						{
-							if (isKeyString)
-							{
-								CoronaLuaWarning( L, "Invalid customization details: expected string, but got '%s' key (value = %s)", luaL_typename( L, -2 ), lua_tostring( L, -1 ) ); 
-							}
-
-							else if (isValueString)
-							{
-								CoronaLuaWarning( L, "Invalid customization details: expected string, but got '%s' value (key = %s)", luaL_typename( L, -1 ), lua_tostring( L, -2 ) ); 
-							}
-
-							else
-							{
-								CoronaLuaWarning( L, "Invalid customization details: expected strings, got '%s' key and '%s' value", luaL_typename( L, -2 ), luaL_typename( L, -1 ) );
-							}
-
-							lua_pop( L, 1 ); // ..., customizations, details, strings, key
+							CoronaLuaWarning( L, "Invalid customization details: expected strings, got '%s' key and '%s' value", luaL_typename( L, -2 ), luaL_typename( L, -1 ) );
 						}
 					}
-
-					const char ** strings = (const char **)lua_newuserdata( L, 2U * detailsCount * sizeof( const char * ) ); // ..., customizations, details, strings, stringsUserdata
-					int index = 0;
-
-					for (lua_pushnil( L ); lua_next( L, -3 ); lua_pop( L, 1 ), ++index)
-					{
-						strings[index] = lua_tostring( L, -2 );
-						strings[index + detailsCount] = lua_tostring( L, -1 );
-// TODO: put a string back in if value was a number...
-					}
-
-					resource->AddSourceTransformDetails( strings, strings + detailsCount, detailsCount );
-
-					lua_rawset( L, LUA_REGISTRYINDEX ); // ..., customizations, details; registry = { ..., [strings] = stringsUserdata }
 				}
 
 				else if (!lua_isnil( L, -1 ))
@@ -616,9 +594,7 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 					
 				lua_pop( L, 1 ); // ..., customizations
 				
-				CoronaShaderCallbacks * callbacks = (CoronaShaderCallbacks *)lua_touserdata( L, -1 );
-
-				resource->SetShaderCallbacks( callbacks );
+				resource->SetShaderCallbacks( (CoronaShaderCallbacks *)lua_touserdata( L, -1 ) );
 			}
 
 			else
@@ -1267,7 +1243,7 @@ ShaderFactory::RegisterCustomization( const char * name, const CoronaShaderCallb
 
 	else
 	{
-		void * out = lua_newuserdata( L, sizeof( CoronaShaderCallbacks ) + 20U ); // ..., customizations, nil, callbacks
+		void * out = lua_newuserdata( L, sizeof( CoronaShaderCallbacks ) ); // ..., customizations, nil, callbacks
 
 		memcpy( out, &callbacks, sizeof( CoronaShaderCallbacks ) );
 

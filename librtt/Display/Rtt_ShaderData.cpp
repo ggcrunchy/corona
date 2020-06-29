@@ -48,7 +48,7 @@ ShaderData::ShaderData( const WeakPtr< ShaderResource >& resource )
 
 		if (callbacks && callbacks->extraSpace)
 		{
-			fExtraSpace = Rtt_NEW( NULL, U8( callbacks->extraSpace ) );
+			fExtraSpace = Rtt_MALLOC( NULL, callbacks->extraSpace );
 			fExtraCount = callbacks->extraSpace;
 
 			memset( fExtraSpace, 0, fExtraCount );
@@ -64,7 +64,7 @@ ShaderData::~ShaderData()
 		fProxy->DetachUserdata();
 	}
 // STEVE CHANGE
-//	Rtt_DELETE( fExtraSpace );
+	Rtt_FREE( fExtraSpace );
 // /STEVE CHANGE
 }
 
@@ -117,7 +117,7 @@ ShaderData::Clone( Rtt_Allocator *allocator )
 	// STEVE CHANGE
 	if (fExtraCount)
 	{
-//		memcpy( result->fExtraSpace, fExtraSpace, fExtraCount );
+		memcpy( result->fExtraSpace, fExtraSpace, fExtraCount );
 	}
 	// /STEVE CHANGE
 

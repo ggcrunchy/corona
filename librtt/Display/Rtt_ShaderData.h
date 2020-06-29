@@ -90,7 +90,7 @@ class ShaderData
 		void DidUpdateUniform( DataIndex index );
 
 		// STEVE CHANGE
-		U8 * GetExtraSpace() const { return fExtraSpace; }
+		void * GetExtraSpace() const { return fExtraSpace; }
 		U32 GetExtraCount() const { return fExtraCount; }
 		// /STEVE CHANGE
 	public:
@@ -108,7 +108,7 @@ class ShaderData
 		Uniform *fUniformData[kNumData];
 		WeakPtr< ShaderResource > fShaderResource;
 		// STEVE CHANGE
-		U8 * fExtraSpace;
+		void * fExtraSpace;
 		U32 fExtraCount;
 		// /STEVE CHANGE
 		const Shader *fOwner;

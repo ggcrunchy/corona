@@ -287,9 +287,18 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 	const char * hints[] = { "header", "highpSupport", "mask", "texCoordZ", NULL };
 	void * sourceTransformKey = &fCleanupSourceTransform; // n.b. done to make cleanup robust
 
-	params.details = shaderResource->GetSourceTransformDetails();
 	params.hints = hints;
 
+	std::vector< CoronaShaderSourceTransformDetail > details;
+	CoronaShaderSourceTransformDetail detail;
+
+	for (int i = 0; shaderResource->GetSourceTransformDetail( i, detail ); ++i)
+	{
+		details.push_back( detail );
+	}
+
+	params.details = details.data();
+	params.ndetails = details.size();
 	// /STEVE CHANGE
 
 	// Vertex shader.

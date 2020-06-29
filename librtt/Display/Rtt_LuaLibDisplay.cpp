@@ -1291,17 +1291,17 @@ static int RegisterCustomization( lua_State * L)
 
 		instancingData->out = NULL;
 
-		CoronaShaderSourceTransformDetails details = CoronaShaderGetSourceTransformDetails( shader );
-
-		for (size_t i = 0; i < details.count; ++i)
+		CoronaShaderSourceTransformDetail detail;
+		
+		for (int i = 0; CoronaShaderGetSourceTransformDetail( shader, i, &detail ); ++i)
 		{
-			if (strcmp( details.names[i], "supportsInstancing" ) == 0)
+			if (strcmp( detail.name, "supportsInstancing" ) == 0)
 			{
-				instancingData->out = CoronaGeometryGetMappingFromRenderData( renderData, details.values[i], &instancingData->dstLayout );
+				instancingData->out = CoronaGeometryGetMappingFromRenderData( renderData, detail.value, &instancingData->dstLayout );
 			}
 		}
 	};
-	/*
+
 	static std::vector< const char * > sStrings;
 	static std::string sUpdated;
 
@@ -1355,7 +1355,7 @@ static int RegisterCustomization( lua_State * L)
 		sStrings.clear();
 		sUpdated.clear();
 	};
-	*/
+
 	lua_pushboolean( L, CoronaShaderRegisterCustomization( L, "instances", &callbacks ) ); // ..., ok?
 
 	return 1;

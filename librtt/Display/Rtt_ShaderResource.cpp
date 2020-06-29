@@ -122,19 +122,24 @@ ShaderResource::~ShaderResource()
 
 // STEVE CHANGE
 void
-ShaderResource::AddSourceTransformDetails( const char ** names, const char ** values, U32 count )
+ShaderResource::AddSourceTransformDetail( const char * name, const char * value )
 {
-	fDetailNames = names; // n.b. owned by Lua
-	fDetailValues = values; // ditto
-	fDetailsCount = count;
+	fDetailNames.push_back( name );
+	fDetailValues.push_back( value );
 }
 
-CoronaShaderSourceTransformDetails
-ShaderResource::GetSourceTransformDetails() const
+int
+ShaderResource::GetSourceTransformDetail( int index, CoronaShaderSourceTransformDetail & detail ) const
 {
-	CoronaShaderSourceTransformDetails details = { fDetailNames, fDetailValues, fDetailsCount };
+	if (index >= 0 && index < fDetailNames.size() )
+	{
+		detail.name = fDetailNames[index].c_str();
+		detail.value = fDetailValues[index].c_str();
 
-	return details;
+		return 1;
+	}
+
+	return 0;
 }
 // /STEVE CHANGE
 

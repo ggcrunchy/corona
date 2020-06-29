@@ -17,6 +17,7 @@
 
 // STEVE CHANGE
 #include "Corona/CoronaGraphics.h"
+#include <vector>
 // /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
@@ -89,9 +90,9 @@ class ShaderResource
 		// STEVE CHANGE
 		const CoronaShaderCallbacks * GetShaderCallbacks() const { return fShaderCallbacks; }
 		void SetShaderCallbacks( CoronaShaderCallbacks * callbacks ) { fShaderCallbacks = callbacks; }
-		void AddSourceTransformDetails( const char ** names, const char ** values, U32 count );
+		void AddSourceTransformDetail( const char * name, const char * value );
 
-		CoronaShaderSourceTransformDetails GetSourceTransformDetails() const;
+		int GetSourceTransformDetail( int index, CoronaShaderSourceTransformDetail & detail ) const;
 		// /STEVE CHANGE
 
 		TimeTransform *GetTimeTransform() const { return fTimeTransform; }
@@ -135,8 +136,8 @@ class ShaderResource
 		ShaderData *fDefaultData;
 		// STEVE CHANGE
 		CoronaShaderCallbacks *fShaderCallbacks;
-		const char ** fDetailNames;
-		const char ** fDetailValues;
+		std::vector< std::string > fDetailNames;
+		std::vector< std::string > fDetailValues;
 		U32 fDetailsCount;
 		// /STEVE CHANGE
 		TimeTransform *fTimeTransform;

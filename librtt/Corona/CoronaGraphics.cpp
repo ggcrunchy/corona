@@ -141,7 +141,7 @@ int CoronaShaderRawDraw( const CoronaShaderHandle shaderHandle, const CoronaRend
 }
 
 CORONA_API
-CoronaShaderSourceTransformDetails CoronaShaderGetSourceTransformDetails( const CoronaShaderHandle shaderHandle )
+int CoronaShaderGetSourceTransformDetail( const CoronaShaderHandle shaderHandle, int index, CoronaShaderSourceTransformDetail * detail )
 {
 	const Rtt::Shader * shader = static_cast< const Rtt::Shader * >( CoronaExtractConstantShader( shaderHandle ) );
 
@@ -153,13 +153,11 @@ CoronaShaderSourceTransformDetails CoronaShaderGetSourceTransformDetails( const 
 
 		if (resource.NotNull())
 		{
-			return resource->GetSourceTransformDetails();
+			return resource->GetSourceTransformDetail( index, *detail );
 		}
 	}
 
-	const CoronaShaderSourceTransformDetails details = {};
-
-	return details;
+	return 0;
 }
 
 CORONA_API

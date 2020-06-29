@@ -251,11 +251,10 @@ typedef struct CoronaShaderAttribute {
 /**
 TODO
 */
-typedef struct CoronaShaderSourceTransformDetails {
-	const char ** names;
-	const char ** values;
-	unsigned int count;
-} CoronaShaderSourceTransformDetails;
+typedef struct CoronaShaderSourceTransformDetail {
+	const char * name;
+	const char * value;
+} CoronaShaderSourceTransformDetail;
 
 /**
 TODO
@@ -264,10 +263,11 @@ typedef struct CoronaShaderSourceTransformParams {
 	const char * type;
 	const char ** sources;
 	const char ** hints; // originally same size as sources
-	CoronaShaderSourceTransformDetails details;
+	CoronaShaderSourceTransformDetail * details;
 	const CoronaShaderAttribute * attributes; // NYI
 	unsigned int nsources; // n.b. must agree with output after call
 	unsigned int nattribs;
+	unsigned int ndetails;
 } CoronaShaderSourceTransformParams;
 
 typedef const char ** (*CoronaShaderSourceTransformBegin)(CoronaShaderSourceTransformParams * params, void * key);
@@ -392,7 +392,7 @@ CORONA_API
 int CoronaShaderRawDraw( const CoronaShaderHandle shader, const CoronaRenderDataHandle renderData, CoronaRendererHandle renderer ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-CoronaShaderSourceTransformDetails CoronaShaderGetSourceTransformDetails( const CoronaShaderHandle shader ) CORONA_PUBLIC_SUFFIX;
+int CoronaShaderGetSourceTransformDetail( const CoronaShaderHandle shader, int index, CoronaShaderSourceTransformDetail * detail ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 CoronaRendererBackend CoronaRendererGetBackend( lua_State * L ) CORONA_PUBLIC_SUFFIX;
