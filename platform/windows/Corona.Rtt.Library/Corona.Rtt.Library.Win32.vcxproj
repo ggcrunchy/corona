@@ -144,6 +144,14 @@
     <ClCompile Include="..\..\..\librtt\Display\Rtt_TextureResourceExternal.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_TextureResourceExternalAdapter.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_VertexCache.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\ColorMask.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\Depth.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\Instancing.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\StencilLib.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\StencilClear.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\StencilState.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\StencilEnvironment.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\Support.cpp" />
     <ClCompile Include="..\..\..\librtt\Input\Rtt_InputAxisCollection.cpp" />
     <ClCompile Include="..\..\..\librtt\Input\Rtt_InputAxisDescriptor.cpp" />
     <ClCompile Include="..\..\..\librtt\Input\Rtt_InputAxisType.cpp" />
@@ -438,6 +446,8 @@
     <ClInclude Include="..\..\..\librtt\Display\Rtt_TextureResourceExternal.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_TextureResourceExternalAdapter.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_VertexCache.h" />
+    <ClInclude Include="..\..\..\librtt\Display\TESTING\Stencil.h" />
+    <ClInclude Include="..\..\..\librtt\Display\TESTING\TESTING.h" />
     <ClInclude Include="..\..\..\librtt\Input\Rtt_InputAxisCollection.h" />
     <ClInclude Include="..\..\..\librtt\Input\Rtt_InputAxisDescriptor.h" />
     <ClInclude Include="..\..\..\librtt\Input\Rtt_InputAxisType.h" />
