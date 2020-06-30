@@ -66,7 +66,7 @@ ShapeAdapterMesh::GetMeshMode(lua_State *L, int index)
 }
 	
 bool
-ShapeAdapterMesh::InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator )
+ShapeAdapterMesh::InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator, bool hasZ ) // <- STEVE CHANGE
 {
 	if ( !lua_istable( L, index ) )
 	{
@@ -79,13 +79,16 @@ ShapeAdapterMesh::InitializeMesh(lua_State *L, int index, TesselatorMesh& tessel
 	lua_getfield( L, index, "vertices" );
 	if (lua_istable( L, -1))
 	{
-		Rtt_ASSERT (lua_objlen( L, -1 ) % 2 == 0);
-		U32 numVertices = (U32)lua_objlen( L, -1 )/2;
+		// STEVE CHANGE
+		int componentCount = hasZ ? 3 : 2;
+		// /STEVE CHANGE
+		Rtt_ASSERT (lua_objlen( L, -1 ) % componentCount/*2*/ == 0); // <- STEVE CHANGE
+		U32 numVertices = (U32)lua_objlen( L, -1 )/componentCount/*2*/; // <- STEVE CHANGE
 		mesh.Reserve( numVertices );
 		for(U32 i=0; i<numVertices; i++)
 		{
-			lua_rawgeti( L, -1, 2*i+1 );
-			lua_rawgeti( L, -2, 2*i+2 );
+			lua_rawgeti( L, -1, /*2*/componentCount*i+1 ); // <- STEVE CHANGE
+			lua_rawgeti( L, -2, /*2*/componentCount*i+2 ); // <- STEVE CHANGE
 			if ( lua_type( L, -2 ) == LUA_TNUMBER &&
 			     lua_type( L, -1 ) == LUA_TNUMBER )
 			{
@@ -284,10 +287,27 @@ int ShapeAdapterMesh::setVertex( lua_State *L )
 	const Vertex2 &offset = tesselator->GetVertexOffset();
 	x -= offset.x;
 	y -= offset.y;
+	// STEVE CHANGE
+	VertexCache & cache = path->GetFillSource();
+	ArrayFloat * floatArray = cache.ExtraFloatArray( 0U ); // FIXME: assumes just one...
 
+	bool zChanged = false;
+
+	if (floatArray && lua_isnumber( L, nextArg ))
+	{
+		Real z = luaL_toreal( L, nextArg );
+		Real & origZ = (*floatArray)[vertIndex];
+
+		if ( !Rtt_RealEqual( z, origZ ) )
+		{
+			origZ = z;
+			zChanged = true;
+		}
+	}
+	// /STEVE CHANGE
 	Vertex2& orig = tesselator->GetMesh().WriteAccess()[vertIndex];
 	
-	if( !Rtt_RealEqual(x, orig.x) || !Rtt_RealEqual(y, orig.y))
+	if( !Rtt_RealEqual(x, orig.x) || !Rtt_RealEqual(y, orig.y) || zChanged) // <- STEVE CHANGE
 	{
 		orig.x = x;
 		orig.y = y;
@@ -329,6 +349,19 @@ int ShapeAdapterMesh::getVertex( lua_State *L )
 		lua_pushnumber( L, vert.x+offset.x );
 		lua_pushnumber( L, vert.y+offset.y );
 		result = 2;
+		// STEVE CHANGE
+		VertexCache & cache = path->GetFillSource();
+		ArrayFloat * floatArray = cache.ExtraFloatArray( 0U ); // FIXME: assumes just one...
+
+		bool zChanged = false;
+
+		if (floatArray)
+		{
+			lua_pushnumber( L, (*floatArray)[vertIndex] );
+
+			result = 3;
+		}
+		// /STEVE CHANGE
 	}
 	
 	return result;

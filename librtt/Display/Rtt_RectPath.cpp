@@ -349,7 +349,14 @@ RectPath::UpdateGeometry(
 		hasOffset = tesselator->HasOffset();
 	}
 
-	for ( U32 i = 0, iMax = vertices.Length(); i < iMax; i++ )
+// STEVE CHANGE
+	const ArrayFloat * floatArray = src.ExtraFloatArray( 0U ); // FIXME: not very general
+	Rtt_ASSERT( ! floatArray || ( floatArray->Length() == vertices.Length() ) );
+	const float zero = 0.f, * zsource = floatArray ? floatArray->ReadAccess() : &zero;
+	size_t step = floatArray ? 1U : 0U;
+// /STEVE CHANGE
+
+	for ( U32 i = 0, iMax = vertices.Length(); i < iMax; i++, zsource += step ) // <- STEVE CHANGE
 	{
 		Rtt_ASSERT( i < dst.GetVerticesAllocated() );
 
@@ -362,7 +369,7 @@ RectPath::UpdateGeometry(
 
 			dst.x = v.x;
 			dst.y = v.y;
-			dst.z = 0.f;
+			dst.z = *zsource;//dst.z = 0.f; <- STEVE CHANGE
 		}
 
 		if ( updateTexture )

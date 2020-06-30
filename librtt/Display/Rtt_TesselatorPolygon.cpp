@@ -27,7 +27,7 @@ class Triangulate
 	public:
 		// Tesselate a contour/polygon into a series of triangles.
 		static bool Process(
-			const ArrayVertex2 &contour, ArrayVertex2 &result, Rect& bounds );
+			const ArrayVertex2 &contour, ArrayVertex2 &result, Rect& boundsfTriangulationIndices, ArrayIndex * triangulationIndices ); // <- STEVE CHANGE
 
 		// Compute area of a contour/polygon
 		static float Area(const ArrayVertex2 &contour);
@@ -115,7 +115,7 @@ Triangulate::Snip( const ArrayVertex2 &contour, int u, int v, int w, int n, int 
 }
 
 bool
-Triangulate::Process( const ArrayVertex2 &contour, ArrayVertex2 &result, Rect& bounds )
+Triangulate::Process( const ArrayVertex2 &contour, ArrayVertex2 &result, Rect& bounds, ArrayIndex * triangulationIndices ) // <- STEVE CHANGE
 {
 	// allocate and initialize list of Vertices in polygon
 	int n = contour.Length();
@@ -169,7 +169,14 @@ Triangulate::Process( const ArrayVertex2 &contour, ArrayVertex2 &result, Rect& b
 			result.Append( contour[a] ); bounds.Union( contour[a] );
 			result.Append( contour[b] ); bounds.Union( contour[b] );
 			result.Append( contour[c] ); bounds.Union( contour[c] );
-
+			// STEVE CHANGE
+			if (triangulationIndices)
+			{
+				triangulationIndices->Append( a );
+				triangulationIndices->Append( b );
+				triangulationIndices->Append( c );
+			}
+			// /STEVE CHANGE
 			m++;
 
 			// remove v from remaining polygon
@@ -198,7 +205,10 @@ TesselatorPolygon::TesselatorPolygon( Rtt_Allocator *allocator )
 	fSelfBounds(),
 	fCenter( kVertexOrigin ),
 	fIsFillValid( false ),
-	fIsBadPolygon( false )
+	fIsBadPolygon( false ),
+// STEVE CHANGE
+	fTriangulationIndices( NULL )
+// /STEVE CHANGE
 {
 }
 
@@ -298,7 +308,13 @@ TesselatorPolygon::Update()
 	{
 		fSelfBounds.SetEmpty();
 
-		fIsFillValid = Triangulate::Process( fContour, fFill, fSelfBounds );
+		// STEVE CHANGE
+		if (fTriangulationIndices)
+		{
+			fTriangulationIndices->Clear();
+		}
+		// /STEVE CHANGE
+		fIsFillValid = Triangulate::Process( fContour, fFill, fSelfBounds, fTriangulationIndices ); // <- STEVE CHANGE
 		fIsBadPolygon = ! fIsFillValid;
 
 		if ( fIsFillValid )
@@ -308,6 +324,8 @@ TesselatorPolygon::Update()
 			fSelfBounds.GetCenter( center );
 
 			fCenter = center;
+			// STEVE CHANGE
+			// /STEVE CHANGE
 		}
 		else
 		{

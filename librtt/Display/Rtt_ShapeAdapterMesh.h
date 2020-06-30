@@ -28,7 +28,7 @@ class ShapeAdapterMesh : public ShapeAdapter
 	public:
 		static const ShapeAdapterMesh& Constant();
 	
-		static bool InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator );
+		static bool InitializeMesh(lua_State *L, int index, TesselatorMesh& tesselator, bool hasZ ); // <- STEVE CHANGE
 		static Geometry::PrimitiveType GetMeshMode(lua_State *L, int index);
 
 	protected:

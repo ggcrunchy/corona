@@ -75,6 +75,10 @@
 
 #include "Rtt_LuaAux.h"
 
+// STEVE CHANGE
+#include "Display/Rtt_TesselatorPolygon.h"
+// /STEVE CHANGE
+
 #ifdef Rtt_WIN_ENV
 #undef CreateFont
 #endif
@@ -1916,6 +1920,24 @@ DisplayLibrary::newCircle( lua_State *L )
 	return result;
 }
 
+// STEVE CHANGE
+static void
+LoadZ( lua_State * L, int index, ShapePath * path )
+{
+	VertexCache & cache = path->GetFillSource();
+	ArrayFloat * floatArray = cache.ExtraFloatArray( 0U, true ); // FIXME: assumes just one...
+
+	for (int i = 3, n = (( int )lua_objlen( L, index ) / 3) * 3; i <= n; i += 3, lua_pop( L, 1 ))
+	{
+		lua_rawgeti( L, index, i ); // ..., z
+
+		Real z = luaL_toreal( L, -1 );
+
+		floatArray->Append( z );
+	}
+}
+// /STEVE CHANGE
+
 int
 DisplayLibrary::newPolygon( lua_State *L )
 {
@@ -1931,12 +1953,23 @@ DisplayLibrary::newPolygon( lua_State *L )
 	Real y = luaL_checkreal( L, nextArg++ );
 
 	ShapePath *path = ShapePath::NewPolygon( display.GetAllocator() );
-
+	// STEVE CHANGE
+	bool hasZ = lua_toboolean( L, nextArg + 1 );
+	// /STEVE CHANGE
 	TesselatorPolygon *tesselator = (TesselatorPolygon *)path->GetTesselator();
-	if ( ShapeAdapterPolygon::InitializeContour( L, nextArg, * tesselator ) )
+	if ( ShapeAdapterPolygon::InitializeContour( L, nextArg, * tesselator, hasZ ) ) // <- STEVE CHANGE
 	{
 		ShapeObject *v = Rtt_NEW( display.GetAllocator(), ShapeObject( path ) );
+		// STEVE CHANGE
+		if (hasZ)
+		{
+			ArrayIndex * indexArray = path->GetFillSource().ExtraIndexArray( 0U, true ); // FIXME!
 
+			tesselator->SetTriangulationArray( indexArray );
+
+			LoadZ( L, nextArg, path );
+		}
+		// /STEVE CHANGE
 		result = LuaLibDisplay::AssignParentAndPushResult( L, display, v, parent );
 		AssignDefaultFillColor( display, * v );
 		v->Translate( x, y );
@@ -2010,14 +2043,29 @@ DisplayLibrary::newMesh( lua_State *L )
 					   nextArg, lua_typename( L, lua_type( L, nextArg ) ));
 		return result;
 	}
-	
+	// STEVE CHANGE
+	lua_getfield( L, nextArg, "hasZ" ); // ..., hasZ
+
+	bool hasZ = lua_toboolean( L, -1 );
+
+	lua_pop( L, 1 ); // ...
+	// /STEVE CHANGE
 	ShapePath *path = ShapePath::NewMesh( display.GetAllocator(), ShapeAdapterMesh::GetMeshMode( L, nextArg) );
 	
 	TesselatorMesh *tesselator = (TesselatorMesh *)path->GetTesselator();
-	if ( ShapeAdapterMesh::InitializeMesh( L, nextArg, * tesselator ) )
+	if ( ShapeAdapterMesh::InitializeMesh( L, nextArg, * tesselator, hasZ ) ) // <- STEVE CHANGE
 	{
 		ShapeObject *v = Rtt_NEW( display.GetAllocator(), ShapeObject( path ) );
-		
+		// STEVE CHANGE
+		if (hasZ)
+		{
+			lua_getfield( L, nextArg, "vertices" ); // ..., vertices
+
+			LoadZ( L, -1, path );
+
+			lua_pop( L, 1 ); // ...
+		}
+		// /STEVE CHANGE
 		if (tesselator->GetFillPrimitive() == Geometry::kIndexedTriangles)
 		{
 			path->Invalidate( ShapePath::kFillSourceIndices );

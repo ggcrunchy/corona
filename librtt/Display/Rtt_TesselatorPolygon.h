@@ -43,6 +43,9 @@ class TesselatorPolygon : public TesselatorShape
 
 		ArrayVertex2& GetContour() { return fContour; }
 
+		// STEVE CHANGE
+		void SetTriangulationArray( ArrayIndex * triangulationIndices ) { fTriangulationIndices = triangulationIndices; }
+		// /STEVE CHANGE
 	protected:
 		// Update the polygons
 		void Update();
@@ -54,6 +57,9 @@ class TesselatorPolygon : public TesselatorShape
 		Vertex2 fCenter;
 		bool fIsFillValid;
 		bool fIsBadPolygon;
+		// STEVE CHANGE
+		ArrayIndex * fTriangulationIndices;
+		// /STEVE CHANGE
 };
 
 // ----------------------------------------------------------------------------

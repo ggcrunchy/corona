@@ -17,6 +17,10 @@
 #include "Renderer/Rtt_Geometry_Renderer.h"
 #include "Rtt_LuaUserdataProxy.h"
 
+// STEVE CHANGE
+#include <vector>
+// /STEVE CHANGE
+
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -44,8 +48,43 @@ DisplayPath::UpdateGeometry( Geometry& dst, const VertexCache& src, const Matrix
 	bool updateTexture = ( flags & kTexVerticesMask );
 
 	Rtt_ASSERT( ! updateTexture || ( vertices.Length() == texVertices.Length() ) );
+// STEVE CHANGE
+	const ArrayFloat * floatArray = src.ExtraFloatArray( 0U ); // FIXME: not very general
+	const ArrayIndex * indexArray = src.ExtraIndexArray( 0U ); // DITTO!
 
-	for ( U32 i = 0, iMax = vertices.Length(); i < iMax; i++ )
+	std::vector< float > temp;
+	const float zero = 0.f, * zsource;
+	size_t step = 0U;
+
+	if (floatArray)
+	{
+		if (indexArray)
+		{
+			for (S32 i = 0; i < indexArray->Length(); ++i)
+			{
+				U16 index = (*indexArray)[i];
+
+				temp.push_back( (*floatArray)[index] );
+			}
+
+			zsource = temp.data();
+		}
+
+		else
+		{
+			zsource = floatArray->ReadAccess();
+		}
+
+		++step;
+	}
+
+	else
+	{
+		zsource = &zero;
+		step = 0U;
+	}
+// /STEVE CHANGE
+	for ( U32 i = 0, iMax = vertices.Length(); i < iMax; i++, zsource += step ) // <- STEVE CHANGE
 	{
 		Rtt_ASSERT( i < dst.GetVerticesAllocated() );
 
@@ -58,7 +97,7 @@ DisplayPath::UpdateGeometry( Geometry& dst, const VertexCache& src, const Matrix
 
 			dst.x = v.x;
 			dst.y = v.y;
-			dst.z = 0.f;
+			dst.z = *zsource;//dst.z = 0.f; <- STEVE CHANGE
 		}
 
 		if ( updateTexture )
