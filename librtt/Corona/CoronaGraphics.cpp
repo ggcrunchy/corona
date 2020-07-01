@@ -25,6 +25,7 @@
 #include "Display/Rtt_ShaderFactory.h"
 #include "Renderer/Rtt_CommandBuffer.h"
 #include "Renderer/Rtt_Geometry_Renderer.h"
+#include "Renderer/Rtt_Matrix_Renderer.h"
 #include "Renderer/Rtt_Renderer.h"
 #include "Renderer/Rtt_RenderData.h"
 
@@ -359,8 +360,56 @@ int CoronaRendererIssueCommand( CoronaRendererHandle rendererHandle, CoronaComma
 }
 
 CORONA_API
-int CoronaRendererSetFrustum( CoronaRendererHandle rendererHandle, const float * viewMatrix, const float * projectionMatrix )
+void CoronaMultiplyMatrix4x4( const CoronaMatrix4x4 m1, const CoronaMatrix4x4 m2, CoronaMatrix4x4 result )
 {
+	Rtt::Multiply4x4( m1, m2, result );
+}
+
+CORONA_API
+void CoronaCreateViewMatrix( const CoronaVector3 eye, const CoronaVector3 center, const CoronaVector3 up, CoronaMatrix4x4 result )
+{
+	Rtt::CreateViewMatrix( eye[0], eye[1], eye[2], center[0], center[1], center[2], up[0], up[1], up[2], result );
+}
+
+CORONA_API
+void CoronaCreateOrthoMatrix( float left, float right, float bottom, float top, float zNear, float zFar, CoronaMatrix4x4 result )
+{
+	Rtt::CreateOrthoMatrix( left, right, bottom, top, zNear, zFar, result );
+}
+
+CORONA_API
+void CoronaCreatePerspectiveMatrix( float fovy, float aspectRatio, float zNear, float zFar, CoronaMatrix4x4 result )
+{
+	Rtt::CreatePerspectiveMatrix( fovy, aspectRatio, zNear, zFar, result );
+}
+
+CORONA_API
+int CoronaRendererGetFrustum( CoronaRendererHandle rendererHandle, CoronaMatrix4x4 viewMatrix, CoronaMatrix4x4 projectionMatrix )
+{
+	Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( CoronaExtractRenderer( rendererHandle ) );
+
+	if (renderer)
+	{
+		renderer->GetFrustum( viewMatrix, projectionMatrix );
+
+		return 1;
+	}
+
+	return 0;
+}
+
+CORONA_API
+int CoronaRendererSetFrustum( CoronaRendererHandle rendererHandle, const CoronaMatrix4x4 viewMatrix, const CoronaMatrix4x4 projectionMatrix )
+{
+	Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( CoronaExtractRenderer( rendererHandle ) );
+
+	if (renderer)
+	{
+		renderer->SetFrustum( viewMatrix, projectionMatrix );
+
+		return 1;
+	}
+
 	return 0;
 }
 

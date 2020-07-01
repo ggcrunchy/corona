@@ -23,6 +23,7 @@ struct DepthSettings {
 
 struct DepthInfo {
 	double clear{0.};
+	CoronaMatrix4x4 projectionMatrix, viewMatrix;
 	DepthSettings settings;
 };
 
@@ -36,6 +37,7 @@ struct DepthEnvironment {
 	double clear{0.}; // TODO: should add some way to set this, too...
 	bool anySinceClear{false};
 	bool hasSetID{false};
+	bool matricesValid{false};
 };
 
 DepthEnvironment * InitDepthEnvironment( lua_State * L );

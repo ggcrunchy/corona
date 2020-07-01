@@ -447,10 +447,29 @@ CORONA_API
 int CoronaRendererRegisterCommand( lua_State * L, CoronaCommandHandle * out, const CoronaCommand * command ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
-int CoronaRendererIssueCommand( const CoronaRendererHandle renderer, CoronaCommandHandle command, void * data, unsigned int size ) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererIssueCommand( CoronaRendererHandle renderer, CoronaCommandHandle command, void * data, unsigned int size ) CORONA_PUBLIC_SUFFIX;
+
+typedef float CoronaMatrix4x4[16];
+typedef float CoronaVector3[3];
 
 CORONA_API
-int CoronaRendererSetFrustum( const CoronaRendererHandle renderer, const float * viewMatrix, const float * projectionMatrix ) CORONA_PUBLIC_SUFFIX;
+void CoronaMultiplyMatrix4x4( const CoronaMatrix4x4 m1, const CoronaMatrix4x4 m2, CoronaMatrix4x4 result ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+void CoronaCreateViewMatrix( const CoronaVector3 eye, const CoronaVector3 center, const CoronaVector3 up, CoronaMatrix4x4 result ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+void CoronaCreateOrthoMatrix( float left, float right, float bottom, float top, float zNear, float zFar, CoronaMatrix4x4 result ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+void CoronaCreatePerspectiveMatrix( float fovy, float aspectRatio, float zNear, float zFar, CoronaMatrix4x4 result ) CORONA_PUBLIC_SUFFIX;
+
+
+CORONA_API
+int CoronaRendererGetFrustum( CoronaRendererHandle renderer, CoronaMatrix4x4 viewMatrix, CoronaMatrix4x4 projectionMatrix ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaRendererSetFrustum( CoronaRendererHandle renderer, const CoronaMatrix4x4 viewMatrix, const CoronaMatrix4x4 projectionMatrix ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 unsigned int CoronaGeometryCopyData( void * dst, const CoronaShaderMappingLayout * dstLayout, const void * src, const CoronaShaderMappingLayout * srcLayout ) CORONA_PUBLIC_SUFFIX;

@@ -21,13 +21,16 @@ struct SharedDepthStateData {
 struct InstancedDepthStateData {
 	SharedDepthStateData * shared;
 	DepthSettings settings;
-	U8 hasFunc : 1;
-	U8 hasCullFace : 1;
-	U8 hasFrontFace : 1;
-	U8 hasNear : 1;
-	U8 hasFar : 1;
-	U8 hasMask : 1;
-	U8 hasEnabled : 1;
+	CoronaMatrix4x4 projectionMatrix, viewMatrix;
+	U16 hasFunc : 1;
+	U16 hasCullFace : 1;
+	U16 hasFrontFace : 1;
+	U16 hasNear : 1;
+	U16 hasFar : 1;
+	U16 hasProjectionMatrix : 1;
+	U16 hasViewMatrix : 1;
+	U16 hasMask : 1;
+	U16 hasEnabled : 1;
 };
 
 static void
@@ -101,6 +104,18 @@ RegisterRendererLogic( lua_State * L, SharedDepthStateData * sharedData )
 	}, sharedData );
 }
 
+static bool
+MatricesDiffer( const CoronaMatrix4x4 m1, const CoronaMatrix4x4 m2 )
+{
+	return memcmp( m1, m2, sizeof( CoronaMatrix4x4 ) ) != 0;
+}
+
+static bool
+HasDirtyMatrices( const DepthEnvironment * env )
+{
+	return env->matricesValid && (MatricesDiffer( env->current.projectionMatrix, env->working.projectionMatrix ) || MatricesDiffer( env->current.viewMatrix, env->working.viewMatrix ) );
+}
+
 static CoronaObjectDrawParams
 DrawParams()
 {
@@ -111,6 +126,22 @@ DrawParams()
 	{
 		InstancedDepthStateData * _this = static_cast< InstancedDepthStateData * >( userData );
 		DepthEnvironment * env = _this->shared->env;
+
+		if (!env->matricesValid)
+		{
+			CoronaRendererGetFrustum( rendererHandle, env->current.viewMatrix, env->current.projectionMatrix );
+
+			memcpy( env->working.projectionMatrix, env->current.projectionMatrix, sizeof( CoronaMatrix4x4 ) );
+			memcpy( env->working.viewMatrix, env->current.viewMatrix, sizeof( CoronaMatrix4x4 ) );
+
+			for (size_t i = 0; i < env->stack.size(); ++i)
+			{
+				memcpy( env->stack[i].projectionMatrix, env->current.projectionMatrix, sizeof( CoronaMatrix4x4 ) );
+				memcpy( env->stack[i].viewMatrix, env->current.viewMatrix, sizeof( CoronaMatrix4x4 ) );
+			}
+
+			env->matricesValid = true;
+		}
 
 		if (_this->hasFunc)
 		{
@@ -137,9 +168,14 @@ DrawParams()
 			env->working.settings.far = _this->settings.far;
 		}
 
-		if (_this->hasFrontFace)
+		if (_this->hasProjectionMatrix)
 		{
-			env->working.settings.frontFace = _this->settings.frontFace;
+			memcpy( env->working.projectionMatrix, _this->projectionMatrix, sizeof( CoronaMatrix4x4 ) );
+		}
+
+		if (_this->hasViewMatrix)
+		{
+			memcpy( env->working.viewMatrix, _this->viewMatrix, sizeof( CoronaMatrix4x4 ) );
 		}
 
 		if (_this->hasMask)
@@ -155,6 +191,14 @@ DrawParams()
 		if (memcmp( &env->current.settings, &env->working.settings, sizeof( DepthSettings ) ) != 0)
 		{
 			CoronaRendererSetOperationStateDirty( rendererHandle, _this->shared->stateOp );
+		}
+
+		if (HasDirtyMatrices( env ))
+		{
+			CoronaRendererSetFrustum( rendererHandle, env->working.viewMatrix, env->working.projectionMatrix );
+			
+			memcpy( env->current.projectionMatrix, env->working.projectionMatrix, sizeof( CoronaMatrix4x4 ) );
+			memcpy( env->current.viewMatrix, env->working.viewMatrix, sizeof( CoronaMatrix4x4 ) );
 		}
 	};
 
@@ -359,6 +403,148 @@ UpdateConstant( lua_State * L, InstancedDepthStateData * _this, const char key[]
 	return NULL;
 }
 
+static void
+ClearMatrix( InstancedDepthStateData * _this, int index )
+{
+	switch (index)
+	{
+	case 0:
+		_this->hasProjectionMatrix = false;
+
+		break;
+	case 1:
+		_this->hasViewMatrix = false;
+
+		break;
+	default:
+		Rtt_ASSERT_NOT_REACHED();
+	}
+}
+
+static void
+SetMatrix( lua_State * L, InstancedDepthStateData * _this, int index, int valueIndex )
+{
+	if (lua_istable( L, valueIndex ))
+	{
+		switch (index)
+		{
+		case 0:
+		{
+			const char * names[] = { "fovy", "aspectRatio", "zNear", "zFar" }, * badType = NULL;
+			float args[4] = {};
+
+			for (int i = 0; i < 4 && !badType; ++i)
+			{
+				lua_getfield( L, valueIndex, names[i] ); // ..., value
+
+				if (lua_isnumber( L, -1 ))
+				{
+					args[i] = (float)lua_tonumber( L, -1 );
+				}
+
+				else
+				{
+					badType = luaL_typename( L, -1 );
+
+					CoronaLuaWarning( L, "Expected number for projection matrix component '%s', got %s", names[i], badType );
+				}
+
+				lua_pop( L, 1 ); // ...
+			}
+
+			if (!badType)
+			{
+				CoronaCreatePerspectiveMatrix( args[0], args[1], args[2], args[3], _this->projectionMatrix );
+
+				_this->hasProjectionMatrix = true;
+			}
+		}
+
+			break;
+		case 1:
+		{
+			const char * names[] = { "eye", "center", "up" }, * badType = NULL;
+			CoronaVector3 vecs[3];
+
+			for (int i = 0; i < 3 && !badType; ++i)
+			{
+				lua_getfield( L, valueIndex, names[i] ); // ..., vec
+
+				if (lua_istable( L, -1 ))
+				{
+					for (int j = 1; j <= 3 && !badType; ++j)
+					{
+						lua_rawgeti( L, -1, j ); // ..., vec, comp
+
+						if (lua_isnumber( L, -1 ))
+						{
+							vecs[i][j - 1] = (float)lua_tonumber( L, -1 );
+						}
+
+						else
+						{
+							badType = luaL_typename( L, -1 );
+
+							CoronaLuaWarning( L, "Expected number for view matrix vector component #%i, got %s", j, badType );
+						}
+
+						lua_pop( L, 1 ); // ..., vec
+					}
+				}
+
+				else
+				{
+					badType = luaL_typename( L, -1 );
+
+					CoronaLuaWarning( L, "Expected table for view matrix vector %s, got %s", names[i], badType );
+				}
+
+				lua_pop( L, 1 ); // ...
+			}
+
+			if (!badType)
+			{
+				CoronaCreateViewMatrix( vecs[0], vecs[1], vecs[2], _this->viewMatrix );
+
+				_this->hasViewMatrix = true;
+			}
+		}
+
+			break;
+		default:
+			Rtt_ASSERT_NOT_REACHED();
+		}
+	}
+
+	else
+	{
+		CoronaLuaWarning( L, "Expected matrix provided as table " );
+	}
+}
+
+static const char *
+UpdateMatrix( lua_State * L, InstancedDepthStateData * _this, const char key[], int valueIndex )
+{
+	int index = 'v' == key[0];
+
+	if (lua_isnil( L, valueIndex ))
+	{
+		ClearMatrix( _this, index );
+	}
+
+	else if (lua_isnumber( L, valueIndex ))
+	{
+		SetMatrix( L, _this, index, valueIndex );
+	}
+
+	else
+	{
+		return "table";
+	}
+
+	return NULL;
+}
+
 static CoronaObjectSetValueParams
 SetValueParams()
 {
@@ -389,6 +575,11 @@ SetValueParams()
 		else if (strcmp( key, "near" ) == 0 || strcmp( key, "far" ) == 0)
 		{
 			expected = UpdateConstant( L, _this, key, valueIndex );
+		}
+
+		else if (strcmp( key, "projectionMatrix" ) == 0 || strcmp( key, "viewMatrix" ) == 0)
+		{
+			expected = UpdateMatrix( L, _this, key, valueIndex );
 		}
 
 		else
@@ -428,6 +619,14 @@ PopDepthState( InstancedDepthStateData * _this, DepthEnvironment * env, const Sc
 		if (memcmp( &env->working.settings, &env->current.settings, sizeof( DepthSettings ) ) != 0)
 		{
 			CoronaRendererSetOperationStateDirty( payload.rendererHandle, _this->shared->stateOp );
+		}
+
+		if (HasDirtyMatrices( env ))
+		{
+			CoronaRendererSetFrustum( payload.rendererHandle, env->working.viewMatrix, env->working.projectionMatrix );
+			
+			memcpy( env->current.projectionMatrix, env->working.projectionMatrix, sizeof( CoronaMatrix4x4 ) );
+			memcpy( env->current.viewMatrix, env->working.viewMatrix, sizeof( CoronaMatrix4x4 ) );
 		}
 	}
 
