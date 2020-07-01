@@ -136,6 +136,9 @@
     <Filter Include="librtt\Display\TESTING\Stencil">
       <UniqueIdentifier>{1f4d903e-32ec-4bf5-a122-c53fbb0ea5b6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="librtt\Display\TESTING\Depth">
+      <UniqueIdentifier>{852f1fc8-72b9-4aaa-8298-5dc705a10fd2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\external\ALmixer\luaal.c">
@@ -915,9 +918,6 @@
     <ClCompile Include="..\..\..\librtt\Display\TESTING\Instancing.cpp">
       <Filter>librtt\Display\TESTING</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\librtt\Display\TESTING\Depth.cpp">
-      <Filter>librtt\Display\TESTING</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\librtt\Display\TESTING\Support.cpp">
       <Filter>librtt\Display\TESTING</Filter>
     </ClCompile>
@@ -935,6 +935,18 @@
     </ClCompile>
     <ClCompile Include="..\..\..\librtt\Display\TESTING\StencilLib.cpp">
       <Filter>librtt\Display\TESTING\Stencil</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\DepthLib.cpp">
+      <Filter>librtt\Display\TESTING\Depth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\DepthClear.cpp">
+      <Filter>librtt\Display\TESTING\Depth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\DepthState.cpp">
+      <Filter>librtt\Display\TESTING\Depth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\DepthEnvironment.cpp">
+      <Filter>librtt\Display\TESTING\Depth</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1852,6 +1864,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\librtt\Display\TESTING\Stencil.h">
       <Filter>librtt\Display\TESTING\Stencil</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\librtt\Display\TESTING\Depth.h">
+      <Filter>librtt\Display\TESTING\Depth</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

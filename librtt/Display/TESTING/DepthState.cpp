@@ -8,79 +8,88 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "Stencil.h"
+#include "Depth.h"
 
-struct SharedStencilStateData {
+struct SharedDepthStateData {
 	CoronaBeginFrameOpHandle beginFrameOp = {};
 	CoronaCommandHandle command = {};
 	CoronaStateOpHandle stateOp = {};
 	CoronaObjectParams params;
-	StencilEnvironment * env;
+	DepthEnvironment * env;
 };
 
-struct InstancedStencilStateData {
-	SharedStencilStateData * shared;
-	StencilSettings settings;
+struct InstancedDepthStateData {
+	SharedDepthStateData * shared;
+	DepthSettings settings;
 	U8 hasFunc : 1;
-	U8 hasFuncRef : 1;
-	U8 hasFail : 1;
-	U8 hasZFail : 1;
-	U8 hasZPass : 1;
-	U8 hasFuncMask : 1;
+	U8 hasCullFace : 1;
+	U8 hasFrontFace : 1;
+	U8 hasNear : 1;
+	U8 hasFar : 1;
 	U8 hasMask : 1;
 	U8 hasEnabled : 1;
 };
 
 static void
-RegisterRendererLogic( lua_State * L, SharedStencilStateData * sharedData )
+RegisterRendererLogic( lua_State * L, SharedDepthStateData * sharedData )
 {
 	CoronaCommand command = {
 		[](const U8 * data, unsigned int size) {
-			StencilSettings settings[2];
+			DepthSettings settings[2];
 
 			Rtt_ASSERT( size >= sizeof( settings ) );
 
 			memcpy( settings, data, sizeof( settings ) );
 
-			const StencilSettings & current = settings[0], & working = settings[1];
+			const DepthSettings & current = settings[0], & working = settings[1];
 
-			if (current.func != working.func || current.funcRef != working.funcRef || current.funcMask != working.funcMask)
+			if (current.func != working.func)
 			{
-				glStencilFunc( working.func, working.funcRef, working.funcMask );
+				glDepthFunc( working.func );
+			}
+
+			if (current.cullFace != working.cullFace)
+			{
+				glCullFace( working.cullFace );
+			}
+
+			if (current.frontFace != working.frontFace)
+			{
+				glFrontFace( working.frontFace );
+			}
+
+			if (current.near != working.near || current.far != working.far)
+			{
+				Rtt_glDepthRange( working.near, working.far );
 			}
 
 			if (current.mask != working.mask)
 			{
-				glStencilMask( working.mask );
-			}
-
-			if (current.fail != working.fail || current.zfail != working.zfail || current.zpass != working.zpass)
-			{
-				glStencilOp( working.fail, working.zfail, working.zpass );
+				glDepthMask( working.mask );
 			}
 
 			if (current.enabled != working.enabled)
 			{
-				(working.enabled ? glEnable : glDisable)( GL_STENCIL_TEST );
+				(working.enabled ? glEnable : glDisable)( GL_DEPTH_TEST );
 			}
 		}, CopyWriter
 	};
 
 	CoronaRendererRegisterCommand( L, &sharedData->command, &command );
 	CoronaRendererRegisterBeginFrameOp( L, &sharedData->beginFrameOp, [](CoronaRendererHandle rendererHandle, void * userData) {
-		SharedStencilStateData * _this = static_cast< SharedStencilStateData * >( userData );
-		StencilEnvironment * env = _this->env;
-		StencilSettings settings[] = { env->current.settings, StencilSettings{} };
+		SharedDepthStateData * _this = static_cast< SharedDepthStateData * >( userData );
+		DepthEnvironment * env = _this->env;
+		DepthSettings settings[] = { env->current.settings, DepthSettings{} };
 
 		CoronaRendererIssueCommand( rendererHandle, _this->command, &settings, sizeof( settings ) );
 
-		env->current.settings = env->working.settings = StencilSettings{};
+		env->current.settings = env->working.settings = DepthSettings{};
 	}, sharedData );
 	CoronaRendererRegisterStateOp( L, &sharedData->stateOp, [](CoronaRendererHandle rendererHandle, void * userData) {
-		SharedStencilStateData * _this = static_cast< SharedStencilStateData * >( userData );
-		StencilEnvironment * env = _this->env;
+		SharedDepthStateData * _this = static_cast< SharedDepthStateData * >( userData );
+		DepthEnvironment * env = _this->env;
 
-		StencilSettings settings[] = { env->current.settings, env->working.settings };
+		DepthSettings settings[] = { env->current.settings, env->working.settings };
 
 		CoronaRendererIssueCommand( rendererHandle, _this->command, settings, sizeof( settings ) );
 		CoronaRendererEnableClear( rendererHandle, env->clearOp, true );
@@ -100,22 +109,37 @@ DrawParams()
 	drawParams.ignoreOriginal = true;
 	drawParams.after = [](const CoronaDisplayObjectHandle, void * userData, CoronaRendererHandle rendererHandle)
 	{
-		InstancedStencilStateData * _this = static_cast< InstancedStencilStateData * >( userData );
-		StencilEnvironment * env = _this->shared->env;
+		InstancedDepthStateData * _this = static_cast< InstancedDepthStateData * >( userData );
+		DepthEnvironment * env = _this->shared->env;
 
 		if (_this->hasFunc)
 		{
 			env->working.settings.func = _this->settings.func;
 		}
 
-		if (_this->hasFuncRef)
+		if (_this->hasCullFace)
 		{
-			env->working.settings.funcRef = _this->settings.funcRef;
+			env->working.settings.cullFace = _this->settings.cullFace;
 		}
 
-		if (_this->hasFuncMask)
+		if (_this->hasFrontFace)
 		{
-			env->working.settings.funcMask = _this->settings.funcMask;
+			env->working.settings.frontFace = _this->settings.frontFace;
+		}
+
+		if (_this->hasNear)
+		{
+			env->working.settings.near = _this->settings.near;
+		}
+
+		if (_this->hasFar)
+		{
+			env->working.settings.far = _this->settings.far;
+		}
+
+		if (_this->hasFrontFace)
+		{
+			env->working.settings.frontFace = _this->settings.frontFace;
 		}
 
 		if (_this->hasMask)
@@ -123,27 +147,12 @@ DrawParams()
 			env->working.settings.mask = _this->settings.mask;
 		}
 
-		if (_this->hasFail)
-		{
-			env->working.settings.fail = _this->settings.fail;
-		}
-
-		if (_this->hasZFail)
-		{
-			env->working.settings.zfail = _this->settings.zfail;
-		}
-
-		if (_this->hasZPass)
-		{
-			env->working.settings.zpass = _this->settings.zpass;
-		}
-
 		if (_this->hasEnabled)
 		{
 			env->working.settings.enabled = _this->settings.enabled;
 		}
 
-		if (memcmp( &env->current.settings, &env->working.settings, sizeof( StencilSettings ) ) != 0)
+		if (memcmp( &env->current.settings, &env->working.settings, sizeof( DepthSettings ) ) != 0)
 		{
 			CoronaRendererSetOperationStateDirty( rendererHandle, _this->shared->stateOp );
 		}
@@ -153,7 +162,7 @@ DrawParams()
 }
 
 static void
-UpdateEnabled( lua_State * L, InstancedStencilStateData * _this, int valueIndex )
+UpdateEnabled( lua_State * L, InstancedDepthStateData * _this, int valueIndex )
 {
 	_this->hasEnabled = !lua_isnil( L, valueIndex );
 	
@@ -164,7 +173,7 @@ UpdateEnabled( lua_State * L, InstancedStencilStateData * _this, int valueIndex 
 }
 
 static const char *
-UpdateFunc( lua_State * L, InstancedStencilStateData * _this, int valueIndex )
+UpdateFunc( lua_State * L, InstancedDepthStateData * _this, int valueIndex )
 {
 	if (lua_isnil( L, valueIndex ))
 	{
@@ -180,7 +189,7 @@ UpdateFunc( lua_State * L, InstancedStencilStateData * _this, int valueIndex )
 
 		else
 		{
-			CoronaLuaWarning( L, "'%s' is not a supported stencil function", lua_tostring( L, valueIndex ) );
+			CoronaLuaWarning( L, "'%s' is not a supported depth function", lua_tostring( L, valueIndex ) );
 		}
 	}
 
@@ -193,20 +202,16 @@ UpdateFunc( lua_State * L, InstancedStencilStateData * _this, int valueIndex )
 }
 
 static void
-ClearOpValue( InstancedStencilStateData * _this, int eventIndex )
+ClearFaceValue( InstancedDepthStateData * _this, int opIndex )
 {
-	switch (eventIndex)
+	switch (opIndex)
 	{
 	case 0:
-		_this->hasFail = false;
+		_this->hasCullFace = false;
 
 		break;
 	case 1:
-		_this->hasZFail = false;
-
-		break;
-	case 2:
-		_this->hasZPass = false;
+		_this->hasFrontFace = false;
 
 		break;
 	default:
@@ -215,30 +220,48 @@ ClearOpValue( InstancedStencilStateData * _this, int eventIndex )
 }
 
 static void
-SetOpValue( lua_State * L, InstancedStencilStateData * _this, int eventIndex, int valueIndex )
+SetFaceValue( lua_State * L, InstancedDepthStateData * _this, int opIndex, int valueIndex )
 {
-	const char * names[] = { "keep", "zero", "replace", "increment", "incrementWrap", "decrement", "decrementWrap", "invert", nullptr };
-	int opIndex = FindName( L, valueIndex, names );
+	const char * cullFaceNames[] = { "front", "back", "frontAndBack", NULL }, * frontFaceNames[] = { "cw", "ccw", NULL }, ** names = NULL;
 
-	if (names[opIndex])
+	switch (opIndex)
 	{
-		const GLenum ops[] = { GL_KEEP, GL_ZERO, GL_REPLACE, GL_INCR, GL_INCR_WRAP, GL_DECR, GL_DECR_WRAP, GL_INVERT };
+	case 0:
+		names = cullFaceNames;
 
-		switch (eventIndex)
+		break;
+	case 1:
+		names = frontFaceNames;
+
+		break;
+	default:
+		Rtt_ASSERT_NOT_REACHED();
+	}
+
+	int resultIndex = FindName( L, valueIndex, names );
+
+	if (names[resultIndex])
+	{
+		switch (opIndex)
 		{
-		case 0:							
-			_this->settings.fail = ops[opIndex];
-			_this->hasFail = true;
+		case 0:
+			{
+				const GLenum cullFaceValues[] = { GL_FRONT, GL_BACK, GL_FRONT_AND_BACK };
+
+				_this->settings.cullFace = cullFaceValues[resultIndex];
+			}
+
+			_this->hasCullFace = true;
 
 			break;
 		case 1:
-			_this->settings.zfail = ops[opIndex];
-			_this->hasZFail = true;
+			{
+				const GLenum frontFaceValues[] = { GL_CW, GL_CCW };
 
-			break;
-		case 2:
-			_this->settings.zpass = ops[opIndex];
-			_this->hasZPass = true;
+				_this->settings.frontFace = frontFaceValues[resultIndex];
+			}
+
+			_this->hasFrontFace = true;
 
 			break;
 		default:
@@ -248,23 +271,23 @@ SetOpValue( lua_State * L, InstancedStencilStateData * _this, int eventIndex, in
 
 	else
 	{
-		CoronaLuaWarning( L, "'%s' is not a supported stencil op", lua_tostring( L, valueIndex ) );
+		CoronaLuaWarning( L, "'%s' is not a supported face value", lua_tostring( L, valueIndex ) );
 	}
 }
 
 static const char *
-UpdateOp( lua_State * L, InstancedStencilStateData * _this, const char key[], int valueIndex )
+UpdateFaceOp( lua_State * L, InstancedDepthStateData * _this, const char key[], int valueIndex )
 {
-	int eventIndex = ('z' == key[0]) + ('p' == key[1]);
+	int opIndex = 'f' == key[0];
 
 	if (lua_isnil( L, valueIndex ))
 	{
-		ClearOpValue( _this, eventIndex );
+		ClearFaceValue( _this, opIndex );
 	}
 
 	else if (lua_isstring( L, valueIndex ))
 	{
-		SetOpValue( L, _this, eventIndex, valueIndex );
+		SetFaceValue( L, _this, opIndex, valueIndex );
 	}
 
 	else
@@ -276,20 +299,16 @@ UpdateOp( lua_State * L, InstancedStencilStateData * _this, const char key[], in
 }
 
 static void
-ClearConstantValue( InstancedStencilStateData * _this, int index )
+ClearConstantValue( InstancedDepthStateData * _this, int index )
 {
 	switch (index)
 	{
 	case 0:
-		_this->hasFuncRef = false;
+		_this->hasNear = false;
 
 		break;
 	case 1:
-		_this->hasFuncMask = false;
-
-		break;
-	case 2:
-		_this->hasMask = false;
+		_this->hasFar = false;
 
 		break;
 	default:
@@ -298,23 +317,18 @@ ClearConstantValue( InstancedStencilStateData * _this, int index )
 }
 
 static void
-SetConstantValue( lua_State * L, InstancedStencilStateData * _this, int index, int valueIndex )
+SetConstantValue( lua_State * L, InstancedDepthStateData * _this, int index, int valueIndex )
 {
 	switch (index)
 	{
 	case 0:
-		_this->settings.funcRef = (int)lua_tointeger( L, valueIndex );
-		_this->hasFuncRef = true;
+		_this->settings.near = lua_tonumber( L, valueIndex );
+		_this->hasNear = true;
 
 		break;
 	case 1:
-		_this->settings.funcMask = (unsigned int)lua_tonumber( L, valueIndex );
-		_this->hasFuncMask = true;
-
-		break;
-	case 2:
-		_this->settings.mask = (unsigned int)lua_tonumber( L, valueIndex );
-		_this->hasMask = true;
+		_this->settings.far = lua_tonumber( L, valueIndex );
+		_this->hasFar = true;
 
 		break;
 	default:
@@ -323,9 +337,9 @@ SetConstantValue( lua_State * L, InstancedStencilStateData * _this, int index, i
 }
 
 static const char *
-UpdateConstant( lua_State * L, InstancedStencilStateData * _this, const char key[], int valueIndex )
+UpdateConstant( lua_State * L, InstancedDepthStateData * _this, const char key[], int valueIndex )
 {
-	int index = 'f' == key[0] ? 'M' == key[4] : 2;
+	int index = 'f' == key[0];
 
 	if (lua_isnil( L, valueIndex ))
 	{
@@ -352,7 +366,7 @@ SetValueParams()
 
 	setValueParams.before = [](const CoronaDisplayObjectHandle, void * userData, lua_State * L, const char key[], int valueIndex, int * result)
 	{
-		InstancedStencilStateData * _this = static_cast< InstancedStencilStateData * >( userData );
+		InstancedDepthStateData * _this = static_cast< InstancedDepthStateData * >( userData );
 		const char * expected = NULL;
 
 		*result = true;
@@ -367,12 +381,12 @@ SetValueParams()
 			expected = UpdateFunc( L, _this, valueIndex );
 		}
 
-		else if (strcmp( key, "fail" ) == 0 || strcmp( key, "zfail" ) == 0 || strcmp( key, "zpass" ) == 0)
+		else if (strcmp( key, "cullFace" ) == 0 || strcmp( key, "frontFace" ) == 0)
 		{
-			expected = UpdateOp( L, _this, key, valueIndex );
+			expected = UpdateFaceOp( L, _this, key, valueIndex );
 		}
 
-		else if (strcmp( key, "funcRef" ) == 0 || strcmp( key, "funcMask" ) == 0 || strcmp( key, "mask" ) == 0)
+		else if (strcmp( key, "near" ) == 0 || strcmp( key, "far" ) == 0)
 		{
 			expected = UpdateConstant( L, _this, key, valueIndex );
 		}
@@ -392,7 +406,7 @@ SetValueParams()
 }
 
 static void
-PushStencilState( StencilEnvironment * env, const ScopeMessagePayload & payload )
+PushDepthState( DepthEnvironment * env, const ScopeMessagePayload & payload )
 {
 	env->stack.push_back( env->working );
 
@@ -401,7 +415,7 @@ PushStencilState( StencilEnvironment * env, const ScopeMessagePayload & payload 
 }
 
 static void
-PopStencilState( InstancedStencilStateData * _this, StencilEnvironment * env, const ScopeMessagePayload & payload )
+PopDepthState( InstancedDepthStateData * _this, DepthEnvironment * env, const ScopeMessagePayload & payload )
 {
 	env->hasSetID = false;
 
@@ -411,7 +425,7 @@ PopStencilState( InstancedStencilStateData * _this, StencilEnvironment * env, co
 
 		env->stack.pop_back();
 
-		if (memcmp( &env->working.settings, &env->current.settings, sizeof( StencilSettings ) ) != 0)
+		if (memcmp( &env->working.settings, &env->current.settings, sizeof( DepthSettings ) ) != 0)
 		{
 			CoronaRendererSetOperationStateDirty( payload.rendererHandle, _this->shared->stateOp );
 		}
@@ -430,8 +444,8 @@ OnMessageParams()
 
 	onMessageParams.action = [](const CoronaDisplayObjectHandle, void * userData, const char * message, const void * data, U32 size)
 	{
-		InstancedStencilStateData * _this = static_cast< InstancedStencilStateData * >( userData );
-		StencilEnvironment * env = _this->shared->env;
+		InstancedDepthStateData * _this = static_cast< InstancedDepthStateData * >( userData );
+		DepthEnvironment * env = _this->shared->env;
 
 		if (strcmp( message, "willDraw" ) == 0 || strcmp( message, "didDraw" ) == 0)
 		{
@@ -441,12 +455,12 @@ OnMessageParams()
 
 				if ('w' == message[0] && !env->hasSetID)
 				{
-					PushStencilState( env, payload );
+					PushDepthState( env, payload );
 				}
 
 				else if (env->hasSetID && payload.drawSessionID == env->id)
 				{
-					PopStencilState( _this, env, payload );
+					PopDepthState( _this, env, payload );
 				}
 			}
 				
@@ -461,9 +475,9 @@ OnMessageParams()
 }
 
 static void
-PopulateSharedData( lua_State * L, SharedStencilStateData * sharedData )
+PopulateSharedData( lua_State * L, SharedDepthStateData * sharedData )
 {
-	StencilEnvironment * env = InitStencilEnvironment( L );
+	DepthEnvironment * env = InitDepthEnvironment( L );
 
 	sharedData->env = env;
 
@@ -489,7 +503,7 @@ PopulateSharedData( lua_State * L, SharedStencilStateData * sharedData )
 
 	onFinalizeParams.action = [](const CoronaDisplayObjectHandle, void * userData)
 	{
-		delete static_cast< InstancedStencilStateData * >( userData );
+		delete static_cast< InstancedDepthStateData * >( userData );
 	};
 
 	AddToParamsList( paramsList, &onFinalizeParams.header, kAugmentedMethod_OnFinalize );
@@ -499,22 +513,22 @@ PopulateSharedData( lua_State * L, SharedStencilStateData * sharedData )
 }
 
 int
-StencilStateObject( lua_State * L )
+DepthStateObject( lua_State * L )
 {
 	DummyArgs( L ); // [group, ]x, y, w, h
 
 	static int sNonce;
 
-	auto sharedStateData = GetOrNew< SharedStencilStateData >(L, &sNonce );
+	auto sharedStateData = GetOrNew< SharedDepthStateData >(L, &sNonce );
 
 	if (sharedStateData.isNew)
 	{
 		PopulateSharedData( L, sharedStateData.object );
 	}
 
-	InstancedStencilStateData * stateData = new InstancedStencilStateData;
+	InstancedDepthStateData * stateData = new InstancedDepthStateData;
 
-	memset( stateData, 0, sizeof( InstancedStencilStateData ) );
+	memset( stateData, 0, sizeof( InstancedDepthStateData ) );
 
 	stateData->shared = sharedStateData.object;
 

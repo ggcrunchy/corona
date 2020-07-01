@@ -8,40 +8,40 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "Stencil.h"
+#include "Depth.h"
 
-StencilEnvironment * InitStencilEnvironment( lua_State * L )
+DepthEnvironment * InitDepthEnvironment( lua_State * L )
 {
 	static int sNonce;
 
-	auto env = GetOrNew< StencilEnvironment >( L, &sNonce, true );
+	auto env = GetOrNew< DepthEnvironment >( L, &sNonce, true );
 
 	if (env.isNew)
 	{
 		CoronaCommand command = {
 			[](const U8 * data, unsigned int size) {
-				int clear;
+				double clear;
 
-				Rtt_ASSERT( size >= sizeof( int ) );
+				Rtt_ASSERT( size >= sizeof( double ) );
 
-				memcpy( &clear, data, sizeof( int ) );
+				memcpy( &clear, data, sizeof( double ) );
 
-				glClearStencil( GLint( clear ) ); // TODO: is this expensive? if so, avoid when possible...
-				glClear( GL_STENCIL_BUFFER_BIT );
+				Rtt_glClearDepth( GLdouble( clear ) ); // TODO: is this expensive? if so, avoid when possible...
+				glClear( GL_DEPTH_BUFFER_BIT );
 			}, CopyWriter
 		};
 
 		CoronaRendererRegisterCommand( L, &env.object->command, &command );
 		CoronaRendererRegisterBeginFrameOp( L, &env.object->beginFrameOp, [](CoronaRendererHandle rendererHandle, void * userData) {
-			StencilEnvironment * _this = static_cast< StencilEnvironment * >( userData );
-			int clear = 0;
+			DepthEnvironment * _this = static_cast< DepthEnvironment * >( userData );
+			double clear = 0.;
 
-			CoronaRendererIssueCommand( rendererHandle, _this->command, &clear, sizeof( int ) );
+			CoronaRendererIssueCommand( rendererHandle, _this->command, &clear, sizeof( double ) );
 		}, env.object );
 		CoronaRendererRegisterClearOp( L, &env.object->clearOp, [](CoronaRendererHandle rendererHandle, void * userData) {
-			StencilEnvironment * _this = static_cast< StencilEnvironment * >( userData );
+			DepthEnvironment * _this = static_cast< DepthEnvironment * >( userData );
 
-			CoronaRendererIssueCommand( rendererHandle, _this->command, &_this->clear, sizeof( int ) );
+			CoronaRendererIssueCommand( rendererHandle, _this->command, &_this->clear, sizeof( double ) );
 		}, env.object );
 	}
 

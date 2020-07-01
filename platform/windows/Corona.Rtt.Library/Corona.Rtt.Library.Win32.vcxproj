@@ -145,7 +145,10 @@
     <ClCompile Include="..\..\..\librtt\Display\Rtt_TextureResourceExternalAdapter.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\Rtt_VertexCache.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\TESTING\ColorMask.cpp" />
-    <ClCompile Include="..\..\..\librtt\Display\TESTING\Depth.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\DepthClear.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\DepthEnvironment.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\DepthLib.cpp" />
+    <ClCompile Include="..\..\..\librtt\Display\TESTING\DepthState.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\TESTING\Instancing.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\TESTING\StencilLib.cpp" />
     <ClCompile Include="..\..\..\librtt\Display\TESTING\StencilClear.cpp" />
@@ -446,6 +449,7 @@
     <ClInclude Include="..\..\..\librtt\Display\Rtt_TextureResourceExternal.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_TextureResourceExternalAdapter.h" />
     <ClInclude Include="..\..\..\librtt\Display\Rtt_VertexCache.h" />
+    <ClInclude Include="..\..\..\librtt\Display\TESTING\Depth.h" />
     <ClInclude Include="..\..\..\librtt\Display\TESTING\Stencil.h" />
     <ClInclude Include="..\..\..\librtt\Display\TESTING\TESTING.h" />
     <ClInclude Include="..\..\..\librtt\Input\Rtt_InputAxisCollection.h" />

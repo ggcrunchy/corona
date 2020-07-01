@@ -33,6 +33,7 @@ void CopyWriter( U8 * out, const void * data, U32 size );
 void DummyWriter( U8 *, const void *, U32 );
 void DummyArgs( lua_State * L );
 int FindName( lua_State * L, int valueIndex, const char * list[] );
+bool FindFunc( lua_State * L, int valueIndex, int * func );
 
 struct ScopeMessagePayload {
 	CoronaRendererHandle rendererHandle;

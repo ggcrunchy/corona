@@ -9,6 +9,7 @@
 //-----------------------------------------------------------------------------
 
 #include "TESTING.h"
+#include "Renderer/Rtt_GL.h"
 
 static int
 ScopeGroupObject( lua_State * L )
@@ -115,6 +116,23 @@ FindName( lua_State * L, int valueIndex, const char * list[] )
 	}
 
 	return index;
+}
+
+bool FindFunc( lua_State * L, int valueIndex, int * func )
+{
+	const char * names[] = { "never", "less", "equal", "greater", "greaterThanOrEqual", "lessThanOrEqual", "notEqual", "always", NULL };
+	int index = FindName( L, valueIndex, names );
+
+	if (names[index])
+	{
+		const GLenum funcs[] = { GL_NEVER, GL_LESS, GL_EQUAL, GL_GREATER, GL_GEQUAL, GL_LEQUAL, GL_NOTEQUAL, GL_ALWAYS };
+
+		*func = funcs[index];
+
+		return true;
+	}
+
+	return false;
 }
 
 int
