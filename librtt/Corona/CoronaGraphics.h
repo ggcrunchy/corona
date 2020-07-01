@@ -270,8 +270,8 @@ typedef struct CoronaShaderSourceTransformParams {
 	unsigned int ndetails;
 } CoronaShaderSourceTransformParams;
 
-typedef const char ** (*CoronaShaderSourceTransformBegin)(CoronaShaderSourceTransformParams * params, void * key);
-typedef void (*CoronaShaderSourceTransformFinish)(const char * transformed[], unsigned int n, void * key);
+typedef const char ** (*CoronaShaderSourceTransformBegin)(CoronaShaderSourceTransformParams * params, void * userData, void * key);
+typedef void (*CoronaShaderSourceTransformFinish)(void * userData, void * key);
 typedef void (*CoronaShaderSourceTransformStateCleanup)(void * key);
 
 typedef struct CoronaShaderMappingLayout {
@@ -283,6 +283,12 @@ typedef struct CoronaShaderMappingLayout {
 TODO
 */
 typedef struct CoronaShaderSourceTransform {
+	/**
+	Optional
+	TODO
+	*/
+	unsigned int extraSpace;
+
 	/**
 	Optional
 	TODO
@@ -463,7 +469,6 @@ void CoronaCreateOrthoMatrix( float left, float right, float bottom, float top, 
 
 CORONA_API
 void CoronaCreatePerspectiveMatrix( float fovy, float aspectRatio, float zNear, float zFar, CoronaMatrix4x4 result ) CORONA_PUBLIC_SUFFIX;
-
 
 CORONA_API
 int CoronaRendererGetFrustum( CoronaRendererHandle renderer, CoronaMatrix4x4 viewMatrix, CoronaMatrix4x4 projectionMatrix ) CORONA_PUBLIC_SUFFIX;

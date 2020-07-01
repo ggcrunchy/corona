@@ -219,13 +219,13 @@ CountLines( const char **segments, int numSegments )
 
 // STEVE CHANGE
 static void 
-SetShaderSource( GLuint shader, CoronaShaderSourceTransformParams & params, const CoronaShaderSourceTransform * xform, void * key )
+SetShaderSource( GLuint shader, CoronaShaderSourceTransformParams & params, const CoronaShaderSourceTransform * xform, void * userData, void * key )
 {
 	const char ** strings = params.sources, ** old = strings;
 
 	if (xform && xform->begin)
 	{
-		strings = xform->begin( &params, key );
+		strings = xform->begin( &params, userData, key );
 
 		if (!strings)
 		{
@@ -235,9 +235,9 @@ SetShaderSource( GLuint shader, CoronaShaderSourceTransformParams & params, cons
 
 	glShaderSource( shader, params.nsources, strings, NULL );
 
-	if (old != strings && xform && xform->finish)
+	if (xform && xform->finish)
 	{
-		xform->finish( strings, params.nsources, key );
+		xform->finish( userData, key );
 	}
 
 	GL_CHECK_ERROR();
@@ -299,6 +299,16 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 
 	params.details = details.data();
 	params.ndetails = details.size();
+
+	std::vector< U8 > space;
+	U8 * spaceData = NULL;
+
+	if (callbacks->transform.extraSpace)
+	{
+		space.resize( callbacks->transform.extraSpace );
+
+		spaceData = space.data();
+	}
 	// /STEVE CHANGE
 
 	// Vertex shader.
@@ -310,7 +320,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 		params.sources = shader_source;
 		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
-		SetShaderSource( data.fVertexShader, params, callbacks ? &callbacks->transform : NULL, sourceTransformKey );
+		SetShaderSource( data.fVertexShader, params, callbacks ? &callbacks->transform : NULL, spaceData, sourceTransformKey );
 /*
 		glShaderSource( data.fVertexShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
@@ -330,7 +340,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 		params.sources = shader_source;
 		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
-		SetShaderSource( data.fFragmentShader, params, callbacks ? &callbacks->transform : NULL, sourceTransformKey );
+		SetShaderSource( data.fFragmentShader, params, callbacks ? &callbacks->transform : NULL, spaceData, sourceTransformKey );
 /*
 		glShaderSource( data.fFragmentShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),

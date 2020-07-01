@@ -40,7 +40,7 @@ DrawParams()
 	CoronaObjectDrawParams drawParams = {};
 
 	drawParams.ignoreOriginal = true;
-	drawParams.after = [](const CoronaDisplayObjectHandle, void * userData, CoronaRendererHandle rendererHandle)
+	drawParams.after = []( const CoronaDisplayObjectHandle, void * userData, CoronaRendererHandle rendererHandle )
 	{
 		InstancedStencilClearData * _this = static_cast< InstancedStencilClearData * >( userData );
 		SharedStencilClearData * shared = _this->shared;
@@ -61,7 +61,7 @@ SetValueParams()
 {
 	CoronaObjectSetValueParams setValueParams = {};
 
-	setValueParams.before = [](const CoronaDisplayObjectHandle, void * userData, lua_State * L, const char key[], int valueIndex, int * result)
+	setValueParams.before = []( const CoronaDisplayObjectHandle, void * userData, lua_State * L, const char key[], int valueIndex, int * result )
 	{
 		if (strcmp( key, "value" ) == 0)
 		{
@@ -113,7 +113,7 @@ PopulateSharedData( lua_State * L, SharedStencilClearData * sharedData )
 
 	CoronaObjectLifetimeParams finalizeParams = {};
 
-	finalizeParams.action = [](const CoronaDisplayObjectHandle, void * userData)
+	finalizeParams.action = []( const CoronaDisplayObjectHandle, void * userData )
 	{
 		delete static_cast< InstancedStencilClearData * >( userData );
 	};

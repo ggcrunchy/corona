@@ -122,7 +122,7 @@ DrawParams()
 	CoronaObjectDrawParams drawParams = {};
 
 	drawParams.ignoreOriginal = true;
-	drawParams.after = [](const CoronaDisplayObjectHandle, void * userData, CoronaRendererHandle rendererHandle)
+	drawParams.after = []( const CoronaDisplayObjectHandle, void * userData, CoronaRendererHandle rendererHandle )
 	{
 		InstancedDepthStateData * _this = static_cast< InstancedDepthStateData * >( userData );
 		DepthEnvironment * env = _this->shared->env;
@@ -550,7 +550,7 @@ SetValueParams()
 {
 	CoronaObjectSetValueParams setValueParams = {};
 
-	setValueParams.before = [](const CoronaDisplayObjectHandle, void * userData, lua_State * L, const char key[], int valueIndex, int * result)
+	setValueParams.before = []( const CoronaDisplayObjectHandle, void * userData, lua_State * L, const char key[], int valueIndex, int * result )
 	{
 		InstancedDepthStateData * _this = static_cast< InstancedDepthStateData * >( userData );
 		const char * expected = NULL;
@@ -641,7 +641,7 @@ OnMessageParams()
 {
 	CoronaObjectOnMessageParams onMessageParams = {};
 
-	onMessageParams.action = [](const CoronaDisplayObjectHandle, void * userData, const char * message, const void * data, U32 size)
+	onMessageParams.action = []( const CoronaDisplayObjectHandle, void * userData, const char * message, const void * data, U32 size )
 	{
 		InstancedDepthStateData * _this = static_cast< InstancedDepthStateData * >( userData );
 		DepthEnvironment * env = _this->shared->env;
@@ -700,7 +700,7 @@ PopulateSharedData( lua_State * L, SharedDepthStateData * sharedData )
 
 	CoronaObjectLifetimeParams onFinalizeParams = {};
 
-	onFinalizeParams.action = [](const CoronaDisplayObjectHandle, void * userData)
+	onFinalizeParams.action = []( const CoronaDisplayObjectHandle, void * userData )
 	{
 		delete static_cast< InstancedDepthStateData * >( userData );
 	};

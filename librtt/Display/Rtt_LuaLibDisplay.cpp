@@ -772,6 +772,12 @@ LoadZ( lua_State * L, int index, ShapePath * path )
 		floatArray->Append( z );
 	}
 }
+
+static ShapeObject *
+NewShape( Rtt_Allocator * allocator, ClosedPath * path )
+{
+	return Rtt_NEW( allocator, ShapeObject( path ) );
+}
 // /STEVE CHANGE
 
 int
@@ -795,8 +801,10 @@ DisplayLibrary::newPolygon( lua_State *L )
 	TesselatorPolygon *tesselator = (TesselatorPolygon *)path->GetTesselator();
 	if ( ShapeAdapterPolygon::InitializeContour( L, nextArg, * tesselator, hasZ ) ) // <- STEVE CHANGE
 	{
-		ShapeObject *v = Rtt_NEW( display.GetAllocator(), ShapeObject( path ) );
 		// STEVE CHANGE
+		auto * polygonFactory = GetObjectFactory( L, &NewShape );
+		ShapeObject *v = polygonFactory( display.GetAllocator(), path );//Rtt_NEW( display.GetAllocator(), ShapeObject( path ) );
+
 		if (hasZ)
 		{
 			ArrayIndex * indexArray = path->GetFillSource().ExtraIndexArray( 0U, true ); // FIXME!
@@ -891,8 +899,10 @@ DisplayLibrary::newMesh( lua_State *L )
 	TesselatorMesh *tesselator = (TesselatorMesh *)path->GetTesselator();
 	if ( ShapeAdapterMesh::InitializeMesh( L, nextArg, * tesselator, hasZ ) ) // <- STEVE CHANGE
 	{
-		ShapeObject *v = Rtt_NEW( display.GetAllocator(), ShapeObject( path ) );
 		// STEVE CHANGE
+		auto * meshFactory = GetObjectFactory( L, &NewShape );
+		ShapeObject *v = meshFactory( display.GetAllocator(), path );//Rtt_NEW( display.GetAllocator(), ShapeObject( path ) );
+
 		if (hasZ)
 		{
 			lua_getfield( L, nextArg, "vertices" ); // ..., vertices

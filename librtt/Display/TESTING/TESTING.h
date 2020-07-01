@@ -17,6 +17,7 @@
 #include "Corona/CoronaGraphics.h"
 #include "Corona/CoronaObjects.h"
 #include "Core/Rtt_Types.h"
+#include <string>
 
 extern "C" {
 	int ColorMaskLib( lua_State * L );
@@ -34,6 +35,9 @@ void DummyWriter( U8 *, const void *, U32 );
 void DummyArgs( lua_State * L );
 int FindName( lua_State * L, int valueIndex, const char * list[] );
 bool FindFunc( lua_State * L, int valueIndex, int * func );
+
+void FindAndReplace( std::string & str, const char * original, const char * replacement );
+void FindAndInsertAfter( std::string & str, const char * what, const char * toInsert );
 
 struct ScopeMessagePayload {
 	CoronaRendererHandle rendererHandle;

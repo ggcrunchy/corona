@@ -75,7 +75,7 @@ DrawParams()
 	CoronaObjectDrawParams drawParams = {};
 
 	drawParams.ignoreOriginal = true;
-	drawParams.after = [](const CoronaDisplayObjectHandle, void * userData, CoronaRendererHandle rendererHandle)
+	drawParams.after = []( const CoronaDisplayObjectHandle, void * userData, CoronaRendererHandle rendererHandle )
 	{
 		InstancedColorMaskData * _this = static_cast< InstancedColorMaskData * >( userData );
 		SharedColorMaskData * shared = _this->shared;
@@ -170,7 +170,7 @@ SetValueParams()
 {
 	CoronaObjectSetValueParams setValueParams = {};
 
-	setValueParams.before = [](const CoronaDisplayObjectHandle, void * userData, lua_State * L, const char key[], int valueIndex, int * result)
+	setValueParams.before = []( const CoronaDisplayObjectHandle, void * userData, lua_State * L, const char key[], int valueIndex, int * result )
 	{
 		InstancedColorMaskData * _this = static_cast< InstancedColorMaskData * >( userData );
 
@@ -232,7 +232,7 @@ OnMessageParams()
 {
 	CoronaObjectOnMessageParams onMessageParams = {};
 
-	onMessageParams.action = [](const CoronaDisplayObjectHandle, void * userData, const char * message, const void * data, U32 size)
+	onMessageParams.action = []( const CoronaDisplayObjectHandle, void * userData, const char * message, const void * data, U32 size )
 	{
 		InstancedColorMaskData * _this = static_cast< InstancedColorMaskData * >( userData );
 		SharedColorMaskData * shared = _this->shared;
@@ -287,7 +287,7 @@ PopulateSharedData( lua_State * L, SharedColorMaskData * sharedData )
 
 	CoronaObjectLifetimeParams onFinalizeParams = {};
 
-	onFinalizeParams.action = [](const CoronaDisplayObjectHandle, void * userData)
+	onFinalizeParams.action = []( const CoronaDisplayObjectHandle, void * userData )
 	{
 		delete static_cast< InstancedColorMaskData * >( userData );
 	};

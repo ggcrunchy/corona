@@ -20,15 +20,11 @@ ScopeGroupObject( lua_State * L )
 
 	if (params.isNew)
 	{
-	//	params->afterDidInsert = [](void * groupObject, void * userData, int childParentChanged ) {}
-	//	params->afterDidRemove = [](void * groupObject, void * userData ) {}
-	// ^^ TODO: double-check these
 		CoronaObjectDrawParams drawParams = {};
 
-		drawParams.before = [](const CoronaDisplayObjectHandle object, void * userData, CoronaRendererHandle rendererHandle)
+		drawParams.before = []( const CoronaDisplayObjectHandle object, void * userData, CoronaRendererHandle rendererHandle )
 		{
 			const CoronaGroupObjectHandle groupObject = reinterpret_cast< CoronaGroupObjectHandle >( object );
-
 			ScopeMessagePayload payload = { rendererHandle, sScopeDrawSessionID };
 
 			for (int i = 0, n = CoronaGroupObjectGetNumChildren( groupObject ); i < n; ++i)
@@ -37,10 +33,9 @@ ScopeGroupObject( lua_State * L )
 			}
 		};
 
-		drawParams.after = [](const CoronaDisplayObjectHandle object, void * userData, CoronaRendererHandle rendererHandle)
+		drawParams.after = []( const CoronaDisplayObjectHandle object, void * userData, CoronaRendererHandle rendererHandle )
 		{
 			const CoronaGroupObjectHandle groupObject = reinterpret_cast< CoronaGroupObjectHandle >( object );
-
 			ScopeMessagePayload payload = { rendererHandle, sScopeDrawSessionID++ };
 
 			for (int i = CoronaGroupObjectGetNumChildren( groupObject ); i; --i)
@@ -133,6 +128,24 @@ bool FindFunc( lua_State * L, int valueIndex, int * func )
 	}
 
 	return false;
+}
+
+void
+FindAndReplace( std::string & str, const char * original, const char * replacement )
+{
+	const std::string asCppString = original;
+	size_t pos = str.find( asCppString );
+
+	str.replace( pos, asCppString.size(), replacement );
+}
+
+void
+FindAndInsertAfter( std::string & str, const char * what, const char * toInsert )
+{
+	const std::string asCppString = what;
+	size_t pos = str.find( asCppString );
+
+	str.insert( pos + asCppString.size(), toInsert );
 }
 
 int

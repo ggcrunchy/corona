@@ -9,7 +9,6 @@
 //-----------------------------------------------------------------------------
 
 #include "TESTING.h"
-#include <string>
 #include <vector>
 
 struct InstancingData {
@@ -89,7 +88,7 @@ DrawParams()
 	CoronaShaderDrawParams drawParams = {};
 
 	drawParams.ignoreOriginal = true;
-	drawParams.after = [](const CoronaShaderHandle shader, void * userData, CoronaRendererHandle renderer, const CoronaRenderDataHandle renderData)
+	drawParams.after = []( const CoronaShaderHandle shader, void * userData, CoronaRendererHandle renderer, const CoronaRenderDataHandle renderData )
 	{	
 		InstancingData * _this = static_cast< InstancingData * >( userData );
 
@@ -145,49 +144,37 @@ Prepare( const CoronaShaderHandle shader, void * userData, CoronaRenderDataHandl
 	}
 }
 
-static std::vector< const char * > sStrings;
-static std::string sUpdated;
+struct TransformData {
+	char * newString;
+	const char ** stringList;
+};
 
 static void
-FindAndReplace( const char * original, const char * replacement )
+UpdateVertexSpecificSource( std::string & str )
 {
-	const std::string asCppString = original;
-	size_t pos = sUpdated.find( asCppString );
+	FindAndReplace( str, "vec2 a_Position", "vec3 a_Position" );
 
-	sUpdated.replace( pos, asCppString.size(), replacement );
-}
+	FindAndInsertAfter( str,
+		// Find this...
+		"v_UserData = a_UserData;",
 
-static void
-FindAndInsertAfter( const char * what, const char * toInsert )
-{
-	const std::string asCppString = what;
-	size_t pos = sUpdated.find( asCppString );
-
-	sUpdated.insert( pos + asCppString.size(), toInsert );
-}
-
-static void
-UpdateVertexParts()
-{
-	FindAndReplace( "vec2 a_Position", "vec3 a_Position" );
-
-	FindAndInsertAfter( "v_UserData = a_UserData;",
-
+		// ...then insert this after:
 		"\n"
 		"\tv_InstanceIndex = a_Position.z;\n"
 
 	);
 
-	FindAndReplace( "( a_Position )", "( a_Position.xy )" );
+	FindAndReplace( str, "( a_Position )", "( a_Position.xy )" );
 }
 
-static void
-UpdateSnippet( const char * source, bool isVertexSource )
+static std::string
+UpdateSource( std::string str, bool isVertexSource )
 {
-	sUpdated.assign( source );
+	FindAndReplace( str,
+		// Find this...
+		"vec2 v_Position;",
 
-	FindAndReplace( "vec2 v_Position;",
-
+		// ...and replace with:
 		"float v_InstanceIndex;\n"
 		"\n"
 		"#define CoronaInstanceIndex int( v_InstanceIndex )\n"
@@ -197,44 +184,45 @@ UpdateSnippet( const char * source, bool isVertexSource )
 
 	if (isVertexSource)
 	{
-		UpdateVertexParts();
+		UpdateVertexSpecificSource( str );
 	}
+
+	return str;
 }
 
 static const char **
-SourceTransformBegin( CoronaShaderSourceTransformParams * params, void * )
+SourceTransformBegin( CoronaShaderSourceTransformParams * params, void * userData, void * )
 {
+	TransformData * transformData = static_cast< TransformData * >( userData );
+
+	transformData->stringList = static_cast< const char ** >( malloc( params->nsources * sizeof( const char * ) ) );
+	transformData->newString = NULL;
+
 	for (size_t i = 0; i < params->nsources; ++i)
 	{
+		const char * source = params->sources[i];
 		bool isVertexSource = strcmp( params->hints[i], "vertexSource" ) == 0;
 
 		if (isVertexSource || strcmp( params->hints[i], "fragmentSource" ) == 0)
 		{
-			UpdateSnippet( params->sources[i], isVertexSource );
+			std::string updated = UpdateSource( source, isVertexSource );
 
-			sStrings.push_back( sUpdated.c_str() );
+			source = transformData->newString = strdup( updated.c_str() );
 		}
 
-		else
-		{
-			sStrings.push_back( params->sources[i] );
-		}
+		transformData->stringList[i] = source;
 	}
 
-	return sStrings.data();
+	return transformData->stringList;
 }
 
 static void
-ClearStrings()
+SourceTransformFinish( void * userData, void * )
 {
-	sStrings.clear();
-	sUpdated.clear();
-}
+	TransformData * transformData = static_cast< TransformData * >( userData );
 
-static void
-SourceTransformFinish( const char * transformed[], unsigned int n, void * )
-{
-	ClearStrings();
+	free( transformData->newString );
+	free( transformData->stringList );
 }
 
 static int
@@ -251,6 +239,7 @@ RegisterCustomization( lua_State * L)
 	callbacks.prepare = Prepare;
 	callbacks.transform.begin = SourceTransformBegin;
 	callbacks.transform.finish = SourceTransformFinish;
+	callbacks.transform.extraSpace = sizeof( TransformData );
 
 	lua_pushboolean( L, CoronaShaderRegisterCustomization( L, "instances", &callbacks ) ); // ..., ok?
 
@@ -259,8 +248,6 @@ RegisterCustomization( lua_State * L)
 
 int InstancingLib( lua_State * L )
 {
-	ClearStrings();
-
 	lua_newtable( L ); // instancingLib
 
 	luaL_Reg funcs[] = {

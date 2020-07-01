@@ -109,7 +109,7 @@ CORONA_OBJECTS_EARLY_OUTABLE_BOOKENDED_PARAMS( BooleanResult, const CoronaDispla
 CORONA_OBJECTS_EARLY_OUTABLE_BOOKENDED_PARAMS( BooleanResultPoint, const CoronaDisplayObjectHandle object, void * userData, float x, float y, int * result );
 CORONA_OBJECTS_EARLY_OUTABLE_BOOKENDED_PARAMS( BooleanResultMatrix, const CoronaDisplayObjectHandle object, void * userData, const float matrix[6], int * result );
 
-typedef void (*CoronaObjectSetValueBookend) (const CoronaDisplayObjectHandle object, void * userData, lua_State * L, const char key[], int valueIndex, int * result );
+typedef void (*CoronaObjectSetValueBookend) ( const CoronaDisplayObjectHandle object, void * userData, lua_State * L, const char key[], int valueIndex, int * result );
 
 typedef struct CoronaObjectSetValueParams {
     CoronaObjectParamsHeader header;
@@ -117,7 +117,7 @@ typedef struct CoronaObjectSetValueParams {
     CoronaObjectSetValueBookend before, after;
 } CoronaObjectSetValueParams;
 
-typedef void (*CoronaObjectValueBookend) (const CoronaDisplayObjectHandle object, void * userData, lua_State * L, const char key[], int * result );
+typedef void (*CoronaObjectValueBookend) ( const CoronaDisplayObjectHandle object, void * userData, lua_State * L, const char key[], int * result );
 
 typedef struct CoronaObjectValueParams {
     CoronaObjectParamsHeader header;
@@ -132,7 +132,7 @@ typedef struct CoronaObjectLifetimeParams {
 
 typedef struct CoronaObjectOnMessageParams {
     CoronaObjectParamsHeader header;
-    void (*action)(const CoronaDisplayObjectHandle object, void * userData, const char * message, const void * data, unsigned int size);
+    void (*action)( const CoronaDisplayObjectHandle object, void * userData, const char * message, const void * data, unsigned int size );
 } CoronaObjectOnMessageParams;
 
 typedef struct CoronaObjectParams {
@@ -148,6 +148,12 @@ int CoronaObjectsBuildMethodStream( lua_State * L, const CoronaObjectParamsHeade
 
 CORONA_API
 int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsPushMesh( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsPushPolygon( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 int CoronaObjectsPushRect( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;

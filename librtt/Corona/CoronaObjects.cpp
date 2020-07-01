@@ -842,6 +842,78 @@ int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaObjectPa
 /**
 TODO
 */
+CORONA_OBJECTS_VTABLE( Mesh, Shape );
+
+class Mesh2 : public Rtt::ShapeObject {
+public:
+	typedef Mesh2 Self;
+	typedef Rtt::ShapeObject Super;
+
+public:
+	Mesh2( Rtt::ClosedPath * path )
+		: ShapeObject( path ),
+		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
+	{
+	}
+
+	CORONA_OBJECTS_INTERFACE( Mesh );
+};
+
+static Rtt::ShapeObject *
+NewMesh2( Rtt_Allocator * allocator, Rtt::ClosedPath * path )
+{
+	Mesh2 * mesh = Rtt_NEW( allocator, Mesh2( path ) );
+
+	CORONA_OBJECTS_ON_CREATE( mesh );
+
+	return mesh;
+}
+
+CORONA_API
+int CoronaObjectsPushMesh( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( Mesh );
+}
+
+/**
+TODO
+*/
+CORONA_OBJECTS_VTABLE( Polygon, Shape );
+
+class Polygon2 : public Rtt::ShapeObject {
+public:
+	typedef Polygon2 Self;
+	typedef Rtt::ShapeObject Super;
+
+public:
+	Polygon2( Rtt::ClosedPath * path )
+		: ShapeObject( path ),
+		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
+	{
+	}
+
+	CORONA_OBJECTS_INTERFACE( Polygon );
+};
+
+static Rtt::ShapeObject *
+NewPolygon2( Rtt_Allocator * allocator, Rtt::ClosedPath * path )
+{
+	Polygon2 * polygon = Rtt_NEW( allocator, Polygon2( path ) );
+
+	CORONA_OBJECTS_ON_CREATE( polygon );
+
+	return polygon;
+}
+
+CORONA_API
+int CoronaObjectsPushPolygon( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( Polygon );
+}
+
+/**
+TODO
+*/
 CORONA_OBJECTS_VTABLE( Rect, Shape );
 
 class Rect2 : public Rtt::RectObject {
