@@ -104,7 +104,7 @@ ValuePrologue( lua_State * L, const Rtt::MLuaProxyable& object, const char key[]
 
 		bool canEarlyOut = !params.disallowEarlyOut, expectsNonZero = !params.earlyOutIfZero;
 
-		if (canEarlyOut && expectsNonZero == !!result)
+		if (canEarlyOut && expectsNonZero == !!*result)
 		{
 			return false;
 		}
@@ -137,7 +137,7 @@ SetValuePrologue( lua_State * L, Rtt::MLuaProxyable& object, const char key[], i
 
 		bool canEarlyOut = !params.disallowEarlyOut;
 
-		if (canEarlyOut && result)
+		if (canEarlyOut && *result)
 		{
 			return false;
 		}
