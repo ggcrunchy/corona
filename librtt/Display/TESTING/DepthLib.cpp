@@ -219,7 +219,7 @@ DrawParams()
 
 		if (_this->mode != InstancedTransformableState::kIdentity)
 		{
-			CoronaRendererSetFrustum( renderer,_this->shared->prevViewMatrix, _this->shared->prevProjectionMatrix );
+			CoronaRendererSetFrustum( renderer, _this->shared->prevViewMatrix, _this->shared->prevProjectionMatrix );
 		}
 	};
 
@@ -433,7 +433,7 @@ TransformableMesh( lua_State * L )
 	SharedTransformableState * shared = InitSharedTransformableState( L );
 	InstancedTransformableState * stateData = NewTransformableState( L, shared );
 
-	return CoronaObjectsPushMesh( L, NULL, &shared->params );
+	return CoronaObjectsPushMesh( L, stateData, &shared->params );
 }
 
 static int
@@ -442,7 +442,7 @@ TransformablePolygon( lua_State * L )
 	SharedTransformableState * shared = InitSharedTransformableState( L );
 	InstancedTransformableState * stateData = NewTransformableState( L, shared );
 
-	return CoronaObjectsPushPolygon( L, NULL, &shared->params );
+	return CoronaObjectsPushPolygon( L, stateData, &shared->params );
 }
 
 static int
@@ -571,7 +571,7 @@ const char * FillMatrixFromArray( lua_State * L, int index, const char * what, C
 
 		if (lua_isnumber( L, -1 ))
 		{
-			matrix[i - 1] = (float)lua_tonumber( L, -1 );
+			temp[i - 1] = (float)lua_tonumber( L, -1 );
 		}
 
 		else

@@ -431,7 +431,7 @@ SetMatrix( lua_State * L, InstancedDepthStateData * _this, int index, int valueI
 		switch (index)
 		{
 		case 0:
-			if (FillMatrixFromArray( L, valueIndex, "projection matrix", matrix ))
+			if (NULL == FillMatrixFromArray( L, valueIndex, "projection matrix", matrix ))
 			{
 				memcpy( _this->projectionMatrix, matrix, sizeof( CoronaMatrix4x4 ) );
 
@@ -440,7 +440,7 @@ SetMatrix( lua_State * L, InstancedDepthStateData * _this, int index, int valueI
 
 			break;
 		case 1:
-			if (FillMatrixFromArray( L, valueIndex, "view matrix", matrix ))
+			if (NULL == FillMatrixFromArray( L, valueIndex, "view matrix", matrix ))
 			{
 				memcpy( _this->viewMatrix, matrix, sizeof( CoronaMatrix4x4 ) );
 

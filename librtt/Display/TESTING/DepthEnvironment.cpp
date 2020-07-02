@@ -34,7 +34,7 @@ DepthEnvironment * InitDepthEnvironment( lua_State * L )
 		CoronaRendererRegisterCommand( L, &env.object->command, &command );
 		CoronaRendererRegisterBeginFrameOp( L, &env.object->beginFrameOp, [](CoronaRendererHandle rendererHandle, void * userData) {
 			DepthEnvironment * _this = static_cast< DepthEnvironment * >( userData );
-			double clear = 0.;
+			double clear = 1.;
 
 			CoronaRendererIssueCommand( rendererHandle, _this->command, &clear, sizeof( double ) );
 		}, env.object );
