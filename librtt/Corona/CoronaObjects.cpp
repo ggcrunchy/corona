@@ -270,7 +270,7 @@ OnCreate( const void * object, void * userData, const unsigned char * stream )
 	OnCreate( OBJECT, OBJECT->fUserData, OBJECT->fStream )
 
 static bool 
-CallNewFactory (lua_State * L, const char * name, void * func)
+CallNewFactory( lua_State * L, const char * name, void * func )
 {
 	if (PushFactory( L, name ) ) // stream, ...[, factories, factory]
 	{
@@ -503,7 +503,7 @@ int PushObject( lua_State * L, void * userData, const CoronaObjectParams * param
 	return 0;
 }
 
-#define CORONA_OBJECTS_PUSH(OBJECT_KIND) return PushObject< OBJECT_KIND##2 >( L, userData, params, "new" #OBJECT_KIND, &New##OBJECT_KIND##2 )
+#define CORONA_OBJECTS_PUSH(OBJECT_KIND) return PushObject< OBJECT_KIND##2 >( L, userData, params, "new" #OBJECT_KIND, &OBJECT_KIND##2::New )
 
 #define STORE_THIS(OBJECT_TYPE) auto storedThis = CoronaInternalStore##OBJECT_TYPE( reinterpret_cast< const OBJECT_TYPE * >( this ) )
 #define STORE_VALUE(NAME, OBJECT_TYPE) auto NAME##Stored = CoronaInternalStore##OBJECT_TYPE( NAME )
@@ -794,18 +794,31 @@ TODO
 CORONA_OBJECTS_VTABLE( Group, Group );
 
 class Group2 : public Rtt::GroupObject {
+	Rtt_CLASS_NO_COPIES( Group2 )
+
 public:
 	typedef Group2 Self;
 	typedef Rtt::GroupObject Super;
 
 public:
+	static Super *
+	New( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
+	{
+		Self * group = Rtt_NEW( allocator, Self( allocator, NULL ) );
 
+		CORONA_OBJECTS_ON_CREATE( group );
+
+		return group;
+	}
+
+protected:
 	Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
-		: GroupObject( allocator, stageObject ),
+		: Super( allocator, stageObject ),
 		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
 	{
 	}
 
+public:
 	virtual void DidInsert( bool childParentChanged )
 	{
 		STORE_THIS( GroupObject );
@@ -823,16 +836,6 @@ public:
 	CORONA_OBJECTS_INTERFACE( Group );
 };
 
-static Rtt::GroupObject *
-NewGroup2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
-{
-    Group2 * group = Rtt_NEW( allocator, Group2( allocator, NULL ) );
-
-	CORONA_OBJECTS_ON_CREATE( group );
-
-	return group;
-}
-
 CORONA_API
 int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaObjectParams * params )
 {
@@ -845,29 +848,33 @@ TODO
 CORONA_OBJECTS_VTABLE( Mesh, Shape );
 
 class Mesh2 : public Rtt::ShapeObject {
+	Rtt_CLASS_NO_COPIES( Mesh2 )
+
 public:
 	typedef Mesh2 Self;
 	typedef Rtt::ShapeObject Super;
 
 public:
+	static Super *
+	New( Rtt_Allocator * allocator, Rtt::ClosedPath * path )
+	{
+		Self * mesh = Rtt_NEW( allocator, Self( path ) );
+
+		CORONA_OBJECTS_ON_CREATE( mesh );
+
+		return mesh;
+	}
+
+protected:
 	Mesh2( Rtt::ClosedPath * path )
-		: ShapeObject( path ),
+		: Super( path ),
 		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
 	{
 	}
 
+public:
 	CORONA_OBJECTS_INTERFACE( Mesh );
 };
-
-static Rtt::ShapeObject *
-NewMesh2( Rtt_Allocator * allocator, Rtt::ClosedPath * path )
-{
-	Mesh2 * mesh = Rtt_NEW( allocator, Mesh2( path ) );
-
-	CORONA_OBJECTS_ON_CREATE( mesh );
-
-	return mesh;
-}
 
 CORONA_API
 int CoronaObjectsPushMesh( lua_State * L, void * userData, const CoronaObjectParams * params )
@@ -881,29 +888,33 @@ TODO
 CORONA_OBJECTS_VTABLE( Polygon, Shape );
 
 class Polygon2 : public Rtt::ShapeObject {
+	Rtt_CLASS_NO_COPIES( Polygon2 )
+
 public:
 	typedef Polygon2 Self;
 	typedef Rtt::ShapeObject Super;
 
 public:
+	static Super *
+	New( Rtt_Allocator * allocator, Rtt::ClosedPath * path )
+	{
+		Self * polygon = Rtt_NEW( allocator, Self( path ) );
+
+		CORONA_OBJECTS_ON_CREATE( polygon );
+
+		return polygon;
+	}
+
+protected:
 	Polygon2( Rtt::ClosedPath * path )
-		: ShapeObject( path ),
+		: Super( path ),
 		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
 	{
 	}
 
+public:
 	CORONA_OBJECTS_INTERFACE( Polygon );
 };
-
-static Rtt::ShapeObject *
-NewPolygon2( Rtt_Allocator * allocator, Rtt::ClosedPath * path )
-{
-	Polygon2 * polygon = Rtt_NEW( allocator, Polygon2( path ) );
-
-	CORONA_OBJECTS_ON_CREATE( polygon );
-
-	return polygon;
-}
 
 CORONA_API
 int CoronaObjectsPushPolygon( lua_State * L, void * userData, const CoronaObjectParams * params )
@@ -917,30 +928,34 @@ TODO
 CORONA_OBJECTS_VTABLE( Rect, Shape );
 
 class Rect2 : public Rtt::RectObject {
+	Rtt_CLASS_NO_COPIES( Rect2 )
+
 public:
 	typedef Rect2 Self;
 	typedef Rtt::RectObject Super;
 
 public:
+	static Super *
+	New( Rtt_Allocator* pAllocator, Rtt::Real width, Rtt::Real height )
+	{
+		Rtt::RectPath * path = Rtt::RectPath::NewRect( pAllocator, width, height );
+		Self * rect = Rtt_NEW( pAllocator, Self( path ) );
+
+		CORONA_OBJECTS_ON_CREATE( rect );
+
+		return rect;
+	}
+
+protected:
 	Rect2( Rtt::RectPath * path )
-		: RectObject( path ),
+		: Super( path ),
 		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
 	{
 	}
 
+public:
 	CORONA_OBJECTS_INTERFACE( Rect );
 };
-
-static Rtt::RectObject *
-NewRect2( Rtt_Allocator* pAllocator, Rtt::Real width, Rtt::Real height )
-{
-	Rtt::RectPath * path = Rtt::RectPath::NewRect( pAllocator, width, height );
-	Rect2 * rect = Rtt_NEW( pAllocator, Rect2( path ) );
-
-	CORONA_OBJECTS_ON_CREATE( rect );
-
-	return rect;
-}
 
 CORONA_API
 int CoronaObjectsPushRect( lua_State * L, void * userData, const CoronaObjectParams * params )
@@ -954,29 +969,33 @@ TODO
 CORONA_OBJECTS_VTABLE( Snapshot, Snapshot );
 
 class Snapshot2 : public Rtt::SnapshotObject {
+	Rtt_CLASS_NO_COPIES( Snapshot2 )
+
 public:
 	typedef Snapshot2 Self;
 	typedef Rtt::SnapshotObject Super;
 
 public:
-	Snapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real contentW, Rtt::Real contentH )
-		: SnapshotObject( pAllocator, display, contentW, contentH ),
+	static Super *
+	New( Rtt_Allocator * allocator, Rtt::Display & display, Rtt::Real width, Rtt::Real height )
+	{
+		Self * snapshot = Rtt_NEW( allocator, Self( allocator, display, width, height ) );
+
+		CORONA_OBJECTS_ON_CREATE( snapshot );
+
+		return snapshot;
+	}
+
+protected:
+	Snapshot2( Rtt_Allocator * allocator, Rtt::Display & display, Rtt::Real contentW, Rtt::Real contentH )
+		: Super( allocator, display, contentW, contentH ),
 		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
 	{
 	}
 
+public:
 	CORONA_OBJECTS_INTERFACE( Snapshot );
 };
-
-static Rtt::SnapshotObject *
-NewSnapshot2( Rtt_Allocator * pAllocator, Rtt::Display & display, Rtt::Real width, Rtt::Real height )
-{
-	Snapshot2 * snapshot = Rtt_NEW( pAllocator, Snapshot2( pAllocator, display, width, height ) );
-
-	CORONA_OBJECTS_ON_CREATE( snapshot );
-
-	return snapshot;
-}
 
 CORONA_API
 int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaObjectParams * params )
