@@ -426,89 +426,26 @@ SetMatrix( lua_State * L, InstancedDepthStateData * _this, int index, int valueI
 {
 	if (lua_istable( L, valueIndex ))
 	{
+		CoronaMatrix4x4 matrix;
+
 		switch (index)
 		{
 		case 0:
-		{
-			const char * names[] = { "fovy", "aspectRatio", "zNear", "zFar" }, * badType = NULL;
-			float args[4] = {};
-
-			for (int i = 0; i < 4 && !badType; ++i)
+			if (FillMatrixFromArray( L, valueIndex, "projection matrix", matrix ))
 			{
-				lua_getfield( L, valueIndex, names[i] ); // ..., value
-
-				if (lua_isnumber( L, -1 ))
-				{
-					args[i] = (float)lua_tonumber( L, -1 );
-				}
-
-				else
-				{
-					badType = luaL_typename( L, -1 );
-
-					CoronaLuaWarning( L, "Expected number for projection matrix component '%s', got %s", names[i], badType );
-				}
-
-				lua_pop( L, 1 ); // ...
-			}
-
-			if (!badType)
-			{
-				CoronaCreatePerspectiveMatrix( args[0], args[1], args[2], args[3], _this->projectionMatrix );
+				memcpy( _this->projectionMatrix, matrix, sizeof( CoronaMatrix4x4 ) );
 
 				_this->hasProjectionMatrix = true;
 			}
-		}
 
 			break;
 		case 1:
-		{
-			const char * names[] = { "eye", "center", "up" }, * badType = NULL;
-			CoronaVector3 vecs[3];
-
-			for (int i = 0; i < 3 && !badType; ++i)
+			if (FillMatrixFromArray( L, valueIndex, "view matrix", matrix ))
 			{
-				lua_getfield( L, valueIndex, names[i] ); // ..., vec
-
-				if (lua_istable( L, -1 ))
-				{
-					for (int j = 1; j <= 3 && !badType; ++j)
-					{
-						lua_rawgeti( L, -1, j ); // ..., vec, comp
-
-						if (lua_isnumber( L, -1 ))
-						{
-							vecs[i][j - 1] = (float)lua_tonumber( L, -1 );
-						}
-
-						else
-						{
-							badType = luaL_typename( L, -1 );
-
-							CoronaLuaWarning( L, "Expected number for view matrix vector component #%i, got %s", j, badType );
-						}
-
-						lua_pop( L, 1 ); // ..., vec
-					}
-				}
-
-				else
-				{
-					badType = luaL_typename( L, -1 );
-
-					CoronaLuaWarning( L, "Expected table for view matrix vector %s, got %s", names[i], badType );
-				}
-
-				lua_pop( L, 1 ); // ...
-			}
-
-			if (!badType)
-			{
-				CoronaCreateViewMatrix( vecs[0], vecs[1], vecs[2], _this->viewMatrix );
+				memcpy( _this->viewMatrix, matrix, sizeof( CoronaMatrix4x4 ) );
 
 				_this->hasViewMatrix = true;
 			}
-		}
 
 			break;
 		default:
@@ -532,7 +469,7 @@ UpdateMatrix( lua_State * L, InstancedDepthStateData * _this, const char key[], 
 		ClearMatrix( _this, index );
 	}
 
-	else if (lua_isnumber( L, valueIndex ))
+	else if (lua_istable( L, valueIndex ))
 	{
 		SetMatrix( L, _this, index, valueIndex );
 	}

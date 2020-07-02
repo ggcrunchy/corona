@@ -42,6 +42,9 @@ struct DepthEnvironment {
 
 DepthEnvironment * InitDepthEnvironment( lua_State * L );
 
+const char * FillMatrixFromArray( lua_State * L, int index, const char * what, CoronaMatrix4x4 matrix );
+void FillArrayFromMatrix( lua_State * L, int index, const CoronaMatrix4x4 matrix );
+
 extern "C" {
 	int DepthClearObject( lua_State * L );
 	int DepthStateObject( lua_State * L );

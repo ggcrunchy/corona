@@ -303,7 +303,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 	std::vector< U8 > space;
 	U8 * spaceData = NULL;
 
-	if (callbacks->transform.extraSpace)
+	if (callbacks && callbacks->transform.extraSpace)
 	{
 		space.resize( callbacks->transform.extraSpace );
 
