@@ -92,6 +92,8 @@ DrawParams()
 	{	
 		InstancingData * _this = static_cast< InstancingData * >( userData );
 
+		CoronaShaderRawDraw( shader, renderData, renderer ); // first / only instance
+
 		if (_this->out && _this->count > 1U)
 		{
 			CoronaShaderMappingLayout srcLayout;
@@ -102,24 +104,17 @@ DrawParams()
 			srcLayout.data.type = kAttributeType_Float;
 			srcLayout.size = sizeof( float );
 
-			CoronaShaderRawDraw( shader, renderData, renderer );
-
 			for (size_t i = 1; i < _this->count; ++i)
 			{
 				const float instance = float( i );
 
-				CoronaGeometryCopyData( _this->out, &_this->dstLayout, &instance, &srcLayout );
-				CoronaShaderRawDraw( shader, renderData, renderer );
+				CoronaGeometryCopyData( _this->out, &_this->dstLayout, &instance, &srcLayout ); // update instance index
+				CoronaShaderRawDraw( shader, renderData, renderer ); // instance #2 and up
 			}
 
 			const float zero = 0.f;
 
-			CoronaGeometryCopyData( _this->out, &_this->dstLayout, &zero, &srcLayout );
-		}
-
-		else
-		{
-			CoronaShaderRawDraw( shader, renderData, renderer );
+			CoronaGeometryCopyData( _this->out, &_this->dstLayout, &zero, &srcLayout ); // restore instance index to 0
 		}
 	};
 
