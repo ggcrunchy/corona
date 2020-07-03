@@ -22,7 +22,7 @@ struct DepthSettings {
 };
 
 struct DepthInfo {
-	double clear{0.};
+	double clear{1.};
 	CoronaMatrix4x4 projectionMatrix, viewMatrix;
 	DepthSettings settings;
 };
@@ -34,7 +34,7 @@ struct DepthEnvironment {
 	CoronaClearOpHandle clearOp = {};
 	CoronaCommandHandle command = {};
 	U32 id;
-	double clear{0.}; // TODO: should add some way to set this, too...
+	double clear{1.}; // TODO: should add some way to set this, too...
 	bool anySinceClear{false};
 	bool hasSetID{false};
 	bool matricesValid{false};
