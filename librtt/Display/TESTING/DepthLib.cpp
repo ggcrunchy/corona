@@ -57,7 +57,6 @@ SourceTransformBegin( CoronaShaderSourceTransformParams * params, void * userDat
 			std::string updated = UpdateSource( source );
 
 			source = transformData->newString = strdup( updated.c_str() );
-			CoronaLog( source );
 		}
 
 		transformData->stringList[i] = source;
@@ -369,7 +368,7 @@ PopulateSharedState( lua_State * L, SharedTransformableState * shared )
 {
 	CoronaObjectParamsHeader paramsList = {};
 
-	DisableCullAndHitTest( paramsList );
+//	DisableCullAndHitTest( paramsList );
 
 	CoronaObjectDrawParams drawParams = DrawParams();
 

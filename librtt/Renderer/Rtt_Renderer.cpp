@@ -1156,6 +1156,9 @@ Renderer::CheckAndInsertDrawCommand()
 					Rtt_ASSERT_NOT_REACHED();
 			};
 		}
+		// STEVE CHANGE
+		fCurrentGeometry = NULL;
+		// /STEVE CHANGE
 		fRenderDataCount = 0;
 	}
 }
@@ -1171,7 +1174,13 @@ Renderer::FlushBatch()
 void
 Renderer::UpdateBatch( bool batch, bool enoughSpace, bool storedOnGPU, U32 verticesRequired )
 {
+	// STEVE CHANGE
+	Geometry * was = enoughSpace ? fCurrentGeometry : NULL;
+	// /STEVE CHANGE
 	CheckAndInsertDrawCommand();
+	// STEVE CHANGE
+	fCurrentGeometry = was;
+	// /STEVE CHANGE
 
 	if( storedOnGPU && !fWireframeEnabled )
 	{
