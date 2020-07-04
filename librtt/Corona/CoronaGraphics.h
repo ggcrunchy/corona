@@ -439,13 +439,8 @@ int CoronaRendererRegisterClearOp( lua_State * L, CoronaClearOpHandle * out, Cor
 CORONA_API
 int CoronaRendererEnableClear( CoronaRendererHandle renderer, CoronaClearOpHandle op, int enable ) CORONA_PUBLIC_SUFFIX;
 
-typedef struct { long _; } CoronaStateOpHandle;
-
 CORONA_API
-int CoronaRendererRegisterStateOp( lua_State * L, CoronaStateOpHandle * out, CoronaRendererOp onState, void * userData ) CORONA_PUBLIC_SUFFIX;
-
-CORONA_API
-int CoronaRendererSetOperationStateDirty( CoronaRendererHandle renderer, CoronaStateOpHandle op ) CORONA_PUBLIC_SUFFIX;
+int CoronaRendererDo( CoronaRendererHandle renderer, CoronaRendererOp action, void * userData ) CORONA_PUBLIC_SUFFIX;
 
 typedef struct { long _; } CoronaCommandHandle;
 

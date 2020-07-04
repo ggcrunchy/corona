@@ -18,7 +18,7 @@ struct ColorMaskSettings {
 struct SharedColorMaskData {
 	CoronaBeginFrameOpHandle beginFrameOp = {};
 	CoronaCommandHandle command = {};
-	CoronaStateOpHandle stateOp = {};
+	CoronaRendererOp op;
 	CoronaObjectParams params;
 	ColorMaskSettings current, working;
 	std::vector< ColorMaskSettings > stack;
@@ -59,14 +59,17 @@ RegisterRendererLogic( lua_State * L, SharedColorMaskData * sharedData )
 
 		_this->current = _this->working = defSettings;
 	}, sharedData );
-	CoronaRendererRegisterStateOp( L, &sharedData->stateOp, [](CoronaRendererHandle rendererHandle, void * userData ) {
-		SharedColorMaskData * _this = static_cast< SharedColorMaskData * >( userData );
+}
 
-		CoronaRendererIssueCommand( rendererHandle, _this->command, &_this->working, sizeof( ColorMaskSettings ) );
-		CoronaRendererScheduleForNextFrame( rendererHandle, _this->beginFrameOp, kBeginFrame_Schedule );
+static void
+UpdateColorMask( CoronaRendererHandle rendererHandle, void * userData )
+{
+	SharedColorMaskData * _this = static_cast< SharedColorMaskData * >( userData );
+
+	CoronaRendererIssueCommand( rendererHandle, _this->command, &_this->working, sizeof( ColorMaskSettings ) );
+	CoronaRendererScheduleForNextFrame( rendererHandle, _this->beginFrameOp, kBeginFrame_Schedule );
 			
-		_this->current = _this->working;
-	}, sharedData );
+	_this->current = _this->working;
 }
 
 static CoronaObjectDrawParams
@@ -102,7 +105,7 @@ DrawParams()
 
 		if (memcmp( &shared->current, &shared->working, sizeof( ColorMaskSettings ) ) != 0)
 		{
-			CoronaRendererSetOperationStateDirty( rendererHandle, shared->stateOp );
+			CoronaRendererDo( rendererHandle, UpdateColorMask, shared );
 		}
 	};
 
@@ -217,7 +220,7 @@ PopColorMask( SharedColorMaskData * shared, const ScopeMessagePayload & payload 
 
 		if (memcmp( &shared->working, &shared->current, sizeof( ColorMaskSettings ) ) != 0)
 		{
-			CoronaRendererSetOperationStateDirty( payload.rendererHandle, shared->stateOp );
+			CoronaRendererDo( payload.rendererHandle, UpdateColorMask, shared );
 		}
 	}
 
@@ -250,7 +253,7 @@ OnMessageParams()
 
 				else if (shared->hasSetID && payload.drawSessionID == shared->id)
 				{
-					PopColorMask (shared, payload );
+					PopColorMask( shared, payload );
 				}
 			}
 				

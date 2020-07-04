@@ -13,7 +13,6 @@
 struct SharedStencilStateData {
 	CoronaBeginFrameOpHandle beginFrameOp = {};
 	CoronaCommandHandle command = {};
-	CoronaStateOpHandle stateOp = {};
 	CoronaObjectParams params;
 	StencilEnvironment * env;
 };
@@ -76,20 +75,23 @@ RegisterRendererLogic( lua_State * L, SharedStencilStateData * sharedData )
 
 		env->current.settings = env->working.settings = StencilSettings{};
 	}, sharedData );
-	CoronaRendererRegisterStateOp( L, &sharedData->stateOp, [](CoronaRendererHandle rendererHandle, void * userData) {
-		SharedStencilStateData * _this = static_cast< SharedStencilStateData * >( userData );
-		StencilEnvironment * env = _this->env;
+}
 
-		StencilSettings settings[] = { env->current.settings, env->working.settings };
+static void
+UpdateStencilState( CoronaRendererHandle rendererHandle, void * userData )
+{
+	SharedStencilStateData * _this = static_cast< SharedStencilStateData * >( userData );
+	StencilEnvironment * env = _this->env;
 
-		CoronaRendererIssueCommand( rendererHandle, _this->command, settings, sizeof( settings ) );
-		CoronaRendererEnableClear( rendererHandle, env->clearOp, true );
-		CoronaRendererScheduleForNextFrame( rendererHandle, env->beginFrameOp, kBeginFrame_Schedule );
-		CoronaRendererScheduleForNextFrame( rendererHandle, _this->beginFrameOp, kBeginFrame_Schedule );
+	StencilSettings settings[] = { env->current.settings, env->working.settings };
 
-		env->current = env->working;
-		env->anySinceClear = true;
-	}, sharedData );
+	CoronaRendererIssueCommand( rendererHandle, _this->command, settings, sizeof( settings ) );
+	CoronaRendererEnableClear( rendererHandle, env->clearOp, true );
+	CoronaRendererScheduleForNextFrame( rendererHandle, env->beginFrameOp, kBeginFrame_Schedule );
+	CoronaRendererScheduleForNextFrame( rendererHandle, _this->beginFrameOp, kBeginFrame_Schedule );
+
+	env->current = env->working;
+	env->anySinceClear = true;
 }
 
 static CoronaObjectDrawParams
@@ -145,7 +147,7 @@ DrawParams()
 
 		if (memcmp( &env->current.settings, &env->working.settings, sizeof( StencilSettings ) ) != 0)
 		{
-			CoronaRendererSetOperationStateDirty( rendererHandle, _this->shared->stateOp );
+			CoronaRendererDo( rendererHandle, UpdateStencilState, _this->shared );
 		}
 	};
 
@@ -413,7 +415,7 @@ PopStencilState( InstancedStencilStateData * _this, StencilEnvironment * env, co
 
 		if (memcmp( &env->working.settings, &env->current.settings, sizeof( StencilSettings ) ) != 0)
 		{
-			CoronaRendererSetOperationStateDirty( payload.rendererHandle, _this->shared->stateOp );
+			CoronaRendererDo( payload.rendererHandle, UpdateStencilState, _this->shared );
 		}
 	}
 

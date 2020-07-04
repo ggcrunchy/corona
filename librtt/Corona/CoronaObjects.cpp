@@ -217,10 +217,6 @@ public:
 	virtual const Rtt::LuaProxyVTable& ProxyVTable() const { return Self::Constant(); }
 };
 
-#define CORONA_OBJECTS_VTABLE(OBJECT_KIND, PROXY_KIND)															\
-	class OBJECT_KIND##2;																						\
-	typedef Proxy2VTable< OBJECT_KIND##2, Rtt::Lua##PROXY_KIND##ObjectProxyVTable > OBJECT_KIND##2ProxyVTable
-
 static bool
 PushFactory( lua_State * L, const char * name )
 {
@@ -235,39 +231,6 @@ PushFactory( lua_State * L, const char * name )
 
 	return true;
 }
-
-struct StreamAndUserData {
-	unsigned char * stream;
-	void * userData;
-};
-
-static StreamAndUserData sStreamAndUserData;
-
-static void
-OnCreate( const void * object, void * userData, const unsigned char * stream )
-{
-	const auto params = FindParams< CoronaObjectLifetimeParams >( stream, kAugmentedMethod_OnCreate, sizeof( CoronaObjectLifetimeParams ) - sizeof( GenericParams::Lifetime ) );
-
-	if (params.action)
-	{
-		auto && storedObject = CoronaInternalStoreDisplayObject( object );
-
-		params.action( storedObject.GetHandle(), userData );
-	}
-}
-
-#define CORONA_OBJECTS_BIND_STREAM_AND_USER_DATA(INDEX)							\
-	sStreamAndUserData.stream = (unsigned char *)lua_touserdata( L, INDEX );	\
-	sStreamAndUserData.userData = userData
-
-#define CORONA_OBJECTS_ON_CREATE(OBJECT)				\
-	OBJECT->fStream = sStreamAndUserData.stream;		\
-	OBJECT->fUserData = sStreamAndUserData.userData;	\
-														\
-	sStreamAndUserData.stream = NULL;	\
-	sStreamAndUserData.userData = NULL;	\
-										\
-	OnCreate( OBJECT, OBJECT->fUserData, OBJECT->fStream )
 
 static bool 
 CallNewFactory( lua_State * L, const char * name, void * func )
@@ -462,6 +425,14 @@ GetStream( lua_State * L, const CoronaObjectsParams * params )
 	return hasStream;
 }
 
+
+struct StreamAndUserData {
+	unsigned char * stream;
+	void * userData;
+};
+
+static StreamAndUserData sStreamAndUserData;
+
 template<typename T>
 int PushObject( lua_State * L, void * userData, const CoronaObjectParams * params, const char * name, void * func )
 {
@@ -471,8 +442,9 @@ int PushObject( lua_State * L, void * userData, const CoronaObjectParams * param
 	}
 
 	lua_insert( L, 1 ); // stream, ...
-
-	CORONA_OBJECTS_BIND_STREAM_AND_USER_DATA( 1 );
+	
+	sStreamAndUserData.stream = (unsigned char *)lua_touserdata( L, 1 );
+	sStreamAndUserData.userData = userData;
 
 	if (CallNewFactory( L, name, func )) // stream[, object]
 	{
@@ -598,182 +570,215 @@ Copy3 (float * dst, const float * src)
 
 #define CORONA_OBJECTS_GET_PARAMS(PARAMS_TYPE) CORONA_OBJECTS_GET_PARAMS_SPECIFIC(PARAMS_TYPE, PARAMS_TYPE)
 
-#define CORONA_OBJECTS_INTERFACE(OBJECT_KIND)								\
-	virtual void AddedToParent( lua_State * L, Rtt::GroupObject * parent )	\
-	{																		\
-		STORE_THIS( DisplayObject );		\
-		STORE_VALUE( parent, GroupObject );	\
-		CORONA_OBJECTS_GET_PARAMS( AddedToParent );											\
-		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, L, parentStored.GetHandle() );	\
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( AddedToParent, L, parent );					\
-		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, L, parentStored.GetHandle() );	\
-	}	\
-		\
-	virtual bool CanCull() const		\
-	{									\
-		STORE_THIS( DisplayObject );	\
-		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( CanCull, BooleanResult );	\
-		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS )	\
-		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanCull ) 				\
-		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, &result )		\
-						\
-		return result;	\
-	}	\
-		\
-	virtual bool CanHitTest() const		\
-	{									\
-		STORE_THIS( DisplayObject );	\
-		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( CanHitTest, BooleanResult );	\
-		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS )		\
-		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanHitTest )				\
-		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, &result )			\
-						\
-		return result;	\
-	}	\
-		\
-	virtual void DidMoveOffscreen()		\
-	{									\
-		STORE_THIS( DisplayObject );	\
-		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( DidMoveOffscreen, Basic );	\
-		CORONA_OBJECTS_METHOD( DidMoveOffscreen )						\
-	}	\
-		\
-	virtual void DidUpdateTransform( Rtt::Matrix & srcToDst )	\
-	{															\
-		STORE_THIS( DisplayObject );							\
-		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( DidUpdateTransform, Matrix );		\
-		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( before )							\
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( DidUpdateTransform, srcToDst )	\
-		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( after )							\
-	}	\
-		\
-	virtual void Draw( Rtt::Renderer & renderer ) const	\
-	{													\
-		STORE_THIS( DisplayObject );		\
-		STORE_VALUE( &renderer, Renderer );	\
-		CORONA_OBJECTS_GET_PARAMS( Draw );													\
-		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, rendererStored.GetHandle() );	\
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( Draw, renderer );								\
-		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, rendererStored.GetHandle() );		\
-	}	\
-		\
-	virtual void FinalizeSelf( lua_State * L )	\
-	{											\
-		STORE_THIS( DisplayObject );			\
-		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( OnFinalize, Lifetime );	\
-																	\
-		if (params.action)					\
-		{									\
-			params.action( FIRST_ARGS );	\
-		}	\
-			\
-		lua_unref( L, fRef );	\
-								\
-		Super::FinalizeSelf( L );	\
-	}	\
-		\
-	virtual void GetSelfBounds( Rtt::Rect & rect ) const	\
-	{														\
-		STORE_THIS( DisplayObject );						\
-		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( GetSelfBounds, RectResult );									\
-		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )	\
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBounds, rect )											\
-		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )	\
-	}	\
-		\
-	virtual void GetSelfBoundsForAnchor( Rtt::Rect & rect ) const	\
-	{																\
-		STORE_THIS( DisplayObject );								\
-		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( GetSelfBoundsForAnchor, RectResult );							\
-		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )	\
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBoundsForAnchor, rect )								\
-		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )	\
-	}	\
-		\
-	virtual bool HitTest( Rtt::Real contentX, Rtt::Real contentY )	\
-	{																\
-		STORE_THIS( DisplayObject );								\
-		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( HitTest, BooleanResultPoint );	\
-		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS, contentX, contentY )	\
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( HitTest, contentX, contentY )		\
-		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, contentX, contentY, &result )		\
-						\
-		return result;	\
-	}	\
-		\
-	virtual void Prepare( const Rtt::Display & display )	\
-	{														\
-		STORE_THIS( DisplayObject );						\
-		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( Prepare, Basic );		\
-		CORONA_OBJECTS_METHOD_STRIP_ARGUMENT( Prepare, display )	\
-	}	\
-		\
-	virtual void RemovedFromParent( lua_State * L, Rtt::GroupObject * parent )		\
-	{																				\
-		STORE_THIS( DisplayObject );		\
-		STORE_VALUE( parent, GroupObject );	\
-		CORONA_OBJECTS_GET_PARAMS( RemovedFromParent );										\
-		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, L, parentStored.GetHandle() );	\
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( AddedToParent, L, parent );					\
-		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, L, parentStored.GetHandle() );	\
-	}	\
-		\
-	virtual void Rotate( Rtt::Real deltaTheta )								\
-	{																		\
-		STORE_THIS( DisplayObject );										\
-		CORONA_OBJECTS_GET_PARAMS( Rotate );					\
-		CORONA_OBJECTS_METHOD_WITH_ARGS( Rotate, deltaTheta )	\
-	}	\
-		\
-	virtual void Scale( Rtt::Real sx, Rtt::Real sy, bool isNewValue )	\
-	{																	\
-		STORE_THIS( DisplayObject );									\
-		CORONA_OBJECTS_GET_PARAMS( Scale );								\
-		CORONA_OBJECTS_METHOD_WITH_ARGS( Scale, sx, sy, isNewValue )	\
-	}	\
-		\
-	virtual void SendMessage( const char * message, const void * payload, U32 size ) const	\
-	{																						\
-		STORE_THIS( DisplayObject );														\
-		CORONA_OBJECTS_GET_PARAMS( OnMessage );	\
-												\
-		if (params.action)											\
-		{															\
-			params.action( FIRST_ARGS, message, payload, size );	\
-		}															\
-	}	\
-		\
-	virtual void Translate( Rtt::Real deltaX, Rtt::Real deltaY )	\
-	{																\
-		STORE_THIS( DisplayObject );								\
-		CORONA_OBJECTS_GET_PARAMS( Translate );							\
-		CORONA_OBJECTS_METHOD_WITH_ARGS( Translate, deltaX, deltaY )	\
-	}	\
-		\
-	virtual bool UpdateTransform( const Rtt::Matrix & parentToDstSpace )	\
-	{																		\
-		STORE_THIS( DisplayObject );										\
-		CORONA_OBJECTS_INIT_MATRIX( parentToDstSpace );											\
-		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( UpdateTransform, BooleanResultMatrix );				\
-		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS, matrix )					\
-		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( UpdateTransform, parentToDstSpace )	\
-		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, matrix, &result )						\
-						\
-		return result;	\
-	}	\
-		\
-	virtual void WillMoveOnscreen()		\
-	{									\
-		STORE_THIS( DisplayObject );	\
-		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( WillMoveOnscreen, Basic );	\
-		CORONA_OBJECTS_METHOD( WillMoveOnscreen )						\
-	}	\
-		\
-	virtual const Rtt::LuaProxyVTable& ProxyVTable() const { return OBJECT_KIND##2ProxyVTable::Constant(); }	\
-																												\
-	unsigned char * fStream;	\
-	mutable void * fUserData;	\
-	int fRef
+static void
+OnCreate( const void * object, void * userData, const unsigned char * stream )
+{
+	const auto params = FindParams< CoronaObjectLifetimeParams >( stream, kAugmentedMethod_OnCreate, sizeof( CoronaObjectLifetimeParams ) - sizeof( GenericParams::Lifetime ) );
+
+	if (params.action)
+	{
+		auto && storedObject = CoronaInternalStoreDisplayObject( object );
+
+		params.action( storedObject.GetHandle(), userData );
+	}
+}
+
+template<typename Base, typename ProxyVTable, typename... Args>
+struct CoronaObjectsInterface : public Base {
+	typedef CoronaObjectsInterface Self;
+	typedef Base Super;
+
+	CoronaObjectsInterface( Args ... args )
+		: Super( args... ),
+		fStream( NULL ),
+		fUserData( NULL ),
+		fRef( LUA_NOREF )
+	{
+		fStream = sStreamAndUserData.stream;
+		fUserData = sStreamAndUserData.userData;
+
+		sStreamAndUserData.stream = NULL;
+		sStreamAndUserData.userData = NULL;
+
+		OnCreate( this, fUserData, fStream );
+	}
+
+	virtual void AddedToParent( lua_State * L, Rtt::GroupObject * parent )
+	{
+		STORE_THIS( DisplayObject );
+		STORE_VALUE( parent, GroupObject );
+		CORONA_OBJECTS_GET_PARAMS( AddedToParent );
+		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, L, parentStored.GetHandle() );
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( AddedToParent, L, parent );
+		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, L, parentStored.GetHandle() );
+	}
+
+	virtual bool CanCull() const
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( CanCull, BooleanResult );
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS )
+		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanCull )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, &result )
+
+		return result;
+	}
+
+	virtual bool CanHitTest() const
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( CanHitTest, BooleanResult );
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS )
+		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanHitTest )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, &result )
+
+		return result;
+	}
+
+	virtual void DidMoveOffscreen()
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( DidMoveOffscreen, Basic );
+		CORONA_OBJECTS_METHOD( DidMoveOffscreen )
+	}
+
+	virtual void DidUpdateTransform( Rtt::Matrix & srcToDst )
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( DidUpdateTransform, Matrix );
+		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( before )
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( DidUpdateTransform, srcToDst )
+		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( after )
+	}
+
+	virtual void Draw( Rtt::Renderer & renderer ) const
+	{
+		STORE_THIS( DisplayObject );
+		STORE_VALUE( &renderer, Renderer );
+		CORONA_OBJECTS_GET_PARAMS( Draw );
+		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, rendererStored.GetHandle() );
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( Draw, renderer );
+		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, rendererStored.GetHandle() );
+	}
+
+	virtual void FinalizeSelf( lua_State * L )
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( OnFinalize, Lifetime );
+
+		if (params.action)
+		{
+			params.action( FIRST_ARGS );
+		}
+
+		lua_unref( L, fRef );
+
+		Super::FinalizeSelf( L );
+	}
+
+	virtual void GetSelfBounds( Rtt::Rect & rect ) const
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( GetSelfBounds, RectResult );
+		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBounds, rect )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
+	}
+
+	virtual void GetSelfBoundsForAnchor( Rtt::Rect & rect ) const
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( GetSelfBoundsForAnchor, RectResult );
+		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBoundsForAnchor, rect )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
+	}
+
+	virtual bool HitTest( Rtt::Real contentX, Rtt::Real contentY )
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( HitTest, BooleanResultPoint );
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS, contentX, contentY )
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( HitTest, contentX, contentY )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, contentX, contentY, &result )
+
+		return result;
+	}
+
+	virtual void Prepare( const Rtt::Display & display )
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( Prepare, Basic );
+		CORONA_OBJECTS_METHOD_STRIP_ARGUMENT( Prepare, display )
+	}
+
+	virtual void RemovedFromParent( lua_State * L, Rtt::GroupObject * parent )
+	{
+		STORE_THIS( DisplayObject );
+		STORE_VALUE( parent, GroupObject );
+		CORONA_OBJECTS_GET_PARAMS( RemovedFromParent );
+		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, L, parentStored.GetHandle() );
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( AddedToParent, L, parent );
+		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, L, parentStored.GetHandle() );
+	}
+
+	virtual void Rotate( Rtt::Real deltaTheta )
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS( Rotate );
+		CORONA_OBJECTS_METHOD_WITH_ARGS( Rotate, deltaTheta )
+	}
+
+	virtual void Scale( Rtt::Real sx, Rtt::Real sy, bool isNewValue )
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS( Scale );
+		CORONA_OBJECTS_METHOD_WITH_ARGS( Scale, sx, sy, isNewValue )
+	}
+
+	virtual void SendMessage( const char * message, const void * payload, U32 size ) const
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS( OnMessage );
+
+		if (params.action)
+		{
+			params.action( FIRST_ARGS, message, payload, size );
+		}
+	}
+
+	virtual void Translate( Rtt::Real deltaX, Rtt::Real deltaY )
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS( Translate );
+		CORONA_OBJECTS_METHOD_WITH_ARGS( Translate, deltaX, deltaY )
+	}
+
+	virtual bool UpdateTransform( const Rtt::Matrix & parentToDstSpace )
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_INIT_MATRIX( parentToDstSpace );
+		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( UpdateTransform, BooleanResultMatrix );
+		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS, matrix )
+		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( UpdateTransform, parentToDstSpace )
+		CORONA_OBJECTS_METHOD_BOOKEND( after, FIRST_ARGS, matrix, &result )
+
+		return result;
+	}
+
+	virtual void WillMoveOnscreen()
+	{
+		STORE_THIS( DisplayObject );
+		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( WillMoveOnscreen, Basic );
+		CORONA_OBJECTS_METHOD( WillMoveOnscreen )
+	}
+
+	virtual const Rtt::LuaProxyVTable& ProxyVTable() const { return ProxyVTable::Constant(); }
+
+	unsigned char * fStream;
+	mutable void * fUserData;
+	int fRef;
+};
 
 CORONA_API
 int CoronaObjectsBuildMethodStream( lua_State * L, const CoronaObjectParamsHeader * head )
@@ -786,35 +791,43 @@ int CoronaObjectsBuildMethodStream( lua_State * L, const CoronaObjectParamsHeade
 	return LUA_REFNIL;
 }
 
-#define CORONA_OBJECTS_DEFAULT_INITIALIZATION() fStream( NULL ), fUserData( NULL ), fRef( LUA_NOREF )
+#define CORONA_OBJECTS_VTABLE_AND_INTERFACE(OBJECT_KIND, PROXY_KIND, ...)										\
+	class OBJECT_KIND##2;																						\
+	typedef Proxy2VTable< OBJECT_KIND##2, Rtt::Lua##PROXY_KIND##ObjectProxyVTable > OBJECT_KIND##2ProxyVTable;	\
+									\
+	typedef CoronaObjectsInterface<	\
+		Rtt::PROXY_KIND##Object,	\
+		OBJECT_KIND##2ProxyVTable,	\
+					\
+		__VA_ARGS__	\
+	> OBJECT_KIND##Interface
 
 /**
 TODO
 */
-CORONA_OBJECTS_VTABLE( Group, Group );
+CORONA_OBJECTS_VTABLE_AND_INTERFACE(
+	Group, Group,
 
-class Group2 : public Rtt::GroupObject {
+	Rtt_Allocator *, Rtt::StageObject *
+);
+
+class Group2 : public GroupInterface {
 	Rtt_CLASS_NO_COPIES( Group2 )
 
 public:
 	typedef Group2 Self;
-	typedef Rtt::GroupObject Super;
+	typedef GroupInterface Super;
 
 public:
-	static Super *
+	static Super::Super *
 	New( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
 	{
-		Self * group = Rtt_NEW( allocator, Self( allocator, NULL ) );
-
-		CORONA_OBJECTS_ON_CREATE( group );
-
-		return group;
+		return Rtt_NEW( allocator, Self( allocator, NULL ) );
 	}
 
 protected:
 	Group2( Rtt_Allocator * allocator, Rtt::StageObject * stageObject )
-		: Super( allocator, stageObject ),
-		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
+		: Super( allocator, stageObject )
 	{
 	}
 
@@ -832,8 +845,6 @@ public:
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( DidRemove, GroupBasic );
 		CORONA_OBJECTS_METHOD( DidRemove )
 	}
-
-	CORONA_OBJECTS_INTERFACE( Group );
 };
 
 CORONA_API
@@ -845,35 +856,31 @@ int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaObjectPa
 /**
 TODO
 */
-CORONA_OBJECTS_VTABLE( Mesh, Shape );
+CORONA_OBJECTS_VTABLE_AND_INTERFACE(
+	Mesh, Shape,
+	
+	Rtt::ClosedPath *
+);
 
-class Mesh2 : public Rtt::ShapeObject {
+class Mesh2 : public MeshInterface {
 	Rtt_CLASS_NO_COPIES( Mesh2 )
 
 public:
 	typedef Mesh2 Self;
-	typedef Rtt::ShapeObject Super;
+	typedef MeshInterface Super;
 
 public:
-	static Super *
+	static Super::Super *
 	New( Rtt_Allocator * allocator, Rtt::ClosedPath * path )
 	{
-		Self * mesh = Rtt_NEW( allocator, Self( path ) );
-
-		CORONA_OBJECTS_ON_CREATE( mesh );
-
-		return mesh;
+		return Rtt_NEW( allocator, Self( path ) );
 	}
 
 protected:
 	Mesh2( Rtt::ClosedPath * path )
-		: Super( path ),
-		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
+		: Super( path )
 	{
 	}
-
-public:
-	CORONA_OBJECTS_INTERFACE( Mesh );
 };
 
 CORONA_API
@@ -885,35 +892,31 @@ int CoronaObjectsPushMesh( lua_State * L, void * userData, const CoronaObjectPar
 /**
 TODO
 */
-CORONA_OBJECTS_VTABLE( Polygon, Shape );
+CORONA_OBJECTS_VTABLE_AND_INTERFACE(
+	Polygon, Shape,
+		
+	Rtt::ClosedPath *
+);
 
-class Polygon2 : public Rtt::ShapeObject {
+class Polygon2 : public PolygonInterface {
 	Rtt_CLASS_NO_COPIES( Polygon2 )
 
 public:
 	typedef Polygon2 Self;
-	typedef Rtt::ShapeObject Super;
+	typedef PolygonInterface Super;
 
 public:
-	static Super *
+	static Super::Super *
 	New( Rtt_Allocator * allocator, Rtt::ClosedPath * path )
 	{
-		Self * polygon = Rtt_NEW( allocator, Self( path ) );
-
-		CORONA_OBJECTS_ON_CREATE( polygon );
-
-		return polygon;
+		return Rtt_NEW( allocator, Self( path ) );
 	}
 
 protected:
 	Polygon2( Rtt::ClosedPath * path )
-		: Super( path ),
-		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
+		: Super( path )
 	{
 	}
-
-public:
-	CORONA_OBJECTS_INTERFACE( Polygon );
 };
 
 CORONA_API
@@ -925,36 +928,33 @@ int CoronaObjectsPushPolygon( lua_State * L, void * userData, const CoronaObject
 /**
 TODO
 */
-CORONA_OBJECTS_VTABLE( Rect, Shape );
+CORONA_OBJECTS_VTABLE_AND_INTERFACE(
+	Rect, Shape,
 
-class Rect2 : public Rtt::RectObject {
+	Rtt::RectPath *
+);
+
+class Rect2 : public RectInterface {
 	Rtt_CLASS_NO_COPIES( Rect2 )
 
 public:
 	typedef Rect2 Self;
-	typedef Rtt::RectObject Super;
+	typedef RectInterface Super;
 
 public:
-	static Super *
+	static Super::Super *
 	New( Rtt_Allocator* pAllocator, Rtt::Real width, Rtt::Real height )
 	{
 		Rtt::RectPath * path = Rtt::RectPath::NewRect( pAllocator, width, height );
-		Self * rect = Rtt_NEW( pAllocator, Self( path ) );
 
-		CORONA_OBJECTS_ON_CREATE( rect );
-
-		return rect;
+		return Rtt_NEW( pAllocator, Self( path ) );
 	}
 
 protected:
 	Rect2( Rtt::RectPath * path )
-		: Super( path ),
-		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
+		: Super( path )
 	{
 	}
-
-public:
-	CORONA_OBJECTS_INTERFACE( Rect );
 };
 
 CORONA_API
@@ -966,35 +966,31 @@ int CoronaObjectsPushRect( lua_State * L, void * userData, const CoronaObjectPar
 /**
 TODO
 */
-CORONA_OBJECTS_VTABLE( Snapshot, Snapshot );
+CORONA_OBJECTS_VTABLE_AND_INTERFACE(
+	Snapshot, Snapshot,
 
-class Snapshot2 : public Rtt::SnapshotObject {
+	Rtt_Allocator *, Rtt::Display &, Rtt::Real, Rtt::Real
+);
+
+class Snapshot2 : public SnapshotInterface {
 	Rtt_CLASS_NO_COPIES( Snapshot2 )
 
 public:
 	typedef Snapshot2 Self;
-	typedef Rtt::SnapshotObject Super;
+	typedef SnapshotInterface Super;
 
 public:
-	static Super *
+	static Super::Super *
 	New( Rtt_Allocator * allocator, Rtt::Display & display, Rtt::Real width, Rtt::Real height )
 	{
-		Self * snapshot = Rtt_NEW( allocator, Self( allocator, display, width, height ) );
-
-		CORONA_OBJECTS_ON_CREATE( snapshot );
-
-		return snapshot;
+		return Rtt_NEW( allocator, Self( allocator, display, width, height ) );
 	}
 
 protected:
 	Snapshot2( Rtt_Allocator * allocator, Rtt::Display & display, Rtt::Real contentW, Rtt::Real contentH )
-		: Super( allocator, display, contentW, contentH ),
-		CORONA_OBJECTS_DEFAULT_INITIALIZATION()
+		: Super( allocator, display, contentW, contentH )
 	{
 	}
-
-public:
-	CORONA_OBJECTS_INTERFACE( Snapshot );
 };
 
 CORONA_API

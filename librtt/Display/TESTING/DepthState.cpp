@@ -13,7 +13,6 @@
 struct SharedDepthStateData {
 	CoronaBeginFrameOpHandle beginFrameOp = {};
 	CoronaCommandHandle command = {};
-	CoronaStateOpHandle stateOp = {};
 	CoronaObjectParams params;
 	DepthEnvironment * env;
 };
@@ -94,20 +93,6 @@ RegisterRendererLogic( lua_State * L, SharedDepthStateData * sharedData )
 
 		env->current.settings = env->working.settings = DepthSettings{};
 	}, sharedData );
-	CoronaRendererRegisterStateOp( L, &sharedData->stateOp, [](CoronaRendererHandle rendererHandle, void * userData) {
-		SharedDepthStateData * _this = static_cast< SharedDepthStateData * >( userData );
-		DepthEnvironment * env = _this->env;
-
-		DepthSettings settings[] = { env->current.settings, env->working.settings };
-
-		CoronaRendererIssueCommand( rendererHandle, _this->command, settings, sizeof( settings ) );
-		CoronaRendererEnableClear( rendererHandle, env->clearOp, true );
-		CoronaRendererScheduleForNextFrame( rendererHandle, env->beginFrameOp, kBeginFrame_Schedule );
-		CoronaRendererScheduleForNextFrame( rendererHandle, _this->beginFrameOp, kBeginFrame_Schedule );
-
-		env->current = env->working;
-		env->anySinceClear = true;
-	}, sharedData );
 }
 
 static bool
@@ -120,6 +105,23 @@ static bool
 HasDirtyMatrices( const DepthEnvironment * env )
 {
 	return env->matricesValid && (MatricesDiffer( env->current.projectionMatrix, env->working.projectionMatrix ) || MatricesDiffer( env->current.viewMatrix, env->working.viewMatrix ) );
+}
+
+static void
+UpdateDepthState( CoronaRendererHandle rendererHandle, void * userData )
+{
+	SharedDepthStateData * _this = static_cast< SharedDepthStateData * >( userData );
+	DepthEnvironment * env = _this->env;
+
+	DepthSettings settings[] = { env->current.settings, env->working.settings };
+
+	CoronaRendererIssueCommand( rendererHandle, _this->command, settings, sizeof( settings ) );
+	CoronaRendererEnableClear( rendererHandle, env->clearOp, true );
+	CoronaRendererScheduleForNextFrame( rendererHandle, env->beginFrameOp, kBeginFrame_Schedule );
+	CoronaRendererScheduleForNextFrame( rendererHandle, _this->beginFrameOp, kBeginFrame_Schedule );
+
+	env->current.settings = env->working.settings;
+	env->anySinceClear = true;
 }
 
 static CoronaObjectDrawParams
@@ -196,7 +198,7 @@ DrawParams()
 
 		if (memcmp( &env->current.settings, &env->working.settings, sizeof( DepthSettings ) ) != 0)
 		{
-			CoronaRendererSetOperationStateDirty( rendererHandle, _this->shared->stateOp );
+			CoronaRendererDo( rendererHandle, UpdateDepthState, _this->shared );
 		}
 
 		if (HasDirtyMatrices( env ))
@@ -615,7 +617,7 @@ PopDepthState( InstancedDepthStateData * _this, DepthEnvironment * env, const Sc
 
 		if (memcmp( &env->working.settings, &env->current.settings, sizeof( DepthSettings ) ) != 0)
 		{
-			CoronaRendererSetOperationStateDirty( payload.rendererHandle, _this->shared->stateOp );
+			CoronaRendererDo( payload.rendererHandle, UpdateDepthState, _this->shared );
 		}
 
 		if (HasDirtyMatrices( env ))

@@ -141,8 +141,6 @@ Renderer::Renderer( Rtt_Allocator* allocator )
 	fPendingCommands( allocator ),
 	fBeginFrameOps( allocator ),
 	fClearOps( allocator ),
-	fStateOps( allocator ),
-	fStateFlags( 0U ),
 	fBeginFrameFlags( 0U ),
 	fDoNotCancelFlags( 0U ),
 	fClearFlags( 0U ),
@@ -550,9 +548,6 @@ Renderer::Insert( const RenderData* data )
 	bool maskTextureDirty = data->fMaskTexture != fPrevious.fMaskTexture;
 	bool maskUniformDirty = data->fMaskUniform != fPrevious.fMaskUniform;
 	bool programDirty = data->fProgram != fPrevious.fProgram || MaskCount() != fCurrentProgramMaskCount;
-	// STEVE CHANGE
-	bool stateDirty = fStateFlags;
-	// /STEVE CHANGE
 	bool userUniformDirty0 = data->fUserUniform0 != fPrevious.fUserUniform0;
 	bool userUniformDirty1 = data->fUserUniform1 != fPrevious.fUserUniform1;
 	bool userUniformDirty2 = data->fUserUniform2 != fPrevious.fUserUniform2;
@@ -596,9 +591,6 @@ Renderer::Insert( const RenderData* data )
 				|| maskTextureDirty
 				|| maskUniformDirty
 				|| programDirty
-				// STEVE CHANGE
-				|| stateDirty
-				// /STEVE CHANGE
 				|| userUniformDirty0
 				|| userUniformDirty1
 				|| userUniformDirty2
@@ -803,11 +795,7 @@ Renderer::Insert( const RenderData* data )
 	{
 		--MaskCount();
 	}
-// STEVE CHANGE
-	CallOps( this, fStateOps, fStateFlags );
 
-	fStateFlags = 0U;
-// /STEVE CHANGE
 	// User data
 	if( userUniformDirty0 && data->fUserUniform0 )
 	{
@@ -980,13 +968,16 @@ Renderer::AddClearOp( CoronaRendererOp action, void * userData )
 	return AddOp( fClearOps, action, userData, MAX_ARRAY_ENTRIES( fClearFlags ) );
 }
 
-U16
-Renderer::AddStateOp( CoronaRendererOp action, void * userData )
-{
-	return AddOp( fStateOps, action, userData, MAX_ARRAY_ENTRIES( fStateFlags ) );
-}
-
 #undef MAX_ARRAY_ENTRIES
+
+
+void
+Renderer::Inject( CoronaRendererHandle rendererHandle, CoronaRendererOp action, void * userData )
+{
+	CheckAndInsertDrawCommand();
+
+	action( rendererHandle, userData );
+}
 
 bool
 Renderer::IssueCustomCommand( U16 id, const void * data, U32 size )

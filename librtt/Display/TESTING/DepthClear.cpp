@@ -11,7 +11,6 @@
 #include "Depth.h"
 
 struct SharedDepthClearData {
-	CoronaStateOpHandle stateOp = {};
 	CoronaObjectParams params;
 	DepthEnvironment * env;
 };
@@ -21,18 +20,6 @@ struct InstancedDepthClearData {
 	double clear;
 	bool hasClear;
 };
-
-static void
-RegisterRendererLogic( lua_State * L, SharedDepthClearData * sharedData )
-{
-	CoronaRendererRegisterStateOp( L, &sharedData->stateOp, [](CoronaRendererHandle rendererHandle, void * userData) {
-		DepthEnvironment * _this = static_cast< DepthEnvironment * >( userData );
-
-		CoronaRendererIssueCommand( rendererHandle, _this->command, &_this->current.clear, sizeof( double ) ); // TODO: could pass in current and working, compare...
-
-		_this->anySinceClear = false; // TODO: MIGHT be usable to avoid unnecessary clears
-	}, sharedData->env );
-}
 
 static CoronaObjectDrawParams
 DrawParams()
@@ -50,7 +37,13 @@ DrawParams()
 			shared->env->current.clear = _this->clear;
 		}
 
-		CoronaRendererSetOperationStateDirty( rendererHandle, shared->stateOp );
+		CoronaRendererDo( rendererHandle, [](CoronaRendererHandle rendererHandle, void * userData) {
+			DepthEnvironment * _this = static_cast< DepthEnvironment * >( userData );
+
+			CoronaRendererIssueCommand( rendererHandle, _this->command, &_this->current.clear, sizeof( double ) ); // TODO: could pass in current and working, compare...
+
+			_this->anySinceClear = false; // TODO: MIGHT be usable to avoid unnecessary clears
+		}, shared->env );
 	};
 
 	return drawParams;
@@ -96,8 +89,6 @@ PopulateSharedData( lua_State * L, SharedDepthClearData * sharedData )
 	DepthEnvironment * env = InitDepthEnvironment( L );
 
 	sharedData->env = env;
-
-	RegisterRendererLogic( L, sharedData );
 
 	CoronaObjectParamsHeader paramsList = {};
 

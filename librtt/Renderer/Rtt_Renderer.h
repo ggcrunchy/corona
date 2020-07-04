@@ -237,16 +237,15 @@ class Renderer
 		U16 AddCustomCommand( const CoronaCommand & command );
 		U16 AddBeginFrameOp( CoronaRendererOp action, void * userData );
 		U16 AddClearOp( CoronaRendererOp action, void * userData );
-		U16 AddStateOp( CoronaRendererOp action, void * userData );
+
+		void Inject( CoronaRendererHandle rendererHandle, CoronaRendererOp action, void * userData );
 
 		bool IssueCustomCommand( U16 id, const void * data, U32 size );
 
-		U64 GetStateFlags() const { return fStateFlags; }
 		U32 GetBeginFrameFlags() const { return fBeginFrameFlags; }
 		U32 GetDoNotCancelFlags() const { return fDoNotCancelFlags; }
 		U32 GetClearFlags() const { return fClearFlags; }
 
-		void SetStateFlags( U64 flags ) { fStateFlags = flags; }
 		void SetBeginFrameFlags( U32 flags ) { fBeginFrameFlags = flags; }
 		void SetDoNotCancelFlags( U32 flags ) { fDoNotCancelFlags = flags; }
 		void SetClearFlags( U32 flags ) { fClearFlags = flags; }
@@ -343,9 +342,7 @@ class Renderer
 		Array< CoronaCommand > fPendingCommands;
 		Array< CustomOp > fBeginFrameOps;
 		Array< CustomOp > fClearOps;
-		Array< CustomOp > fStateOps;
 
-		U64 fStateFlags;
 		U32 fBeginFrameFlags;
 		U32 fDoNotCancelFlags;
 		U32 fClearFlags;

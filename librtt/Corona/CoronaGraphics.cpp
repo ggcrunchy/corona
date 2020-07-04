@@ -275,59 +275,13 @@ int CoronaRendererEnableClear( CoronaRendererHandle rendererHandle, CoronaClearO
 }
 
 CORONA_API
-int CoronaRendererRegisterStateOp( lua_State * L, CoronaStateOpHandle * out, CoronaRendererOp onState, void * userData )
-{
-	const CoronaStateOpHandle wipe = {};
-	U16 index = 0U;
-
-	*out = wipe;
-
-	if (onState)
-	{
-		index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddStateOp( onState, userData );
-	}
-
-	else // dummy state (does nothing, but will force a batch)
-	{
-		static U16 sNoOpIndex;
-
-		lua_pushlightuserdata( L, &sNoOpIndex ); // ..., nonce
-		lua_rawget( L, LUA_REGISTRYINDEX ); // ..., used?
-
-		if (!lua_isnil( L, -1 ))
-		{
-			index = sNoOpIndex;
-		}
-
-		else
-		{
-			index = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer().AddStateOp( [](CoronaRendererHandle, void *){}, NULL );
-
-			if (index)
-			{
-				lua_pushlightuserdata( L, &sNoOpIndex ); // ..., nil, nonce
-				lua_pushboolean( L, true ); // ..., nil, nonce, true
-				lua_rawset( L, LUA_REGISTRYINDEX ); // ..., nil; registry = { ..., [nonce] = true }
-
-				sNoOpIndex = index;
-			}
-		}
-
-		lua_pop( L, 1 ); // ...
-	}
-
-	return index && EncodeIndex( out, index );
-}
-
-CORONA_API
-int CoronaRendererSetOperationStateDirty( CoronaRendererHandle rendererHandle, CoronaStateOpHandle op )
+int CoronaRendererDo( CoronaRendererHandle rendererHandle, CoronaRendererOp action, void * userData )
 {
 	Rtt::Renderer * renderer = static_cast< Rtt::Renderer *>( CoronaExtractRenderer( rendererHandle ) );
-	U16 index = DecodeIndex( &op );
 
-	if (renderer && index)
+	if (renderer && action)
 	{
-		renderer->SetStateFlags( renderer->GetStateFlags() | IndexToFlag< U64 >( index ) );
+		renderer->Inject( rendererHandle, action, userData );
 
 		return 1;
 	}

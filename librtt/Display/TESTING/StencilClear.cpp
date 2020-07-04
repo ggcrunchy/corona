@@ -11,7 +11,6 @@
 #include "Stencil.h"
 
 struct SharedStencilClearData {
-	CoronaStateOpHandle stateOp = {};
 	CoronaObjectParams params;
 	StencilEnvironment * env;
 };
@@ -21,18 +20,6 @@ struct InstancedStencilClearData {
 	int clear;
 	bool hasClear;
 };
-
-static void
-RegisterRendererLogic( lua_State * L, SharedStencilClearData * sharedData )
-{
-	CoronaRendererRegisterStateOp( L, &sharedData->stateOp, [](CoronaRendererHandle rendererHandle, void * userData) {
-		StencilEnvironment * _this = static_cast< StencilEnvironment * >( userData );
-
-		CoronaRendererIssueCommand( rendererHandle, _this->command, &_this->current.clear, sizeof( int ) ); // TODO: could pass in current and working, compare...
-
-		_this->anySinceClear = false; // TODO: MIGHT be usable to avoid unnecessary clears
-	}, sharedData->env );
-}
 
 static CoronaObjectDrawParams
 DrawParams()
@@ -50,7 +37,13 @@ DrawParams()
 			shared->env->current.clear = _this->clear;
 		}
 
-		CoronaRendererSetOperationStateDirty( rendererHandle, shared->stateOp );
+		CoronaRendererDo( rendererHandle, [](CoronaRendererHandle rendererHandle, void * userData) {
+			StencilEnvironment * _this = static_cast< StencilEnvironment * >( userData );
+
+			CoronaRendererIssueCommand( rendererHandle, _this->command, &_this->current.clear, sizeof( int ) ); // TODO: could pass in current and working, compare...
+
+			_this->anySinceClear = false; // TODO: MIGHT be usable to avoid unnecessary clears
+		}, shared->env );
 	};
 
 	return drawParams;
@@ -96,8 +89,6 @@ PopulateSharedData( lua_State * L, SharedStencilClearData * sharedData )
 	StencilEnvironment * env = InitStencilEnvironment( L );
 
 	sharedData->env = env;
-
-	RegisterRendererLogic( L, sharedData );
 
 	CoronaObjectParamsHeader paramsList = {};
 
