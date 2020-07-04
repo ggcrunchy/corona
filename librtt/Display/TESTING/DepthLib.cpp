@@ -20,20 +20,10 @@ UpdateSource( std::string str )
 {
 	FindAndReplace( str, "vec2 a_Position", "vec3 a_Position" );
 
-	for (int i = 0; i < 3; ++i)
-	{
-		FindAndReplace( str, "vec2 position", "vec3 position" );
-	}
-
-	for (int i = 0; i < 2; ++i)
-	{
-		FindAndReplace( str, "vec2 VertexKernel", "vec3 VertexKernel" );
-	}
-
-	for (int i = 0; i < 3; ++i) // masks
-	{
-		FindAndReplace( str, "position, 1.0", "position.xy, 1.0" );
-	}
+	// these each appear more than once
+	FindAndReplace( str, "vec2 position", "vec3 position", true );
+	FindAndReplace( str, "vec2 VertexKernel", "vec3 VertexKernel", true );
+	FindAndReplace( str, "position, 1.0", "position.xy, 1.0", true );
 
 	FindAndReplace( str, "position, 0.0", "position" );
 
@@ -267,7 +257,7 @@ SetValueParams()
 					memset( _this->eulerAngles, 0, sizeof( VectorBox ) );
 				}
 
-				float angle = (float)lua_tonumber( L, valueIndex );
+				float angle = (float)lua_tonumber( L, valueIndex ) * (3.141592653589793 / 180.);
 
 				switch (*key)
 				{
@@ -334,21 +324,25 @@ ValueParams()
 		{
 			if (_this->eulerAngles)
 			{
+				int index;
+
 				switch (*key)
 				{
 				case 'y':
-					lua_pushnumber( L, _this->eulerAngles->v[0] ); // ..., yaw
+					index = 0;
 
 					break;
 				case 'p':
-					lua_pushnumber( L, _this->eulerAngles->v[1] ); // ..., pitch
+					index = 1;
 
 					break;
 				case 'r':
-					lua_pushnumber( L, _this->eulerAngles->v[2] ); // ..., roll
+					index = 2;
 
 					break;
 				}
+
+				lua_pushnumber( L, _this->eulerAngles->v[index] * (180. / 3.141592653589793) ); // ..., angle
 			}
 
 			else

@@ -18,7 +18,7 @@
 struct DepthSettings {
 	int func{GL_LESS}, cullFace{GL_BACK}, frontFace{GL_CCW};
 	double near{0.}, far{1.};
-	bool enabled{false}, mask{true};
+	bool cullFaceEnabled{false}, enabled{false}, mask{true};
 };
 
 struct DepthInfo {

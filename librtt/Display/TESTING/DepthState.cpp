@@ -30,6 +30,7 @@ struct InstancedDepthStateData {
 	U16 hasProjectionMatrix : 1;
 	U16 hasViewMatrix : 1;
 	U16 hasMask : 1;
+	U16 hasCullFaceEnabled : 1;
 	U16 hasEnabled : 1;
 };
 
@@ -69,6 +70,11 @@ RegisterRendererLogic( lua_State * L, SharedDepthStateData * sharedData )
 			if (current.mask != working.mask)
 			{
 				glDepthMask( working.mask );
+			}
+
+			if (current.cullFaceEnabled != working.cullFaceEnabled)
+			{
+				(working.cullFaceEnabled ? glEnable : glDisable)( GL_CULL_FACE );
 			}
 
 			if (current.enabled != working.enabled)
@@ -206,13 +212,67 @@ DrawParams()
 }
 
 static void
-UpdateEnabled( lua_State * L, InstancedDepthStateData * _this, int valueIndex )
+ClearBoolean( lua_State * L, InstancedDepthStateData * _this, int index )
 {
-	_this->hasEnabled = !lua_isnil( L, valueIndex );
-	
-	if (_this->hasEnabled)
+	switch (index)
 	{
-		_this->settings.enabled = lua_toboolean( L, valueIndex );
+	case 0:
+		_this->hasCullFaceEnabled = false;
+
+		break;
+	case 1:
+		_this->hasEnabled = false;
+
+		break;
+	case 2:
+		_this->hasMask = false;
+
+		break;
+	default:
+		Rtt_ASSERT_NOT_REACHED();
+	}
+}
+
+static void
+SetBoolean( lua_State * L, InstancedDepthStateData * _this, int index, int valueIndex )
+{
+	bool value = lua_toboolean( L, valueIndex );
+
+	switch (index)
+	{
+	case 0:
+		_this->settings.cullFaceEnabled = value;
+		_this->hasCullFaceEnabled = true;
+
+		break;
+	case 1:
+		_this->settings.enabled = value;
+		_this->hasEnabled = true;
+
+		break;
+	case 2:
+		_this->settings.mask = value;
+		_this->hasMask = true;
+
+		break;
+	default:
+		Rtt_ASSERT_NOT_REACHED();
+	}
+}
+
+static void
+UpdateBoolean( lua_State * L, InstancedDepthStateData * _this, const char key[], int valueIndex )
+{
+	int index = 'm' == key[0] ? 2 : 'e' == key[0];
+
+	if (lua_isnil( L, valueIndex ))
+	{
+		ClearBoolean( L, _this, index );
+	}
+
+	else
+	{
+		SetBoolean( L, _this, index, valueIndex );
 	}
 }
 
@@ -494,9 +554,9 @@ SetValueParams()
 
 		*result = true;
 
-		if (strcmp( key, "enabled" ) == 0)
+		if (strcmp( key, "cullFaceEnabled" ) == 0 || strcmp( key, "enabled" ) == 0 || strcmp( key, "mask" ) == 0)
 		{
-			UpdateEnabled( L, _this, valueIndex );
+			UpdateBoolean( L, _this, key, valueIndex );
 		}
 
 		else if (strcmp( key, "func" ) == 0)

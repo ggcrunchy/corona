@@ -130,22 +130,42 @@ bool FindFunc( lua_State * L, int valueIndex, int * func )
 	return false;
 }
 
-void
-FindAndReplace( std::string & str, const char * original, const char * replacement )
+static U32
+FindAndDo( std::string & str, const char * original, const char * modifier, void (*action)( std::string &, size_t, const std::string &, const std::string & ), bool doMultiple )
 {
-	const std::string asCppString = original;
-	size_t pos = str.find( asCppString );
+	const std::string originalAsCppString = original, modifierAsCppString = modifier;
+	U32 count = 0U;
 
-	str.replace( pos, asCppString.size(), replacement );
+	do {
+		size_t pos = str.find( originalAsCppString );
+
+		if (std::string::npos == pos)
+		{
+			break;
+		}
+
+		action( str, pos, originalAsCppString, modifierAsCppString );
+		
+		++count;
+	} while (doMultiple);
+
+	return count;
 }
 
-void
-FindAndInsertAfter( std::string & str, const char * what, const char * toInsert )
+U32
+FindAndReplace( std::string & str, const char * original, const char * replacement, bool doMultiple )
 {
-	const std::string asCppString = what;
-	size_t pos = str.find( asCppString );
+	return FindAndDo( str, original, replacement, []( std::string & s, size_t pos, const std::string & source, const std::string & mod ) {
+		s.replace( pos, source.size(), mod );
+	}, doMultiple);
+}
 
-	str.insert( pos + asCppString.size(), toInsert );
+U32
+FindAndInsertAfter( std::string & str, const char * what, const char * toInsert, bool doMultiple )
+{
+	return FindAndDo( str, what, toInsert, []( std::string & s, size_t pos, const std::string & source, const std::string & mod ) {
+		s.insert( pos + source.size(), mod );
+	}, doMultiple);
 }
 
 int

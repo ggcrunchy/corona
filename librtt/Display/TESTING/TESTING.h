@@ -36,8 +36,8 @@ void DummyArgs( lua_State * L );
 int FindName( lua_State * L, int valueIndex, const char * list[] );
 bool FindFunc( lua_State * L, int valueIndex, int * func );
 
-void FindAndReplace( std::string & str, const char * original, const char * replacement );
-void FindAndInsertAfter( std::string & str, const char * what, const char * toInsert );
+U32 FindAndReplace( std::string & str, const char * original, const char * replacement, bool doMultiple = false );
+U32 FindAndInsertAfter( std::string & str, const char * what, const char * toInsert, bool doMultiple = false );
 
 struct ScopeMessagePayload {
 	CoronaRendererHandle rendererHandle;
