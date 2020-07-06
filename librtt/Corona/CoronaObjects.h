@@ -147,7 +147,25 @@ CORONA_API
 int CoronaObjectsBuildMethodStream( lua_State * L, const CoronaObjectParamsHeader * head ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
+int CoronaObjectsPushContainer( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsPushEmbossedText( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsPushEmitter( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
 int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsPushImage( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsPushImageRect( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsPushLine( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 int CoronaObjectsPushMesh( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
@@ -157,6 +175,15 @@ int CoronaObjectsPushPolygon( lua_State * L, void * userData, const CoronaObject
 
 CORONA_API
 int CoronaObjectsPushRect( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsPushRoundedRect( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsPushSprite( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsPushText( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;

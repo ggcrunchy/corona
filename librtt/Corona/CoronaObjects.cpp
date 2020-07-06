@@ -594,7 +594,8 @@ struct CoronaObjectsInterface : public Base {
 		fUserData( NULL ),
 		fRef( LUA_NOREF )
 	{
-		fStream = sStreamAndUserData.stream;
+		fStream = sStreamAndUserData.stream; // TODO(?): some overloads can be invoked while the object is still being pushed, thus these awkward globals
+											 // an alternate hack would be for the offending methods to lazily load from the stack...
 		fUserData = sStreamAndUserData.userData;
 
 		sStreamAndUserData.stream = NULL;
