@@ -20,12 +20,18 @@
 
 #include "Corona/CoronaPluginSupportInternal.h"
 
+#include "Display/Rtt_ContainerObject.h"
 #include "Display/Rtt_Display.h"
+#include "Display/Rtt_EmbossedTextObject.h"
+#include "Display/Rtt_EmitterObject.h"
 #include "Display/Rtt_GroupObject.h"
+#include "Display/Rtt_LineObject.h"
 #include "Display/Rtt_RectObject.h"
 #include "Display/Rtt_RectPath.h"
 #include "Display/Rtt_SnapshotObject.h"
+#include "Display/Rtt_SpriteObject.h"
 #include "Display/Rtt_StageObject.h"
+#include "Display/Rtt_TextObject.h"
 
 #include <vector>
 #include <stddef.h>
@@ -792,32 +798,124 @@ int CoronaObjectsBuildMethodStream( lua_State * L, const CoronaObjectParamsHeade
 	return LUA_REFNIL;
 }
 
-#define CORONA_OBJECTS_VTABLE_AND_INTERFACE(OBJECT_KIND, PROXY_KIND, ...)										\
-	class OBJECT_KIND##2;																						\
-	typedef Proxy2VTable< OBJECT_KIND##2, Rtt::Lua##PROXY_KIND##ObjectProxyVTable > OBJECT_KIND##2ProxyVTable;	\
-									\
-	typedef CoronaObjectsInterface<	\
-		Rtt::PROXY_KIND##Object,	\
-		OBJECT_KIND##2ProxyVTable,	\
-					\
-		__VA_ARGS__	\
-	> OBJECT_KIND##Interface
+#define CORONA_OBJECTS_CLASS_INTERFACE(OBJECT_KIND) \
+	Rtt_CLASS_NO_COPIES( OBJECT_KIND##2 )			\
+													\
+public:										\
+	typedef OBJECT_KIND##2 Self;			\
+	typedef OBJECT_KIND##Interface Super
 
 /**
 TODO
 */
-CORONA_OBJECTS_VTABLE_AND_INTERFACE(
-	Group, Group,
+typedef CoronaObjectsInterface<
+	Rtt::ContainerObject,
+	Proxy2VTable< class Container2, Rtt::LuaGroupObjectProxyVTable >,
 
-	Rtt_Allocator *, Rtt::StageObject *
-);
+	Rtt_Allocator *, Rtt::StageObject *, Rtt::Real, Rtt::Real
+> ContainerInterface;
 
-class Group2 : public GroupInterface {
-	Rtt_CLASS_NO_COPIES( Group2 )
+class Container2 : public ContainerInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Container );
 
 public:
-	typedef Group2 Self;
-	typedef GroupInterface Super;
+	static Super::Super *
+	New( Rtt_Allocator* allocator, Rtt::StageObject * stageObject, Rtt::Real w, Rtt::Real h )
+	{
+		return Rtt_NEW( allocator, Container2( allocator, stageObject, w, h ) );
+	}
+
+protected:
+	Container2( Rtt_Allocator* allocator, Rtt::StageObject * stageObject, Rtt::Real w, Rtt::Real h )
+		: Super( allocator, stageObject, w, h )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushContainer( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( Container );
+}
+
+/**
+TODO
+*/
+typedef CoronaObjectsInterface<
+	Rtt::EmbossedTextObject,
+	Proxy2VTable< class EmbossedText2, Rtt::LuaEmbossedTextObjectProxyVTable >,
+
+	Rtt::Display &, const char[], Rtt::PlatformFont *, Rtt::Real, Rtt::Real, const char[]
+> EmbossedTextInterface;
+
+class EmbossedText2 : public EmbossedTextInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( EmbossedText );
+
+public:
+	static Super::Super *
+	New( Rtt_Allocator * allocator, Rtt::Display& display, const char text[], Rtt::PlatformFont *font, Rtt::Real w, Rtt::Real h, const char alignment[] )
+	{
+		return Rtt_NEW( allocator, EmbossedText2( display, text, font, w, h, alignment ) );
+	}
+
+protected:
+	EmbossedText2( Rtt::Display& display, const char text[], Rtt::PlatformFont *font, Rtt::Real w, Rtt::Real h, const char alignment[] )
+		: Super( display, text, font, w, h, alignment )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushEmbossedText( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( EmbossedText );
+}
+
+/**
+TODO
+*/
+typedef CoronaObjectsInterface<
+	Rtt::EmitterObject,
+	Proxy2VTable< class Emitter2, Rtt::LuaEmitterObjectProxyVTable >
+
+	/* no args */
+> EmitterInterface;
+
+class Emitter2 : public EmitterInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Emitter );
+
+public:
+	static Super::Super *
+	New( Rtt_Allocator* allocator )
+	{
+		return Rtt_NEW( allocator, Emitter2 );
+	}
+
+protected:
+	Emitter2()
+		: Super()
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushEmitter( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( Emitter );
+}
+
+/**
+TODO
+*/
+typedef CoronaObjectsInterface<
+	Rtt::GroupObject,
+	Proxy2VTable< class Group2, Rtt::LuaGroupObjectProxyVTable >,
+	
+	Rtt_Allocator *, Rtt::StageObject *
+> GroupInterface;
+
+class Group2 : public GroupInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Group );
 
 public:
 	static Super::Super *
@@ -857,18 +955,15 @@ int CoronaObjectsPushGroup( lua_State * L, void * userData, const CoronaObjectPa
 /**
 TODO
 */
-CORONA_OBJECTS_VTABLE_AND_INTERFACE(
-	Mesh, Shape,
+typedef CoronaObjectsInterface<
+	Rtt::ShapeObject,
+	Proxy2VTable< class Mesh2, Rtt::LuaShapeObjectProxyVTable >,
 	
 	Rtt::ClosedPath *
-);
+> MeshInterface;
 
 class Mesh2 : public MeshInterface {
-	Rtt_CLASS_NO_COPIES( Mesh2 )
-
-public:
-	typedef Mesh2 Self;
-	typedef MeshInterface Super;
+	CORONA_OBJECTS_CLASS_INTERFACE( Mesh );
 
 public:
 	static Super::Super *
@@ -893,18 +988,15 @@ int CoronaObjectsPushMesh( lua_State * L, void * userData, const CoronaObjectPar
 /**
 TODO
 */
-CORONA_OBJECTS_VTABLE_AND_INTERFACE(
-	Polygon, Shape,
-		
+typedef CoronaObjectsInterface<
+	Rtt::ShapeObject,
+	Proxy2VTable< class Polygon2, Rtt::LuaShapeObjectProxyVTable >,
+	
 	Rtt::ClosedPath *
-);
+> PolygonInterface;
 
 class Polygon2 : public PolygonInterface {
-	Rtt_CLASS_NO_COPIES( Polygon2 )
-
-public:
-	typedef Polygon2 Self;
-	typedef PolygonInterface Super;
+	CORONA_OBJECTS_CLASS_INTERFACE( Polygon );
 
 public:
 	static Super::Super *
@@ -929,24 +1021,21 @@ int CoronaObjectsPushPolygon( lua_State * L, void * userData, const CoronaObject
 /**
 TODO
 */
-CORONA_OBJECTS_VTABLE_AND_INTERFACE(
-	Rect, Shape,
-
-	Rtt::RectPath *
-);
+typedef CoronaObjectsInterface<
+	Rtt::ShapeObject,
+	Proxy2VTable< class Rect2, Rtt::LuaShapeObjectProxyVTable >,
+	
+	Rtt::ClosedPath *
+> RectInterface;
 
 class Rect2 : public RectInterface {
-	Rtt_CLASS_NO_COPIES( Rect2 )
-
-public:
-	typedef Rect2 Self;
-	typedef RectInterface Super;
+	CORONA_OBJECTS_CLASS_INTERFACE( Rect );
 
 public:
 	static Super::Super *
-	New( Rtt_Allocator* pAllocator, Rtt::Real width, Rtt::Real height )
+	New( Rtt_Allocator * allocator, Rtt::Real width, Rtt::Real height )
 	{
-		Rtt::RectPath * path = Rtt::RectPath::NewRect( pAllocator, width, height );
+		Rtt::RectPath * path = Rtt::RectPath::NewRect( allocator, width, height );
 
 		return Rtt_NEW( pAllocator, Self( path ) );
 	}
@@ -967,18 +1056,118 @@ int CoronaObjectsPushRect( lua_State * L, void * userData, const CoronaObjectPar
 /**
 TODO
 */
-CORONA_OBJECTS_VTABLE_AND_INTERFACE(
-	Snapshot, Snapshot,
+typedef CoronaObjectsInterface<
+	Rtt::ShapeObject,
+	Proxy2VTable< class Image2, Rtt::LuaShapeObjectProxyVTable >,
+	
+	Rtt::RectPath *
+> ImageInterface;
 
-	Rtt_Allocator *, Rtt::Display &, Rtt::Real, Rtt::Real
-);
-
-class Snapshot2 : public SnapshotInterface {
-	Rtt_CLASS_NO_COPIES( Snapshot2 )
+class Image2 : public ImageInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Image );
 
 public:
-	typedef Snapshot2 Self;
-	typedef SnapshotInterface Super;
+	static Super::Super *
+	New( Rtt_Allocator* allocator, Rtt::Real width, Rtt::Real height )
+	{
+		Rtt::RectPath * path = Rtt::RectPath::NewRect( allocator, width, height );
+
+		return Rtt_NEW( pAllocator, Self( path ) );
+	}
+
+protected:
+	Image2( Rtt::RectPath * path )
+		: Super( path )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushImage( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( Image );
+}
+
+/**
+TODO
+*/
+typedef CoronaObjectsInterface<
+	Rtt::ShapeObject,
+	Proxy2VTable< class ImageRect2, Rtt::LuaShapeObjectProxyVTable >,
+	
+	Rtt::RectPath *
+> ImageRectInterface;
+
+class ImageRect2 : public ImageRectInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( ImageRect );
+
+public:
+	static Super::Super *
+	New( Rtt_Allocator* allocator, Rtt::Real width, Rtt::Real height )
+	{
+		Rtt::RectPath * path = Rtt::RectPath::NewRect( allocator, width, height );
+
+		return Rtt_NEW( pAllocator, Self( path ) );
+	}
+
+protected:
+	ImageRect2( Rtt::RectPath * path )
+		: Super( path )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushImageRect( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( ImageRect );
+}
+
+/**
+TODO
+*/
+typedef CoronaObjectsInterface<
+	Rtt::LineObject,
+	Proxy2VTable< class Line2, Rtt::LuaShapeObjectProxyVTable >,
+	
+	Rtt::OpenPath *
+> LineInterface;
+
+class Line2 : public LineInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Line );
+
+public:
+	static Super::Super *
+	New( Rtt_Allocator* allocator, Rtt::OpenPath * path )
+	{
+		return Rtt_NEW( allocator, Line2( path ) );
+	}
+
+protected:
+	Line2( Rtt::OpenPath * path )
+		: Super( path )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushLine( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( Line );
+}
+
+/**
+TODO
+*/
+typedef CoronaObjectsInterface<
+	Rtt::SnapshotObject,
+	Proxy2VTable< class Snapshot2, Rtt::LuaShapeObjectProxyVTable >,
+	
+	Rtt_Allocator *, Rtt::Display &, Rtt::Real, Rtt::Real
+> SnapshotInterface;
+
+class Snapshot2 : public SnapshotInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Snapshot );
 
 public:
 	static Super::Super *
@@ -998,6 +1187,75 @@ CORONA_API
 int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaObjectParams * params )
 {
 	CORONA_OBJECTS_PUSH( Snapshot );
+}
+
+/**
+TODO
+*/
+/*
+typedef CoronaObjectsInterface<
+	Rtt::ContainerObject,
+	Proxy2VTable< class Container2, Rtt::LuaGroupObjectProxyVTable >,
+
+	Rtt_Allocator *, Rtt::StageObject *, Rtt::Real, Rtt::Real
+> SPRITEInterface;
+
+class Container2 : public ContainerInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Container );
+
+public:
+	static Super::Super *
+	New( Rtt_Allocator* allocator, Rtt::StageObject * stageObject, Rtt::Real w, Rtt::Real h )
+	{
+		return Rtt_NEW( allocator, Container2( allocator, stageObject, w, h ) );
+	}
+
+protected:
+	Container2( Rtt_Allocator* allocator, Rtt::StageObject * stageObject, Rtt::Real w, Rtt::Real h )
+		: Super( allocator, stageObject, w, h )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushContainer( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( Container );
+}
+*/
+/**
+TODO
+*//**
+TODO
+*/
+typedef CoronaObjectsInterface<
+	Rtt::TextObject,
+	Proxy2VTable< class Text2, Rtt::LuaTextObjectProxyVTable >,
+
+	Rtt::Display &, const char[], Rtt::PlatformFont *, Rtt::Real, Rtt::Real, const char[]
+> TextInterface;
+
+class Text2 : public TextInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Text );
+
+public:
+	static Super::Super *
+	New( Rtt_Allocator * allocator, Rtt::Display& display, const char text[], Rtt::PlatformFont *font, Rtt::Real w, Rtt::Real h, const char alignment[] )
+	{
+		return Rtt_NEW( allocator, Text2( display, text, font, w, h, alignment ) );
+	}
+
+protected:
+	Text2( Rtt::Display& display, const char text[], Rtt::PlatformFont *font, Rtt::Real w, Rtt::Real h, const char alignment[] )
+		: Super( display, text, font, w, h, alignment )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushText( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( Text );
 }
 
 CORONA_API

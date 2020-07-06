@@ -85,6 +85,17 @@ class LuaLibDisplay
 
 } // namespace Rtt
 
+// STEVE CHANGE
+template<typename F> F *
+GetObjectFactory( lua_State * L, F * defaultFactory )
+{
+	F * replacement = (F *)lua_touserdata( L, lua_upvalueindex( 2 ) );	// the GatherFactories() version might have a factory subbed in (else nil) that lets
+																		// us instantiate an object using a derived type, for overloading purposes
+
+	return replacement ? replacement : defaultFactory;
+}
+// /STEVE CHANGE
+
 // ----------------------------------------------------------------------------
 
 #endif // _Rtt_LuaLibDisplay_H__

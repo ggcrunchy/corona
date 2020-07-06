@@ -13,7 +13,7 @@
 #include "Renderer/Rtt_CommandBuffer.h"
 #include "Renderer/Rtt_Uniform.h"
 // STEVE CHANGE
-#include "Rtt_Array.h"
+#include "Core/Rtt_Array.h"
 // /STEVE CHANGE
 
 // ----------------------------------------------------------------------------

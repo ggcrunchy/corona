@@ -22,10 +22,13 @@
 
 namespace Rtt
 {
-
 class ImageSheetPaint;
 class SpriteObject;
 class SpritePlayer;
+
+// STEVE CHANGE
+struct lua_State;
+// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
 
@@ -165,11 +168,14 @@ class SpriteObject : public RectObject
 
 	public:
 		static SpriteObject* Create(
+			// STEVE CHANGE
+			lua_State * L,
+			// /STEVE CHANGE
 			Rtt_Allocator *pAllocator,
 			const AutoPtr< ImageSheet >& sheet,
 			SpritePlayer& player );
 
-	protected:
+	public://protected: <- STEVE CHANGE
 		SpriteObject(
 			RectPath *path,
 			Rtt_Allocator *pAllocator,
