@@ -585,7 +585,7 @@ SpriteObject::Create(
 
 			// STEVE CHANGE
 			auto * spriteFactory = GetObjectFactory( L, &NewSprite );
-			result = spriteFactory( allocator, path, sheet, player );// Rtt_NEW( pAllocator, SpriteObject( path, pAllocator, sheet, player ) )
+			result = spriteFactory( pAllocator, path, sheet, player );// Rtt_NEW( pAllocator, SpriteObject( path, pAllocator, sheet, player ) )
 			// /STEVE CHANGE
 		}
 		else

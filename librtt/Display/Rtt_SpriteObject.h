@@ -20,15 +20,15 @@
 
 // ----------------------------------------------------------------------------
 
+// STEVE CHANGE
+struct lua_State;
+// /STEVE CHANGE
+
 namespace Rtt
 {
 class ImageSheetPaint;
 class SpriteObject;
 class SpritePlayer;
-
-// STEVE CHANGE
-struct lua_State;
-// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
 

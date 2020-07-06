@@ -809,6 +809,39 @@ public:										\
 TODO
 */
 typedef CoronaObjectsInterface<
+	Rtt::ShapeObject,
+	Proxy2VTable< class Circle2, Rtt::LuaShapeObjectProxyVTable >,
+	
+	Rtt::ClosedPath *
+> CircleInterface;
+
+class Circle2 : public CircleInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Circle );
+
+public:
+	static Super::Super *
+	New( Rtt_Allocator * allocator, Rtt::ClosedPath * path )
+	{
+		return Rtt_NEW( allocator, Self( path ) );
+	}
+
+protected:
+	Circle2( Rtt::ClosedPath * path )
+		: Super( path )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushCircle( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( Circle );
+}
+
+/**
+TODO
+*/
+typedef CoronaObjectsInterface<
 	Rtt::ContainerObject,
 	Proxy2VTable< class Container2, Rtt::LuaGroupObjectProxyVTable >,
 
@@ -1058,6 +1091,39 @@ TODO
 */
 typedef CoronaObjectsInterface<
 	Rtt::ShapeObject,
+	Proxy2VTable< class RoundedRect2, Rtt::LuaShapeObjectProxyVTable >,
+	
+	Rtt::ClosedPath *
+> RoundedRectInterface;
+
+class RoundedRect2 : public RoundedRectInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( RoundedRect );
+
+public:
+	static Super::Super *
+	New( Rtt_Allocator * allocator, Rtt::ClosedPath * path )
+	{
+		return Rtt_NEW( allocator, Self( path ) );
+	}
+
+protected:
+	RoundedRect2( Rtt::ClosedPath * path )
+		: Super( path )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushRoundedRect( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( RoundedRect );
+}
+
+/**
+TODO
+*/
+typedef CoronaObjectsInterface<
+	Rtt::ShapeObject,
 	Proxy2VTable< class Image2, Rtt::LuaShapeObjectProxyVTable >,
 	
 	Rtt::RectPath *
@@ -1192,40 +1258,37 @@ int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaObjec
 /**
 TODO
 */
-/*
 typedef CoronaObjectsInterface<
-	Rtt::ContainerObject,
-	Proxy2VTable< class Container2, Rtt::LuaGroupObjectProxyVTable >,
+	Rtt::SpriteObject,
+	Proxy2VTable< class Sprite2, Rtt::LuaSpriteObjectProxyVTable >,
 
-	Rtt_Allocator *, Rtt::StageObject *, Rtt::Real, Rtt::Real
-> SPRITEInterface;
+	Rtt::RectPath *, Rtt_Allocator *, const Rtt::AutoPtr< Rtt::ImageSheet > &, Rtt::SpritePlayer &
+> SpriteInterface;
 
-class Container2 : public ContainerInterface {
-	CORONA_OBJECTS_CLASS_INTERFACE( Container );
+class Sprite2 : public SpriteInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Sprite );
 
 public:
 	static Super::Super *
-	New( Rtt_Allocator* allocator, Rtt::StageObject * stageObject, Rtt::Real w, Rtt::Real h )
+	New( Rtt_Allocator * allocator, Rtt::RectPath * path, const Rtt::AutoPtr< Rtt::ImageSheet > & sheet, Rtt::SpritePlayer & player )
 	{
-		return Rtt_NEW( allocator, Container2( allocator, stageObject, w, h ) );
+		return Rtt_NEW( allocator, Sprite2( path, allocator, sheet, player ) );
 	}
 
 protected:
-	Container2( Rtt_Allocator* allocator, Rtt::StageObject * stageObject, Rtt::Real w, Rtt::Real h )
-		: Super( allocator, stageObject, w, h )
+	Sprite2( Rtt::RectPath * path, Rtt_Allocator * allocator, const Rtt::AutoPtr< Rtt::ImageSheet > & sheet, Rtt::SpritePlayer & player )
+		: Super( path, allocator, sheet, player )
 	{
 	}
 };
 
 CORONA_API
-int CoronaObjectsPushContainer( lua_State * L, void * userData, const CoronaObjectParams * params )
+int CoronaObjectsPushSprite( lua_State * L, void * userData, const CoronaObjectParams * params )
 {
-	CORONA_OBJECTS_PUSH( Container );
+	CORONA_OBJECTS_PUSH( Sprite );
 }
-*/
+
 /**
-TODO
-*//**
 TODO
 */
 typedef CoronaObjectsInterface<

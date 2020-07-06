@@ -83,6 +83,14 @@
 #undef CreateFont
 #endif
 
+// STEVE CHANGE
+void *
+GetReplacementFactory( lua_State * L )
+{
+	return lua_touserdata( L, lua_upvalueindex( 2 ) );
+}
+// /STEVE CHANGE
+
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -726,6 +734,14 @@ DisplayLibrary::PushImage(
 	return v;
 }
 
+// STEVE CHANGE
+static ShapeObject *
+NewShape( Rtt_Allocator * allocator, ClosedPath * path )
+{
+	return Rtt_NEW( allocator, ShapeObject( path ) );
+}
+// /STEVE CHANGE
+
 int
 DisplayLibrary::newCircle( lua_State *L )
 {
@@ -740,7 +756,10 @@ DisplayLibrary::newCircle( lua_State *L )
 	Real r = luaL_checkreal( L, nextArg++ );
 
 	ShapePath *path = ShapePath::NewCircle( display.GetAllocator(), r );
-	ShapeObject *v = Rtt_NEW( display.GetAllocator(), ShapeObject( path ) );
+	// STEVE CHANGE
+	auto * circleFactory = GetObjectFactory( L, &NewShape );
+	ShapeObject *v = circleFactory( display.GetAllocator(), path );//Rtt_NEW( display.GetAllocator(), ShapeObject( path ) );
+	// /STEVE CHANGE
 
 	int result = LuaLibDisplay::AssignParentAndPushResult( L, display, v, parent );
 	AssignDefaultFillColor( display, * v );
@@ -764,12 +783,6 @@ LoadZ( lua_State * L, int index, ShapePath * path )
 
 		floatArray->Append( z );
 	}
-}
-
-static ShapeObject *
-NewShape( Rtt_Allocator * allocator, ClosedPath * path )
-{
-	return Rtt_NEW( allocator, ShapeObject( path ) );
 }
 // /STEVE CHANGE
 
@@ -975,7 +988,10 @@ DisplayLibrary::newRoundedRect( lua_State *L )
 	Real r = luaL_checkreal( L, nextArg++ );
 
 	ShapePath *path = ShapePath::NewRoundedRect( display.GetAllocator(), w, h, r );
-	ShapeObject *v = Rtt_NEW( display.GetAllocator(), ShapeObject( path ) );
+	// STEVE CHANGE
+	auto * roundedRectFactory = GetObjectFactory( L, &NewShape );
+	ShapeObject *v = roundedRectFactory( display.GetAllocator(), path );//Rtt_NEW( display.GetAllocator(), ShapeObject( path ) );
+	// /STEVE CHANGE
 
 	int result = LuaLibDisplay::AssignParentAndPushResult( L, display, v, parent );
 
