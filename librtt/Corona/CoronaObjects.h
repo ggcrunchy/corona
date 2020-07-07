@@ -180,13 +180,13 @@ CORONA_API
 int CoronaObjectsPushRoundedRect( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
+int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
 int CoronaObjectsPushSprite( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 int CoronaObjectsPushText( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
-
-CORONA_API
-int CoronaObjectsPushSnapshot( lua_State * L, void * userData, const CoronaObjectParams * params ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 int CoronaObjectsShouldDraw( const CoronaDisplayObjectHandle object, int * shouldDraw ) CORONA_PUBLIC_SUFFIX;

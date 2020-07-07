@@ -990,6 +990,109 @@ TODO
 */
 typedef CoronaObjectsInterface<
 	Rtt::ShapeObject,
+	Proxy2VTable< class Image2, Rtt::LuaShapeObjectProxyVTable >,
+	
+	Rtt::RectPath *
+> ImageInterface;
+
+class Image2 : public ImageInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Image );
+
+public:
+	static Super::Super *
+	New( Rtt_Allocator* allocator, Rtt::Real width, Rtt::Real height )
+	{
+		Rtt::RectPath * path = Rtt::RectPath::NewRect( allocator, width, height );
+
+		return Rtt_NEW( pAllocator, Self( path ) );
+	}
+
+protected:
+	Image2( Rtt::RectPath * path )
+		: Super( path )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushImage( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( Image );
+}
+
+/**
+TODO
+*/
+typedef CoronaObjectsInterface<
+	Rtt::ShapeObject,
+	Proxy2VTable< class ImageRect2, Rtt::LuaShapeObjectProxyVTable >,
+	
+	Rtt::RectPath *
+> ImageRectInterface;
+
+class ImageRect2 : public ImageRectInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( ImageRect );
+
+public:
+	static Super::Super *
+	New( Rtt_Allocator* allocator, Rtt::Real width, Rtt::Real height )
+	{
+		Rtt::RectPath * path = Rtt::RectPath::NewRect( allocator, width, height );
+
+		return Rtt_NEW( pAllocator, Self( path ) );
+	}
+
+protected:
+	ImageRect2( Rtt::RectPath * path )
+		: Super( path )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushImageRect( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( ImageRect );
+}
+
+/**
+TODO
+*/
+typedef CoronaObjectsInterface<
+	Rtt::LineObject,
+	Proxy2VTable< class Line2, Rtt::LuaShapeObjectProxyVTable >,
+	
+	Rtt::OpenPath *
+> LineInterface;
+
+class Line2 : public LineInterface {
+	CORONA_OBJECTS_CLASS_INTERFACE( Line );
+
+public:
+	static Super::Super *
+	New( Rtt_Allocator* allocator, Rtt::OpenPath * path )
+	{
+		return Rtt_NEW( allocator, Line2( path ) );
+	}
+
+protected:
+	Line2( Rtt::OpenPath * path )
+		: Super( path )
+	{
+	}
+};
+
+CORONA_API
+int CoronaObjectsPushLine( lua_State * L, void * userData, const CoronaObjectParams * params )
+{
+	CORONA_OBJECTS_PUSH( Line );
+}
+
+/**
+TODO
+*/
+typedef CoronaObjectsInterface<
+	Rtt::ShapeObject,
 	Proxy2VTable< class Mesh2, Rtt::LuaShapeObjectProxyVTable >,
 	
 	Rtt::ClosedPath *
@@ -1117,109 +1220,6 @@ CORONA_API
 int CoronaObjectsPushRoundedRect( lua_State * L, void * userData, const CoronaObjectParams * params )
 {
 	CORONA_OBJECTS_PUSH( RoundedRect );
-}
-
-/**
-TODO
-*/
-typedef CoronaObjectsInterface<
-	Rtt::ShapeObject,
-	Proxy2VTable< class Image2, Rtt::LuaShapeObjectProxyVTable >,
-	
-	Rtt::RectPath *
-> ImageInterface;
-
-class Image2 : public ImageInterface {
-	CORONA_OBJECTS_CLASS_INTERFACE( Image );
-
-public:
-	static Super::Super *
-	New( Rtt_Allocator* allocator, Rtt::Real width, Rtt::Real height )
-	{
-		Rtt::RectPath * path = Rtt::RectPath::NewRect( allocator, width, height );
-
-		return Rtt_NEW( pAllocator, Self( path ) );
-	}
-
-protected:
-	Image2( Rtt::RectPath * path )
-		: Super( path )
-	{
-	}
-};
-
-CORONA_API
-int CoronaObjectsPushImage( lua_State * L, void * userData, const CoronaObjectParams * params )
-{
-	CORONA_OBJECTS_PUSH( Image );
-}
-
-/**
-TODO
-*/
-typedef CoronaObjectsInterface<
-	Rtt::ShapeObject,
-	Proxy2VTable< class ImageRect2, Rtt::LuaShapeObjectProxyVTable >,
-	
-	Rtt::RectPath *
-> ImageRectInterface;
-
-class ImageRect2 : public ImageRectInterface {
-	CORONA_OBJECTS_CLASS_INTERFACE( ImageRect );
-
-public:
-	static Super::Super *
-	New( Rtt_Allocator* allocator, Rtt::Real width, Rtt::Real height )
-	{
-		Rtt::RectPath * path = Rtt::RectPath::NewRect( allocator, width, height );
-
-		return Rtt_NEW( pAllocator, Self( path ) );
-	}
-
-protected:
-	ImageRect2( Rtt::RectPath * path )
-		: Super( path )
-	{
-	}
-};
-
-CORONA_API
-int CoronaObjectsPushImageRect( lua_State * L, void * userData, const CoronaObjectParams * params )
-{
-	CORONA_OBJECTS_PUSH( ImageRect );
-}
-
-/**
-TODO
-*/
-typedef CoronaObjectsInterface<
-	Rtt::LineObject,
-	Proxy2VTable< class Line2, Rtt::LuaShapeObjectProxyVTable >,
-	
-	Rtt::OpenPath *
-> LineInterface;
-
-class Line2 : public LineInterface {
-	CORONA_OBJECTS_CLASS_INTERFACE( Line );
-
-public:
-	static Super::Super *
-	New( Rtt_Allocator* allocator, Rtt::OpenPath * path )
-	{
-		return Rtt_NEW( allocator, Line2( path ) );
-	}
-
-protected:
-	Line2( Rtt::OpenPath * path )
-		: Super( path )
-	{
-	}
-};
-
-CORONA_API
-int CoronaObjectsPushLine( lua_State * L, void * userData, const CoronaObjectParams * params )
-{
-	CORONA_OBJECTS_PUSH( Line );
 }
 
 /**
