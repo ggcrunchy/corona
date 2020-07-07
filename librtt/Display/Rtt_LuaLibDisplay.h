@@ -86,7 +86,9 @@ class LuaLibDisplay
 } // namespace Rtt
 
 // STEVE CHANGE
-void * GetReplacementFactory( lua_State * L );
+typedef void (*CoronaFactoryFunction)(void);
+
+CoronaFactoryFunction GetReplacementFactory( lua_State * L );
 
 template<typename F> F *
 GetObjectFactory( lua_State * L, F * defaultFactory )

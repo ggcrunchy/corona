@@ -77,6 +77,7 @@
 
 // STEVE CHANGE
 #include "Display/Rtt_TesselatorPolygon.h"
+#include "Corona/CoronaPluginSupportInternal.h"
 // /STEVE CHANGE
 
 #ifdef Rtt_WIN_ENV
@@ -84,11 +85,17 @@
 #endif
 
 // STEVE CHANGE
-void *
+CoronaFactoryFunction
 GetReplacementFactory( lua_State * L )
 {
-	return lua_touserdata( L, lua_upvalueindex( 2 ) );
+	CoronaFunctionPointer * funcBox = (CoronaFunctionPointer *)lua_touserdata( L, lua_upvalueindex( 2 ) );
+
+    return funcBox->fFunc;
 }
+// /STEVE CHANGE
+
+// STEVE CHANGE (TEST HACK!!!!!)
+#include "TESTING/TESTING.h"
 // /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
@@ -196,9 +203,7 @@ DisplayLibrary::DisplayLibrary( Display& display )
 DisplayLibrary::~DisplayLibrary()
 {
 }
-// STEVE CHANGE (TEST HACK!!!!!)
-#include "Testing/TESTING.h"
-// /STEVE CHANGE
+
 int
 DisplayLibrary::Open( lua_State *L )
 {

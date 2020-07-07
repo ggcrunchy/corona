@@ -22,6 +22,10 @@ struct CoronaShaderData { long _sd = 0L; };
 struct CoronaDisplayObject { long _do = 0L; };
 struct CoronaGroupObject { long _go = 0L; };
 
+struct CoronaFunctionPointer {
+    void (*fFunc)();
+};
+
 class CoronaTempStore {
 public:
 	CoronaTempStore( const char * str )

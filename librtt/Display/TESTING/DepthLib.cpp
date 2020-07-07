@@ -9,6 +9,7 @@
 //-----------------------------------------------------------------------------
 
 #include "Depth.h"
+#include <math.h>
 
 struct TransformData {
 	char * newString;

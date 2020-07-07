@@ -239,7 +239,7 @@ PushFactory( lua_State * L, const char * name )
 }
 
 static bool 
-CallNewFactory( lua_State * L, const char * name, void * func )
+CallNewFactory( lua_State * L, const char * name, CoronaFunctionPointer * func  )
 {
 	if (PushFactory( L, name ) ) // stream, ...[, factories, factory]
 	{
@@ -440,7 +440,7 @@ struct StreamAndUserData {
 static StreamAndUserData sStreamAndUserData;
 
 template<typename T>
-int PushObject( lua_State * L, void * userData, const CoronaObjectParams * params, const char * name, void * func )
+int PushObject( lua_State * L, void * userData, const CoronaObjectParams * params, const char * name, void (*func)() )
 {
 	if (!GetStream( L, params )) // ...[, stream]
 	{
@@ -452,7 +452,9 @@ int PushObject( lua_State * L, void * userData, const CoronaObjectParams * param
 	sStreamAndUserData.stream = (unsigned char *)lua_touserdata( L, 1 );
 	sStreamAndUserData.userData = userData;
 
-	if (CallNewFactory( L, name, func )) // stream[, object]
+    CoronaFunctionPointer funcBox = { func };
+    
+	if (CallNewFactory( L, name, &funcBox )) // stream[, object]
 	{
 		T * object = (T *)Rtt::LuaProxy::GetProxyableObject( L, 2 );
 
@@ -481,9 +483,11 @@ int PushObject( lua_State * L, void * userData, const CoronaObjectParams * param
 	return 0;
 }
 
-#define CORONA_OBJECTS_PUSH(OBJECT_KIND) return PushObject< OBJECT_KIND##2 >( L, userData, params, "new" #OBJECT_KIND, &OBJECT_KIND##2::New )
+#define CORONA_OBJECTS_PUSH(OBJECT_KIND) void (*func)() = OBJECT_KIND##2::New;  \
+                                                                                \
+    return PushObject< OBJECT_KIND##2 >( L, userData, params, "new" #OBJECT_KIND, func )
 
-#define STORE_THIS(OBJECT_TYPE) auto storedThis = CoronaInternalStore##OBJECT_TYPE( reinterpret_cast< const OBJECT_TYPE * >( this ) )
+#define STORE_THIS(OBJECT_TYPE) auto storedThis = CoronaInternalStore##OBJECT_TYPE( reinterpret_cast< const Rtt::OBJECT_TYPE * >( this ) )
 #define STORE_VALUE(NAME, OBJECT_TYPE) auto NAME##Stored = CoronaInternalStore##OBJECT_TYPE( NAME )
 
 #define FIRST_ARGS storedThis.GetHandle(), fUserData
@@ -589,7 +593,7 @@ OnCreate( const void * object, void * userData, const unsigned char * stream )
 	}
 }
 
-template<typename Base, typename ProxyVTable, typename... Args>
+template<typename Base, typename ProxyVTableType, typename... Args>
 struct CoronaObjectsInterface : public Base {
 	typedef CoronaObjectsInterface Self;
 	typedef Base Super;
@@ -780,7 +784,7 @@ struct CoronaObjectsInterface : public Base {
 		CORONA_OBJECTS_METHOD( WillMoveOnscreen )
 	}
 
-	virtual const Rtt::LuaProxyVTable& ProxyVTable() const { return ProxyVTable::Constant(); }
+	virtual const Rtt::LuaProxyVTable& ProxyVTable() const { return ProxyVTableType::Constant(); }
 
 	unsigned char * fStream;
 	mutable void * fUserData;

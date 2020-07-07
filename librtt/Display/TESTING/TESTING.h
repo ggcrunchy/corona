@@ -11,20 +11,20 @@
 #ifndef _CoronaObjectsTesting_H__
 #define _CoronaObjectsTesting_H__
 
-#include "CoronaLua.h"
-#include "CoronaMacros.h"
-#include "CoronaPublicTypes.h"
+#include "Corona/CoronaLua.h"
+#include "Corona/CoronaMacros.h"
+#include "Corona/CoronaPublicTypes.h"
 #include "Corona/CoronaGraphics.h"
 #include "Corona/CoronaObjects.h"
 #include "Core/Rtt_Types.h"
 #include <string>
 
 extern "C" {
-	int ColorMaskLib( lua_State * L );
-	int DepthLib( lua_State * L );
-	int InstancingLib( lua_State * L );
-	int StencilLib( lua_State * L );
-	int SupportLib( lua_State * L );
+    int ColorMaskLib( lua_State * L );
+    int DepthLib( lua_State * L );
+    int InstancingLib( lua_State * L );
+    int StencilLib( lua_State * L );
+    int SupportLib( lua_State * L );
 }
 
 void EarlyOutPredicate( const CoronaDisplayObjectHandle, void *, int * result );
@@ -88,4 +88,4 @@ GetOrNew( lua_State * L, void * nonce, bool construct = false )
 	return boxed;
 }
 
-#endif // _CoronaObjects_H__
+#endif // _CoronaObjectsTesting_H__

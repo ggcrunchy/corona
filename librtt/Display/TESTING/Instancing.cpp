@@ -42,7 +42,7 @@ GetData( lua_State * L, int dataIndex, void * userData, int * pushedError )
 
 	else
 	{
-		lua_pushliteral( L, "getData given bad index: %i", dataIndex ); // ..., err
+		lua_pushfstring( L, "getData given bad index: %i", dataIndex ); // ..., err
 
 		*pushedError = true;
 

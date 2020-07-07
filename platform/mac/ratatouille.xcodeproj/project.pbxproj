@@ -1591,6 +1591,32 @@
 		C2FCD3E31B38D03C00EF7B02 /* AndroidAppBuildController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4F36554146C44200019808D /* AndroidAppBuildController.mm */; };
 		C2FCD3E41B38D06000EF7B02 /* AppBuildController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4B00FA014565609008FB6E6 /* AppBuildController.mm */; };
 		C2FCD3E61B38D0BD00EF7B02 /* WebAppBuildController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A425454E18DB9EF400EE06A8 /* WebAppBuildController.mm */; };
+		CE06986824B521DD00F974B3 /* CoronaPluginSupport.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986424B521DC00F974B3 /* CoronaPluginSupport.cpp */; };
+		CE06986924B521DD00F974B3 /* CoronaObjects.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986624B521DC00F974B3 /* CoronaObjects.cpp */; };
+		CE06987824B5221000F974B3 /* StencilState.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986A24B5220D00F974B3 /* StencilState.cpp */; };
+		CE06987924B5221000F974B3 /* DepthEnvironment.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986B24B5220E00F974B3 /* DepthEnvironment.cpp */; };
+		CE06987A24B5221000F974B3 /* StencilEnvironment.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986C24B5220E00F974B3 /* StencilEnvironment.cpp */; };
+		CE06987B24B5221000F974B3 /* DepthClear.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986D24B5220E00F974B3 /* DepthClear.cpp */; };
+		CE06987C24B5221000F974B3 /* ColorMask.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986F24B5220E00F974B3 /* ColorMask.cpp */; };
+		CE06987D24B5221000F974B3 /* Support.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987024B5220E00F974B3 /* Support.cpp */; };
+		CE06987E24B5221000F974B3 /* StencilLib.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987224B5220F00F974B3 /* StencilLib.cpp */; };
+		CE06987F24B5221000F974B3 /* DepthState.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987324B5220F00F974B3 /* DepthState.cpp */; };
+		CE06988024B5221000F974B3 /* Instancing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987424B5220F00F974B3 /* Instancing.cpp */; };
+		CE06988124B5221000F974B3 /* DepthLib.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987624B5220F00F974B3 /* DepthLib.cpp */; };
+		CE06988224B5221000F974B3 /* StencilClear.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987724B5221000F974B3 /* StencilClear.cpp */; };
+		CE06988424B5237C00F974B3 /* CoronaObjects.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986624B521DC00F974B3 /* CoronaObjects.cpp */; };
+		CE06988524B5238800F974B3 /* CoronaPluginSupport.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986424B521DC00F974B3 /* CoronaPluginSupport.cpp */; };
+		CE06988624B5239C00F974B3 /* Support.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987024B5220E00F974B3 /* Support.cpp */; };
+		CE06988724B523A800F974B3 /* StencilState.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986A24B5220D00F974B3 /* StencilState.cpp */; };
+		CE06988824B523B400F974B3 /* StencilLib.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987224B5220F00F974B3 /* StencilLib.cpp */; };
+		CE06988924B523CC00F974B3 /* StencilEnvironment.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986C24B5220E00F974B3 /* StencilEnvironment.cpp */; };
+		CE06988A24B523D600F974B3 /* StencilClear.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987724B5221000F974B3 /* StencilClear.cpp */; };
+		CE06988B24B523E400F974B3 /* Instancing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987424B5220F00F974B3 /* Instancing.cpp */; };
+		CE06988C24B523F000F974B3 /* DepthState.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987324B5220F00F974B3 /* DepthState.cpp */; };
+		CE06988D24B523F900F974B3 /* DepthLib.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06987624B5220F00F974B3 /* DepthLib.cpp */; };
+		CE06988E24B5240300F974B3 /* DepthEnvironment.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986B24B5220E00F974B3 /* DepthEnvironment.cpp */; };
+		CE06988F24B5242000F974B3 /* DepthClear.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986D24B5220E00F974B3 /* DepthClear.cpp */; };
+		CE06989024B5242B00F974B3 /* ColorMask.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE06986F24B5220E00F974B3 /* ColorMask.cpp */; };
 		E23CD30D147C725200BC9038 /* BuildSessionState.mm in Sources */ = {isa = PBXBuildFile; fileRef = E23CD30C147C725200BC9038 /* BuildSessionState.mm */; };
 		F500FB401FED5CE20050B28B /* webtemplate.zip in Resources */ = {isa = PBXBuildFile; fileRef = F500FB3F1FED5CE20050B28B /* webtemplate.zip */; };
 		F50F51B81B700C04006FEF92 /* Rtt_TextureResourceBitmap.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F50F51B61B700C04006FEF92 /* Rtt_TextureResourceBitmap.cpp */; };
@@ -1904,13 +1930,6 @@
 			remoteGlobalIDString = 50B013EA17558BCA00B822B8;
 			remoteInfo = Box2D;
 		};
-		A4FBC5111A2D5509004D9A01 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = A4B66AB1176A7A370077B2BF /* libtachyon.xcodeproj */;
-			proxyType = 1;
-			remoteGlobalIDString = A43287D9176A610100ACB6FF;
-			remoteInfo = tachyon;
-		};
 		A4FBC5141A2D552C004D9A01 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 00FD0C011330445800716D46 /* car.xcodeproj */;
@@ -2022,13 +2041,6 @@
 			proxyType = 1;
 			remoteGlobalIDString = C26DD0D41BD6B94700EC4F44;
 			remoteInfo = CoronaConsole;
-		};
-		C26E84841A5DE235008950FB /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = A4B66AB1176A7A370077B2BF /* libtachyon.xcodeproj */;
-			proxyType = 1;
-			remoteGlobalIDString = A43287D9176A610100ACB6FF;
-			remoteInfo = tachyon;
 		};
 		C26E84861A5DE255008950FB /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -3292,6 +3304,25 @@
 		C2F8376C1AC205FA00D33D6E /* CoronaViewRuntimeDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = CoronaViewRuntimeDelegate.mm; path = browser/CoronaViewRuntimeDelegate.mm; sourceTree = "<group>"; };
 		C2FCD3CE1B377B5C00EF7B02 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
 		C2FCEBA51B701A1800587F1E /* gameoverlayrenderer.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = gameoverlayrenderer.dylib; path = /Applications/Steam.app/Contents/MacOS/gameoverlayrenderer.dylib; sourceTree = "<group>"; };
+		CE06986324B521DC00F974B3 /* CoronaPublicTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CoronaPublicTypes.h; path = Corona/CoronaPublicTypes.h; sourceTree = "<group>"; };
+		CE06986424B521DC00F974B3 /* CoronaPluginSupport.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CoronaPluginSupport.cpp; path = Corona/CoronaPluginSupport.cpp; sourceTree = "<group>"; };
+		CE06986524B521DC00F974B3 /* CoronaPluginSupportInternal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CoronaPluginSupportInternal.h; path = Corona/CoronaPluginSupportInternal.h; sourceTree = "<group>"; };
+		CE06986624B521DC00F974B3 /* CoronaObjects.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CoronaObjects.cpp; path = Corona/CoronaObjects.cpp; sourceTree = "<group>"; };
+		CE06986724B521DD00F974B3 /* CoronaObjects.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CoronaObjects.h; path = Corona/CoronaObjects.h; sourceTree = "<group>"; };
+		CE06986A24B5220D00F974B3 /* StencilState.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StencilState.cpp; path = Display/TESTING/StencilState.cpp; sourceTree = "<group>"; };
+		CE06986B24B5220E00F974B3 /* DepthEnvironment.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DepthEnvironment.cpp; path = Display/TESTING/DepthEnvironment.cpp; sourceTree = "<group>"; };
+		CE06986C24B5220E00F974B3 /* StencilEnvironment.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StencilEnvironment.cpp; path = Display/TESTING/StencilEnvironment.cpp; sourceTree = "<group>"; };
+		CE06986D24B5220E00F974B3 /* DepthClear.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DepthClear.cpp; path = Display/TESTING/DepthClear.cpp; sourceTree = "<group>"; };
+		CE06986E24B5220E00F974B3 /* Stencil.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Stencil.h; path = Display/TESTING/Stencil.h; sourceTree = "<group>"; };
+		CE06986F24B5220E00F974B3 /* ColorMask.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ColorMask.cpp; path = Display/TESTING/ColorMask.cpp; sourceTree = "<group>"; };
+		CE06987024B5220E00F974B3 /* Support.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Support.cpp; path = Display/TESTING/Support.cpp; sourceTree = "<group>"; };
+		CE06987124B5220F00F974B3 /* Depth.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Depth.h; path = Display/TESTING/Depth.h; sourceTree = "<group>"; };
+		CE06987224B5220F00F974B3 /* StencilLib.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StencilLib.cpp; path = Display/TESTING/StencilLib.cpp; sourceTree = "<group>"; };
+		CE06987324B5220F00F974B3 /* DepthState.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DepthState.cpp; path = Display/TESTING/DepthState.cpp; sourceTree = "<group>"; };
+		CE06987424B5220F00F974B3 /* Instancing.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Instancing.cpp; path = Display/TESTING/Instancing.cpp; sourceTree = "<group>"; };
+		CE06987524B5220F00F974B3 /* TESTING.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TESTING.h; path = Display/TESTING/TESTING.h; sourceTree = "<group>"; };
+		CE06987624B5220F00F974B3 /* DepthLib.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = DepthLib.cpp; path = Display/TESTING/DepthLib.cpp; sourceTree = "<group>"; };
+		CE06987724B5221000F974B3 /* StencilClear.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = StencilClear.cpp; path = Display/TESTING/StencilClear.cpp; sourceTree = "<group>"; };
 		E23CD30B147C725200BC9038 /* BuildSessionState.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BuildSessionState.h; sourceTree = "<group>"; };
 		E23CD30C147C725200BC9038 /* BuildSessionState.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = BuildSessionState.mm; sourceTree = "<group>"; };
 		F500FB3F1FED5CE20050B28B /* webtemplate.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = webtemplate.zip; path = ../resources/webtemplate.zip; sourceTree = "<group>"; };
@@ -4717,6 +4748,7 @@
 		A43287E1176A61C300ACB6FF /* Display */ = {
 			isa = PBXGroup;
 			children = (
+				CE06988324B5221800F974B3 /* TESTING */,
 				A43287E2176A621100ACB6FF /* Rtt_BitmapMask.cpp */,
 				A43287E3176A621100ACB6FF /* Rtt_BitmapMask.h */,
 				A43287E4176A621100ACB6FF /* Rtt_BitmapPaint.cpp */,
@@ -5015,6 +5047,11 @@
 		A491860E1641DD2700A39286 /* Corona */ = {
 			isa = PBXGroup;
 			children = (
+				CE06986624B521DC00F974B3 /* CoronaObjects.cpp */,
+				CE06986724B521DD00F974B3 /* CoronaObjects.h */,
+				CE06986424B521DC00F974B3 /* CoronaPluginSupport.cpp */,
+				CE06986524B521DC00F974B3 /* CoronaPluginSupportInternal.h */,
+				CE06986324B521DC00F974B3 /* CoronaPublicTypes.h */,
 				A491860F1641DD6100A39286 /* CoronaAssert.c */,
 				A49186101641DD6100A39286 /* CoronaAssert.h */,
 				A49186111641DD6100A39286 /* CoronaEvent.cpp */,
@@ -5350,6 +5387,27 @@
 				C2EF85061B336B6300731A45 /* CoronaShell.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		CE06988324B5221800F974B3 /* TESTING */ = {
+			isa = PBXGroup;
+			children = (
+				CE06987524B5220F00F974B3 /* TESTING.h */,
+				CE06987024B5220E00F974B3 /* Support.cpp */,
+				CE06986A24B5220D00F974B3 /* StencilState.cpp */,
+				CE06987224B5220F00F974B3 /* StencilLib.cpp */,
+				CE06986C24B5220E00F974B3 /* StencilEnvironment.cpp */,
+				CE06986E24B5220E00F974B3 /* Stencil.h */,
+				CE06987724B5221000F974B3 /* StencilClear.cpp */,
+				CE06987424B5220F00F974B3 /* Instancing.cpp */,
+				CE06987324B5220F00F974B3 /* DepthState.cpp */,
+				CE06987624B5220F00F974B3 /* DepthLib.cpp */,
+				CE06986B24B5220E00F974B3 /* DepthEnvironment.cpp */,
+				CE06986D24B5220E00F974B3 /* DepthClear.cpp */,
+				CE06987124B5220F00F974B3 /* Depth.h */,
+				CE06986F24B5220E00F974B3 /* ColorMask.cpp */,
+			);
+			name = TESTING;
 			sourceTree = "<group>";
 		};
 		F533257A1D9DD2DE003613F7 /* Products */ = {
@@ -6133,7 +6191,6 @@
 				A4FBC5091A2D5495004D9A01 /* PBXTargetDependency */,
 				C229E20F1B32226600D87A7C /* PBXTargetDependency */,
 				A4FBC51B1A2D554D004D9A01 /* PBXTargetDependency */,
-				A4FBC5121A2D5509004D9A01 /* PBXTargetDependency */,
 			);
 			name = CoronaCore;
 			productName = libCoronaCards;
@@ -6186,7 +6243,6 @@
 				C26E84891A5DE255008950FB /* PBXTargetDependency */,
 				C26E848B1A5DE255008950FB /* PBXTargetDependency */,
 				C2E993221A6B288100E99F46 /* PBXTargetDependency */,
-				C26E84851A5DE235008950FB /* PBXTargetDependency */,
 			);
 			name = CoronaCards;
 			productName = CoronaCards;
@@ -6578,8 +6634,6 @@
 			buildActionMask = 2147483647;
 			files = (
 			);
-			inputFileListPaths = (
-			);
 			inputPaths = (
 				"$(SRCROOT)/../resources/AppSettings.lua",
 			);
@@ -6711,6 +6765,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CE06989024B5242B00F974B3 /* ColorMask.cpp in Sources */,
+				CE06988F24B5242000F974B3 /* DepthClear.cpp in Sources */,
+				CE06988E24B5240300F974B3 /* DepthEnvironment.cpp in Sources */,
+				CE06988D24B523F900F974B3 /* DepthLib.cpp in Sources */,
+				CE06988C24B523F000F974B3 /* DepthState.cpp in Sources */,
+				CE06988B24B523E400F974B3 /* Instancing.cpp in Sources */,
+				CE06988A24B523D600F974B3 /* StencilClear.cpp in Sources */,
+				CE06988924B523CC00F974B3 /* StencilEnvironment.cpp in Sources */,
+				CE06988824B523B400F974B3 /* StencilLib.cpp in Sources */,
+				CE06988724B523A800F974B3 /* StencilState.cpp in Sources */,
+				CE06988624B5239C00F974B3 /* Support.cpp in Sources */,
+				CE06988524B5238800F974B3 /* CoronaPluginSupport.cpp in Sources */,
+				CE06988424B5237C00F974B3 /* CoronaObjects.cpp in Sources */,
 				F53C328C2404E2A300BC2BED /* CoronaBuilderPluginCollector.lua in Sources */,
 				F5FFADBC23FFC7DB004E61A9 /* CoronaOfflineiOSPackager.lua in Sources */,
 				C2AF1E571DA6F24500907A65 /* valid_build_settings.lua in Sources */,
@@ -7189,6 +7256,7 @@
 				A4B00FAA14576402008FB6E6 /* AppleSigningIdentityController.mm in Sources */,
 				E23CD30D147C725200BC9038 /* BuildSessionState.mm in Sources */,
 				1F34F53D21115FB2006EE117 /* Rtt_LinuxAppPackager.cpp in Sources */,
+				CE06987E24B5221000F974B3 /* StencilLib.cpp in Sources */,
 				00B73DA812B720CA0057F594 /* ButtonImageView.m in Sources */,
 				00B73DA612B720CA0057F594 /* ButtonTextField.m in Sources */,
 				00F641C2146C72950021E5D4 /* CoreAnimationUtilities.m in Sources */,
@@ -7205,6 +7273,10 @@
 				000CE8F912B7404400D9B6A4 /* ListKeyStore.cpp in Sources */,
 				00602C3D153F9EA400A82C43 /* NSAlert-OAExtensions.m in Sources */,
 				0090CFBA15E2F452000A0144 /* NSWindow+ForFirstResponderMenu.m in Sources */,
+				CE06986824B521DD00F974B3 /* CoronaPluginSupport.cpp in Sources */,
+				CE06988224B5221000F974B3 /* StencilClear.cpp in Sources */,
+				CE06987B24B5221000F974B3 /* DepthClear.cpp in Sources */,
+				CE06987924B5221000F974B3 /* DepthEnvironment.cpp in Sources */,
 				A4D24B24143FD1E300E583D1 /* NewProjectController.mm in Sources */,
 				C24ACF741B38D1250049599D /* OSXAppBuildController.mm in Sources */,
 				00B73DA712B720CA0057F594 /* ResponderPassthroughTextField.m in Sources */,
@@ -7214,7 +7286,9 @@
 				A498B85616DD64580091A148 /* Rtt_DeviceBuildData.cpp in Sources */,
 				C2FCD3E11B38CF4B00EF7B02 /* Rtt_IOSAppPackager.mm in Sources */,
 				A40A906F1BD99B23001D2038 /* TVOSAppBuildController.mm in Sources */,
+				CE06987824B5221000F974B3 /* StencilState.cpp in Sources */,
 				4C111FCB1B2A41B200DF8BE8 /* Rtt_KeyName.cpp in Sources */,
+				CE06988024B5221000F974B3 /* Instancing.cpp in Sources */,
 				A41A186E143A6F7E00F1BF0D /* Rtt_LuaLibSimulator.cpp in Sources */,
 				002D1B72145BB81B002B69B6 /* Rtt_MacActivityIndicator.mm in Sources */,
 				C287481B19F6E01F002D5B27 /* Rtt_MacConsolePlatform.mm in Sources */,
@@ -7223,6 +7297,7 @@
 				00B73D9812B720CA0057F594 /* Rtt_MacFBConnect.mm in Sources */,
 				00B73D9A12B720CA0057F594 /* Rtt_MacImageProvider.mm in Sources */,
 				4C0F07B01B2901DC006FA0FB /* Rtt_MacKeyServices.mm in Sources */,
+				CE06987D24B5221000F974B3 /* Support.cpp in Sources */,
 				A476E629131DB173009A59F2 /* Rtt_MacMapViewObject.mm in Sources */,
 				00B73D9C12B720CA0057F594 /* Rtt_MacRemotePlayerHost.mm in Sources */,
 				00B73D9D12B720CA0057F594 /* Rtt_MacServer.mm in Sources */,
@@ -7230,6 +7305,7 @@
 				A42E68AB143AB0DE00693E3A /* Rtt_MacSimulatorServices.mm in Sources */,
 				00B73D9F12B720CA0057F594 /* Rtt_MacSurfaceVideoRecorder.mm in Sources */,
 				1F34F5432111661E006EE117 /* LinuxAppBuildController.mm in Sources */,
+				CE06988124B5221000F974B3 /* DepthLib.cpp in Sources */,
 				00B73DA012B720CA0057F594 /* Rtt_MacTextBoxObject.mm in Sources */,
 				00B73DA112B720CA0057F594 /* Rtt_MacTextFieldObject.mm in Sources */,
 				A4BEDC9B14BE81320028BE25 /* Rtt_MacVideoObject.mm in Sources */,
@@ -7242,11 +7318,14 @@
 				000CEA1212B7467E00D9B6A4 /* Rtt_PlatformDictionaryWrapper.cpp in Sources */,
 				A4FBC56A1A2D59F4004D9A01 /* Rtt_PlatformObjectWrapper.cpp in Sources */,
 				000CE90212B7404400D9B6A4 /* Rtt_PlatformPlayer.cpp in Sources */,
+				CE06987F24B5221000F974B3 /* DepthState.cpp in Sources */,
 				000CE90312B7404400D9B6A4 /* Rtt_PlatformSimulator.cpp in Sources */,
 				A4592FAA1433CF31008B4E6D /* Rtt_SimulatorAnalytics.cpp in Sources */,
 				0718C13916E94A9D00FD5F45 /* Rtt_TargetAndroidAppStore.cpp in Sources */,
 				A45EBE1418E6465A0010C678 /* Rtt_WebAppPackager.cpp in Sources */,
 				F57D17761BE2713B00AABAC1 /* Rtt_AppleInputMFiDeviceListener.mm in Sources */,
+				CE06986924B521DD00F974B3 /* CoronaObjects.cpp in Sources */,
+				CE06987A24B5221000F974B3 /* StencilEnvironment.cpp in Sources */,
 				C20F8AD81AD78CAB0034BD21 /* SDKList.m in Sources */,
 				002D1B48145BB621002B69B6 /* SPILDTopLayerView.m in Sources */,
 				F57D17711BE25E1200AABAC1 /* Rtt_AppleInputDevice.mm in Sources */,
@@ -7264,6 +7343,7 @@
 				00B73DAA12B720CA0057F594 /* VersionLabel.m in Sources */,
 				C2FCD3E61B38D0BD00EF7B02 /* WebAppBuildController.mm in Sources */,
 				0028FC4014FEC5E400B40EC3 /* XcodeToolHelper.m in Sources */,
+				CE06987C24B5221000F974B3 /* ColorMask.cpp in Sources */,
 				002D1B4B145BB621002B69B6 /* YRKSpinningProgressIndicatorLayer.m in Sources */,
 				000CE90A12B7409400D9B6A4 /* hmac_sha2.c in Sources */,
 				00B73D8B12B720CA0057F594 /* main.m in Sources */,
@@ -7779,11 +7859,6 @@
 			target = 50B013EA17558BCA00B822B8 /* Box2D */;
 			targetProxy = A4FBC50A1A2D5495004D9A01 /* PBXContainerItemProxy */;
 		};
-		A4FBC5121A2D5509004D9A01 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = tachyon;
-			targetProxy = A4FBC5111A2D5509004D9A01 /* PBXContainerItemProxy */;
-		};
 		A4FBC5151A2D552C004D9A01 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = car;
@@ -7848,11 +7923,6 @@
 			isa = PBXTargetDependency;
 			name = CoronaConsole;
 			targetProxy = C26DD1121BD9514100EC4F44 /* PBXContainerItemProxy */;
-		};
-		C26E84851A5DE235008950FB /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = tachyon;
-			targetProxy = C26E84841A5DE235008950FB /* PBXContainerItemProxy */;
 		};
 		C26E84871A5DE255008950FB /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;

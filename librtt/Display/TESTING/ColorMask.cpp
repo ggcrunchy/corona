@@ -10,6 +10,7 @@
 
 #include "TESTING.h"
 #include "Renderer/Rtt_GL.h"
+#include <vector>
 	
 struct ColorMaskSettings {
 	bool red{true}, green{true}, blue{true}, alpha{true};
