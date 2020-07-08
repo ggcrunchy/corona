@@ -40,36 +40,36 @@
 
 #define PARAMS(NAME) CoronaObject##NAME##Params
 #define SIZE_MINUS_OFFSET(TYPE, OFFSET) sizeof( TYPE ) - OFFSET
-#define OFFSET_OF_MEMBER(NAME, MEMBER_NAME) offsetof( PARAMS( NAME ), MEMBER_NAME )
-#define AFTER_HEADER_STRUCT(NAME, MEMBER_NAME)																						\
-	struct NAME##Struct { unsigned char bytes[ SIZE_MINUS_OFFSET( PARAMS( NAME ), OFFSET_OF_MEMBER( NAME, MEMBER_NAME ) ) ]; } NAME
-#define AFTER_HEADER_FLAG(NAME) AFTER_HEADER_STRUCT( NAME, ignoreOriginal )
-#define AFTER_HEADER_ACTION(NAME) AFTER_HEADER_STRUCT( NAME, action )
-#define AFTER_HEADER_FLAG_OFFSET(NAME) OFFSET_OF_MEMBER( NAME, ignoreOriginal )
-#define AFTER_HEADER_ACTION_OFFSET(NAME) OFFSET_OF_MEMBER( NAME, action )
+#define AFTER_HEADER_STRUCT(NAME)																							\
+	struct NAME##Struct { unsigned char bytes[ SIZE_MINUS_OFFSET( PARAMS( NAME ), AFTER_HEADER_OFFSET( NAME ) ) ]; } NAME
 
 union GenericParams {
-	AFTER_HEADER_FLAG( Basic );
-	AFTER_HEADER_FLAG( GroupBasic );
-	AFTER_HEADER_FLAG( AddedToParent );
-	AFTER_HEADER_FLAG( DidInsert );
-	AFTER_HEADER_FLAG( Matrix );
-	AFTER_HEADER_FLAG( Draw );
-	AFTER_HEADER_FLAG( RectResult );
-	AFTER_HEADER_FLAG( RemovedFromParent );
-	AFTER_HEADER_FLAG( Rotate );
-	AFTER_HEADER_FLAG( Scale );
-	AFTER_HEADER_FLAG( Translate );
+	#define AFTER_HEADER_OFFSET(NAME) offsetof( PARAMS(NAME), action )
 
-	AFTER_HEADER_FLAG( BooleanResult );
-	AFTER_HEADER_FLAG( BooleanResultPoint );
-	AFTER_HEADER_FLAG( BooleanResultMatrix );
+	AFTER_HEADER_STRUCT( Lifetime );
+	AFTER_HEADER_STRUCT( OnMessage );
 
-	AFTER_HEADER_FLAG( SetValue );
-	AFTER_HEADER_FLAG( Value );
+	#undef AFTER_HEADER_OFFSET
+	#define AFTER_HEADER_OFFSET(NAME) offsetof( PARAMS(NAME), ignoreOriginal )
 
-	AFTER_HEADER_ACTION( Lifetime );
-	AFTER_HEADER_ACTION( OnMessage );
+	AFTER_HEADER_STRUCT( Basic );
+	AFTER_HEADER_STRUCT( GroupBasic );
+	AFTER_HEADER_STRUCT( AddedToParent );
+	AFTER_HEADER_STRUCT( DidInsert );
+	AFTER_HEADER_STRUCT( Matrix );
+	AFTER_HEADER_STRUCT( Draw );
+	AFTER_HEADER_STRUCT( RectResult );
+	AFTER_HEADER_STRUCT( RemovedFromParent );
+	AFTER_HEADER_STRUCT( Rotate );
+	AFTER_HEADER_STRUCT( Scale );
+	AFTER_HEADER_STRUCT( Translate );
+
+	AFTER_HEADER_STRUCT( BooleanResult );
+	AFTER_HEADER_STRUCT( BooleanResultPoint );
+	AFTER_HEADER_STRUCT( BooleanResultMatrix );
+
+	AFTER_HEADER_STRUCT( SetValue );
+	AFTER_HEADER_STRUCT( Value );
 };
 
 template<typename T> T
@@ -183,7 +183,7 @@ public:
 	virtual int ValueForKey( lua_State *L, const Rtt::MLuaProxyable& object, const char key[], bool overrideRestriction = false ) const
 	{
 		const Proxy2 & resolved = static_cast< const Proxy2 & >( object );
-		const auto params = FindParams< CoronaObjectValueParams >( resolved.fStream, kAugmentedMethod_Value, AFTER_HEADER_FLAG_OFFSET( Value ) );
+		const auto params = FindParams< CoronaObjectValueParams >( resolved.fStream, kAugmentedMethod_Value, AFTER_HEADER_OFFSET( Value ) );
 		void * userData = const_cast< void * >( resolved.fUserData );
 		int result = 0;
 
@@ -203,7 +203,7 @@ public:
 	virtual bool SetValueForKey( lua_State *L, Rtt::MLuaProxyable& object, const char key[], int valueIndex ) const
 	{
 		const Proxy2 & resolved = static_cast< const Proxy2 & >( object );
-		const auto params = FindParams< CoronaObjectSetValueParams >( resolved.fStream, kAugmentedMethod_SetValue, AFTER_HEADER_FLAG_OFFSET( SetValue ) );
+		const auto params = FindParams< CoronaObjectSetValueParams >( resolved.fStream, kAugmentedMethod_SetValue, AFTER_HEADER_OFFSET( SetValue ) );
 		void * userData = const_cast< void * >( resolved.fUserData );
 		int result = 0;
 
@@ -223,6 +223,8 @@ public:
 	virtual const Rtt::LuaProxyVTable& Parent() const { return Super::Constant(); }
 	virtual const Rtt::LuaProxyVTable& ProxyVTable() const { return Self::Constant(); }
 };
+
+#undef AFTER_HEADER_OFFSET
 
 static bool
 PushFactory( lua_State * L, const char * name )
@@ -1409,10 +1411,5 @@ int CoronaObjectSendMessage( const CoronaDisplayObjectHandle object, const char 
 
 #undef PARAMS
 #undef SIZE_MINUS_OFFSET
-#undef OFFSET_OF_MEMBER
 #undef AFTER_HEADER_STRUCT
-#undef AFTER_HEADER_FLAG
-#undef AFTER_HEADER_ACTION
-#undef AFTER_HEADER_FLAG_OFFSET
-#undef AFTER_HEADER_ACTION_OFFSET
 #undef FIRST_ARGS
