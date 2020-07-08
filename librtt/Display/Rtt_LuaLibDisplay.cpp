@@ -85,12 +85,12 @@
 #endif
 
 // STEVE CHANGE
-CoronaFactoryFunction
-GetReplacementFactory( lua_State * L )
+FactoryReplacement
+GetFactoryReplacement( lua_State * L )
 {
-	CoronaFunctionPointer * funcBox = (CoronaFunctionPointer *)lua_touserdata( L, lua_upvalueindex( 2 ) );
+	CoronaFunctionPointerBox * funcBox = (CoronaFunctionPointerBox *)lua_touserdata( L, lua_upvalueindex( 2 ) );
 
-    return funcBox->fFunc;
+    return funcBox ? funcBox->fFunc : NULL;
 }
 // /STEVE CHANGE
 

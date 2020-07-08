@@ -38,10 +38,11 @@
 
 #define CORONA_OBJECTS_STREAM_METATABLE_NAME "CoronaObjectsStream"
 
+#define PARAMS(NAME) CoronaObject##NAME##Params
 #define SIZE_MINUS_OFFSET(TYPE, OFFSET) sizeof( TYPE ) - OFFSET
-#define OFFSET_OF_MEMBER(NAME, MEMBER_NAME) offsetof( CoronaObject##NAME##Params, MEMBER_NAME )
-#define AFTER_HEADER_STRUCT(NAME, MEMBER_NAME)																									\
-	struct NAME##Struct { unsigned char bytes[ SIZE_MINUS_OFFSET( CoronaObject##NAME##Params, OFFSET_OF_MEMBER( NAME, MEMBER_NAME ) ) ]; } NAME
+#define OFFSET_OF_MEMBER(NAME, MEMBER_NAME) offsetof( PARAMS( NAME ), MEMBER_NAME )
+#define AFTER_HEADER_STRUCT(NAME, MEMBER_NAME)																						\
+	struct NAME##Struct { unsigned char bytes[ SIZE_MINUS_OFFSET( PARAMS( NAME ), OFFSET_OF_MEMBER( NAME, MEMBER_NAME ) ) ]; } NAME
 #define AFTER_HEADER_FLAG(NAME) AFTER_HEADER_STRUCT( NAME, ignoreOriginal )
 #define AFTER_HEADER_ACTION(NAME) AFTER_HEADER_STRUCT( NAME, action )
 #define AFTER_HEADER_FLAG_OFFSET(NAME) OFFSET_OF_MEMBER( NAME, ignoreOriginal )
@@ -239,12 +240,12 @@ PushFactory( lua_State * L, const char * name )
 }
 
 static bool 
-CallNewFactory( lua_State * L, const char * name, CoronaFunctionPointer * func  )
+CallNewFactory( lua_State * L, const char * name, CoronaFunctionPointerBox * funcBox  )
 {
 	if (PushFactory( L, name ) ) // stream, ...[, factories, factory]
 	{
-		lua_pushlightuserdata( L, func ); // stream, ..., factories, factory, func
-		lua_setupvalue( L, -2, 2 ); // stream, ..., factories, factory; factory.upvalue[2] = func
+		lua_pushlightuserdata( L, funcBox ); // stream, ..., factories, factory, funcBox
+		lua_setupvalue( L, -2, 2 ); // stream, ..., factories, factory; factory.upvalue[2] = funcBox
 		lua_insert( L, 2 ); // stream, factory, ..., factories
 		lua_pop( L, 1 ); // stream, factory, ...
 		lua_call( L, lua_gettop( L ) - 2, 1 ); // stream, object?
@@ -258,8 +259,8 @@ CallNewFactory( lua_State * L, const char * name, CoronaFunctionPointer * func  
 static void
 GetSizes( unsigned short method, size_t & fullSize, size_t & paramSize )
 {
-#define GET_SIZES(NAME)									\
-	fullSize = sizeof( CoronaObject##NAME##Params );	\
+#define GET_SIZES(NAME)								\
+	fullSize = sizeof( PARAMS( NAME ) );			\
 	paramSize = sizeof( GenericParams::NAME.bytes )
 
 #define UNIQUE_METHOD(NAME)		\
@@ -452,7 +453,7 @@ int PushObject( lua_State * L, void * userData, const CoronaObjectParams * param
 	sStreamAndUserData.stream = (unsigned char *)lua_touserdata( L, 1 );
 	sStreamAndUserData.userData = userData;
 
-    CoronaFunctionPointer funcBox = { func };
+    CoronaFunctionPointerBox funcBox = { func };
     
 	if (CallNewFactory( L, name, &funcBox )) // stream[, object]
 	{
@@ -483,12 +484,7 @@ int PushObject( lua_State * L, void * userData, const CoronaObjectParams * param
 	return 0;
 }
 
-#define CORONA_OBJECTS_PUSH(OBJECT_KIND) void (*func)() = OBJECT_KIND##2::New;  \
-                                                                                \
-    return PushObject< OBJECT_KIND##2 >( L, userData, params, "new" #OBJECT_KIND, func )
-
-#define STORE_THIS(OBJECT_TYPE) auto storedThis = CoronaInternalStore##OBJECT_TYPE( reinterpret_cast< const Rtt::OBJECT_TYPE * >( this ) )
-#define STORE_VALUE(NAME, OBJECT_TYPE) auto NAME##Stored = CoronaInternalStore##OBJECT_TYPE( NAME )
+#define CORONA_OBJECTS_PUSH(OBJECT_KIND) return PushObject< OBJECT_KIND##2 >( L, userData, params, "new" #OBJECT_KIND, ( decltype( CoronaFunctionPointerBox::fFunc ) )OBJECT_KIND##2::New )
 
 #define FIRST_ARGS storedThis.GetHandle(), fUserData
 #define CORONA_OBJECTS_METHOD_BOOKEND(WHEN, ...)	\
@@ -575,8 +571,8 @@ Copy3 (float * dst, const float * src)
 		Copy3(const_cast< float * >(srcToDst.Row1()), matrix + 3);	\
 	}
 
-#define CORONA_OBJECTS_GET_PARAMS_SPECIFIC(METHOD, PARAMS_TYPE)																																		\
-	const auto params = FindParams< CoronaObject##PARAMS_TYPE##Params >( fStream, kAugmentedMethod_##METHOD, sizeof( CoronaObject##PARAMS_TYPE##Params) - sizeof( GenericParams::PARAMS_TYPE ) )
+#define CORONA_OBJECTS_GET_PARAMS_SPECIFIC(METHOD, NAME)																								\
+	const auto params = FindParams< PARAMS( NAME ) >( fStream, kAugmentedMethod_##METHOD, sizeof( PARAMS( NAME ) ) - sizeof( GenericParams::NAME ) )
 
 #define CORONA_OBJECTS_GET_PARAMS(PARAMS_TYPE) CORONA_OBJECTS_GET_PARAMS_SPECIFIC(PARAMS_TYPE, PARAMS_TYPE)
 
@@ -616,8 +612,9 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual void AddedToParent( lua_State * L, Rtt::GroupObject * parent )
 	{
-		STORE_THIS( DisplayObject );
-		STORE_VALUE( parent, GroupObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+		auto parentStored = CoronaInternalStoreGroupObject( parent );
+
 		CORONA_OBJECTS_GET_PARAMS( AddedToParent );
 		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, L, parentStored.GetHandle() );
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( AddedToParent, L, parent );
@@ -626,7 +623,8 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual bool CanCull() const
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( CanCull, BooleanResult );
 		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS )
 		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanCull )
@@ -637,7 +635,8 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual bool CanHitTest() const
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( CanHitTest, BooleanResult );
 		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS )
 		CORONA_OBJECTS_METHOD_CORE_WITH_RESULT( CanHitTest )
@@ -648,14 +647,16 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual void DidMoveOffscreen()
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( DidMoveOffscreen, Basic );
 		CORONA_OBJECTS_METHOD( DidMoveOffscreen )
 	}
 
 	virtual void DidUpdateTransform( Rtt::Matrix & srcToDst )
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( DidUpdateTransform, Matrix );
 		CORONA_OBJECTS_MATRIX_BOOKEND_METHOD( before )
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( DidUpdateTransform, srcToDst )
@@ -664,8 +665,9 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual void Draw( Rtt::Renderer & renderer ) const
 	{
-		STORE_THIS( DisplayObject );
-		STORE_VALUE( &renderer, Renderer );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+		auto rendererStored = CoronaInternalStoreRenderer( &renderer );
+
 		CORONA_OBJECTS_GET_PARAMS( Draw );
 		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, rendererStored.GetHandle() );
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( Draw, renderer );
@@ -674,7 +676,8 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual void FinalizeSelf( lua_State * L )
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( OnFinalize, Lifetime );
 
 		if (params.action)
@@ -689,7 +692,8 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual void GetSelfBounds( Rtt::Rect & rect ) const
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( GetSelfBounds, RectResult );
 		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBounds, rect )
@@ -698,7 +702,8 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual void GetSelfBoundsForAnchor( Rtt::Rect & rect ) const
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( GetSelfBoundsForAnchor, RectResult );
 		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, &rect.xMin, &rect.yMin, &rect.xMax, &rect.yMax )
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( GetSelfBoundsForAnchor, rect )
@@ -707,7 +712,8 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual bool HitTest( Rtt::Real contentX, Rtt::Real contentY )
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( HitTest, BooleanResultPoint );
 		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS, contentX, contentY )
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS_AND_RESULT( HitTest, contentX, contentY )
@@ -718,15 +724,17 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual void Prepare( const Rtt::Display & display )
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( Prepare, Basic );
 		CORONA_OBJECTS_METHOD_STRIP_ARGUMENT( Prepare, display )
 	}
 
 	virtual void RemovedFromParent( lua_State * L, Rtt::GroupObject * parent )
 	{
-		STORE_THIS( DisplayObject );
-		STORE_VALUE( parent, GroupObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+		auto parentStored = CoronaInternalStoreGroupObject( parent );
+
 		CORONA_OBJECTS_GET_PARAMS( RemovedFromParent );
 		CORONA_OBJECTS_METHOD_BOOKEND( before, FIRST_ARGS, L, parentStored.GetHandle() );
 		CORONA_OBJECTS_METHOD_CORE_WITH_ARGS( AddedToParent, L, parent );
@@ -735,21 +743,24 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual void Rotate( Rtt::Real deltaTheta )
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS( Rotate );
 		CORONA_OBJECTS_METHOD_WITH_ARGS( Rotate, deltaTheta )
 	}
 
 	virtual void Scale( Rtt::Real sx, Rtt::Real sy, bool isNewValue )
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS( Scale );
 		CORONA_OBJECTS_METHOD_WITH_ARGS( Scale, sx, sy, isNewValue )
 	}
 
 	virtual void SendMessage( const char * message, const void * payload, U32 size ) const
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS( OnMessage );
 
 		if (params.action)
@@ -760,14 +771,16 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual void Translate( Rtt::Real deltaX, Rtt::Real deltaY )
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS( Translate );
 		CORONA_OBJECTS_METHOD_WITH_ARGS( Translate, deltaX, deltaY )
 	}
 
 	virtual bool UpdateTransform( const Rtt::Matrix & parentToDstSpace )
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_INIT_MATRIX( parentToDstSpace );
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( UpdateTransform, BooleanResultMatrix );
 		CORONA_OBJECTS_METHOD_BEFORE_WITH_BOOLEAN_RESULT( FIRST_ARGS, matrix )
@@ -779,7 +792,8 @@ struct CoronaObjectsInterface : public Base {
 
 	virtual void WillMoveOnscreen()
 	{
-		STORE_THIS( DisplayObject );
+		auto storedThis = CoronaInternalStoreDisplayObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( WillMoveOnscreen, Basic );
 		CORONA_OBJECTS_METHOD( WillMoveOnscreen )
 	}
@@ -970,14 +984,16 @@ protected:
 public:
 	virtual void DidInsert( bool childParentChanged )
 	{
-		STORE_THIS( GroupObject );
+		auto storedThis = CoronaInternalStoreGroupObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS( DidInsert );
 		CORONA_OBJECTS_METHOD_WITH_ARGS( DidInsert, childParentChanged )
 	}
 
 	virtual void DidRemove()
 	{
-		STORE_THIS( GroupObject );
+		auto storedThis = CoronaInternalStoreGroupObject( this );
+
 		CORONA_OBJECTS_GET_PARAMS_SPECIFIC( DidRemove, GroupBasic );
 		CORONA_OBJECTS_METHOD( DidRemove )
 	}
@@ -1391,6 +1407,7 @@ int CoronaObjectSendMessage( const CoronaDisplayObjectHandle object, const char 
 	return 0;
 }
 
+#undef PARAMS
 #undef SIZE_MINUS_OFFSET
 #undef OFFSET_OF_MEMBER
 #undef AFTER_HEADER_STRUCT
@@ -1399,5 +1416,3 @@ int CoronaObjectSendMessage( const CoronaDisplayObjectHandle object, const char 
 #undef AFTER_HEADER_FLAG_OFFSET
 #undef AFTER_HEADER_ACTION_OFFSET
 #undef FIRST_ARGS
-#undef STORE_THIS
-#undef STORE_VALUE
