@@ -39,18 +39,17 @@
 #define CORONA_OBJECTS_STREAM_METATABLE_NAME "CoronaObjectsStream"
 
 #define PARAMS(NAME) CoronaObject##NAME##Params
-#define SIZE_MINUS_OFFSET(TYPE, OFFSET) sizeof( TYPE ) - OFFSET
-#define AFTER_HEADER_STRUCT(NAME)																							\
-	struct NAME##Struct { unsigned char bytes[ SIZE_MINUS_OFFSET( PARAMS( NAME ), AFTER_HEADER_OFFSET( NAME ) ) ]; } NAME
+#define AFTER_HEADER_STRUCT(NAME) \
+	struct NAME##Struct { unsigned char bytes[ sizeof( PARAMS( NAME ) ) - AFTER_HEADER_OFFSET( NAME ) ]; } NAME
 
 union GenericParams {
-	#define AFTER_HEADER_OFFSET(NAME) offsetof( PARAMS(NAME), action )
+	#define AFTER_HEADER_OFFSET(NAME) offsetof( PARAMS( NAME ), action )
 
 	AFTER_HEADER_STRUCT( Lifetime );
 	AFTER_HEADER_STRUCT( OnMessage );
 
 	#undef AFTER_HEADER_OFFSET
-	#define AFTER_HEADER_OFFSET(NAME) offsetof( PARAMS(NAME), ignoreOriginal )
+	#define AFTER_HEADER_OFFSET(NAME) offsetof( PARAMS( NAME ), ignoreOriginal )
 
 	AFTER_HEADER_STRUCT( Basic );
 	AFTER_HEADER_STRUCT( GroupBasic );
@@ -91,7 +90,7 @@ FindParams( const unsigned char * stream, unsigned short method, size_t offset )
 	{
 		if (methods[i] == method)
 		{
-			memcpy( reinterpret_cast< unsigned char * >( &out ) + offset, genericParams, SIZE_MINUS_OFFSET( T, offset ) );
+			memcpy( reinterpret_cast< unsigned char * >( &out ) + offset, genericParams, sizeof( T ) - offset );
 
 			break;
 		}
@@ -573,10 +572,10 @@ Copy3 (float * dst, const float * src)
 		Copy3(const_cast< float * >(srcToDst.Row1()), matrix + 3);	\
 	}
 
-#define CORONA_OBJECTS_GET_PARAMS_SPECIFIC(METHOD, NAME)																								\
-	const auto params = FindParams< PARAMS( NAME ) >( fStream, kAugmentedMethod_##METHOD, sizeof( PARAMS( NAME ) ) - sizeof( GenericParams::NAME ) )
+#define CORONA_OBJECTS_GET_PARAMS_SPECIFIC(METHOD, NAME) GenericParams gp = {}; /* workaround on Xcode */  \
+const auto params = FindParams< PARAMS( NAME ) >( fStream, kAugmentedMethod_##METHOD, sizeof( PARAMS( NAME ) ) - sizeof( gp.NAME.bytes ) )
 
-#define CORONA_OBJECTS_GET_PARAMS(PARAMS_TYPE) CORONA_OBJECTS_GET_PARAMS_SPECIFIC(PARAMS_TYPE, PARAMS_TYPE)
+#define CORONA_OBJECTS_GET_PARAMS(PARAMS_TYPE) CORONA_OBJECTS_GET_PARAMS_SPECIFIC( PARAMS_TYPE, PARAMS_TYPE )
 
 static void
 OnCreate( const void * object, void * userData, const unsigned char * stream )
@@ -1410,6 +1409,5 @@ int CoronaObjectSendMessage( const CoronaDisplayObjectHandle object, const char 
 }
 
 #undef PARAMS
-#undef SIZE_MINUS_OFFSET
 #undef AFTER_HEADER_STRUCT
 #undef FIRST_ARGS

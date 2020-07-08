@@ -192,7 +192,7 @@ Renderer::Initialize()
 template<typename T> T
 LowestBit( T x )
 {
-	return x & (~x + T( 1 )); // -x (silence some warnings, since unsigned)
+	return x & (~x + T( 1 )); // this is -x, written thus to avoid warnings
 }
 
 // https://graphics.stanford.edu/~seander/bithacks.html#IntegerLogDeBruijn with power of 2
@@ -206,21 +206,6 @@ Log2OfPower( U32 power )
 	};
 
 	return MultiplyDeBruijnBitPosition2[(power * 0x077CB531U) >> 27];
-}
-
-static U32
-Log2OfPower( U64 power )
-{
-	union {
-		U64 power;
-		U32 arr[2];
-	} v;
-
-	v.power = power;
-
-	U64 index = !v.arr[0]; // if 0, choose 1
-
-	return index * 32U + Log2OfPower( v.arr[index] );
 }
 
 template<typename T> void
