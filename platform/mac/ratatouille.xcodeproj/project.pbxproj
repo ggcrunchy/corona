@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 52;
 	objects = {
 
 /* Begin PBXAggregateTarget section */
@@ -1740,12 +1740,13 @@
 			filePatterns = "*.lua";
 			fileType = pattern.proxy;
 			inputFiles = (
+				"$(BUILT_PRODUCTS_DIR)/lua",
 			);
 			isEditable = 1;
 			outputFiles = (
 				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/$(INPUT_FILE_BASE).lu",
 			);
-			script = "# This option is used to exit the script as\n# soon as a command returns a non-zero value.\nset -o errexit\necho \"Compiling '$INPUT_FILE_PATH' -> '$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/$INPUT_FILE_BASE.lu'...\"\n$BUILT_PRODUCTS_DIR/lua $SRCROOT/../../bin/rcc.lua -c $BUILT_PRODUCTS_DIR -O$CONFIGURATION -o \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/$INPUT_FILE_BASE.lu\" $INPUT_FILE_PATH\n";
+			script = "# This option is used to exit the script as\n# soon as a command returns a non-zero value.\nset -o errexit\necho \"Compiling '$INPUT_FILE_PATH' -> '$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/$INPUT_FILE_BASE.lu'...\"\n$BUILT_PRODUCTS_DIR/lua $SRCROOT/../../bin/rcc.lua -c $BUILT_PRODUCTS_DIR -g -o \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/$INPUT_FILE_BASE.lu\" $INPUT_FILE_PATH\n";
 		};
 		00B73C2C12B71C960057F594 /* PBXBuildRule */ = {
 			isa = PBXBuildRule;
@@ -1753,12 +1754,13 @@
 			filePatterns = "*.lua";
 			fileType = pattern.proxy;
 			inputFiles = (
+				"$(BUILT_PRODUCTS_DIR)/lua",
 			);
 			isEditable = 1;
 			outputFiles = (
-				"$TARGET_TEMP_DIR/$(INPUT_FILE_BASE).cpp",
+				"$(TARGET_TEMP_DIR)/$(INPUT_FILE_BASE).cpp",
 			);
-			script = "# This option is used to exit the script as\n# soon as a command returns a non-zero value.\nset -o errexit\n\n$BUILT_PRODUCTS_DIR/lua $SRCROOT/../../bin/rcc.lua -c $BUILT_PRODUCTS_DIR -O$CONFIGURATION -o $TARGET_TEMP_DIR/$INPUT_FILE_BASE.lu $INPUT_FILE_PATH\n$BUILT_PRODUCTS_DIR/lua -epackage.path=[[$SRCROOT/../../external/loop-2.3-beta/lua/?.lua]] $SRCROOT/../../external/loop-2.3-beta/lua/precompiler.constant.lua -d $TARGET_TEMP_DIR -o $INPUT_FILE_BASE -l $TARGET_TEMP_DIR/?.lu -n $INPUT_FILE_BASE";
+			script = "# This option is used to exit the script as\n# soon as a command returns a non-zero value.\nset -o errexit\n\n$BUILT_PRODUCTS_DIR/lua $SRCROOT/../../bin/rcc.lua -c $BUILT_PRODUCTS_DIR -O$CONFIGURATION -o $TARGET_TEMP_DIR/$INPUT_FILE_BASE.lu $INPUT_FILE_PATH\n$BUILT_PRODUCTS_DIR/lua -epackage.path=[[$SRCROOT/../../external/loop-2.3-beta/lua/?.lua]] $SRCROOT/../../external/loop-2.3-beta/lua/precompiler.constant.lua -d $TARGET_TEMP_DIR -o $INPUT_FILE_BASE -l $TARGET_TEMP_DIR/?.lu -n $INPUT_FILE_BASE\n";
 		};
 		C229E2021B32221B00D87A7C /* PBXBuildRule */ = {
 			isa = PBXBuildRule;
@@ -1766,12 +1768,13 @@
 			filePatterns = "*.lua";
 			fileType = pattern.proxy;
 			inputFiles = (
+				"$(BUILT_PRODUCTS_DIR)/lua",
 			);
 			isEditable = 1;
 			outputFiles = (
-				"$TARGET_TEMP_DIR/$(INPUT_FILE_BASE).cpp",
+				"$(TARGET_TEMP_DIR)/$(INPUT_FILE_BASE).cpp",
 			);
-			script = "# This option is used to exit the script as\n# soon as a command returns a non-zero value.\nset -o errexit\n\n$BUILT_PRODUCTS_DIR/lua $SRCROOT/../../bin/rcc.lua -c $BUILT_PRODUCTS_DIR -O$CONFIGURATION -o $TARGET_TEMP_DIR/$INPUT_FILE_BASE.lu $INPUT_FILE_PATH\n$BUILT_PRODUCTS_DIR/lua -epackage.path=[[$SRCROOT/../../external/loop-2.3-beta/lua/?.lua]] $SRCROOT/../../external/loop-2.3-beta/lua/precompiler.constant.lua -d $TARGET_TEMP_DIR -o $INPUT_FILE_BASE -l $TARGET_TEMP_DIR/?.lu -n $INPUT_FILE_BASE\n";
+			script = "# This option is used to exit the script as\n# soon as a command returns a non-zero value.\nset -o errexit\n\n$BUILT_PRODUCTS_DIR/lua $SRCROOT/../../bin/rcc.lua -c $BUILT_PRODUCTS_DIR -g -o $TARGET_TEMP_DIR/$INPUT_FILE_BASE.lu $INPUT_FILE_PATH\n$BUILT_PRODUCTS_DIR/lua -epackage.path=[[$SRCROOT/../../external/loop-2.3-beta/lua/?.lua]] $SRCROOT/../../external/loop-2.3-beta/lua/precompiler.constant.lua -d $TARGET_TEMP_DIR -o $INPUT_FILE_BASE -l $TARGET_TEMP_DIR/?.lu -n $INPUT_FILE_BASE\n";
 		};
 /* End PBXBuildRule section */
 
@@ -8220,7 +8223,10 @@
 				GCC_WARN_UNUSED_FUNCTION = NO;
 				INSTALL_PATH = /usr/local/lib;
 				PRODUCT_NAME = lua;
-				USER_HEADER_SEARCH_PATHS = "../../librtt .";
+				USER_HEADER_SEARCH_PATHS = (
+					../../librtt,
+					.,
+				);
 			};
 			name = Debug;
 		};
@@ -8237,7 +8243,10 @@
 				GCC_WARN_UNUSED_FUNCTION = NO;
 				INSTALL_PATH = /usr/local/lib;
 				PRODUCT_NAME = lua;
-				USER_HEADER_SEARCH_PATHS = "../../librtt .";
+				USER_HEADER_SEARCH_PATHS = (
+					../../librtt,
+					.,
+				);
 				ZERO_LINK = NO;
 			};
 			name = Release;
@@ -8356,7 +8365,11 @@
 				SDKROOT = macosx;
 				SEPARATE_STRIP = NO;
 				STRIP_INSTALLED_PRODUCT = NO;
-				USER_HEADER_SEARCH_PATHS = "../../librtt ../../platform/apple .";
+				USER_HEADER_SEARCH_PATHS = (
+					../../librtt,
+					../../platform/apple,
+					.,
+				);
 				VALID_ARCHS = "i386 x86_64";
 			};
 			name = "Release-template";
@@ -8445,7 +8458,10 @@
 				GCC_WARN_UNUSED_FUNCTION = NO;
 				INSTALL_PATH = /usr/local/lib;
 				PRODUCT_NAME = lua;
-				USER_HEADER_SEARCH_PATHS = "../../librtt .";
+				USER_HEADER_SEARCH_PATHS = (
+					../../librtt,
+					.,
+				);
 				ZERO_LINK = NO;
 			};
 			name = "Release-template";
@@ -8889,7 +8905,11 @@
 				SDKROOT = macosx;
 				SEPARATE_STRIP = NO;
 				STRIP_INSTALLED_PRODUCT = NO;
-				USER_HEADER_SEARCH_PATHS = "../../librtt ../../platform/apple .";
+				USER_HEADER_SEARCH_PATHS = (
+					../../librtt,
+					../../platform/apple,
+					.,
+				);
 				VALID_ARCHS = "i386 x86_64";
 				WARNING_CFLAGS = (
 					"-Wno-inconsistent-missing-override",
@@ -8961,7 +8981,11 @@
 				SDKROOT = macosx;
 				SEPARATE_STRIP = NO;
 				STRIP_INSTALLED_PRODUCT = NO;
-				USER_HEADER_SEARCH_PATHS = "../../librtt ../../platform/apple .";
+				USER_HEADER_SEARCH_PATHS = (
+					../../librtt,
+					../../platform/apple,
+					.,
+				);
 				VALID_ARCHS = "i386 x86_64";
 				WARNING_CFLAGS = "-Wno-inconsistent-missing-override";
 			};
@@ -9055,7 +9079,10 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				INFOPLIST_FILE = CoronaCards/Info.plist;
 				INSTALL_PATH = "@executable_path/../Frameworks";
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @loader_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)",
@@ -9105,7 +9132,10 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				INFOPLIST_FILE = CoronaCards/Info.plist;
 				INSTALL_PATH = "@executable_path/../Frameworks";
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @loader_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)",
@@ -9155,7 +9185,10 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				INFOPLIST_FILE = CoronaCards/Info.plist;
 				INSTALL_PATH = "@executable_path/../Frameworks";
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @loader_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)",
