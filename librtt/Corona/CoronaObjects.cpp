@@ -1352,6 +1352,21 @@ int CoronaObjectsShouldDraw( const CoronaDisplayObjectHandle object, int * shoul
 }
 
 CORONA_API
+int CoronaObjectsSetHasDummyStageBounds( CoronaDisplayObjectHandle object, int hasBounds )
+{
+	Rtt::DisplayObject * displayObject = static_cast< Rtt::DisplayObject * >( CoronaExtractDisplayObject( object ) );
+
+	if (displayObject)
+	{
+		displayObject->SetDummyStageBounds( hasBounds );
+
+		return 1;
+	}
+
+	return 0;
+}
+
+CORONA_API
 const CoronaGroupObjectHandle CoronaObjectGetParent( const CoronaDisplayObjectHandle object )
 {
 	const Rtt::DisplayObject * displayObject = static_cast< const Rtt::GroupObject * >( CoronaExtractConstantDisplayObject( object ) );

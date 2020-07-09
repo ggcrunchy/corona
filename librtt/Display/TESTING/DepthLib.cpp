@@ -363,7 +363,7 @@ PopulateSharedState( lua_State * L, SharedTransformableState * shared )
 {
 	CoronaObjectParamsHeader paramsList = {};
 
-//	DisableCullAndHitTest( paramsList );
+	DisableCullAndHitTest( paramsList );
 
 	CoronaObjectDrawParams drawParams = DrawParams();
 
@@ -376,6 +376,15 @@ PopulateSharedState( lua_State * L, SharedTransformableState * shared )
 	CoronaObjectValueParams valueParams = ValueParams();
 
 	AddToParamsList( paramsList, &valueParams.header, kAugmentedMethod_Value );
+
+	CoronaObjectLifetimeParams onCreateParams = {};
+
+	onCreateParams.action = []( CoronaDisplayObjectHandle object, void * )
+	{
+		CoronaObjectsSetHasDummyStageBounds( object, true );
+	};
+
+	AddToParamsList( paramsList, &onCreateParams.header, kAugmentedMethod_OnCreate );
 
 	CoronaObjectLifetimeParams onFinalizeParams = {};
 

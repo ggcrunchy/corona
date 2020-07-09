@@ -127,7 +127,7 @@ typedef struct CoronaObjectValueParams {
 
 typedef struct CoronaObjectLifetimeParams {
     CoronaObjectParamsHeader header;
-    CoronaObjectBasicBookend action;
+    void (*action)( CoronaDisplayObjectHandle object, void * userData );
 } CoronaObjectLifetimeParams;
 
 typedef struct CoronaObjectOnMessageParams {
@@ -190,6 +190,9 @@ int CoronaObjectsPushText( lua_State * L, void * userData, const CoronaObjectPar
 
 CORONA_API
 int CoronaObjectsShouldDraw( const CoronaDisplayObjectHandle object, int * shouldDraw ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaObjectsSetHasDummyStageBounds( CoronaDisplayObjectHandle object, int hasBounds ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 const CoronaGroupObjectHandle CoronaObjectGetParent( const CoronaDisplayObjectHandle object ) CORONA_PUBLIC_SUFFIX;

@@ -16,6 +16,7 @@
 #include "Corona/CoronaPublicTypes.h"
 #include "Corona/CoronaGraphics.h"
 #include "Corona/CoronaObjects.h"
+#include "Core/Rtt_Assert.h"
 #include "Core/Rtt_Types.h"
 #include <string>
 

@@ -347,6 +347,8 @@ add_library( corona SHARED
 		${CORONA_ROOT}/librtt/Corona/CoronaLua.cpp
 		${CORONA_ROOT}/librtt/Corona/CoronaVersion.c
 		${CORONA_ROOT}/librtt/Corona/CoronaGraphics.cpp
+		${CORONA_ROOT}/librtt/Corona/CoronaObjects.cpp
+		${CORONA_ROOT}/librtt/Corona/CoronaPluginSupport.cpp
 		${CORONA_ROOT}/librtt/Display/Rtt_BitmapMask.cpp
 		${CORONA_ROOT}/librtt/Display/Rtt_BitmapPaint.cpp
 		${CORONA_ROOT}/librtt/Display/Rtt_BitmapPaintAdapter.cpp
@@ -427,6 +429,17 @@ add_library( corona SHARED
 		${CORONA_ROOT}/librtt/Display/Rtt_TextureResourceExternal.cpp
 		${CORONA_ROOT}/librtt/Display/Rtt_TextureResourceExternalAdapter.cpp
 		${CORONA_ROOT}/librtt/Display/Rtt_VertexCache.cpp
+		${CORONA_ROOT}/librtt/Display/TESTING/ColorMask.cpp
+		${CORONA_ROOT}/librtt/Display/TESTING/DepthClear.cpp
+		${CORONA_ROOT}/librtt/Display/TESTING/DepthEnvironment.cpp
+		${CORONA_ROOT}/librtt/Display/TESTING/DepthState.cpp
+		${CORONA_ROOT}/librtt/Display/TESTING/DepthLib.cpp
+		${CORONA_ROOT}/librtt/Display/TESTING/StencilClear.cpp
+		${CORONA_ROOT}/librtt/Display/TESTING/StencilEnvironment.cpp
+		${CORONA_ROOT}/librtt/Display/TESTING/StencilState.cpp
+		${CORONA_ROOT}/librtt/Display/TESTING/StencilLib.cpp
+		${CORONA_ROOT}/librtt/Display/TESTING/Instancing.cpp
+		${CORONA_ROOT}/librtt/Display/TESTING/Support.cpp
 		${CORONA_ROOT}/librtt/Input/Rtt_InputAxisCollection.cpp
 		${CORONA_ROOT}/librtt/Input/Rtt_InputAxisDescriptor.cpp
 		${CORONA_ROOT}/librtt/Input/Rtt_InputAxisType.cpp
