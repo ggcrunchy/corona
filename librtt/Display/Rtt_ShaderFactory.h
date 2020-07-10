@@ -86,6 +86,7 @@ class ShaderFactory
 		bool BindUniformDataMap( lua_State *L, int index, const SharedPtr< ShaderResource >& resource );
 		// STEVE CHANGE
 		void BindCustomization( lua_State * L, int index, const SharedPtr< ShaderResource >& resource );
+		void BindSourceTransform( lua_State * L, int index, const SharedPtr< ShaderResource >& resource );
 		// /STEVE CHANGE
 		void BindTimeTransform( lua_State *L, int index, const SharedPtr< ShaderResource >& resource );
 		void InitializeBindings( lua_State *L, int shaderIndex, const SharedPtr< ShaderResource >& resource );
@@ -110,6 +111,7 @@ class ShaderFactory
 	
 		// STEVE CHANGE
 		bool RegisterCustomization( const char * name, const CoronaShaderCallbacks & callbacks );
+		bool RegisterSourceTransform( const char * name, const CoronaShaderSourceTransform & transform );
 		// /STEVE CHANGE
 
 	protected:

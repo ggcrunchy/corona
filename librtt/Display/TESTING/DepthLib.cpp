@@ -68,14 +68,14 @@ SourceTransformFinish( void * userData, void * )
 static int
 Register3DCustomization( lua_State * L )
 {
-	CoronaShaderCallbacks callbacks = {};
+	CoronaShaderSourceTransform transform = {};
 
-	callbacks.size = sizeof( CoronaShaderCallbacks );
-	callbacks.transform.begin = SourceTransformBegin;
-	callbacks.transform.finish = SourceTransformFinish;
-	callbacks.transform.extraSpace = sizeof( TransformData );
+	transform.size = sizeof( CoronaShaderSourceTransform );
+	transform.begin = SourceTransformBegin;
+	transform.finish = SourceTransformFinish;
+	transform.extraSpace = sizeof( TransformData );
 
-	lua_pushboolean( L, CoronaShaderRegisterCustomization( L, "3D", &callbacks ) ); // ..., ok?
+	lua_pushboolean( L, CoronaShaderRegisterSourceTransform( L, "3D", &transform ) ); // ..., ok?
 
 	return 1;
 }

@@ -109,6 +109,12 @@ int CoronaShaderRegisterCustomization( lua_State * L, const char * name, const C
 }
 
 CORONA_API
+int CoronaShaderRegisterSourceTransform( lua_State * L, const char * name, const CoronaShaderSourceTransform * transform )
+{
+	return Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetShaderFactory().RegisterSourceTransform( name, *transform );
+}
+
+CORONA_API
 int CoronaShaderRegisterProgramMod( int * mod, const char ** details, unsigned int detailsCount )
 {
 	Rtt_ASSERT_NOT_IMPLEMENTED();

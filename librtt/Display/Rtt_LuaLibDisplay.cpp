@@ -1579,7 +1579,7 @@ static int CreateTextObject( lua_State *L, bool isEmbossed )
 	else
 	{
 		// STEVE CHANGE
-		auto * textFactory = GetObjectFactory( L, &NewEmbossedText );
+		auto * textFactory = GetObjectFactory( L, &NewText );
 		textObject = textFactory( runtime.Allocator(), display, str, font, w, h, alignment );// Rtt_NEW( runtime.Allocator(), Rtt_NEW( runtime.Allocator(), TextObject( display, str, font, w, h, alignment ) );
 		// /STEVE CHANGE
 	}

@@ -282,7 +282,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 
 	// STEVE CHANGE
 	ShaderResource * shaderResource = program->GetShaderResource();
-	const CoronaShaderCallbacks * callbacks = shaderResource->GetShaderCallbacks();
+	const CoronaShaderSourceTransform * sourceTransform = shaderResource->GetShaderSourceTransform();
 	CoronaShaderSourceTransformParams params = {};
 	const char * hints[] = { "header", "highpSupport", "mask", "texCoordZ", NULL };
 	void * sourceTransformKey = &fCleanupSourceTransform; // n.b. done to make cleanup robust
@@ -303,9 +303,9 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 	std::vector< U8 > space;
 	U8 * spaceData = NULL;
 
-	if (callbacks && callbacks->transform.extraSpace)
+	if (sourceTransform && sourceTransform->extraSpace)
 	{
-		space.resize( callbacks->transform.extraSpace );
+		space.resize( sourceTransform->extraSpace );
 
 		spaceData = space.data();
 	}
@@ -320,7 +320,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 		params.sources = shader_source;
 		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
-		SetShaderSource( data.fVertexShader, params, callbacks ? &callbacks->transform : NULL, spaceData, sourceTransformKey );
+		SetShaderSource( data.fVertexShader, params, sourceTransform, spaceData, sourceTransformKey );
 /*
 		glShaderSource( data.fVertexShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
@@ -340,7 +340,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 		params.sources = shader_source;
 		params.nsources = sizeof(shader_source) / sizeof(shader_source[0]);
 
-		SetShaderSource( data.fFragmentShader, params, callbacks ? &callbacks->transform : NULL, spaceData, sourceTransformKey );
+		SetShaderSource( data.fFragmentShader, params, sourceTransform, spaceData, sourceTransformKey );
 /*
 		glShaderSource( data.fFragmentShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
@@ -448,11 +448,11 @@ GLProgram::Update( Program::Version version, VersionData& data )
 	glUseProgram( 0 );
 	GL_CHECK_ERROR();
 // STEVE CHANGE
-	const CoronaShaderCallbacks * callbacks = program->GetShaderResource()->GetShaderCallbacks();
+	const CoronaShaderSourceTransform * transform = program->GetShaderResource()->GetShaderSourceTransform();
 
-	if (callbacks && callbacks->transform.cleanup)
+	if (transform && transform->cleanup)
 	{
-		fCleanupSourceTransform = callbacks->transform.cleanup;
+		fCleanupSourceTransform = transform->cleanup;
 	}
 // /STEVE CHANGE
 }

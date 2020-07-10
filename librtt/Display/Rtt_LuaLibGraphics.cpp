@@ -13,6 +13,9 @@
 
 #include "Corona/CoronaLibrary.h"
 #include "Corona/CoronaLua.h"
+// STEVE CHANGE
+#include "Corona/CoronaGraphics.h"
+// /STEVE CHANGE
 #include "Rtt_FilePath.h"
 #include "Display/Rtt_BitmapMask.h"
 #include "Display/Rtt_Display.h"
@@ -74,6 +77,9 @@ class GraphicsLibrary
 		static int newGradient( lua_State *L );
 		static int newImageSheet( lua_State *L );
 		static int defineEffect( lua_State *L );
+		// STEVE CHANGE
+		static int defineSourceTransform( lua_State * L );
+		// /STEVE CHANGE
 		static int listEffects( lua_State *L );
 		static int newOutline( lua_State *L ); // This returns an outline in texels.
 		static int newTexture( lua_State *L );
@@ -116,6 +122,9 @@ GraphicsLibrary::Open( lua_State *L )
 		{ "newGradient", newGradient },
 		{ "newImageSheet", newImageSheet },
 		{ "defineEffect", defineEffect },
+		// STEVE CHANGE
+		{ "defineSourceTransform", defineSourceTransform },
+		// /STEVE CHANGE
 		{ "listEffects", listEffects },
 		{ "newOutline", newOutline }, // This returns an outline in texels.
 		{ "newTexture", newTexture },
@@ -304,6 +313,73 @@ GraphicsLibrary::defineEffect( lua_State *L )
 	lua_pushboolean( L, factory.DefineEffect( L, index ) );
 	return 1;
 }
+
+// STEVE CHANGE
+// graphics.defineSourceTransform( params )
+GraphicsLibrary::defineSourceTransform( lua_State * L )
+{
+	int ok = 0;
+
+	if (lua_istable( L, 1 ))
+	{
+	}
+	
+	else
+	{
+		Rtt_TRACE_SIM( ( "graphics.defineSourceTransform() expected table" ) );
+	}
+	struct TransformData {
+		const char ** stringList;
+		unsigned int count;
+		char * newString[1];
+	};
+
+	static const char **
+SourceTransformBegin( CoronaShaderSourceTransformParams * params, void * userData, void * )
+{
+	TransformData * transformData = static_cast< TransformData * >( userData );
+
+	transformData->stringList = static_cast< const char ** >( malloc( params->nsources * sizeof( const char * ) ) );
+	transformData->newString = NULL;
+
+	for (size_t i = 0; i < params->nsources; ++i)
+	{
+		const char * source = params->sources[i];
+		bool isVertexSource = strcmp( params->hints[i], "vertexSource" ) == 0;
+
+		if (isVertexSource || strcmp( params->hints[i], "fragmentSource" ) == 0)
+		{
+			std::string updated = UpdateSource( source, isVertexSource );
+
+			source = transformData->newString = strdup( updated.c_str() );
+		}
+
+		transformData->stringList[i] = source;
+	}
+
+	return transformData->stringList;
+}
+
+static void
+SourceTransformFinish( void * userData, void * )
+{
+	TransformData * transformData = static_cast< TransformData * >( userData );
+
+	free( transformData->newString );
+	free( transformData->stringList );
+}
+
+	CoronaShaderSourceTransform transform = {};
+
+	transform.size = sizeof( CoronaShaderSourceTransform );
+	transform.begin = SourceTransformBegin;
+	transform.finish = SourceTransformFinish;
+	transform.extraSpace = sizeof( TransformData );
+
+	lua_pushboolean( L, CoronaShaderRegisterCustomization( L, "instances", &callbacks ) && CoronaShaderRegisterSourceTransform( L, "instances", &transform ) ); 
+	lua_pushboolean( L, ok ); // ..., ok?
+}
+// /STEVE CHANGE
 
 // graphics.listEffects( category )
 int

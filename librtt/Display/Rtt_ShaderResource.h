@@ -90,6 +90,8 @@ class ShaderResource
 		// STEVE CHANGE
 		const CoronaShaderCallbacks * GetShaderCallbacks() const { return fShaderCallbacks; }
 		void SetShaderCallbacks( CoronaShaderCallbacks * callbacks ) { fShaderCallbacks = callbacks; }
+		const CoronaShaderSourceTransform * GetShaderSourceTransform() const { return fSourceTransform; }
+		void SetShaderSourceTransform( CoronaShaderSourceTransform * sourceTransform ) { fSourceTransform = sourceTransform; }
 		void AddSourceTransformDetail( const char * name, const char * value );
 
 		int GetSourceTransformDetail( int index, CoronaShaderSourceTransformDetail & detail ) const;
@@ -136,6 +138,7 @@ class ShaderResource
 		ShaderData *fDefaultData;
 		// STEVE CHANGE
 		CoronaShaderCallbacks *fShaderCallbacks;
+		CoronaShaderSourceTransform *fSourceTransform;
 		std::vector< std::string > fDetailNames;
 		std::vector< std::string > fDetailValues;
 		U32 fDetailsCount;

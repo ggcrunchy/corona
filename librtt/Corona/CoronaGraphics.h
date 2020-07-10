@@ -284,6 +284,12 @@ TODO
 */
 typedef struct CoronaShaderSourceTransform {
 	/**
+	Required
+	TODO
+	*/
+	unsigned long size;
+
+	/**
 	Optional
 	TODO
 	*/
@@ -308,8 +314,6 @@ typedef struct CoronaShaderSourceTransform {
 	CoronaShaderSourceTransformStateCleanup cleanup;
 } CoronaShaderSourceTransform;
 
-
-
 typedef void (*CoronaShaderPrepare)(const CoronaShaderHandle shader, void * userData, CoronaRenderDataHandle renderData, int w, int h, int mod);
 typedef void (*CoronaShaderDrawBookend)(const CoronaShaderHandle shader, void * userData, CoronaRendererHandle renderer, const CoronaRenderDataHandle renderData);
 typedef int (*CoronaShaderNameToIndex)(const char * name);
@@ -332,12 +336,6 @@ typedef struct CoronaShaderCallbacks {
 	TODO
 	*/
 	unsigned long size;
-
-	/**
-	Optional
-	TODO
-	*/
-	CoronaShaderSourceTransform transform;
 
 	/**
 	Required
@@ -387,6 +385,9 @@ int CoronaShaderRegisterAttributeSet( lua_State * L, CoronaAttributesHandle * ou
 
 CORONA_API
 int CoronaShaderRegisterCustomization( lua_State * L, const char * name, const CoronaShaderCallbacks * callbacks ) CORONA_PUBLIC_SUFFIX;
+
+CORONA_API
+int CoronaShaderRegisterSourceTransform( lua_State * L, const char * name, const CoronaShaderSourceTransform * transform ) CORONA_PUBLIC_SUFFIX;
 
 CORONA_API
 int CoronaShaderRegisterProgramMod( int * mod, const char ** details, unsigned int detailsCount ) CORONA_PUBLIC_SUFFIX;

@@ -232,11 +232,15 @@ RegisterCustomization( lua_State * L)
 	callbacks.setData = SetData;
 	callbacks.drawParams = DrawParams();
 	callbacks.prepare = Prepare;
-	callbacks.transform.begin = SourceTransformBegin;
-	callbacks.transform.finish = SourceTransformFinish;
-	callbacks.transform.extraSpace = sizeof( TransformData );
 
-	lua_pushboolean( L, CoronaShaderRegisterCustomization( L, "instances", &callbacks ) ); // ..., ok?
+	CoronaShaderSourceTransform transform = {};
+
+	transform.size = sizeof( CoronaShaderSourceTransform );
+	transform.begin = SourceTransformBegin;
+	transform.finish = SourceTransformFinish;
+	transform.extraSpace = sizeof( TransformData );
+
+	lua_pushboolean( L, CoronaShaderRegisterCustomization( L, "instances", &callbacks ) && CoronaShaderRegisterSourceTransform( L, "instances", &transform ) ); // ..., ok?
 
 	return 1;
 }

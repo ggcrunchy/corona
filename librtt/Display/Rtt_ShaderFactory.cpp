@@ -611,6 +611,56 @@ ShaderFactory::BindCustomization( lua_State * L, int index, const SharedPtr< Sha
 
 	lua_pop( L, 1 ); // ...
 }
+
+static int sSourceTransformsNonce;
+
+void
+ShaderFactory::BindSourceTransform( lua_State * L, int index, const SharedPtr< ShaderResource >& resource )
+{
+	Rtt_LUA_STACK_GUARD(L);
+
+	lua_getfield( L, index, "sourceTransform" ); // ..., name?
+
+	if (lua_isstring( L, -1 ))
+	{
+		lua_pushlightuserdata( L, &sSourceTransformsNonce ); // ..., name, nonce
+		lua_rawget( L, LUA_REGISTRYINDEX ); // ..., name, transforms?
+
+		if (!lua_istable( L, -1 ))
+		{
+			CoronaLuaWarning( L, "No source transforms registered" );
+
+			lua_pop( L, 1 ); // ..., name
+		}
+
+		else
+		{
+			const char * name = lua_tostring( L, -2 );
+
+			lua_insert( L, -2 ); // ..., transforms, name
+			lua_rawget( L, -2 ); // ..., transforms, xform?
+			lua_remove( L, -2 ); // ..., xform?
+
+			if (!lua_isnil( L, -1 ))
+			{
+				
+				resource->SetShaderSourceTransform( (CoronaShaderSourceTransform *)lua_touserdata( L, -1 ) );
+			}
+
+			else
+			{
+				CoronaLuaWarning( L, "No customization registered under '%s'", name );
+			}
+		}
+	}
+
+	else if (!lua_isnil( L, -1 ))
+	{
+		CoronaLuaWarning( L, "Source transform expected to be a string, got %s", luaL_typename( L, -1 ) );
+	}
+
+	lua_pop( L, 1 ); // ...
+}
 // /STEVE CHANGE
 
 static void
@@ -749,6 +799,7 @@ ShaderFactory::InitializeBindings( lua_State *L, int shaderIndex, const SharedPt
 
 	// STEVE CHANGE
 	BindCustomization( L, shaderIndex, resource );
+	BindSourceTransform( L, shaderIndex, resource );
 	// /STEVE CHANGE
 
 	if (resource->UsesTime())
@@ -1220,6 +1271,13 @@ ShaderFactory::RegisterCustomization( const char * name, const CoronaShaderCallb
 {
 	lua_State *L = fL;
 
+	if (callbacks.size != sizeof( CoronaShaderCallbacks ))
+	{
+		CoronaLuaError(L, "Customization - invalid binary version for callback structure; size value isn't valid");
+
+		return false;
+	}
+
 	lua_pushlightuserdata( L, &sCustomizationsNonce ); // ..., nonce
 	lua_rawget( L, LUA_REGISTRYINDEX ); // ..., customizations?
 
@@ -1248,6 +1306,52 @@ ShaderFactory::RegisterCustomization( const char * name, const CoronaShaderCallb
 		memcpy( out, &callbacks, sizeof( CoronaShaderCallbacks ) );
 
 		lua_setfield( L, -3, name ); // ..., customizations = { ..., [name] = callbacks }, nil
+		lua_pop( L, 2 ); // ...
+
+		return true;
+	}
+}
+
+bool
+ShaderFactory::RegisterSourceTransform( const char * name, const CoronaShaderSourceTransform & transform )
+{
+	lua_State *L = fL;
+	
+	if (transform.size != sizeof( CoronaShaderSourceTransform ))
+	{
+		CoronaLuaError(L, "Source transform - invalid binary version for callback structure; size value isn't valid");
+
+		return false;
+	}
+
+	lua_pushlightuserdata( L, &sSourceTransformsNonce ); // ..., nonce
+	lua_rawget( L, LUA_REGISTRYINDEX ); // ..., transforms?
+
+	if (lua_isnil( L, -1 ))
+	{
+		lua_pop( L, 1 ); // ...
+		lua_newtable( L ); // ..., transforms
+		lua_pushlightuserdata( L, &sSourceTransformsNonce ); // ..., transforms, nonce
+		lua_pushvalue( L, -2 ); // ..., transforms, nonce, transforms
+		lua_rawset( L, LUA_REGISTRYINDEX ); // ..., transforms; registry = { ..., [nonce] = transforms }
+	}
+
+	lua_getfield( L, -1, name ); // ..., transforms, xform?
+
+	if (!lua_isnil( L, -1 ))
+	{
+		lua_pop( L, 2 ); // ...
+
+		return false;
+	}
+
+	else
+	{
+		void * out = lua_newuserdata( L, sizeof( CoronaShaderSourceTransform ) ); // ..., transforms, nil, xform
+
+		memcpy( out, &transform, sizeof( CoronaShaderSourceTransform ) );
+
+		lua_setfield( L, -3, name ); // ..., transforms = { ..., [name] = xform }, nil
 		lua_pop( L, 2 ); // ...
 
 		return true;
