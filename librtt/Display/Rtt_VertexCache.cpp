@@ -23,8 +23,8 @@ VertexCache::VertexCache( Rtt_Allocator* pAllocator )
 	fTexVertices( pAllocator ),
 	fCounts( pAllocator ),
 // STEVE CHANGE
-	fExtraFloatArrays( pAllocator ),
-	fExtraIndexArrays( pAllocator )
+	fExtraFloatArrays( NULL ),
+	fExtraIndexArrays( NULL )
 // /STEVE CHANGE
 {
 }
@@ -32,14 +32,18 @@ VertexCache::VertexCache( Rtt_Allocator* pAllocator )
 // STEVE CHANGE
 VertexCache::~VertexCache()
 {
-	for (S32 i = 0; i < fExtraFloatArrays.Length(); ++i)
+	for (ArrayFloatBox * cur = fExtraFloatArrays, * next; cur; cur = next)
 	{
-		Rtt_DELETE( fExtraFloatArrays[i] );
+		next = cur->fNext;
+
+		Rtt_DELETE( cur );
 	}
 
-	for (S32 i = 0; i < fExtraIndexArrays.Length(); ++i)
+	for (ArrayIndexBox * cur = fExtraIndexArrays, * next; cur; cur = next)
 	{
-		Rtt_DELETE( fExtraIndexArrays[i] );
+		next = cur->fNext;
+
+		Rtt_DELETE( cur );
 	}
 }
 // /STEVE CHANGE
@@ -53,74 +57,158 @@ VertexCache::Invalidate()
 }
 
 // STEVE CHANGE
-bool
-VertexCache::AddExtraFloatArray()
+VertexCache::ArrayFloatBox::ArrayFloatBox( Rtt_Allocator * allocator )
+	:	fArray( allocator ),
+		fKey( NULL ),
+		fNext( NULL )
 {
-	fExtraFloatArrays.Append( Rtt_NEW( fVertices.Allocator(), ArrayFloat( fVertices.Allocator() ) ) );
-
-	return true;
 }
 
 bool
-VertexCache::AddExtraIndexArray()
+VertexCache::AddExtraFloatArray( const void * key )
 {
-	fExtraIndexArrays.Append( Rtt_NEW( fVertices.Allocator(), ArrayIndex( fVertices.Allocator() ) ) );
-
-	return true;
-}
-
-template<typename AT> bool
-EnsureExists( Rtt_Allocator * allocator, LightPtrArray< AT > & ptrArray, U32 index, bool addIfAbsent )
-{
-	bool slotExists = index < ptrArray.Length();
-
-	if (slotExists && ptrArray[index])
+	if (!FindFloatArray( key ))
 	{
+		ArrayFloatBox * box = Rtt_NEW( fVertices.Allocator(), ArrayFloatBox( fVertices.Allocator() ) );
+
+		box->fKey = key ? const_cast< void * >( key ) : box;
+		box->fNext = fExtraFloatArrays;
+		fExtraFloatArrays = box;
+
 		return true;
 	}
 
-	else if (!addIfAbsent || index >= 20U) // arbitrary limit, but larger than necessary?
-	{
-		return false;
-	}
-
-	if (!slotExists)
-	{
-		U32 extra = index - ptrArray.Length() + 1;
-
-		for (U32 i = 0; i < extra; ++i)
-		{
-			ptrArray.Append( NULL );
-		}
-	}
-
-	ptrArray[index] = Rtt_NEW( allocator, AT( allocator ) );
-
-	return true;
+	return false;
 }
 
 ArrayFloat *
-VertexCache::ExtraFloatArray( U32 index, bool addIfAbsent )
+VertexCache::FindFloatArray( const void * key ) const
 {
-	return EnsureExists( fVertices.Allocator(), fExtraFloatArrays, index, addIfAbsent ) ? fExtraFloatArrays[index] : NULL;
+	for (ArrayFloatBox * cur = fExtraFloatArrays; cur; cur = cur->fNext)
+	{
+		if (key == cur->fKey)
+		{
+			return &cur->fArray;
+		}
+	}
+
+	return NULL;
 }
 
-const ArrayFloat *
-VertexCache::ExtraFloatArray( U32 index ) const
+U32
+VertexCache::ExtraFloatArrayCount() const
 {
-	return (index >= 0 && index < fExtraFloatArrays.Length()) ? fExtraFloatArrays[index] : NULL;
+	U32 count = 0U;
+
+	for (ArrayFloatBox * cur = fExtraFloatArrays; cur; cur = cur->fNext)
+	{
+		++count;
+	}
+
+	return count;
+}
+
+VertexCache::ArrayIndexBox::ArrayIndexBox( Rtt_Allocator * allocator )
+	:	fArray( allocator ),
+		fKey( NULL ),
+		fNext( NULL )
+{
+}
+
+bool
+VertexCache::AddExtraIndexArray( const void * key )
+{
+	if (!FindIndexArray( key ))
+	{
+		ArrayIndexBox * box = Rtt_NEW( fVertices.Allocator(), ArrayIndexBox( fVertices.Allocator() ) );
+	
+		box->fKey = key ? const_cast< void * >( key ) : box;
+		box->fNext = fExtraIndexArrays;
+		fExtraIndexArrays = box;
+
+		return true;
+	}
+
+	return false;
 }
 
 ArrayIndex *
-VertexCache::ExtraIndexArray( U32 index, bool addIfAbsent )
+VertexCache::FindIndexArray( const void * key ) const
 {
-	return EnsureExists( fVertices.Allocator(), fExtraIndexArrays, index, addIfAbsent ) ? fExtraIndexArrays[index] : NULL;
+	for (ArrayIndexBox * cur = fExtraIndexArrays; cur; cur = cur->fNext)
+	{
+		if (key == cur->fKey)
+		{
+			return &cur->fArray;
+		}
+	}
+
+	return NULL;
+}
+
+U32
+VertexCache::ExtraIndexArrayCount() const
+{
+	U32 count = 0U;
+
+	for (ArrayIndexBox * cur = fExtraIndexArrays; cur; cur = cur->fNext)
+	{
+		++count;
+	}
+
+	return count;
+}
+
+ArrayFloat *
+VertexCache::ExtraFloatArray( const void * key, bool addIfAbsent )
+{
+	if (key)
+	{
+		ArrayFloat * floatArray = FindFloatArray( key );
+
+		if (!floatArray && addIfAbsent)
+		{
+			AddExtraFloatArray( key );
+
+			floatArray = &fExtraFloatArrays->fArray;
+		}
+
+		return floatArray;
+	}
+
+	return NULL;
+}
+
+const ArrayFloat *
+VertexCache::ExtraFloatArray( const void * key ) const
+{
+	return key ? FindFloatArray( key ) : NULL;
+}
+
+ArrayIndex *
+VertexCache::ExtraIndexArray( const void * key, bool addIfAbsent )
+{
+	if (key)
+	{
+		ArrayIndex * indexArray = FindIndexArray( key );
+
+		if (!indexArray && addIfAbsent)
+		{
+			AddExtraIndexArray( key );
+
+			indexArray = &fExtraIndexArrays->fArray;
+		}
+
+		return indexArray;
+	}
+
+	return NULL;
 }
 
 const ArrayIndex *
-VertexCache::ExtraIndexArray( U32 index ) const
+VertexCache::ExtraIndexArray( const void * key ) const
 {
-	return (index >= 0 && index < fExtraIndexArrays.Length()) ? fExtraIndexArrays[index] : NULL;
+	return key ? FindIndexArray( key ) : NULL;
 }
 // /STEVE CHANGE
 

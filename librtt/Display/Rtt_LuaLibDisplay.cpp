@@ -778,7 +778,7 @@ static void
 LoadZ( lua_State * L, int index, ShapePath * path )
 {
 	VertexCache & cache = path->GetFillSource();
-	ArrayFloat * floatArray = cache.ExtraFloatArray( 0U, true ); // FIXME: assumes just one...
+	ArrayFloat * floatArray = cache.ExtraFloatArray( DisplayPath::ZKey(), true );
 
 	for (int i = 3, n = (( int )lua_objlen( L, index ) / 3) * 3; i <= n; i += 3, lua_pop( L, 1 ))
 	{

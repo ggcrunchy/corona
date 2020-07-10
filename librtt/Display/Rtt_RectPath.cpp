@@ -350,7 +350,7 @@ RectPath::UpdateGeometry(
 	}
 
 // STEVE CHANGE
-	const ArrayFloat * floatArray = src.ExtraFloatArray( 0U ); // FIXME: not very general
+	const ArrayFloat * floatArray = src.ExtraFloatArray( ZKey() );
 	Rtt_ASSERT( ! floatArray || ( floatArray->Length() == vertices.Length() ) );
 	const float zero = 0.f, * zsource = floatArray ? floatArray->ReadAccess() : &zero;
 	size_t step = floatArray ? 1U : 0U;

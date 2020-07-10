@@ -49,8 +49,8 @@ DisplayPath::UpdateGeometry( Geometry& dst, const VertexCache& src, const Matrix
 
 	Rtt_ASSERT( ! updateTexture || ( vertices.Length() == texVertices.Length() ) );
 // STEVE CHANGE
-	const ArrayFloat * floatArray = src.ExtraFloatArray( 0U ); // FIXME: not very general
-	const ArrayIndex * indexArray = src.ExtraIndexArray( 0U ); // DITTO!
+	const ArrayFloat * floatArray = src.ExtraFloatArray( ZKey() );
+	const ArrayIndex * indexArray = src.ExtraIndexArray( IndicesKey() );
 
 	std::vector< float > temp;
 	const float zero = 0.f, * zsource;
@@ -127,6 +127,25 @@ DisplayPath::UpdateGeometry( Geometry& dst, const VertexCache& src, const Matrix
 		dst.SetIndicesUsed(numIndices);
 	}
 }
+
+// STEVE CHANGE
+
+const void *
+DisplayPath::ZKey()
+{
+	static int key;
+
+	return &key;
+}
+
+const void *
+DisplayPath::IndicesKey()
+{
+	static int key;
+
+	return &key;
+}
+// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
 

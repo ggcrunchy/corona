@@ -32,11 +32,11 @@ class VertexCache
 		bool IsValid() const { return fVertices.Length() > 0; }
 
 		// STEVE CHANGE
-		bool AddExtraFloatArray();
-		U32 ExtraFloatArrayCount() const { return fExtraFloatArrays.Length(); }
+		bool AddExtraFloatArray( const void * key );
+		U32 ExtraFloatArrayCount() const;
 
-		bool AddExtraIndexArray();
-		U32 ExtraIndexArrayCount() const { return fExtraIndexArrays.Length(); }
+		bool AddExtraIndexArray( const void * key );
+		U32 ExtraIndexArrayCount() const;
 		// /STEVE CHANGE
 	public:
 		ArrayVertex2& Vertices() { return fVertices; }
@@ -44,11 +44,13 @@ class VertexCache
 		ArrayS32& Counts() { return fCounts; }
 
 		// STEVE CHANGE
-		ArrayFloat * ExtraFloatArray( U32 index, bool addIfAbsent = false );
-		const ArrayFloat * ExtraFloatArray( U32 index ) const;
+		ArrayFloat * ExtraFloatArray( const void * key, bool addIfAbsent = false );
+		ArrayFloat * FindFloatArray( const void * key ) const;
+		const ArrayFloat * ExtraFloatArray( const void * key ) const;
 
-		ArrayIndex * ExtraIndexArray( U32 index, bool addIfAbsent = false );
-		const ArrayIndex * ExtraIndexArray( U32 index ) const;
+		ArrayIndex * ExtraIndexArray( const void * key, bool addIfAbsent = false );
+		ArrayIndex * FindIndexArray( const void * key ) const;
+		const ArrayIndex * ExtraIndexArray( const void * key ) const;
 		// /STEVE CHANGE
 
 		const ArrayVertex2& Vertices() const { return fVertices; }
@@ -60,8 +62,23 @@ class VertexCache
 		ArrayVertex2 fTexVertices;
 		ArrayS32 fCounts;
 		// STEVE CHANGE
-		LightPtrArray< ArrayFloat > fExtraFloatArrays;
-		LightPtrArray< ArrayIndex > fExtraIndexArrays;
+		struct ArrayFloatBox {
+			ArrayFloatBox( Rtt_Allocator * allocator );
+
+			ArrayFloatBox * fNext;
+			ArrayFloat fArray;
+			void * fKey;
+		};
+
+		struct ArrayIndexBox {
+			ArrayIndexBox( Rtt_Allocator * allocator );
+
+			ArrayIndexBox * fNext;
+			ArrayIndex fArray;
+			void * fKey;
+		};
+		ArrayFloatBox * fExtraFloatArrays;
+		ArrayIndexBox * fExtraIndexArrays;
 		// /STEVE CHANGE
 };
 

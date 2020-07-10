@@ -442,7 +442,7 @@ static bool GetLayout( const Rtt::Geometry * geometry, const char * name, Corona
 			layout->data.type = kAttributeType_Float;
 		}
 
-		else if (strcmp( name, "texture" ) == 0)
+		else if (strcmp( name, "texCoord" ) == 0)
 		{
 			layout->data.count = 3U;
 			layout->data.offset = offsetof( Rtt::Geometry::Vertex, u );
@@ -456,10 +456,32 @@ static bool GetLayout( const Rtt::Geometry * geometry, const char * name, Corona
 			layout->data.type = kAttributeType_Byte;
 		}
 
-		else if (strcmp( name, "userdata" ) == 0)
+		else if (strcmp( name, "userData" ) == 0)
 		{
 			layout->data.count = 4U;
 			layout->data.offset = offsetof( Rtt::Geometry::Vertex, ux );
+			layout->data.type = kAttributeType_Float;
+		}
+
+		else if ('u' == name[0] && name[1] && !name[2])
+		{
+			switch (name[1])
+			{
+			case 'x':
+			case 'y':
+			case 'z':
+				layout->data.offset = offsetof( Rtt::Geometry::Vertex, ux ) + (name[1] - 'x') * sizeof( float );
+
+				break;
+			case 'w':
+				layout->data.offset = offsetof( Rtt::Geometry::Vertex, uw );
+
+				break;
+			default:
+				return false;
+			}
+
+			layout->data.count = 1U;
 			layout->data.type = kAttributeType_Float;
 		}
 

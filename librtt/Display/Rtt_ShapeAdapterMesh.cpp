@@ -289,7 +289,7 @@ int ShapeAdapterMesh::setVertex( lua_State *L )
 	y -= offset.y;
 	// STEVE CHANGE
 	VertexCache & cache = path->GetFillSource();
-	ArrayFloat * floatArray = cache.ExtraFloatArray( 0U ); // FIXME: assumes just one...
+	ArrayFloat * floatArray = cache.ExtraFloatArray( DisplayPath::ZKey() );
 
 	bool zChanged = false;
 
@@ -351,7 +351,7 @@ int ShapeAdapterMesh::getVertex( lua_State *L )
 		result = 2;
 		// STEVE CHANGE
 		VertexCache & cache = path->GetFillSource();
-		ArrayFloat * floatArray = cache.ExtraFloatArray( 0U ); // FIXME: assumes just one...
+		ArrayFloat * floatArray = cache.ExtraFloatArray( DisplayPath::ZKey() );
 
 		bool zChanged = false;
 

@@ -57,6 +57,11 @@ class DisplayPath
 			U32 flags,
 		    ArrayIndex *indices );
 
+		// STEVE CHANGE
+		static const void * ZKey();
+		static const void * IndicesKey();
+		// /STEVE CHANGE
+
 	public:
 		DisplayPath();
 		virtual ~DisplayPath();
