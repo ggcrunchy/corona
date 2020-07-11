@@ -265,13 +265,14 @@ typedef struct CoronaShaderSourceTransformParams {
 	const char ** hints; // originally same size as sources
 	CoronaShaderSourceTransformDetail * details;
 	const CoronaShaderAttribute * attributes; // NYI
+	const void * userData;
 	unsigned int nsources; // n.b. must agree with output after call
 	unsigned int nattribs;
 	unsigned int ndetails;
 } CoronaShaderSourceTransformParams;
 
-typedef const char ** (*CoronaShaderSourceTransformBegin)(CoronaShaderSourceTransformParams * params, void * userData, void * key);
-typedef void (*CoronaShaderSourceTransformFinish)(void * userData, void * key);
+typedef const char ** (*CoronaShaderSourceTransformBegin)(CoronaShaderSourceTransformParams * params, void * workSpaceData, void * key);
+typedef void (*CoronaShaderSourceTransformFinish)(void * workSpaceData, void * key);
 typedef void (*CoronaShaderSourceTransformStateCleanup)(void * key);
 
 typedef struct CoronaShaderMappingLayout {
@@ -293,7 +294,7 @@ typedef struct CoronaShaderSourceTransform {
 	Optional
 	TODO
 	*/
-	unsigned int extraSpace;
+	unsigned int workSpace;
 
 	/**
 	Optional
@@ -312,6 +313,12 @@ typedef struct CoronaShaderSourceTransform {
 	TODO
 	*/
 	CoronaShaderSourceTransformStateCleanup cleanup;
+
+	/**
+	Optional
+	TODO
+	*/
+	void * userData;
 } CoronaShaderSourceTransform;
 
 typedef void (*CoronaShaderPrepare)(const CoronaShaderHandle shader, void * userData, CoronaRenderDataHandle renderData, int w, int h, int mod);

@@ -118,6 +118,7 @@ ShaderResource::~ShaderResource()
 	{
 		Rtt_DELETE( fTimeTransform );
 	}
+
 }
 
 // STEVE CHANGE

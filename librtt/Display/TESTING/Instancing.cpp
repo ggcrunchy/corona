@@ -238,7 +238,7 @@ RegisterCustomization( lua_State * L)
 	transform.size = sizeof( CoronaShaderSourceTransform );
 	transform.begin = SourceTransformBegin;
 	transform.finish = SourceTransformFinish;
-	transform.extraSpace = sizeof( TransformData );
+	transform.workSpace = sizeof( TransformData );
 
 	lua_pushboolean( L, CoronaShaderRegisterCustomization( L, "instances", &callbacks ) && CoronaShaderRegisterSourceTransform( L, "instances", &transform ) ); // ..., ok?
 

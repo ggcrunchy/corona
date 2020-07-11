@@ -38,6 +38,13 @@
 
 #include <float.h>
 
+// STEVE CHANGE
+#include <string>
+#include <vector>
+
+#define CORONA_SOURCE_TRANSFORMS_METATABLE_NAME "graphics.SourceTransforms"
+// /STEVE CHANGE
+
 #define ENABLE_DEBUG_PRINT	( 0 )
 
 // ----------------------------------------------------------------------------
@@ -316,68 +323,241 @@ GraphicsLibrary::defineEffect( lua_State *L )
 
 // STEVE CHANGE
 // graphics.defineSourceTransform( params )
+int
 GraphicsLibrary::defineSourceTransform( lua_State * L )
 {
 	int ok = 0;
 
-	if (lua_istable( L, 1 ))
-	{
-	}
-	
-	else
-	{
-		Rtt_TRACE_SIM( ( "graphics.defineSourceTransform() expected table" ) );
-	}
+	struct TransformEntry {
+		std::string fName;
+		std::vector< std::string > fFindAndInsertAfter;
+		std::vector< std::string > fFindAndReplace;
+	};
+
+	struct Transformations {
+		std::vector< TransformEntry > mArray;
+	};
+
 	struct TransformData {
 		const char ** stringList;
 		unsigned int count;
 		char * newString[1];
 	};
 
-	static const char **
-SourceTransformBegin( CoronaShaderSourceTransformParams * params, void * userData, void * )
-{
-	TransformData * transformData = static_cast< TransformData * >( userData );
+	ok = lua_istable( L, 1 );
 
-	transformData->stringList = static_cast< const char ** >( malloc( params->nsources * sizeof( const char * ) ) );
-	transformData->newString = NULL;
-
-	for (size_t i = 0; i < params->nsources; ++i)
+	if (ok)
 	{
-		const char * source = params->sources[i];
-		bool isVertexSource = strcmp( params->hints[i], "vertexSource" ) == 0;
+		lua_getfield( L, 1, "name" ); // params, name
 
-		if (isVertexSource || strcmp( params->hints[i], "fragmentSource" ) == 0)
+		ok = lua_isstring( L, -1 );
+
+		if (!ok)
 		{
-			std::string updated = UpdateSource( source, isVertexSource );
-
-			source = transformData->newString = strdup( updated.c_str() );
+			Rtt_TRACE_SIM( ( "graphics.defineSourceTransform(): non-string modification value" ) );
 		}
-
-		transformData->stringList[i] = source;
 	}
 
-	return transformData->stringList;
-}
+	else
+	{
+		Rtt_TRACE_SIM( ( "graphics.defineSourceTransform() expected table" ) );
+	}
 
-static void
-SourceTransformFinish( void * userData, void * )
-{
-	TransformData * transformData = static_cast< TransformData * >( userData );
+	if (!ok)
+	{
+		lua_pushboolean( L, 0 ); // params[, name], false
 
-	free( transformData->newString );
-	free( transformData->stringList );
-}
+		return 1;
+	}
+
+	const char * name = lua_tostring( L, -1 );
+
+	lua_pop( L, 1 ); // params
+
+	Transformations * xforms = (Transformations *)lua_newuserdata( L, sizeof( Transformations ) ); // params, transformations
+
+	new (xforms) Transformations;
+
+	for (lua_pushnil( L ); lua_next( L, 1 ); lua_pop( L, 1 )) // params, transformations[, name, xforms]
+	{
+		if (LUA_TSTRING == lua_type( L, -2 ) && lua_istable( L, -1 ))
+		{
+			xforms->mArray.push_back( TransformEntry() );
+
+			TransformEntry & entry = xforms->mArray.back();
+
+			entry.fName = lua_tostring( L, -2 );
+
+			const char * keys[] = { "findAndInsertAfter", "findAndReplace", NULL };
+
+			for (int i = 0; keys[i]; ++i)
+			{
+				lua_getfield( L, -1, keys[i] ); // params, transformations, name, xforms, xform?
+
+				if (!lua_isnil( L, -1 ))
+				{
+					std::vector< std::string > & set = (0 == i) ? entry.fFindAndInsertAfter : entry.fFindAndReplace;
+
+					for (lua_pushnil( L ); lua_next( L, -2 ); lua_pop( L, 1 )) // params, transformations, name, xforms, xform[, original, modification]
+					{
+						if (LUA_TSTRING == lua_type( L, -2 ) && lua_isstring( L, -1 )) // n.b. harmless to transform second one to string, if number
+						{
+							set.push_back( lua_tostring( L, -2 ) );
+							set.push_back( lua_tostring( L, -1 ) );
+						}
+
+						else
+						{
+							if (lua_type( L, -2 ) != LUA_TSTRING)
+							{
+								Rtt_TRACE_SIM( ( "graphics.defineSourceTransform(): non-string original value" ) );
+							}
+
+							if (!lua_isstring( L, -1 ))
+							{
+								Rtt_TRACE_SIM( ( "graphics.defineSourceTransform(): non-string modification value" ) );
+							}
+						}
+					}
+				}
+
+				else
+				{
+					lua_pop( L, 1 ); // params, transformations, name, xforms
+				}
+			}
+		}
+
+		else
+		{
+			if (lua_type( L, -2 ) != LUA_TSTRING)
+			{
+				Rtt_TRACE_SIM( ( "graphics.defineSourceTransform(): non-string source name" ) );
+			}
+
+			if (!lua_istable( L, -1 ))
+			{
+				Rtt_TRACE_SIM( ( "graphics.defineSourceTransform(): non-table source value" ) );
+			}
+		}
+	}
+
+	if (luaL_newmetatable( L, CORONA_SOURCE_TRANSFORMS_METATABLE_NAME )) // params, transformations, mt
+	{
+		lua_pushcfunction( L, []( lua_State * L ) {
+			(( Transformations * )lua_touserdata( L, 1 ))->~Transformations();
+
+			return 0;
+		} ); // params, transformations, mt, GC
+		lua_setfield( L, -2, "__gc" ); // params, transformations, mt = { __gc = GC }
+	}
+
+	lua_setmetatable( L, -2 ); // params, transformations; transformations.metatable = mt
 
 	CoronaShaderSourceTransform transform = {};
 
 	transform.size = sizeof( CoronaShaderSourceTransform );
-	transform.begin = SourceTransformBegin;
-	transform.finish = SourceTransformFinish;
-	transform.extraSpace = sizeof( TransformData );
 
-	lua_pushboolean( L, CoronaShaderRegisterCustomization( L, "instances", &callbacks ) && CoronaShaderRegisterSourceTransform( L, "instances", &transform ) ); 
-	lua_pushboolean( L, ok ); // ..., ok?
+	transform.begin = []( CoronaShaderSourceTransformParams * params, void * workSpace, void * )
+	{
+		TransformData * transformData = static_cast< TransformData * >( workSpace );
+		const Transformations * transformations = static_cast< const Transformations * >( params->userData );
+
+		transformData->count = transformations->mArray.size();
+		transformData->stringList = static_cast< const char ** >( malloc( params->nsources * sizeof( const char * ) ) );
+
+		for (size_t i = 0; i < transformData->count; ++i)
+		{
+			transformData->newString[i] = NULL;
+		}
+
+		int newStringIndex = 0;
+
+		for (size_t i = 0; i < params->nsources; ++i)
+		{
+			const char * source = params->sources[i];
+
+			for (const TransformEntry & entry : transformations->mArray)
+			{
+				if (entry.fName == params->hints[i])
+				{
+					std::string updated = source;
+
+					for (size_t i = 0; i < entry.fFindAndInsertAfter.size(); i += 2U)
+					{
+						const std::string & original = entry.fFindAndInsertAfter[i], & modifier = entry.fFindAndInsertAfter[i + 1];
+
+						while (true)
+						{
+							size_t pos = updated.find( original );
+
+							if (std::string::npos == pos)
+							{
+								break;
+							}
+
+							updated.insert( pos + original.size(), modifier );
+						}
+					}
+
+					for (size_t i = 0; i < entry.fFindAndReplace.size(); i += 2U)
+					{
+						const std::string & original = entry.fFindAndInsertAfter[i], & modifier = entry.fFindAndInsertAfter[i + 1];
+
+						while (true)
+						{
+							size_t pos = updated.find( original );
+
+							if (std::string::npos == pos)
+							{
+								break;
+							}
+
+							updated.replace( pos, original.size(), modifier );
+						}
+					}
+
+					source = transformData->newString[newStringIndex++] = strdup( updated.c_str() );
+				}
+			}
+
+			transformData->stringList[i] = source;
+		}
+
+		return transformData->stringList;
+	};
+
+	transform.finish = []( void * workSpace, void * )
+	{
+		TransformData * transformData = static_cast< TransformData * >( workSpace );
+
+		for (size_t i = 0; i < transformData->count; ++i)
+		{
+			free( transformData->newString[i] );
+		}
+
+		free( transformData->stringList );
+	};
+
+	transform.workSpace = sizeof( TransformData );
+
+	if (xforms->mArray.size() > 1U)
+	{
+		transform.workSpace += (xforms->mArray.size() - 1U) * sizeof( char * );
+	}
+
+	transform.userData = xforms;
+
+	ok = CoronaShaderRegisterSourceTransform( L, name, &transform );
+
+	if (ok)
+	{
+		luaL_ref( L, LUA_REGISTRYINDEX ); // params; registry = { ..., [ref] = transformations }
+	}
+
+	lua_pushboolean( L, ok ); // params[, transformations], ok
+
+	return 1;
 }
 // /STEVE CHANGE
 

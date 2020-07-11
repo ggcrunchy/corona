@@ -73,7 +73,7 @@ Register3DCustomization( lua_State * L )
 	transform.size = sizeof( CoronaShaderSourceTransform );
 	transform.begin = SourceTransformBegin;
 	transform.finish = SourceTransformFinish;
-	transform.extraSpace = sizeof( TransformData );
+	transform.workSpace = sizeof( TransformData );
 
 	lua_pushboolean( L, CoronaShaderRegisterSourceTransform( L, "3D", &transform ) ); // ..., ok?
 
