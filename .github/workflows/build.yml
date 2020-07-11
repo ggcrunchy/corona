@@ -293,7 +293,7 @@ jobs:
           fi
           for dmg in ./Simulator-macOS/*.dmg
           do
-            xcrun altool --notarize-app $APPLE_AUTH --primary-bundle-id "com.coronalabs.CoronaSimulator.GH"  --file "$dmg"
+            xcrun altool --notarize-app $APPLE_AUTH --primary-bundle-id "com.coronalabs.CoronaSimulator.GH${GITHUB_REF#refs/*/}"  --file "$dmg"
           done
         env:
           APPLE_AUTH: ${{ secrets.AppleAuth }} # --username apple@id.email --password secret-app-specific-pwd --asc-provider anscainc
@@ -478,3 +478,44 @@ jobs:
           asset_path: ./CoronaCards-Android/CoronaCardsAndroidAAR.zip
           asset_name: CoronaCards-Android-${{ env.YEAR }}.${{ env.BUILD }}.zip
           asset_content_type: application/zip
+
+  notify-chats:
+    runs-on: ubuntu-latest
+    needs:
+      - release
+    steps:
+      - run: echo ::set-env name=BUILD::"${GITHUB_REF#refs/tags/}"
+      - name: Notify slack Builds channel
+        run: |
+          [ -z "$SLACK_BOT_TOKEN" ] &&  exit 0
+          curl https://slack.com/api/chat.postMessage -X POST -H "Content-type: application/json" -H "Authorization: Bearer $SLACK_BOT_TOKEN" -d  @- << EOF
+          {
+            "channel":"C01629K0E9W",
+            "link_names":true,
+            "text": "New Solar2D build <https://github.com/coronalabs/corona/releases/tag/${{ env.BUILD }}|${{ env.BUILD }}> is @here!"
+          }
+          EOF
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      - name: Notify slack General channel
+        run: |
+          [ -z "$SLACK_BOT_TOKEN" ] &&  exit 0
+          curl https://slack.com/api/chat.postMessage -X POST -H "Content-type: application/json" -H "Authorization: Bearer $SLACK_BOT_TOKEN" -d  @- << EOF
+          {
+            "channel":"C0ASY7G1X",
+            "link_names":true,
+            "text": "New Solar2D Build <https://github.com/coronalabs/corona/releases/tag/${{ env.BUILD }}|${{ env.BUILD }}> is up!"
+          }
+          EOF
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      - name: Notify Disord Builds channel
+        run: |
+          [ -z "$DISCORD_WEBHOOK_BUILDS" ] &&  exit 0
+          curl "$DISCORD_WEBHOOK_BUILDS" -X POST -H "Content-type: application/json" -d  @- << EOF
+          {
+            "content": "New Solar2D Build [${{ env.BUILD }}](https://github.com/coronalabs/corona/releases/tag/${{ env.BUILD }}) is up!"
+          }
+          EOF
+        env:
+          DISCORD_WEBHOOK_BUILDS: ${{ secrets.DISCORD_WEBHOOK_BUILDS }}

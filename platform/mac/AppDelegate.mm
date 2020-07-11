@@ -1081,9 +1081,6 @@ Rtt_EXPORT const luaL_Reg* Rtt_GetCustomModulesList()
     // Calling this makes the Welcome window fail to appear (the subsequent call seems to work without it)
     //[[NSProcessInfo processInfo] setAutomaticTerminationSupportEnabled:YES];
     [[NSProcessInfo processInfo] disableSuddenTermination];
-
-	// Bring the console to the foreground when we start so it doesn't end up behind Finder windows
-	[self consoleMenuitem:nil];
 }
 
 //
@@ -1391,10 +1388,7 @@ Rtt_EXPORT const luaL_Reg* Rtt_GetCustomModulesList()
 	}
 
 	[self checkOpenGLRequirements];
-#if !defined( Rtt_PROJECTOR )
 	[self coronaInit:aNotification];
-	authorizedToLaunch = NO;
-#endif // Rtt_PROJECTOR
 }
 
 - (void) startDebugAndOpenPanel
@@ -2125,14 +2119,6 @@ Rtt_EXPORT const luaL_Reg* Rtt_GetCustomModulesList()
 	if(NO == self.applicationHasBeenInitialized)
 	{
 		self.launchedWithFile = YES;
-	}
-
-	// If the user has not agreed to the license terms or some other critera,
-	// we can't let this method bypass the normal startup routine.
-	if( NO == authorizedToLaunch )
-	{
-		// return YES to prevent any dialog errors
-		return YES;
 	}
 	
 	BOOL isDirectory = YES;
@@ -3024,12 +3010,6 @@ RunLoopObserverCallback( CFRunLoopObserverRef observer, CFRunLoopActivity activi
 
 -(void)willOpenForBuild:(id)sender
 {
-	// If we didn't succeed in logging into the build server, bail
-	if ( ! authorizedToLaunch )
-	{
-		return;
-	}
-
 	fBuildProblemNotified = false;
 }
 
@@ -3850,13 +3830,7 @@ RunLoopObserverCallback( CFRunLoopObserverRef observer, CFRunLoopActivity activi
 {
 	if ([consoleTask isRunning])
 	{
-		// Signal the logger to bring its window to the front
-		pid_t consolePID = [consoleTask processIdentifier];
-
-		if (consolePID != 0)
-		{
-			kill(consolePID, SIGIO);
-		}
+		CFNotificationCenterPostNotification( CFNotificationCenterGetDistributedCenter(), CFSTR("CoronaConsole.clearConsole"), NULL, NULL, YES);
 	}
 }
 
@@ -3864,25 +3838,21 @@ RunLoopObserverCallback( CFRunLoopObserverRef observer, CFRunLoopActivity activi
 {
 	if ([consoleTask isRunning])
 	{
-		// Signal the logger to bring its window to the front
-		pid_t consolePID = [consoleTask processIdentifier];
-
-		if (consolePID != 0)
-		{
-			kill(consolePID, SIGHUP);
-		}
+		CFNotificationCenterPostNotification( CFNotificationCenterGetDistributedCenter(), CFSTR("CoronaConsole.bringToFront"), NULL, NULL, YES);
 	}
+}
+
+static void BringToFrontCallback(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo)
+{
+	AppDelegate *appDelegate = (__bridge AppDelegate*)observer;
+	[appDelegate bringAllToFront:nil];
+	CFNotificationCenterRemoveObserver(center, observer, name, object);
 }
 
 - (void)applicationWillBecomeActive:(NSNotification *)aNotification
 {
-	// Bring Console helper app to the foreground
+	CFNotificationCenterAddObserver(CFNotificationCenterGetDistributedCenter(), (__bridge const void *)(self), BringToFrontCallback, CFSTR("CoronaSimulator.bringToFront"), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
 	[self consoleMenuitem:nil];
-	// Bring the Simulator to the foreground slightly later so it ends up on top
-	[self performSelector:@selector(bringAllToFront:)
-			   withObject:nil
-			   afterDelay:0.1
-				  inModes:@[ NSRunLoopCommonModes ]];
 }
 
 // -----------------------------------------------------------------------------
