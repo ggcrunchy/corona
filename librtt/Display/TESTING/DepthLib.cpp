@@ -11,75 +11,6 @@
 #include "Depth.h"
 #include <math.h>
 
-struct TransformData {
-	char * newString;
-	const char ** stringList;
-};
-
-static std::string
-UpdateSource( std::string str )
-{
-	FindAndReplace( str, "vec2 a_Position", "vec3 a_Position" );
-
-	// these each appear more than once
-	FindAndReplace( str, "vec2 position", "vec3 position", true );
-	FindAndReplace( str, "vec2 VertexKernel", "vec3 VertexKernel", true );
-	FindAndReplace( str, "position, 1.0", "position.xy, 1.0", true );
-
-	FindAndReplace( str, "position, 0.0", "position" );
-
-	return str;
-}
-
-static const char **
-SourceTransformBegin( CoronaShaderSourceTransformParams * params, void * userData, void * )
-{
-	TransformData * transformData = static_cast< TransformData * >( userData );
-
-	transformData->stringList = static_cast< const char ** >( malloc( params->nsources * sizeof( const char * ) ) );
-	transformData->newString = NULL;
-
-	for (size_t i = 0; i < params->nsources; ++i)
-	{
-		const char * source = params->sources[i];
-
-		if (strcmp( params->hints[i], "vertexSource" ) == 0)
-		{
-			std::string updated = UpdateSource( source );
-
-			source = transformData->newString = strdup( updated.c_str() );
-		}
-
-		transformData->stringList[i] = source;
-	}
-
-	return transformData->stringList;
-}
-
-static void
-SourceTransformFinish( void * userData, void * )
-{
-	TransformData * transformData = static_cast< TransformData * >( userData );
-
-	free( transformData->newString );
-	free( transformData->stringList );
-}
-
-static int
-Register3DCustomization( lua_State * L )
-{
-	CoronaShaderSourceTransform transform = {};
-
-	transform.size = sizeof( CoronaShaderSourceTransform );
-	transform.begin = SourceTransformBegin;
-	transform.finish = SourceTransformFinish;
-	transform.workSpace = sizeof( TransformData );
-
-	lua_pushboolean( L, CoronaShaderRegisterSourceTransform( L, "3D", &transform ) ); // ..., ok?
-
-	return 1;
-}
-
 struct SharedTransformableState {
 	CoronaMatrix4x4 prevViewMatrix, prevProjectionMatrix;
 	CoronaObjectParams params;
@@ -617,7 +548,6 @@ int DepthLib( lua_State * L )
 		{ "newTransformablePolygon", TransformablePolygon },
 		{ "populatePerspectiveMatrix", PopulatePerspectiveMatrix },
 		{ "populateViewMatrix", PopulateViewMatrix },
-		{ "register3DCustomization", Register3DCustomization },
 		{ NULL, NULL }
 	};
 

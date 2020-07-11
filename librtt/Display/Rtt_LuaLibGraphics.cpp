@@ -39,6 +39,7 @@
 #include <float.h>
 
 // STEVE CHANGE
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -328,10 +329,21 @@ GraphicsLibrary::defineSourceTransform( lua_State * L )
 {
 	int ok = 0;
 
+	struct PairWithPriority {
+		PairWithPriority()
+			: fPriority( 0 )
+		{
+		}
+
+		std::string fOriginal;
+		std::string fModifier;
+		int fPriority;
+	};
+
 	struct TransformEntry {
 		std::string fName;
-		std::vector< std::string > fFindAndInsertAfter;
-		std::vector< std::string > fFindAndReplace;
+		std::vector< PairWithPriority > fFindAndInsertAfter;
+		std::vector< PairWithPriority > fFindAndReplace;
 	};
 
 	struct Transformations {
@@ -380,7 +392,14 @@ GraphicsLibrary::defineSourceTransform( lua_State * L )
 
 	for (lua_pushnil( L ); lua_next( L, 1 ); lua_pop( L, 1 )) // params, transformations[, name, xforms]
 	{
-		if (LUA_TSTRING == lua_type( L, -2 ) && lua_istable( L, -1 ))
+		bool isKeyString = LUA_TSTRING == lua_type( L, -2 );
+
+		if (isKeyString && strcmp( lua_tostring( L, -2 ), "name" ) == 0)
+		{
+			continue;
+		}
+
+		else if (isKeyString && lua_istable( L, -1 ))
 		{
 			xforms->mArray.push_back( TransformEntry() );
 
@@ -396,14 +415,50 @@ GraphicsLibrary::defineSourceTransform( lua_State * L )
 
 				if (!lua_isnil( L, -1 ))
 				{
-					std::vector< std::string > & set = (0 == i) ? entry.fFindAndInsertAfter : entry.fFindAndReplace;
+					std::vector< PairWithPriority > * set;
+					
+					if (0 == i)
+					{
+						set = &entry.fFindAndInsertAfter;
+					}
+					
+					else
+					{
+						set = &entry.fFindAndReplace;
+					}
 
 					for (lua_pushnil( L ); lua_next( L, -2 ); lua_pop( L, 1 )) // params, transformations, name, xforms, xform[, original, modification]
 					{
+						int priority = 0;
+
+						if (lua_istable( L, -1 ))
+						{
+							lua_getfield( L, -1, "priority" ); // params, transformations, name, xforms, xform, original, modificationTable, priority?
+
+							if (lua_isnumber( L, -1 ))
+							{
+								priority = lua_tointeger( L, -1 );
+							}
+
+							else
+							{
+								Rtt_TRACE_SIM( ( "graphics.defineSourceTransform(): non-string modification value" ) );
+							}
+
+							lua_pop( L, 1 ); // params, transformations, name, xforms, xform, original, modificationTable
+							lua_getfield( L, -1, "value" ); // params, transformations, name, xforms, xform, original, modificationTable, modification?
+							lua_remove( L, -2 ); // params, transformations, name, xforms, xform, original, modification?
+						}
+
 						if (LUA_TSTRING == lua_type( L, -2 ) && lua_isstring( L, -1 )) // n.b. harmless to transform second one to string, if number
 						{
-							set.push_back( lua_tostring( L, -2 ) );
-							set.push_back( lua_tostring( L, -1 ) );
+							set->push_back( PairWithPriority() );
+
+							PairWithPriority & pwp = set->back();
+
+							pwp.fOriginal = lua_tostring( L, -2 );
+							pwp.fModifier = lua_tostring( L, -1 );
+							pwp.fPriority = priority;
 						}
 
 						else
@@ -419,12 +474,13 @@ GraphicsLibrary::defineSourceTransform( lua_State * L )
 							}
 						}
 					}
+
+					std::sort( set->begin(), set->end(), []( const PairWithPriority & p1, const PairWithPriority & p2 ) {
+						return p1.fPriority < p2.fPriority;
+					});
 				}
 
-				else
-				{
-					lua_pop( L, 1 ); // params, transformations, name, xforms
-				}
+				lua_pop( L, 1 ); // params, transformations, name, xforms
 			}
 		}
 
@@ -483,37 +539,28 @@ GraphicsLibrary::defineSourceTransform( lua_State * L )
 				{
 					std::string updated = source;
 
-					for (size_t i = 0; i < entry.fFindAndInsertAfter.size(); i += 2U)
+					for (const PairWithPriority & pwp : entry.fFindAndInsertAfter)
 					{
-						const std::string & original = entry.fFindAndInsertAfter[i], & modifier = entry.fFindAndInsertAfter[i + 1];
+						size_t pos = updated.find( pwp.fOriginal );
 
-						while (true)
+						if (pos != std::string::npos)
 						{
-							size_t pos = updated.find( original );
-
-							if (std::string::npos == pos)
-							{
-								break;
-							}
-
-							updated.insert( pos + original.size(), modifier );
+							updated.insert( pos + pwp.fOriginal.size(), pwp.fModifier );
 						}
 					}
 
-					for (size_t i = 0; i < entry.fFindAndReplace.size(); i += 2U)
+					for (const PairWithPriority & pwp : entry.fFindAndReplace)
 					{
-						const std::string & original = entry.fFindAndInsertAfter[i], & modifier = entry.fFindAndInsertAfter[i + 1];
-
 						while (true)
 						{
-							size_t pos = updated.find( original );
+							size_t pos = updated.find( pwp.fOriginal );
 
 							if (std::string::npos == pos)
 							{
 								break;
 							}
 
-							updated.replace( pos, original.size(), modifier );
+							updated.replace( pos, pwp.fOriginal.size(), pwp.fModifier );
 						}
 					}
 
@@ -552,7 +599,8 @@ GraphicsLibrary::defineSourceTransform( lua_State * L )
 
 	if (ok)
 	{
-		luaL_ref( L, LUA_REGISTRYINDEX ); // params; registry = { ..., [ref] = transformations }
+		lua_pushboolean( L, 1 ); // params, transformations, true
+		lua_rawset( L, LUA_REGISTRYINDEX ); // params; registry = { ..., [transformations] = true }
 	}
 
 	lua_pushboolean( L, ok ); // params[, transformations], ok

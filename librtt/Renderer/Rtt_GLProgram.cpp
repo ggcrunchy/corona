@@ -299,7 +299,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 
 	params.details = details.data();
 	params.ndetails = details.size();
-	params.userData = sourceTransform->userData;
+	params.userData = sourceTransform ? sourceTransform->userData : NULL;
 
 	std::vector< U8 > space;
 	U8 * spaceData = NULL;

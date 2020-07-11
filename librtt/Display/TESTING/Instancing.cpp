@@ -139,87 +139,6 @@ Prepare( const CoronaShaderHandle shader, void * userData, CoronaRenderDataHandl
 	}
 }
 
-struct TransformData {
-	char * newString;
-	const char ** stringList;
-};
-
-static void
-UpdateVertexSpecificSource( std::string & str )
-{
-	FindAndReplace( str, "vec2 a_Position", "vec3 a_Position" );
-
-	FindAndInsertAfter( str,
-		// Find this...
-		"v_UserData = a_UserData;",
-
-		// ...then insert this after:
-		"\n"
-		"\tv_InstanceIndex = a_Position.z;\n"
-
-	);
-
-	FindAndReplace( str, "( a_Position )", "( a_Position.xy )" );
-}
-
-static std::string
-UpdateSource( std::string str, bool isVertexSource )
-{
-	FindAndReplace( str,
-		// Find this...
-		"vec2 v_Position;",
-
-		// ...and replace with:
-		"float v_InstanceIndex;\n"
-		"\n"
-		"#define CoronaInstanceIndex int( v_InstanceIndex )\n"
-		"#define CoronaInstanceFloat v_InstanceIndex\n"
-
-	);
-
-	if (isVertexSource)
-	{
-		UpdateVertexSpecificSource( str );
-	}
-
-	return str;
-}
-
-static const char **
-SourceTransformBegin( CoronaShaderSourceTransformParams * params, void * userData, void * )
-{
-	TransformData * transformData = static_cast< TransformData * >( userData );
-
-	transformData->stringList = static_cast< const char ** >( malloc( params->nsources * sizeof( const char * ) ) );
-	transformData->newString = NULL;
-
-	for (size_t i = 0; i < params->nsources; ++i)
-	{
-		const char * source = params->sources[i];
-		bool isVertexSource = strcmp( params->hints[i], "vertexSource" ) == 0;
-
-		if (isVertexSource || strcmp( params->hints[i], "fragmentSource" ) == 0)
-		{
-			std::string updated = UpdateSource( source, isVertexSource );
-
-			source = transformData->newString = strdup( updated.c_str() );
-		}
-
-		transformData->stringList[i] = source;
-	}
-
-	return transformData->stringList;
-}
-
-static void
-SourceTransformFinish( void * userData, void * )
-{
-	TransformData * transformData = static_cast< TransformData * >( userData );
-
-	free( transformData->newString );
-	free( transformData->stringList );
-}
-
 static int
 RegisterCustomization( lua_State * L)
 {
@@ -233,14 +152,7 @@ RegisterCustomization( lua_State * L)
 	callbacks.drawParams = DrawParams();
 	callbacks.prepare = Prepare;
 
-	CoronaShaderSourceTransform transform = {};
-
-	transform.size = sizeof( CoronaShaderSourceTransform );
-	transform.begin = SourceTransformBegin;
-	transform.finish = SourceTransformFinish;
-	transform.workSpace = sizeof( TransformData );
-
-	lua_pushboolean( L, CoronaShaderRegisterCustomization( L, "instances", &callbacks ) && CoronaShaderRegisterSourceTransform( L, "instances", &transform ) ); // ..., ok?
+	lua_pushboolean( L, CoronaShaderRegisterCustomization( L, "instances", &callbacks ) ); // ..., ok?
 
 	return 1;
 }

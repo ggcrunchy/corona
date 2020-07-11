@@ -62,6 +62,7 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fDetailNames( NULL ),
 	fDetailValues( NULL ),
 	fDetailsCount( 0U ),
+	fSourceTransform( NULL ),
 // /STEVE CHANGE
 	fTimeTransform( NULL ),
 	fUsesUniforms( false ),
@@ -81,6 +82,7 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
 	fDetailNames( NULL ),
 	fDetailValues( NULL ),
 	fDetailsCount( 0U ),
+	fSourceTransform( NULL ),
 // /STEVE CHANGE
 	fTimeTransform( NULL ),
 	fUsesUniforms( false ),
