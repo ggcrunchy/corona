@@ -25,11 +25,13 @@
 
 #include "Core/Rtt_Config.h"
 
+#include "Renderer/Rtt_VulkanDeviceInfo.h"
 #include "Renderer/Rtt_VulkanTexture.h"
 
 //#include "Renderer/Rtt_GL.h"
 #include "Renderer/Rtt_Texture.h"
 #include "Core/Rtt_Assert.h"
+#include <vulkan/vulkan.hpp>
 
 // ----------------------------------------------------------------------------
 /*
@@ -105,11 +107,50 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
+VulkanTexture::VulkanTexture( VulkanDeviceInfo * deviceInfo )
+	:	fDeviceInfo( deviceInfo )
+{
+}
+
 void 
 VulkanTexture::Create( CPUResource* resource )
 {
 	Rtt_ASSERT( CPUResource::kTexture == resource->GetType() || CPUResource::kVideoTexture == resource->GetType() );
 	Texture* texture = static_cast<Texture*>( resource );
+
+
+	
+	const U32 w = texture->GetWidth();
+	const U32 h = texture->GetHeight();
+	const U8* pixels = texture->GetData();
+
+	VkImageCreateInfo imageInfo = {};
+
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.extent.width = w;
+	imageInfo.extent.height = h;
+	imageInfo.extent.depth = 1;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+		
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+
+// The buffer should be in host visible memory so that we can map it and it should be usable as a transfer source so that we can copy it to an image later on:
+
+// createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+// We can then directly copy the pixel values that we got from the image loading library to the buffer:
+	
+	VkDevice device = fDeviceInfo->GetDevice();
+	VkDeviceSize imageSize = w * h * 4U;
+	void * data;
+
+	vkMapMemory( device, stagingBufferMemory, 0, imageSize, 0, &data );
+    memcpy( data, pixels, static_cast< size_t >( imageSize ) );
+	vkUnmapMemory( device, stagingBufferMemory );
+
 	/*
 	GLuint name = 0;
 	glGenTextures( 1, &name );

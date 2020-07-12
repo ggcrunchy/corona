@@ -194,6 +194,7 @@
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_Uniform.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VideoTexture.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanCommandBuffer.cpp" />
+    <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanDeviceInfo.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanFrameBufferObject.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanGeometry.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanProgram.cpp" />
@@ -481,6 +482,7 @@
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VideoSource.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VideoTexture.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanCommandBuffer.h" />
+    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanDeviceInfo.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanFrameBufferObject.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanGeometry.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanProgram.h" />
@@ -880,7 +882,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -893,6 +895,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\external\b2Separator-cpp;..\..\..\external\fft;..\..\..\external\LuaHashMap;..\..\..\external\smoothpolygon;..\..\..\plugins\shared;$(VULKAN_SDK)\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

@@ -25,6 +25,7 @@
 
 #include "Renderer/Rtt_VulkanRenderer.h"
 
+#include "Renderer/Rtt_VulkanDeviceInfo.h"
 #include "Renderer/Rtt_VulkanCommandBuffer.h"
 #include "Renderer/Rtt_VulkanFrameBufferObject.h"
 #include "Renderer/Rtt_VulkanGeometry.h"
@@ -40,13 +41,61 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator )
-:   Super( allocator )
+VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanDeviceInfo * deviceInfo )
+:   Super( allocator ),
+	fDeviceInfo( deviceInfo )
 {
 //	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator ) );
 //	fBackCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator ) );
 	// N.B. this will probably be RADICALLY different in Vulkan
 	// maybe these can just be hints to some unified thing?
+
+	VkPhysicalDevice physicalDevice = deviceInfo ? deviceInfo->GetPhysicalDevice() : VK_NULL_HANDLE;
+
+	if (physicalDevice != VK_NULL_HANDLE)
+	{
+		VkDeviceCreateInfo createInfo = {};
+
+		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+		// TODO: extensions, layers, features
+
+		VkDeviceQueueCreateInfo queueCreateInfo = {};
+
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = 0;
+
+		float queuePriorities[] = { 1.0f };
+
+		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.pQueuePriorities = queuePriorities;
+
+		createInfo.queueCreateInfoCount = 1;
+		createInfo.pQueueCreateInfos = &queueCreateInfo;
+
+		VkDevice device;
+		VkResult result = vkCreateDevice( physicalDevice, &createInfo, NULL, &device );
+
+		if (VK_SUCCESS == result)
+		{
+			deviceInfo->SetDevice( device );
+		}
+
+		else
+		{
+			Rtt_LogException( "Failed creating logical device: %d\n", result );
+		}
+	}
+
+	else
+	{
+		Rtt_LogException( "Vulkan physical device unavailable" );
+	}
+}
+
+VulkanRenderer::~VulkanRenderer()
+{
+	Rtt_DELETE( fDeviceInfo );
 }
 
 GPUResource* 
@@ -57,7 +106,7 @@ VulkanRenderer::Create( const CPUResource* resource )
 		case CPUResource::kFrameBufferObject: return new VulkanFrameBufferObject;
 		case CPUResource::kGeometry: return new VulkanGeometry;
 		case CPUResource::kProgram: return new VulkanProgram;
-		case CPUResource::kTexture: return new VulkanTexture;
+		case CPUResource::kTexture: return new VulkanTexture( fDeviceInfo );
 		case CPUResource::kUniform: return NULL;
 		default: Rtt_ASSERT_NOT_REACHED(); return NULL; // iPhone irrelevant
 	}

@@ -33,6 +33,8 @@
 namespace Rtt
 {
 
+class VulkanDeviceInfo;
+
 // ----------------------------------------------------------------------------
 
 class VulkanTexture : public GPUResource
@@ -40,6 +42,9 @@ class VulkanTexture : public GPUResource
 	public:
 		typedef GPUResource Super;
 		typedef VulkanTexture Self;
+
+	public:
+		VulkanTexture( VulkanDeviceInfo * deviceInfo );
 
 	public:
 		virtual void Create( CPUResource* resource );
@@ -52,6 +57,7 @@ private:
 	/*
 	GLint fCachedFormat;
 	unsigned long fCachedWidth, fCachedHeight;*/
+	VulkanDeviceInfo * fDeviceInfo;
 };
 
 // ----------------------------------------------------------------------------

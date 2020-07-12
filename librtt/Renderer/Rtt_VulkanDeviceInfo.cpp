@@ -23,46 +23,29 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef _Rtt_VulkanRenderer_H__
-#define _Rtt_VulkanRenderer_H__
-
-#include "Renderer/Rtt_Renderer.h"
+#include "Renderer/Rtt_VulkanDeviceInfo.h"
+#include "Core/Rtt_Assert.h"
 
 // ----------------------------------------------------------------------------
-
-struct Rtt_Allocator;
 
 namespace Rtt
 {
 
-class GPUResource;
-class CPUResource;
-class VulkanDeviceInfo;
-
 // ----------------------------------------------------------------------------
 
-class VulkanRenderer : public Renderer
+VulkanDeviceInfo::VulkanDeviceInfo()
+    :   fInstance( VK_NULL_HANDLE ),
+        fDevice( VK_NULL_HANDLE ),
+        fPhysicalDevice( VK_NULL_HANDLE )
 {
-	public:
-		typedef Renderer Super;
-		typedef VulkanRenderer Self;
+}
 
-	public:
-		VulkanRenderer( Rtt_Allocator* allocator, VulkanDeviceInfo * deviceInfo );
-		virtual ~VulkanRenderer();
-
-	protected:
-		// Create an OpenGL resource appropriate for the given CPUResource.
-		virtual GPUResource* Create( const CPUResource* resource );
-
-	private:
-		VulkanDeviceInfo * fDeviceInfo;
-};
+VulkanDeviceInfo::~VulkanDeviceInfo()
+{
+}
 
 // ----------------------------------------------------------------------------
 
 } // namespace Rtt
 
 // ----------------------------------------------------------------------------
-
-#endif // _Rtt_VulkanRenderer_H__

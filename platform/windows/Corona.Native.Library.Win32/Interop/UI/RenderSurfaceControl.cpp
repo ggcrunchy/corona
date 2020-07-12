@@ -103,8 +103,9 @@ void RenderSurfaceControl::SelectRenderingContext()
 		createInfo.ppEnabledExtensionNames = extensionNames;
 		createInfo.enabledLayerCount = 0;
 
-		if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create instance!");
+		if (vkCreateInstance (&createInfo, nullptr, &instance ) != VK_SUCCESS)
+		{
+			Rtt_LogException( "Failed to create instance!\n" );
 		}
 	*/
 		// Favor the Win32 BeginPaint() function's device context over our main device context, if available.
