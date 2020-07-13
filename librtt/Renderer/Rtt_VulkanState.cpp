@@ -7,10 +7,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef _Rtt_VulkanFrameBufferObject_H__
-#define _Rtt_VulkanFrameBufferObject_H__
-
-#include "Renderer/Rtt_GPUResource.h"
+#include "Renderer/Rtt_VulkanState.h"
+#include "Core/Rtt_Assert.h"
 
 // ----------------------------------------------------------------------------
 
@@ -19,26 +17,20 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-class VulkanFrameBufferObject : public GPUResource
+VulkanState::VulkanState()
+:   fAllocationCallbacks( NULL ),
+    fInstance( VK_NULL_HANDLE ),
+    fDevice( VK_NULL_HANDLE ),
+    fPhysicalDevice( VK_NULL_HANDLE )
 {
-	public:
-		typedef GPUResource Super;
-		typedef VulkanFrameBufferObject Self;
+}
 
-	public:
-		virtual void Create( CPUResource* resource );
-		virtual void Update( CPUResource* resource );
-		virtual void Destroy();
-		virtual void Bind();
-		/*
-		virtual GLuint GetName();
-		virtual GLuint GetTextureName();*/
-};
+VulkanState::~VulkanState()
+{
+}
 
 // ----------------------------------------------------------------------------
 
 } // namespace Rtt
 
 // ----------------------------------------------------------------------------
-
-#endif // _Rtt_VulkanFrameBufferObject_H__
