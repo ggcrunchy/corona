@@ -37,7 +37,7 @@ namespace Rtt
 
 class GPUResource;
 class CPUResource;
-class VulkanDeviceInfo;
+class VulkanState;
 
 // ----------------------------------------------------------------------------
 
@@ -48,7 +48,7 @@ class VulkanRenderer : public Renderer
 		typedef VulkanRenderer Self;
 
 	public:
-		VulkanRenderer( Rtt_Allocator* allocator, VulkanDeviceInfo * deviceInfo );
+		VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state );
 		virtual ~VulkanRenderer();
 
 	protected:
@@ -56,7 +56,7 @@ class VulkanRenderer : public Renderer
 		virtual GPUResource* Create( const CPUResource* resource );
 
 	private:
-		VulkanDeviceInfo * fDeviceInfo;
+		VulkanState * fState;
 };
 
 // ----------------------------------------------------------------------------
