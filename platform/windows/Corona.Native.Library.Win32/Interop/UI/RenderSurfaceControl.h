@@ -17,7 +17,6 @@
 #include <string>
 #include <Windows.h>
 
-
 namespace Interop { namespace UI {
 
 /// <summary>Represents a control that can be rendered to via OpenGL.</summary>
@@ -159,6 +158,11 @@ class RenderSurfaceControl : public Control
 		/// </remarks>
 		void RequestRender();
 
+		// STEVE CHANGE
+		bool IsUsingVulkanBackend() const { return !!fVulkanState; }
+		void * GetBackendState() const { return IsUsingVulkanBackend() ? fVulkanState : nullptr; }
+		// /STEVE CHANGE
+
 		#pragma endregion
 
 	protected:
@@ -253,6 +257,11 @@ class RenderSurfaceControl : public Control
 
 		/// <summary>Stores the major/minor version number of the OpenGL driver that is rendering to this surface.</summary>
 		RenderSurfaceControl::Version fRendererVersion;
+
+		// STEVE CHANGE
+		/// <summary>Various Vulkan-related state, if chosen as the backend.</summary>
+		void * fVulkanState;
+		// /STEVE CHANGE
 
 		#pragma endregion
 };

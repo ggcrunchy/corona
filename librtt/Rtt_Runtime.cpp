@@ -1176,7 +1176,11 @@ Runtime::LoadParameters::LoadParameters()
 :	launchOptions( kDefaultLaunchOption ),
 	orientation( DeviceOrientation::kUpright ),
 	contentWidth( -1 ),
-	contentHeight( -1 )
+	contentHeight( -1 ),
+// STEVE CHANGE
+	backend( "glBackend" ),
+	backendState( NULL )
+// /STEVE CHANGE
 {
 }
 
@@ -1259,7 +1263,7 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 		// but it should be safe to do.
 		RuntimeGuard guard( * this );
 
-		fDisplay->Initialize( L, configIndex, orientation );
+		fDisplay->Initialize( L, configIndex, orientation, parameters.backend, parameters.backendState ); // <- STEVE CHANGE
 
 		if ( fDelegate )
 		{
@@ -1342,11 +1346,15 @@ exit_gracefully:
 }
 
 Runtime::LoadApplicationReturnCodes
-Runtime::LoadApplication( U32 launchOptions, DeviceOrientation::Type orientation )
+Runtime::LoadApplication( U32 launchOptions, DeviceOrientation::Type orientation, const char * backend, void * backendState ) // <- STEVE CHANGE
 {
 	LoadParameters parameters;
 	parameters.launchOptions = launchOptions;
 	parameters.orientation = orientation;
+// STEVE CHANGE
+	parameters.backend = backend;
+	parameters.backendState = backendState;
+// /STEVE CHANGE
 	
 	return LoadApplication( parameters );
 }

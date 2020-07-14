@@ -121,7 +121,7 @@ class Display
 
 	public:
 		//! \Return true for success. False for failure.
-		virtual bool Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orientation );
+		virtual bool Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orientation, const char * backend, void * backendState ); // <- STEVE CHANGE
 		virtual void Teardown();
 
 	protected:

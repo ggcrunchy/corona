@@ -31,6 +31,10 @@
 #include "CoronaLua.h"
 
 #include "Renderer/Rtt_GLRenderer.h"
+// STEVE CHANGE
+#include "Renderer/Rtt_VulkanRenderer.h"
+#include "Renderer/Rtt_VulkanState.h"
+// /STEVE CHANGE
 #include "Renderer/Rtt_FrameBufferObject.h"
 #include "Renderer/Rtt_Matrix_Renderer.h"
 #include "Renderer/Rtt_Program.h"
@@ -240,7 +244,7 @@ Display::~Display()
 }
 
 bool
-Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orientation )
+Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orientation, const char * backend, void * backendState ) // <- STEVE CHANGE
 {
 	bool result = false;
 
@@ -248,7 +252,24 @@ Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orie
 	if ( Rtt_VERIFY( ! fRenderer ) )
 	{
 		Rtt_Allocator *allocator = GetRuntime().GetAllocator();
+		// STEVE CHANGE
+		if (strcmp( backend, "glBackend" ) == 0)
+		{
+		// /STEVE CHANGE
 		fRenderer = Rtt_NEW( allocator, GLRenderer( allocator ) );
+		// STEVE CHANGE
+		}
+
+		else if (strcmp( backend, "vulkanBackend" ) == 0)
+		{
+			fRenderer = Rtt_NEW( allocator, VulkanRenderer( allocator, static_cast< VulkanState *>( backendState ) ) );
+		}
+
+		else
+		{
+			Rtt_ASSERT_NOT_REACHED();
+		}
+		// /STEVE CHANGE
 		
 		fRenderer->Initialize();
 		
