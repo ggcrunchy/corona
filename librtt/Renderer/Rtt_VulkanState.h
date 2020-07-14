@@ -45,6 +45,9 @@ class VulkanState
 	private:
 		VkAllocationCallbacks * fAllocationCallbacks;
 		VkInstance fInstance;
+	#ifndef NDEBUG
+		VkDebugUtilsMessengerEXT fDebugMessenger;
+	#endif
 		VkDevice fDevice;
 		VkPhysicalDevice fPhysicalDevice;
 };
