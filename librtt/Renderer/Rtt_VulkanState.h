@@ -42,6 +42,10 @@ class VulkanState
 		VkPhysicalDevice GetPhysicalDevice() const { return fPhysicalDevice; }
 		void SetPhysicalDevice( VkPhysicalDevice physicalDevice ) { fPhysicalDevice = physicalDevice; }
 
+	#ifndef NDEBUG
+		void SetDebugMessenger( VkDebugUtilsMessengerEXT messenger ) { fDebugMessenger = messenger; }
+	#endif
+
 	private:
 		VkAllocationCallbacks * fAllocationCallbacks;
 		VkInstance fInstance;
