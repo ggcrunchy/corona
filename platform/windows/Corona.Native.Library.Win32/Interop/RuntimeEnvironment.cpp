@@ -1360,7 +1360,10 @@ OperationResult RuntimeEnvironment::RunUsing(const RuntimeEnvironment::CreationS
 	// Load and run the Corona project.
 	fRuntimeState = RuntimeState::kStarting;
 	fLastOrientation = fProjectSettings.GetDefaultOrientation();
-	auto result = fRuntimePointer->LoadApplication(updatedLaunchOptions, fLastOrientation);
+	// STEVE CHANGE
+	const char * backend = fRenderSurfacePointer->IsUsingVulkanBackend() ? "vulkanBackend" : "glBackend";
+	// /STEVE CHANGE
+	auto result = fRuntimePointer->LoadApplication(updatedLaunchOptions, fLastOrientation, backend, fRenderSurfacePointer->GetBackendState()); // <- STEVE CHANGE
 	if (Rtt::Runtime::kSuccess == result)
 	{
 		// Load was successful. Start running the Corona application.

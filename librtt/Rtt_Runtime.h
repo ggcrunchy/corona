@@ -209,6 +209,7 @@ class Runtime : public MCallback,
 		void ClearLaunchArgs();
 
 	public:
+
 		struct LoadParameters
 		{
 			LoadParameters();
@@ -218,6 +219,10 @@ class Runtime : public MCallback,
 			DeviceOrientation::Type orientation;
 			S32 contentWidth;
 			S32 contentHeight;
+			// STEVE CHANGE
+			const char * backend;
+			void * backendState;
+			// /STEVE CHANGE
 		};
 
 		// Inits VM and then loads script file.
@@ -225,7 +230,7 @@ class Runtime : public MCallback,
 
 		// TODO: Remove this in favor of the LoadParameters version
 		// Inits VM and then loads script file.
-		LoadApplicationReturnCodes LoadApplication( U32 launchOptions, DeviceOrientation::Type orientation );
+		LoadApplicationReturnCodes LoadApplication( U32 launchOptions, DeviceOrientation::Type orientation, const char * backend, void * backendState );
 
 		void SetContentOrientation( DeviceOrientation::Type newOrientation );
 

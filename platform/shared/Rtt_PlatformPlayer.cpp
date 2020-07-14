@@ -58,7 +58,7 @@ PlatformPlayer::Start(
 		launchOptions |= Runtime::kConnectToDebugger;
 	}
 
-	if ( Runtime::kSuccess == fRuntime.LoadApplication( launchOptions, launchOrientation ) )
+	if ( Runtime::kSuccess == fRuntime.LoadApplication( launchOptions, launchOrientation, "glBackend", NULL ) ) // <- STEVE CHANGE (TODO: find a way to register the backend earlier)
 	{
 		fRuntime.BeginRunLoop();
 	}

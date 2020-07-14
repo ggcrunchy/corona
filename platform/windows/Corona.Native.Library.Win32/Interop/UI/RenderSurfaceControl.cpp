@@ -23,7 +23,8 @@
 #undef free
 #endif
 
-#include <vulkan\vulkan.hpp>
+#include <vulkan\vulkan.h>
+#include "Renderer/Rtt_VulkanState.h"
 // /STEVE CHANGE
 
 namespace Interop { namespace UI {
@@ -35,7 +36,10 @@ RenderSurfaceControl::RenderSurfaceControl(HWND windowHandle)
 	fRenderFrameEventHandlerPointer(nullptr),
 	fMainDeviceContextHandle(nullptr),
 	fPaintDeviceContextHandle(nullptr),
-	fRenderingContextHandle(nullptr)
+	fRenderingContextHandle(nullptr),
+// STEVE CHANGE
+	fVulkanState(nullptr)
+// /STEVE CHANGE
 {
 	// Add event handlers.
 	GetReceivedMessageEventHandlers().Add(&fReceivedMessageEventHandler);
@@ -295,6 +299,13 @@ void RenderSurfaceControl::CreateContext()
 
 void RenderSurfaceControl::DestroyContext()
 {
+// STEVE CHANGE
+	Rtt::VulkanState * state = static_cast< Rtt::VulkanState * >( fVulkanState );
+
+	Rtt_DELETE( state );
+
+	fVulkanState = nullptr;
+// /STEVE CHANGE
 	// Fetch this control's window handle.
 	auto windowHandle = GetWindowHandle();
 // STEVE CHANGE TODO
