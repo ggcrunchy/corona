@@ -219,10 +219,6 @@ class Runtime : public MCallback,
 			DeviceOrientation::Type orientation;
 			S32 contentWidth;
 			S32 contentHeight;
-			// STEVE CHANGE
-			const char * backend;
-			void * backendState;
-			// /STEVE CHANGE
 		};
 
 		// Inits VM and then loads script file.
@@ -230,7 +226,7 @@ class Runtime : public MCallback,
 
 		// TODO: Remove this in favor of the LoadParameters version
 		// Inits VM and then loads script file.
-		LoadApplicationReturnCodes LoadApplication( U32 launchOptions, DeviceOrientation::Type orientation, const char * backend, void * backendState );
+		LoadApplicationReturnCodes LoadApplication( U32 launchOptions, DeviceOrientation::Type orientation );
 
 		void SetContentOrientation( DeviceOrientation::Type newOrientation );
 
@@ -332,6 +328,10 @@ class Runtime : public MCallback,
 		PhysicsWorld& GetPhysicsWorld() { return * fPhysicsWorld; }
 		const PhysicsWorld& GetPhysicsWorld() const { return * fPhysicsWorld; }
 
+	// STEVE CHANGE
+	public:
+		void SetBackend( const char * backend, void * backendState) { fBackend = backend; fBackendState = backendState; }
+	// /STEVE CHANGE
 	public:
 		// MCallback
 		virtual void operator()();
@@ -374,6 +374,10 @@ class Runtime : public MCallback,
 		Scheduler* fScheduler;
 		Archive* fArchive;
 		PhysicsWorld *fPhysicsWorld;
+	// STEVE CHANGE
+		const char * fBackend;
+		void * fBackendState;
+	// /STEVE CHANGE
 	
 #ifdef Rtt_USE_ALMIXER
 		PlatformOpenALPlayer* fOpenALPlayer;
