@@ -25,6 +25,8 @@
 
 #include <vulkan\vulkan.h>
 #include "Renderer/Rtt_VulkanState.h"
+#include <algorithm>
+#include <vector>
 // /STEVE CHANGE
 
 namespace Interop { namespace UI {
@@ -83,35 +85,6 @@ void RenderSurfaceControl::SelectRenderingContext()
 	if (fRenderingContextHandle)
 	{
 // STEVE CHANGE TODO
-	/*
-		VkInstance instance;
-
-		VkApplicationInfo appInfo = {};
-		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		appInfo.pApplicationName = "Hello Triangle";
-		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-		appInfo.pEngineName = "Solar2D";
-		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-		appInfo.apiVersion = VK_API_VERSION_1_0;
-
-		VkInstanceCreateInfo createInfo = {};
-		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-		createInfo.pApplicationInfo = &appInfo;
-		unsigned int extensionCount = 0;
-		const char* extensionNames[] = {
-			VK_KHR_SURFACE_EXTENSION_NAME,
-			VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-		};
-		vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, NULL);
-		createInfo.enabledExtensionCount = extensionCount;
-		createInfo.ppEnabledExtensionNames = extensionNames;
-		createInfo.enabledLayerCount = 0;
-
-		if (vkCreateInstance (&createInfo, nullptr, &instance ) != VK_SUCCESS)
-		{
-			Rtt_LogException( "Failed to create instance!\n" );
-		}
-	*/
 		// Favor the Win32 BeginPaint() function's device context over our main device context, if available.
 		if (fPaintDeviceContextHandle)
 		{
@@ -193,8 +166,122 @@ void RenderSurfaceControl::OnRaisedDestroyingEvent()
 
 #pragma endregion
 
-
 #pragma region Private Methods
+// STEVE CHANGE
+static void
+CollectExtensions(std::vector<const char *> & extensions, std::vector<const char *> & optional, const std::vector<VkExtensionProperties> & extensionProps)
+{
+	auto optionalEnd = std::remove_if(optional.begin(), optional.end(), [&extensions](const char * name)
+	{
+		return std::find(extensions.begin(), extensions.end(), name) != extensions.end();
+	});
+		
+	for (auto & props : extensionProps)
+	{
+		if (std::find(optional.begin(), optionalEnd, props.extensionName) != optionalEnd)
+		{
+			extensions.push_back(props.extensionName);
+		}
+	}
+}
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData
+) {
+    CoronaLog("validation layer: %s", pCallbackData->pMessage);
+
+/*
+	VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT: Some event has happened that is unrelated to the specification or performance
+	VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT: Something has happened that violates the specification or indicates a possible mistake
+	VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT: Potential non-optimal use of Vulkan
+*/
+
+    return VK_FALSE;
+}
+
+void RenderSurfaceControl::CreateVulkanState()
+{
+	Rtt::VulkanState * state = Rtt_NEW( NULL, Rtt::VulkanState );
+	
+	VkAllocationCallbacks * allocator = NULL; // TODO
+	VkApplicationInfo appInfo = {};
+
+	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+	appInfo.pApplicationName = "Solar App"; // TODO?
+	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.pEngineName = "Solar2D";
+	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.apiVersion = VK_API_VERSION_1_0;
+
+	VkInstanceCreateInfo createInfo = {};
+
+	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	createInfo.pApplicationInfo = &appInfo;
+
+	std::vector< const char * > extensions = { VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME }, optional;
+	unsigned int extensionCount = 0;
+
+	vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, NULL);
+
+	std::vector<VkExtensionProperties> extensionProps(extensionCount);
+
+	vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, extensionProps.data());
+
+#ifndef NDEBUG
+	extensions.push_back()
+#endif
+	CollectExtensions(extensions, optional, extensionProps);
+
+	createInfo.enabledExtensionCount = extensions.size();
+	createInfo.ppEnabledExtensionNames = extensions.data();
+	createInfo.enabledLayerCount = 0;
+
+#ifndef NDEBUG
+	// TODO: validation layers
+
+	VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {};
+
+	debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+	debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+	debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+	debugCreateInfo.pfnUserCallback = DebugCallback;
+
+	createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debugCreateInfo;
+#endif
+
+	VkInstance instance;
+
+	if (VK_SUCCESS == vkCreateInstance(&createInfo, allocator, &instance))
+	{
+		state->SetInstance(instance);
+	}
+
+	else
+	{
+		Rtt_LogException( "Failed to create instance!\n" );
+	}
+
+#ifndef NDEBUG
+	VkDebugUtilsMessengerEXT messenger;
+
+	if (VK_SUCCESS == CreateDebugUtilsMessengerEXT(instance, &debugCreateInfo, allocator, &messenger))
+	{
+		state->SetDebugMessenger(messenger);
+	}
+
+	else
+	{
+		Rtt_LogException( "Failed to create debug messenger!\n" );
+	}
+#endif
+
+	fVulkanState = state;
+}
+
+// /STEVE CHANGE
 void RenderSurfaceControl::CreateContext()
 {
 	// Fetch this control's window handle.
@@ -206,7 +293,12 @@ void RenderSurfaceControl::CreateContext()
 
 	// Destroy the last OpenGL context that was created.
 	DestroyContext();
-
+// STEVE CHANGE
+	if (false) // wantVulkan
+	{
+		CreateVulkanState();
+	}
+// /STEVE CHANGE
 	// Query the video hardware for multisampling result.
 	auto multisampleTestResult = FetchMultisampleFormat();
 
@@ -303,19 +395,21 @@ void RenderSurfaceControl::DestroyContext()
 	Rtt::VulkanState * state = static_cast< Rtt::VulkanState * >( fVulkanState );
 
 	Rtt_DELETE( state );
-
-	fVulkanState = nullptr;
 // /STEVE CHANGE
 	// Fetch this control's window handle.
 	auto windowHandle = GetWindowHandle();
-// STEVE CHANGE TODO
+// STEVE CHANGE
 	// Destroy the OpenGL context.
 	::wglMakeCurrent(nullptr, nullptr);
 	if (fRenderingContextHandle)
 	{
+		Rtt_ASSERT(!fVulkanState);
+
 		::wglDeleteContext(fRenderingContextHandle);
 		fRenderingContextHandle = nullptr;
 	}
+
+	fVulkanState = nullptr;
 // /STEVE CHANGE
 	if (fMainDeviceContextHandle)
 	{
