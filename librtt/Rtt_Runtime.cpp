@@ -166,6 +166,10 @@ Runtime::Runtime(const MPlatform& platform, MCallback* viewCallback)
 	fScheduler(Rtt_NEW(&fAllocator, Scheduler(*this))),
 	fArchive(NULL),
 	fPhysicsWorld(Rtt_NEW(&fAllocator, PhysicsWorld(fAllocator))),
+// STEVE CHANGE
+	fBackend("glBackend"),
+	fBackendState(nullptr),
+// /STEVE CHANGE
 #ifdef Rtt_USE_ALMIXER
 	fOpenALPlayer(NULL),
 #endif
@@ -1176,11 +1180,7 @@ Runtime::LoadParameters::LoadParameters()
 :	launchOptions( kDefaultLaunchOption ),
 	orientation( DeviceOrientation::kUpright ),
 	contentWidth( -1 ),
-	contentHeight( -1 ),
-// STEVE CHANGE
-	backend( "glBackend" ),
-	backendState( NULL )
-// /STEVE CHANGE
+	contentHeight( -1 )
 {
 }
 
@@ -1263,7 +1263,7 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 		// but it should be safe to do.
 		RuntimeGuard guard( * this );
 
-		fDisplay->Initialize( L, configIndex, orientation, parameters.backend, parameters.backendState ); // <- STEVE CHANGE
+		fDisplay->Initialize( L, configIndex, orientation, fBackend, fBackendState ); // <- STEVE CHANGE
 
 		if ( fDelegate )
 		{
@@ -1346,15 +1346,11 @@ exit_gracefully:
 }
 
 Runtime::LoadApplicationReturnCodes
-Runtime::LoadApplication( U32 launchOptions, DeviceOrientation::Type orientation, const char * backend, void * backendState ) // <- STEVE CHANGE
+Runtime::LoadApplication( U32 launchOptions, DeviceOrientation::Type orientation )
 {
 	LoadParameters parameters;
 	parameters.launchOptions = launchOptions;
 	parameters.orientation = orientation;
-// STEVE CHANGE
-	parameters.backend = backend;
-	parameters.backendState = backendState;
-// /STEVE CHANGE
 	
 	return LoadApplication( parameters );
 }
