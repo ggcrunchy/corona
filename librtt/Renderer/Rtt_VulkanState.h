@@ -44,6 +44,7 @@ class VulkanState
 		VkQueue GetGraphicsQueue() const { return fGraphicsQueue; }
 		void SetGraphicsQueue( VkQueue queue ) { fGraphicsQueue = queue; }
 		VkQueue GetPresentQueue() const { return fPresentQueue; }
+		void SetPresentQueue( VkQueue queue ) { fPresentQueue = queue; }
 		void SetSurface( VkSurfaceKHR surface ) { fSurface = surface; }
 
 	#ifndef NDEBUG
