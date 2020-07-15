@@ -47,6 +47,15 @@ class VulkanState
 		void SetPresentQueue( VkQueue queue ) { fPresentQueue = queue; }
 		void SetSurface( VkSurfaceKHR surface ) { fSurface = surface; }
 
+	public:
+		struct NewSurfaceCallback {
+			VkSurfaceKHR (*make)( VkInstance, void *, const VkAllocationCallbacks * );
+			const char * extension;
+			void * data;
+		};
+
+		static bool PopulatePreSwapChainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
+
 	#ifndef NDEBUG
 		void SetDebugMessenger( VkDebugUtilsMessengerEXT messenger ) { fDebugMessenger = messenger; }
 	#endif
