@@ -24,8 +24,10 @@
 #endif
 
 #include <vulkan\vulkan.h>
+#include "CoronaLog.h"
 #include "Renderer/Rtt_VulkanState.h"
 #include <algorithm>
+#include <utility>
 #include <vector>
 // /STEVE CHANGE
 
@@ -168,17 +170,31 @@ void RenderSurfaceControl::OnRaisedDestroyingEvent()
 
 #pragma region Private Methods
 // STEVE CHANGE
+const char *
+StringIdentity( const char * str )
+{
+	return str;
+}
+
+template<typename I, typename F> bool
+FindString( I & i1, I & i2, const char * str, F && getString )
+{
+	return std::find_if( i1, i2, [str, getString](const I::value_type & other) { return strcmp( str, getString( other ) ) == 0; } ) != i2;
+}
+
 static void
 CollectExtensions(std::vector<const char *> & extensions, std::vector<const char *> & optional, const std::vector<VkExtensionProperties> & extensionProps)
 {
 	auto optionalEnd = std::remove_if(optional.begin(), optional.end(), [&extensions](const char * name)
 	{
-		return std::find(extensions.begin(), extensions.end(), name) != extensions.end();
+		return FindString(extensions.begin(), extensions.end(), name, StringIdentity);
 	});
 		
 	for (auto & props : extensionProps)
 	{
-		if (std::find(optional.begin(), optionalEnd, props.extensionName) != optionalEnd)
+		const char * name = props.extensionName;
+
+		if (FindString(optional.begin(), optionalEnd, props.extensionName, StringIdentity))
 		{
 			extensions.push_back(props.extensionName);
 		}
@@ -202,11 +218,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
     return VK_FALSE;
 }
 
-void RenderSurfaceControl::CreateVulkanState()
+static VkApplicationInfo
+AppInfo()
 {
-	Rtt::VulkanState * state = Rtt_NEW( NULL, Rtt::VulkanState );
-	
-	VkAllocationCallbacks * allocator = NULL; // TODO
 	VkApplicationInfo appInfo = {};
 
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -216,10 +230,20 @@ void RenderSurfaceControl::CreateVulkanState()
 	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.apiVersion = VK_API_VERSION_1_0;
 
+	return appInfo;
+}
+
+#ifndef NDEBUG
+static std::pair< VkInstance, VkDebugUtilsMessengerEXT >
+#else
+static VkInstance
+#endif
+MakeInstance( VkApplicationInfo * appInfo, const VkAllocationCallbacks * allocator )
+{
 	VkInstanceCreateInfo createInfo = {};
 
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	createInfo.pApplicationInfo = &appInfo;
+	createInfo.pApplicationInfo = appInfo;
 
 	std::vector< const char * > extensions = { VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME }, optional;
 	unsigned int extensionCount = 0;
@@ -230,17 +254,46 @@ void RenderSurfaceControl::CreateVulkanState()
 
 	vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, extensionProps.data());
 
+	VkInstance instance = VK_NULL_HANDLE;
+
 #ifndef NDEBUG
-	extensions.push_back()
+	extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
+
 	CollectExtensions(extensions, optional, extensionProps);
 
 	createInfo.enabledExtensionCount = extensions.size();
 	createInfo.ppEnabledExtensionNames = extensions.data();
-	createInfo.enabledLayerCount = 0;
+
+	bool ok = true;
 
 #ifndef NDEBUG
-	// TODO: validation layers
+    uint32_t layerCount;
+
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+	
+	const std::vector<const char*> validationLayers = { "VK_LAYER_KHRONOS_validation" };
+    std::vector<VkLayerProperties> availableLayers(layerCount);
+
+    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+	for (const char * layerName : validationLayers)
+	{
+		if (!FindString(availableLayers.begin(), availableLayers.end(), layerName, [](const VkLayerProperties & props)
+		{
+			return props.layerName;
+		}))
+		{
+			CoronaLog( "Unable to find layer %s", layerName );
+
+			ok = false;
+
+			break;
+		}
+	}
+
+	createInfo.enabledLayerCount = validationLayers.size();
+	createInfo.ppEnabledLayerNames = validationLayers.data();
 
 	VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {};
 
@@ -252,33 +305,213 @@ void RenderSurfaceControl::CreateVulkanState()
 	createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debugCreateInfo;
 #endif
 
-	VkInstance instance;
-
-	if (VK_SUCCESS == vkCreateInstance(&createInfo, allocator, &instance))
+	if (ok && vkCreateInstance(&createInfo, allocator, &instance) != VK_SUCCESS)
 	{
-		state->SetInstance(instance);
-	}
+		CoronaLog( "Failed to create instance!\n" );
 
-	else
-	{
-		Rtt_LogException( "Failed to create instance!\n" );
+		ok = false;
 	}
 
 #ifndef NDEBUG
-	VkDebugUtilsMessengerEXT messenger;
+	VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 
-	if (VK_SUCCESS == CreateDebugUtilsMessengerEXT(instance, &debugCreateInfo, allocator, &messenger))
+	if (ok)
 	{
-		state->SetDebugMessenger(messenger);
+		auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+
+		if (!func || VK_SUCCESS == func(instance, &debugCreateInfo, allocator, &messenger) != VK_SUCCESS)
+		{
+			CoronaLog( "Failed to create debug messenger!\n" );
+
+			vkDestroyInstance(instance, allocator);
+
+			instance = VK_NULL_HANDLE;
+		}
 	}
 
-	else
+	return std::make_pair( instance, messenger );
+#else
+	return instance;
+#endif
+}
+
+static VkSurfaceKHR
+MakeSurface( VkInstance instance, HWND handle, const VkAllocationCallbacks * allocator )
+{
+	VkWin32SurfaceCreateInfoKHR createSurfaceInfo = {};
+
+	createSurfaceInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+	createSurfaceInfo.hwnd = handle;
+	createSurfaceInfo.hinstance = GetModuleHandle(nullptr);
+
+	VkSurfaceKHR surface;
+
+	if (vkCreateWin32SurfaceKHR(instance, &createSurfaceInfo, allocator, &surface) != VK_SUCCESS)
 	{
-		Rtt_LogException( "Failed to create debug messenger!\n" );
+		CoronaLog("Failed to create window surface!");
+
+		surface = VK_NULL_HANDLE;
 	}
+
+	return surface;
+}
+
+struct Queues {
+	Queues()
+:	fGraphicsQueue( ~0U ),
+	fPresentQueue( ~0U )
+	{
+	}
+
+	uint32_t fGraphicsQueue;
+	uint32_t fPresentQueue;
+
+	bool isComplete() const { return fGraphicsQueue != ~0U && fPresentQueue != ~0U; }
+};
+
+static bool
+IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues )
+{
+	uint32_t queueFamilyCount;
+
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+	for (uint32_t i = 0; i < queueFamilyCount; ++i)
+	{
+		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+		{
+			queues.fGraphicsQueue = i;
+		}
+
+		VkBool32 supported;
+
+		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &supported);
+
+		if (supported)
+		{
+			queues.fPresentQueue = i;
+		}
+	}
+
+	if (!queues.isComplete())
+	{
+		return false;
+	}
+
+	// TODO: swap chain, 
+
+	return true;
+}
+
+static std::pair< VkPhysicalDevice, Queues >
+ChooseDevice( VkInstance instance, VkSurfaceKHR surface )
+{
+	uint32_t deviceCount;
+
+	vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+	if (0U == deviceCount)
+	{
+		CoronaLog("Failed to find GPUs with Vulkan support!");
+
+		return std::make_pair(VkPhysicalDevice(VK_NULL_HANDLE), Queues());
+	}
+
+	std::vector<VkPhysicalDevice> devices(deviceCount);
+
+	vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+	
+	VkPhysicalDevice bestDevice = VK_NULL_HANDLE;
+	uint32_t bestScore = 0U;
+	Queues bestQueues;
+
+	for (const VkPhysicalDevice & device : devices)
+	{
+		Queues queues;
+
+		if (!IsSuitableDevice(device, surface, queues))
+		{
+			continue;
+		}
+
+		VkPhysicalDeviceProperties deviceProperties;
+		VkPhysicalDeviceFeatures deviceFeatures;
+
+	    vkGetPhysicalDeviceProperties(device, &deviceProperties);
+		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+		
+		uint32_t score = 0U;
+
+		// Discrete GPUs have a significant performance advantage
+		if (VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU == deviceProperties.deviceType)
+		{
+			score += 1000U;
+		}
+
+		// Maximum possible size of textures affects graphics quality
+		score += deviceProperties.limits.maxImageDimension2D;
+
+		// other ideas: ETC2 etc. texture compression
+
+		if (score > bestScore)
+		{
+			bestDevice = device;
+			bestScore = score;
+			bestQueues = queues;
+		}
+	}
+
+	return std::make_pair(bestDevice, bestQueues);
+}
+
+bool RenderSurfaceControl::CreateVulkanState()
+{
+	Rtt::VulkanState * state = Rtt_NEW( NULL, Rtt::VulkanState );
+	
+	fVulkanState = state; // if we encounter an error we'll need to destroy this, so assign it early
+
+	VkAllocationCallbacks * allocator = NULL; // TODO
+
+	VkInstanceCreateInfo createInfo = {};
+	VkApplicationInfo appInfo = AppInfo();
+	auto instanceData = MakeInstance(&appInfo, allocator);
+
+#ifndef NDEBUG
+	state->SetDebugMessenger(instanceData.second);
+
+	VkInstance instance = instanceData.first;
+#else
+	VkInstance instance = instanceData;
 #endif
 
-	fVulkanState = state;
+	if (instance != VK_NULL_HANDLE)
+	{
+		state->SetInstance(instance);
+
+		VkSurfaceKHR surface = MakeSurface(instance, GetWindowHandle(), allocator);
+
+		if (surface != VK_NULL_HANDLE)
+		{
+			state->SetSurface(surface);
+
+			auto physicalDeviceData = ChooseDevice(instance, surface);
+
+			if (physicalDeviceData.first != VK_NULL_HANDLE)
+			{
+				state->SetPhysicalDevice(physicalDeviceData.first);
+
+				// TODO: queues
+
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 // /STEVE CHANGE

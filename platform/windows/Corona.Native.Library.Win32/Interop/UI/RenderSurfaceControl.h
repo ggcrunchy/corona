@@ -220,7 +220,7 @@ class RenderSurfaceControl : public Control
 		///  <para>Creates Vulkan state for the currently referenced control.</para>
 		///  <para>Will destroy the last state or context if still active.</para>
 		/// </summary>
-		void CreateVulkanState();
+		bool CreateVulkanState();
 
 		/// <summary>Destroys the last created rendering context.</summary>
 		void DestroyContext();

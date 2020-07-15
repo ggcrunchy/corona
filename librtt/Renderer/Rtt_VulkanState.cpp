@@ -24,12 +24,16 @@ VulkanState::VulkanState()
 	fDebugMessenger( VK_NULL_HANDLE ),
 #endif
     fDevice( VK_NULL_HANDLE ),
-    fPhysicalDevice( VK_NULL_HANDLE )
+    fPhysicalDevice( VK_NULL_HANDLE ),
+    fGraphicsQueue( VK_NULL_HANDLE ),
+    fPresentQueue( VK_NULL_HANDLE ),
+    fSurface( VK_NULL_HANDLE )
 {
 }
 
 VulkanState::~VulkanState()
 {
+    vkDestroySurfaceKHR(fInstance, fSurface, fAllocationCallbacks);
     vkDestroyDevice(fDevice, fAllocationCallbacks);
 #ifndef NDEBUG
     auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(fInstance, "vkDestroyDebugUtilsMessengerEXT");

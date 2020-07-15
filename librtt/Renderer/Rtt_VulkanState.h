@@ -41,6 +41,10 @@ class VulkanState
 		void SetDevice( VkDevice device ) { fDevice = device; }
 		VkPhysicalDevice GetPhysicalDevice() const { return fPhysicalDevice; }
 		void SetPhysicalDevice( VkPhysicalDevice physicalDevice ) { fPhysicalDevice = physicalDevice; }
+		VkQueue GetGraphicsQueue() const { return fGraphicsQueue; }
+		void SetGraphicsQueue( VkQueue queue ) { fGraphicsQueue = queue; }
+		VkQueue GetPresentQueue() const { return fPresentQueue; }
+		void SetSurface( VkSurfaceKHR surface ) { fSurface = surface; }
 
 	#ifndef NDEBUG
 		void SetDebugMessenger( VkDebugUtilsMessengerEXT messenger ) { fDebugMessenger = messenger; }
@@ -54,6 +58,9 @@ class VulkanState
 	#endif
 		VkDevice fDevice;
 		VkPhysicalDevice fPhysicalDevice;
+		VkQueue fGraphicsQueue;
+		VkQueue fPresentQueue;
+		VkSurfaceKHR fSurface;
 };
 
 // ----------------------------------------------------------------------------
