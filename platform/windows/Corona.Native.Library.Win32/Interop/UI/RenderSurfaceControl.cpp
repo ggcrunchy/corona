@@ -246,7 +246,7 @@ MakeInstance( VkApplicationInfo * appInfo, const VkAllocationCallbacks * allocat
 	createInfo.pApplicationInfo = appInfo;
 
 	std::vector< const char * > extensions = { VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME }, optional;
-	unsigned int extensionCount = 0;
+	unsigned int extensionCount = 0U;
 
 	vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, NULL);
 
@@ -367,12 +367,29 @@ struct Queues {
 	uint32_t fPresentQueue;
 
 	bool isComplete() const { return fGraphicsQueue != ~0U && fPresentQueue != ~0U; }
+
+	std::vector<uint32_t> GetFamilies() const
+	{
+		std::vector<uint32_t> families;
+
+		if (isComplete())
+		{
+			families.push_back(fGraphicsQueue);
+
+			if (fGraphicsQueue != fPresentQueue)
+			{
+				families.push_back(fPresentQueue);
+			}
+		}
+
+		return families;
+	}
 };
 
 static bool
 IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues )
 {
-	uint32_t queueFamilyCount;
+	uint32_t queueFamilyCount = 0U;
 
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
@@ -387,7 +404,7 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 			queues.fGraphicsQueue = i;
 		}
 
-		VkBool32 supported;
+		VkBool32 supported = VK_FALSE;
 
 		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &supported);
 
@@ -402,15 +419,35 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 		return false;
 	}
 
-	// TODO: swap chain, 
+	uint32_t extensionCount = 0U;
 
-	return true;
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+	std::vector< const char * > extensions, required = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
+	CollectExtensions(extensions, required, availableExtensions);
+
+	if (extensions.size() != required.size())
+	{
+		return false;
+	}
+
+	uint32_t formatCount = 0U, presentModeCount = 0U;
+
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+
+	return formatCount != 0U && presentModeCount != 0U;
 }
 
 static std::pair< VkPhysicalDevice, Queues >
-ChooseDevice( VkInstance instance, VkSurfaceKHR surface )
+ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 {
-	uint32_t deviceCount;
+	uint32_t deviceCount = 0U;
 
 	vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
@@ -468,6 +505,45 @@ ChooseDevice( VkInstance instance, VkSurfaceKHR surface )
 	return std::make_pair(bestDevice, bestQueues);
 }
 
+static VkDevice
+MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> & families, const VkAllocationCallbacks * allocator )
+{
+	VkDeviceCreateInfo createDeviceInfo = {};
+
+	createDeviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+
+	for (uint32_t index : families)
+	{
+		VkDeviceQueueCreateInfo queueCreateInfo = {};
+
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = index;
+		queueCreateInfo.queueCount = 1;
+
+		queueCreateInfos.push_back(queueCreateInfo);
+	}
+
+	createDeviceInfo.pQueueCreateInfos = queueCreateInfos.data();
+	createDeviceInfo.queueCreateInfoCount = queueCreateInfos.size();
+
+	VkPhysicalDeviceFeatures deviceFeatures = {};
+
+	createDeviceInfo.pEnabledFeatures = &deviceFeatures;
+
+	VkDevice device;
+
+	if (vkCreateDevice(physicalDevice, &createDeviceInfo, allocator, &device) != VK_SUCCESS)
+	{
+		CoronaLog("Failed to create logical device!");
+
+		return VK_NULL_HANDLE;
+	}
+
+	return device;
+}
+
 bool RenderSurfaceControl::CreateVulkanState()
 {
 	Rtt::VulkanState * state = Rtt_NEW( NULL, Rtt::VulkanState );
@@ -498,15 +574,26 @@ bool RenderSurfaceControl::CreateVulkanState()
 		{
 			state->SetSurface(surface);
 
-			auto physicalDeviceData = ChooseDevice(instance, surface);
+			auto physicalDeviceData = ChoosePhysicalDevice(instance, surface);
 
 			if (physicalDeviceData.first != VK_NULL_HANDLE)
 			{
 				state->SetPhysicalDevice(physicalDeviceData.first);
 
-				// TODO: queues
+				VkDevice device = MakeLogicalDevice(physicalDeviceData.first, physicalDeviceData.second.GetFamilies(), allocator);
 
-				return true;
+				if (device != VK_NULL_HANDLE)
+				{
+					VkQueue graphicsQueue, presentQueue;
+
+					vkGetDeviceQueue(device, physicalDeviceData.second.fGraphicsQueue, 0, &graphicsQueue);
+					vkGetDeviceQueue(device, physicalDeviceData.second.fPresentQueue, 0, &presentQueue);
+
+					state->SetGraphicsQueue(graphicsQueue);
+					state->SetPresentQueue(presentQueue);
+
+					return true;
+				}
 			}
 		}
 	}
@@ -529,7 +616,12 @@ void RenderSurfaceControl::CreateContext()
 // STEVE CHANGE
 	if (false) // wantVulkan
 	{
-		CreateVulkanState();
+		if (!CreateVulkanState())
+		{
+			// clean up
+				// only preferred?
+				// required?
+		}
 	}
 // /STEVE CHANGE
 	// Query the video hardware for multisampling result.
