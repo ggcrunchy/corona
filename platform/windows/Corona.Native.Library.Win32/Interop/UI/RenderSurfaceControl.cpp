@@ -31,7 +31,7 @@
 namespace Interop { namespace UI {
 
 #pragma region Constructors/Destructors
-RenderSurfaceControl::RenderSurfaceControl(HWND windowHandle)
+RenderSurfaceControl::RenderSurfaceControl(HWND windowHandle, const Params & params) // <- STEVE CHANGE
 :	Control(windowHandle),
 	fReceivedMessageEventHandler(this, &RenderSurfaceControl::OnReceivedMessage),
 	fRenderFrameEventHandlerPointer(nullptr),
@@ -46,7 +46,7 @@ RenderSurfaceControl::RenderSurfaceControl(HWND windowHandle)
 	GetReceivedMessageEventHandlers().Add(&fReceivedMessageEventHandler);
 
 	// Create an OpenGL context and bind it to the given control.
-	CreateContext();
+	CreateContext(params); // <- STEVE CHANGE
 }
 
 RenderSurfaceControl::~RenderSurfaceControl()
@@ -215,7 +215,7 @@ bool RenderSurfaceControl::CreateVulkanState()
 }
 
 // /STEVE CHANGE
-void RenderSurfaceControl::CreateContext()
+void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHANGE
 {
 	// Fetch this control's window handle.
 	auto windowHandle = GetWindowHandle();
@@ -227,13 +227,17 @@ void RenderSurfaceControl::CreateContext()
 	// Destroy the last OpenGL context that was created.
 	DestroyContext();
 // STEVE CHANGE
-	if (false) // wantVulkan
+	if (params.IsVulkanWanted() && !CreateVulkanState())
 	{
-		if (!CreateVulkanState())
+		DestroyContext();
+
+		if (params.IsVulkanRequired())
 		{
-			// clean up
-				// only preferred?
-				// required?
+			Rtt_LogException( "Unable to instantiate Vulkan");
+
+			// TODO: anything else?
+
+			return;
 		}
 	}
 // /STEVE CHANGE
@@ -689,5 +693,33 @@ int RenderSurfaceControl::Version::CompareTo(const RenderSurfaceControl::Version
 }
 
 #pragma endregion
+
+// STEVE CHANGE
+#pragma region Params Class
+
+RenderSurfaceControl::Params::Params()
+:	fWantVulkan( false ),
+	fRequireVulkan( false )
+{
+}
+
+void RenderSurfaceControl::Params::SetVulkanWanted(bool required)
+{
+	fWantVulkan = true;
+	fRequireVulkan = required;
+}
+			
+bool RenderSurfaceControl::Params::IsVulkanWanted() const
+{
+	return fWantVulkan;
+}
+			
+bool RenderSurfaceControl::Params::IsVulkanRequired() const
+{
+	return fRequireVulkan;
+}
+
+#pragma endregion
+// /STEVE CHANGE
 
 } }	// namespace Interop::UI

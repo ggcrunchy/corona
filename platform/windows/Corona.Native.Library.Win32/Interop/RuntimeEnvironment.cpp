@@ -292,7 +292,17 @@ RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment::CreationSetting
 		}
 
 		// Wrap the given control with our rendering surface adapter and set up event handlers.
-		fRenderSurfacePointer = new Interop::UI::RenderSurfaceControl(settings.RenderSurfaceHandle);
+		// STEVE CHANGE
+		Interop::UI::RenderSurfaceControl::Params params;
+		const char * backend = fReadOnlyProjectSettings.Backend();
+		bool requireVulkan = strcmp(backend, "requireVulkan") == 0;
+
+		if (requireVulkan || strcmp(backend, "wantVulkan") == 0)
+		{
+			params.SetVulkanWanted(requireVulkan);
+		}
+		// /STEVE CHANGE
+		fRenderSurfacePointer = new Interop::UI::RenderSurfaceControl(settings.RenderSurfaceHandle, params); // <- STEVE CHANGE
 		fRenderSurfacePointer->SetRenderFrameHandler(&fRenderFrameEventHandler);
 		fRenderSurfacePointer->GetDestroyingEventHandlers().Add(&fDestroyingSurfaceEventHandler);
 		fRenderSurfacePointer->GetResizedEventHandlers().Add(&fSurfaceResizedEventHandler);

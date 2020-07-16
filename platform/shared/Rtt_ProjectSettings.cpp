@@ -340,6 +340,19 @@ bool ProjectSettings::LoadFromDirectory(const char* directoryPath)
 		fHasConfigLua = true;
 		wasConfigLuaFound = true;
 
+	// STEVE CHANGE
+		lua_getfield(luaStatePointer, -1, "backend");
+		if (lua_isstring(luaStatePointer, -1))
+		{
+			const char * backend = lua_tostring(luaStatePointer, -1);
+
+			if (strcmp(backend, "wantVulkan") == 0 || strcmp(backend, "requireVulkan") == 0)
+			{
+				fBackend = backend;
+			}
+		}
+		lua_pop(luaStatePointer, 1);
+	// /STEVE CHANGE
 		// Fetch the project's content scaling settings.
 		lua_getfield(luaStatePointer, -1, "content");
 		if (lua_istable(luaStatePointer, -1))
@@ -501,6 +514,9 @@ void ProjectSettings::ResetBuildSettings()
 	fIsWindowMaximizeButtonEnabled = false;
 	fLocalizedWindowTitleTextMap.clear();
 	fIsWindowTitleShown = true;
+// STEVE CHANGE
+	fBackend = "gl";
+// /STEVE CHANGE
 }
 
 void ProjectSettings::ResetConfigLuaSettings()
@@ -737,6 +753,13 @@ bool ProjectSettings::IsWindowTitleShown() const
 {
 	return fIsWindowTitleShown;
 }
+
+// STEVE CHANGE
+std::string ProjectSettings::Backend() const
+{
+	return fBackend;
+}
+// /STEVE CHANGE
 
 void ProjectSettings::OnLoadedFrom(lua_State* luaStatePointer)
 {

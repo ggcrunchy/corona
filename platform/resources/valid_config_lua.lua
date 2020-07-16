@@ -21,6 +21,10 @@ application = {
 	launchPad = true,
 	showRuntimeErrors = true,
 
+	-- STEVE CHANGE
+	backend = "gl",
+	-- /STEVE CHANGE
+
 	content = {
 		graphicsCompatibility = 1,
 		width = 1,
