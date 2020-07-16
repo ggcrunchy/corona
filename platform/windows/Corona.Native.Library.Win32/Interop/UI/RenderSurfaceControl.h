@@ -91,6 +91,32 @@ class RenderSurfaceControl : public Control
 
 		#pragma endregion
 
+		// STEVE CHANGE
+		#pragma region Params Class
+		/// <summary>
+		///  Construction parameters for the control, originating from user settings.
+		/// </summary>
+		class Params {
+		public:
+			Params();
+
+			/// <summary>Set Vulkan as the preferred rendering backend.</summary>
+			/// <param name="required">If true, we must use Vulkan, else fail; otherwise, we can fall back to OpenGL.</param>
+			void SetVulkanWanted(bool required);
+			
+			/// <summary>Get the Vulkan-related preferred backend status.</summary>
+			/// <returns>Returns true if Vulkan is the preferred backend, false otherwise.</returns>
+			bool IsVulkanWanted() const;
+			
+			/// <summary>Get the Vulkan-related backend necessity status.</summary>
+			/// <returns>Returns true if Vulkan must be the backend; if optional or not even requested, false.</returns>
+			bool IsVulkanRequired() const;
+
+		private:
+			bool fWantVulkan;
+			bool fRequireVulkan;
+		};
+		// /STEVE CHANGE
 
 		#pragma region Constructors/Destructors
 		/// <summary>Creates a new render surface which wraps the given window handle.</summary>
@@ -98,7 +124,7 @@ class RenderSurfaceControl : public Control
 		///  <para>Handle to a Windows control to render to.</para>
 		///  <para>Can be null, but then this render surface object will do nothing.</para>
 		/// </param>
-		RenderSurfaceControl(HWND windowHandle);
+		RenderSurfaceControl(HWND windowHandle, const Params & params = Params()); // <- STEVE CHANGE
 
 		/// <summary>Destroys this object.</summary>
 		virtual ~RenderSurfaceControl();
@@ -211,10 +237,11 @@ class RenderSurfaceControl : public Control
 		FetchMultisampleFormatResult FetchMultisampleFormat();
 
 		/// <summary>
+		/// <param name="params">Construction parameters.</param>
 		///  <para>Creates a new rendering context for the currently referenced control.</para>
 		///  <para>Will destroy the last context if still active.</para>
 		/// </summary>
-		void CreateContext();
+		void CreateContext(const Params & params);
 
 		/// <summary>
 		///  <para>Creates Vulkan state for the currently referenced control.</para>
