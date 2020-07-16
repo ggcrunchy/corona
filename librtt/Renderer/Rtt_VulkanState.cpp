@@ -32,7 +32,7 @@ VulkanState::VulkanState()
     fGraphicsQueue( VK_NULL_HANDLE ),
     fPresentQueue( VK_NULL_HANDLE ),
     fSurface( VK_NULL_HANDLE ),
-	fSampleCount( 1U )
+	fSampleCountFlags( VK_SAMPLE_COUNT_1_BIT )
 {
 }
 
@@ -392,6 +392,11 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 
 	createDeviceInfo.pEnabledFeatures = &deviceFeatures;
 
+	const char * deviceExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
+	createDeviceInfo.enabledExtensionCount = 1U;
+	createDeviceInfo.ppEnabledExtensionNames = deviceExtensions;
+
 	VkDevice device;
 
 	if (vkCreateDevice( physicalDevice, &createDeviceInfo, allocator, &device ) != VK_SUCCESS)
@@ -407,10 +412,8 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 bool
 VulkanState::PopulatePreSwapChainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback )
 {
-	const VkAllocationCallbacks * allocator = state.GetAllocationCallbacks();
-
-	VkInstanceCreateInfo createInfo = {};
 	VkApplicationInfo appInfo = AppInfo();
+	const VkAllocationCallbacks * allocator = state.GetAllocationCallbacks();
 	auto instanceData = MakeInstance( &appInfo, surfaceCallback.extension, allocator );
 
 #ifndef NDEBUG
@@ -461,17 +464,98 @@ VulkanState::PopulatePreSwapChainDetails( VulkanState & state, const NewSurfaceC
 bool
 VulkanState::GetMultisampleDetails( VulkanState & state )
 {
-	// TODO!
+    VkPhysicalDeviceProperties physicalDeviceProperties;
 
-	return false;
+    vkGetPhysicalDeviceProperties( state.GetPhysicalDevice(), &physicalDeviceProperties );
+
+    VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+
+    if (counts & VK_SAMPLE_COUNT_64_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_64_BIT;
+	}
+
+    else if (counts & VK_SAMPLE_COUNT_32_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_32_BIT;
+	}
+
+    else if (counts & VK_SAMPLE_COUNT_16_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_16_BIT;
+	}
+
+    else if (counts & VK_SAMPLE_COUNT_8_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_8_BIT;
+	}
+
+    else if (counts & VK_SAMPLE_COUNT_4_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_4_BIT;
+	}
+
+    else if (counts & VK_SAMPLE_COUNT_2_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_2_BIT;
+	}
+
+	else
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_1_BIT;
+	}
+
+	return true;
 }
 
 bool
-VulkanState::GetSwapchainFormat( VulkanState & state )
+VulkanState::GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height )
 {
-	// TODO!
+	VkPhysicalDevice device = state.GetPhysicalDevice();
+	VkSurfaceKHR surface = state.GetSurface();
+	uint32_t formatCount, presentModeCount;
 
-	return false;
+	vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, NULL );
+	vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, NULL );
+
+	std::vector< VkSurfaceFormatKHR > formats( formatCount );
+	std::vector< VkPresentModeKHR > presentModes( presentModeCount );
+
+	vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, formats.data() );
+	vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, presentModes.data() );
+
+	VkSurfaceFormatKHR format = formats.front();
+
+	for (const VkSurfaceFormatKHR & formatInfo : formats)
+	{
+		if (VK_FORMAT_B8G8R8A8_SRGB == formatInfo.format && VK_COLOR_SPACE_SRGB_NONLINEAR_KHR == formatInfo.colorSpace)
+		{
+            format = formatInfo;
+
+			break;
+        }
+	}
+
+	VkPresentModeKHR mode = VK_PRESENT_MODE_FIFO_KHR;
+
+	for (const VkPresentModeKHR & presentMode : presentModes)
+	{
+		if (VK_PRESENT_MODE_MAILBOX_KHR == presentMode)
+		{
+			mode = presentMode;
+		}
+	}
+
+	VkSurfaceCapabilitiesKHR capabilities;
+
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities);
+
+    state.fSwapchainExtent.width = std::max( capabilities.minImageExtent.width, std::min( capabilities.maxImageExtent.width, width ) );
+	state.fSwapchainExtent.height = std::max( capabilities.minImageExtent.height, std::min( capabilities.maxImageExtent.height, height ) );
+	state.fSwapchainFormat = format;
+	state.fPresentMode = mode;
+
+	return true;
 }
 
 // ----------------------------------------------------------------------------

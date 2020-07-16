@@ -247,7 +247,7 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 	// STEVE CHANGE
 	if (fVulkanState)
 	{
-		if (!Rtt::VulkanState::GetSwapchainFormat( *static_cast< Rtt::VulkanState * >( fVulkanState ) ))
+		if (!Rtt::VulkanState::GetSwapchainDetails( *static_cast< Rtt::VulkanState * >( fVulkanState ), uint32_t( GetClientWidth() ), uint32_t( GetClientHeight() ) ))
 		{
 			DestroyContext();
 
