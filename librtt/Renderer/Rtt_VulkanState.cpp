@@ -31,7 +31,8 @@ VulkanState::VulkanState()
     fPhysicalDevice( VK_NULL_HANDLE ),
     fGraphicsQueue( VK_NULL_HANDLE ),
     fPresentQueue( VK_NULL_HANDLE ),
-    fSurface( VK_NULL_HANDLE )
+    fSurface( VK_NULL_HANDLE ),
+	fSampleCount( 1U )
 {
 }
 
@@ -453,6 +454,22 @@ VulkanState::PopulatePreSwapChainDetails( VulkanState & state, const NewSurfaceC
 			}
 		}
 	}
+
+	return false;
+}
+
+bool
+VulkanState::GetMultisampleDetails( VulkanState & state )
+{
+	// TODO!
+
+	return false;
+}
+
+bool
+VulkanState::GetSwapchainFormat( VulkanState & state )
+{
+	// TODO!
 
 	return false;
 }

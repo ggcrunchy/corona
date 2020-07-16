@@ -79,11 +79,16 @@ void RenderSurfaceControl::SetRenderFrameHandler(RenderSurfaceControl::RenderFra
 
 void RenderSurfaceControl::SelectRenderingContext()
 {
+	// STEVE CHANGE
+	if (fVulkanState)
+	{
+		return;
+	}
+	// /STEVE CHANGE
 	// Attempt to select this surface's rendering context.
 	BOOL wasSelected = FALSE;
 	if (fRenderingContextHandle)
 	{
-// STEVE CHANGE TODO
 		// Favor the Win32 BeginPaint() function's device context over our main device context, if available.
 		if (fPaintDeviceContextHandle)
 		{
@@ -93,7 +98,7 @@ void RenderSurfaceControl::SelectRenderingContext()
 		{
 			wasSelected = ::wglMakeCurrent(fMainDeviceContextHandle, fRenderingContextHandle);
 		}
-// /STEVE CHANGE
+
 		// Log an error if we've failed to select a rendering context.
 		// Note: This can happen while the control is being destroyed.
 		if (!wasSelected)
@@ -123,14 +128,18 @@ void RenderSurfaceControl::SelectRenderingContext()
 	// If we've failed, then select a null context so that the caller won't clobber another rendering context by mistake.
 	if (!wasSelected)
 	{
-		// STEVE CHANGE TODO
 		::wglMakeCurrent(nullptr, nullptr);
-		// /STEVE CHANGE
 	}
 }
 
 void RenderSurfaceControl::SwapBuffers()
 {
+// STEVE CHANGE
+	if (fVulkanState)
+	{
+		return;
+	}
+// /STEVE CHANGE
 	if (fPaintDeviceContextHandle)
 	{
 		::SwapBuffers(fPaintDeviceContextHandle);
@@ -231,90 +240,108 @@ void RenderSurfaceControl::CreateContext()
 	// Query the video hardware for multisampling result.
 	auto multisampleTestResult = FetchMultisampleFormat();
 
-	// Fetch the control's device context.
-	fMainDeviceContextHandle = ::GetDC(windowHandle);
-	if (!fMainDeviceContextHandle)
+	// STEVE CHANGE
+	if (fVulkanState)
 	{
-		return;
-	}
-
-	// Select a good pixel format.
-	PIXELFORMATDESCRIPTOR pixelFormatDescriptor {};
-	pixelFormatDescriptor.nSize = sizeof(pixelFormatDescriptor);
-	pixelFormatDescriptor.nVersion = 1;
-	pixelFormatDescriptor.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-	pixelFormatDescriptor.iPixelType = PFD_TYPE_RGBA;
-	pixelFormatDescriptor.cColorBits = 24;
-	pixelFormatDescriptor.cDepthBits = 16;
-	pixelFormatDescriptor.iLayerType = PFD_MAIN_PLANE;
-	int pixelFormatIndex = ::ChoosePixelFormat(fMainDeviceContextHandle, &pixelFormatDescriptor);
-	if (0 == pixelFormatIndex)
-	{
-		DestroyContext();
-		return;
-	}
-
-	// Assign a pixel format to the device context.
-	if (multisampleTestResult.IsSupported)
-	{
-		pixelFormatIndex = multisampleTestResult.PixelFormatIndex;
-	}
-	BOOL wasFormatSet = ::SetPixelFormat(fMainDeviceContextHandle, pixelFormatIndex, &pixelFormatDescriptor);
-	if (!wasFormatSet)
-	{
-		DestroyContext();
-		return;
-	}
-
-	// Create and enable the OpenGL rendering context.
-// STEVE CHANGE TODO
-	fRenderingContextHandle = ::wglCreateContext(fMainDeviceContextHandle);
-// /STEVE CHANGE
-	if (!fRenderingContextHandle)
-	{
-		LPWSTR utf16Buffer;
-		auto errorCode = ::GetLastError();
-		::FormatMessageW(
-				FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-				nullptr, errorCode,
-				MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-				(LPWSTR)&utf16Buffer, 0, nullptr);
-		if (utf16Buffer && utf16Buffer[0])
+		if (!Rtt::VulkanState::GetSwapchainFormat( *static_cast< Rtt::VulkanState * >( fVulkanState ) ))
 		{
-			WinString stringConverter;
-			stringConverter.SetUTF16(utf16Buffer);
-			Rtt_LogException("Failed to create OpenGL rendering context. Reason:\r\n  %s\r\n", stringConverter.GetUTF8());
+			DestroyContext();
+
+			return;
 		}
-		else
-		{
-			Rtt_LogException("Failed to create OpenGL rendering context.\r\n");
-		}
-		::LocalFree(utf16Buffer);
+
+		// TODO: renderer version
 	}
-// STEVE CHANGE TODO
-	// Select the newly created OpenGL context.
-	::wglMakeCurrent(fMainDeviceContextHandle, fRenderingContextHandle);
 
-	// Load OpenGL extensions.
-	glewInit();
-
-	// Fetch the OpenGL driver's version.
-	const char* versionString = (const char*)glGetString(GL_VERSION);
-// STEVE CHANGE
-	fRendererVersion.SetString(versionString);
-	fRendererVersion.SetMajorNumber(0);
-	fRendererVersion.SetMinorNumber(0);
-	if (versionString && (versionString[0] != '\0'))
+	else
 	{
-		try
+		// /STEVE CHANGE
+
+		// Fetch the control's device context.
+		fMainDeviceContextHandle = ::GetDC(windowHandle);
+		if (!fMainDeviceContextHandle)
 		{
-			int majorNumber = 0;
-			int minorNumber = 0;
-			sscanf_s(fRendererVersion.GetString(), "%d.%d", &majorNumber, &minorNumber);
-			fRendererVersion.SetMajorNumber(majorNumber);
-			fRendererVersion.SetMinorNumber(minorNumber);
+			return;
 		}
-		catch (...) {}
+
+		// Select a good pixel format.
+		PIXELFORMATDESCRIPTOR pixelFormatDescriptor {};
+		pixelFormatDescriptor.nSize = sizeof(pixelFormatDescriptor);
+		pixelFormatDescriptor.nVersion = 1;
+		pixelFormatDescriptor.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+		pixelFormatDescriptor.iPixelType = PFD_TYPE_RGBA;
+		pixelFormatDescriptor.cColorBits = 24;
+		pixelFormatDescriptor.cDepthBits = 16;
+		pixelFormatDescriptor.iLayerType = PFD_MAIN_PLANE;
+		int pixelFormatIndex = ::ChoosePixelFormat(fMainDeviceContextHandle, &pixelFormatDescriptor);
+		if (0 == pixelFormatIndex)
+		{
+			DestroyContext();
+			return;
+		}
+
+		// Assign a pixel format to the device context.
+		if (multisampleTestResult.IsSupported)
+		{
+			pixelFormatIndex = multisampleTestResult.PixelFormatIndex;
+		}
+		BOOL wasFormatSet = ::SetPixelFormat(fMainDeviceContextHandle, pixelFormatIndex, &pixelFormatDescriptor);
+		if (!wasFormatSet)
+		{
+			DestroyContext();
+			return;
+		}
+
+		// Create and enable the OpenGL rendering context.
+		fRenderingContextHandle = ::wglCreateContext(fMainDeviceContextHandle);
+
+		if (!fRenderingContextHandle)
+		{
+			LPWSTR utf16Buffer;
+			auto errorCode = ::GetLastError();
+			::FormatMessageW(
+					FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+					nullptr, errorCode,
+					MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+					(LPWSTR)&utf16Buffer, 0, nullptr);
+			if (utf16Buffer && utf16Buffer[0])
+			{
+				WinString stringConverter;
+				stringConverter.SetUTF16(utf16Buffer);
+				Rtt_LogException("Failed to create OpenGL rendering context. Reason:\r\n  %s\r\n", stringConverter.GetUTF8());
+			}
+			else
+			{
+				Rtt_LogException("Failed to create OpenGL rendering context.\r\n");
+			}
+			::LocalFree(utf16Buffer);
+		}
+
+		// Select the newly created OpenGL context.
+		::wglMakeCurrent(fMainDeviceContextHandle, fRenderingContextHandle);
+
+		// Load OpenGL extensions.
+		glewInit();
+
+		// Fetch the OpenGL driver's version.
+		const char* versionString = (const char*)glGetString(GL_VERSION);
+
+		fRendererVersion.SetString(versionString);
+		fRendererVersion.SetMajorNumber(0);
+		fRendererVersion.SetMinorNumber(0);
+		if (versionString && (versionString[0] != '\0'))
+		{
+			try
+			{
+				int majorNumber = 0;
+				int minorNumber = 0;
+				sscanf_s(fRendererVersion.GetString(), "%d.%d", &majorNumber, &minorNumber);
+				fRendererVersion.SetMajorNumber(majorNumber);
+				fRendererVersion.SetMinorNumber(minorNumber);
+			}
+			catch (...) {}
+		}
+	// STEVE CHANGE
 	}
 }
 
@@ -373,6 +400,17 @@ RenderSurfaceControl::FetchMultisampleFormatResult RenderSurfaceControl::FetchMu
 	// Initialize a result value to "not supported".
 	FetchMultisampleFormatResult result;
 	result.IsSupported = false;
+
+	// STEVE CHANGE
+	if (fVulkanState)
+	{
+		Rtt::VulkanState::GetMultisampleDetails( *static_cast< Rtt::VulkanState * >( fVulkanState ) );
+
+		result.IsSupported = true;
+
+		return result;
+	}
+	// /STEVE CHANGE
 
 	// Fetch this control's window handle.
 	auto windowHandle = GetWindowHandle();
@@ -573,10 +611,9 @@ void RenderSurfaceControl::OnPaint()
 		}
 		if (false == didDraw)
 		{
-// STEVE CHANGE TODO
 			::glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 			::glClear(GL_COLOR_BUFFER_BIT);
-// /STEVE CHANGE
+
 			SwapBuffers();
 		}
 	}
