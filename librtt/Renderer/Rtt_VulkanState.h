@@ -45,9 +45,9 @@ class VulkanState
 		void SetGraphicsQueue( VkQueue queue ) { fGraphicsQueue = queue; }
 		VkQueue GetPresentQueue() const { return fPresentQueue; }
 		void SetPresentQueue( VkQueue queue ) { fPresentQueue = queue; }
+		VkSurfaceKHR GetSurface() const { return fSurface; }
 		void SetSurface( VkSurfaceKHR surface ) { fSurface = surface; }
-		void SetSampleCount( unsigned int sampleCount ) { fSampleCount = sampleCount; }
-		unsigned int GetSampleCount() const { return fSampleCount; }
+		VkSampleCountFlags GetSampleCountFlags() const { return fSampleCountFlags; }
 
 	public:
 		struct NewSurfaceCallback {
@@ -58,7 +58,7 @@ class VulkanState
 
 		static bool PopulatePreSwapChainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
 		static bool GetMultisampleDetails( VulkanState & state );
-		static bool GetSwapchainFormat( VulkanState & state );
+		static bool GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height );
 
 	#ifndef NDEBUG
 		void SetDebugMessenger( VkDebugUtilsMessengerEXT messenger ) { fDebugMessenger = messenger; }
@@ -75,7 +75,10 @@ class VulkanState
 		VkQueue fGraphicsQueue;
 		VkQueue fPresentQueue;
 		VkSurfaceKHR fSurface;
-		unsigned int fSampleCount;
+		VkSampleCountFlags fSampleCountFlags;
+		VkExtent2D fSwapchainExtent;
+		VkSurfaceFormatKHR fSwapchainFormat;
+		VkPresentModeKHR fPresentMode;
 };
 
 // ----------------------------------------------------------------------------
