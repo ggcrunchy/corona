@@ -7,6 +7,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanProgram.h"
 
 #include "Renderer/Rtt_CommandBuffer.h"
@@ -18,19 +19,20 @@
 #endif
 #include "Core/Rtt_Assert.h"
 #include <shaderc/shaderc.h>
+#include <string>
 /*
 #include <cstdio>
 #include <string.h> // memset.
 #ifdef Rtt_WIN_PHONE_ENV
 	#include <GLES2/gl2ext.h>
 #endif
-	
+*/	
 
 // To reduce memory consumption and startup cost, defer the
-// creation of GL shaders and programs until they're needed.
+// creation of Vulkan shaders and programs until they're needed.
 // Depending on usage, this could result in framerate dips.
-#define DEFER_CREATION 1
-*/
+#define DEFER_VK_CREATION 1
+
 // ----------------------------------------------------------------------------
 
 namespace /*anonymous*/
@@ -89,12 +91,12 @@ namespace /*anonymous*/
 			delete[] infoLog;
 		}
 	}
-	
+	*/
 	const char* kWireframeSource =
 		"void main()" \
 		"{" \
 			"gl_FragColor = vec4(1.0);" \
-		"}";*/
+		"}";
 }
 
 // ----------------------------------------------------------------------------
@@ -104,93 +106,93 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-VulkanProgram::VulkanProgram()
-{/*
+VulkanProgram::VulkanProgram( VulkanState * state )
+:	fState( state )
+{
 	for( U32 i = 0; i < Program::kNumVersions; ++i )
 	{
 		Reset( fData[i] );
-	}*/
+	}
 }
 
 void 
 VulkanProgram::Create( CPUResource* resource )
 {
-	Rtt_ASSERT( CPUResource::kProgram == resource->GetType() );/*
+	Rtt_ASSERT( CPUResource::kProgram == resource->GetType() );
 	fResource = resource;
 	
-	#if !DEFER_CREATION
+	#if !DEFER_VK_CREATION
 		for( U32 i = 0; i < kMaximumMaskCount + 1; ++i )
 		{
 			Create( fData[i], i );
 		}
 	#endif
-	*/
 }
 
 void
 VulkanProgram::Update( CPUResource* resource )
 {
-	Rtt_ASSERT( CPUResource::kProgram == resource->GetType() );	/*
-	if( fData[Program::kMaskCount0].fProgram ) Update( Program::kMaskCount0, fData[Program::kMaskCount0] );
-	if( fData[Program::kMaskCount1].fProgram ) Update( Program::kMaskCount1, fData[Program::kMaskCount1] );
-	if( fData[Program::kMaskCount2].fProgram ) Update( Program::kMaskCount2, fData[Program::kMaskCount2] );
-	if( fData[Program::kMaskCount3].fProgram ) Update( Program::kMaskCount3, fData[Program::kMaskCount3] );
-	if( fData[Program::kWireframe].fProgram ) Update( Program::kWireframe, fData[Program::kWireframe]);*/
+	Rtt_ASSERT( CPUResource::kProgram == resource->GetType() );
+	if( fData[Program::kMaskCount0].IsValid() ) Update( Program::kMaskCount0, fData[Program::kMaskCount0] );
+	if( fData[Program::kMaskCount1].IsValid() ) Update( Program::kMaskCount1, fData[Program::kMaskCount1] );
+	if( fData[Program::kMaskCount2].IsValid() ) Update( Program::kMaskCount2, fData[Program::kMaskCount2] );
+	if( fData[Program::kMaskCount3].IsValid() ) Update( Program::kMaskCount3, fData[Program::kMaskCount3] );
+	if( fData[Program::kWireframe].IsValid() ) Update( Program::kWireframe, fData[Program::kWireframe]);
 }
 
 void 
 VulkanProgram::Destroy()
-{/*
+{
+	const VkAllocationCallbacks * allocator = fState->GetAllocationCallbacks();
+	VkDevice device = fState->GetDevice();
+
 	for( U32 i = 0; i < Program::kNumVersions; ++i )
 	{
 		VersionData& data = fData[i];
-		if( data.fProgram )
+		if( data.IsValid() )
 		{
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
-			glDeleteShader( data.fVertexShader );
-			glDeleteShader( data.fFragmentShader );
+			vkDestroyShaderModule( device, data.fVertexShader, allocator );
+			vkDestroyShaderModule( device, data.fFragmentShader, allocator );
 #endif
-			glDeleteProgram( data.fProgram );
-			GL_CHECK_ERROR();
 			Reset( data );
 		}
-	}*/
+	}
 }
 
 void
 VulkanProgram::Bind( Program::Version version )
-{/*
+{
 	VersionData& data = fData[version];
 	
-	#if DEFER_CREATION
-		if( !data.fProgram )
+	#if DEFER_VK_CREATION
+		if( !data.IsValid() )
 		{
 			Create( version, data );
 		}
 	#endif
-	
-	glUseProgram( data.fProgram );
-	GL_CHECK_ERROR();*/
+
+	// TODO: add to pipeline
 }
-/*
+
+U32 VulkanProgram::sID;
+
 void
-GLProgram::Create( Program::Version version, VersionData& data )
+VulkanProgram::Create( Program::Version version, VersionData& data )
 {
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
+/*
 	data.fVertexShader = glCreateShader( GL_VERTEX_SHADER );
 	data.fFragmentShader = glCreateShader( GL_FRAGMENT_SHADER );
 	GL_CHECK_ERROR();
+*/
 #endif
 
-	data.fProgram = glCreateProgram();
-	GL_CHECK_ERROR();
+	if (data.IsValid())
+	{
+		data.fShadersID = sID++;
+	}
 
-#ifndef Rtt_USE_PRECOMPILED_SHADERS
-	glAttachShader( data.fProgram, data.fVertexShader );
-	glAttachShader( data.fProgram, data.fFragmentShader );
-	GL_CHECK_ERROR();
-#endif
-	
 	Update( version, data );
 }
 
@@ -208,7 +210,7 @@ CountLines( const char **segments, int numSegments )
 }
 
 void
-GLProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data )
+VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data )
 {
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
 	char maskBuffer[] = "#define MASK_COUNT 0\n";
@@ -246,38 +248,40 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 	// Vertex shader.
 	{
 		shader_source[4] = program->GetVertexShaderSource();
-
+/*
 		glShaderSource( data.fVertexShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
 						shader_source,
 						NULL );
-		GL_CHECK_ERROR();
+		GL_CHECK_ERROR();*/
 	}
 
 	// Fragment shader.
 	{
 		shader_source[4] = ( version == Program::kWireframe ) ? kWireframeSource : program->GetFragmentShaderSource();
-
+/*
 		glShaderSource( data.fFragmentShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
 						shader_source,
 						NULL );
-		GL_CHECK_ERROR();
+		GL_CHECK_ERROR();*/
 	}
 #endif
 }
 
 void
-GLProgram::Update( Program::Version version, VersionData& data )
+VulkanProgram::Update( Program::Version version, VersionData& data )
 {
 	Program* program = static_cast<Program*>( fResource );
 
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
+/*
 	glBindAttribLocation( data.fProgram, Geometry::kVertexPositionAttribute, "a_Position" );
 	glBindAttribLocation( data.fProgram, Geometry::kVertexTexCoordAttribute, "a_TexCoord" );
 	glBindAttribLocation( data.fProgram, Geometry::kVertexColorScaleAttribute, "a_ColorScale" );
 	glBindAttribLocation( data.fProgram, Geometry::kVertexUserDataAttribute, "a_UserData" );
 	GL_CHECK_ERROR();
+*/
 #endif
 
 	UpdateShaderSource( program,
@@ -307,27 +311,27 @@ GLProgram::Update( Program::Version version, VersionData& data )
 	bool isVerbose = program->IsCompilerVerbose();
 	int kernelStartLine = 0;
 
-	glCompileShader( data.fVertexShader );
+//	glCompileShader( data.fVertexShader );
 	if ( isVerbose )
 	{
 		kernelStartLine = data.fHeaderNumLines + program->GetVertexShellNumLines();
-	}
+	}/*
 	CheckShaderCompilationStatus( data.fVertexShader, isVerbose, "vertex", kernelStartLine );
 	GL_CHECK_ERROR();
 
-	glCompileShader( data.fFragmentShader );
+	glCompileShader( data.fFragmentShader );*/
 	if ( isVerbose )
 	{
 		kernelStartLine = data.fHeaderNumLines + program->GetFragmentShellNumLines();
-	}
+	}/*
 	CheckShaderCompilationStatus( data.fFragmentShader, isVerbose, "fragment", kernelStartLine );
 	GL_CHECK_ERROR();
 
 	glLinkProgram( data.fProgram );
 	CheckProgramLinkStatus( data.fProgram, isVerbose );
-	GL_CHECK_ERROR();
+	GL_CHECK_ERROR();*/
 #endif
-
+	/*
 	data.fUniformLocations[Uniform::kViewProjectionMatrix] = glGetUniformLocation( data.fProgram, "u_ViewProjectionMatrix" );
 	GL_CHECK_ERROR();
 	data.fUniformLocations[Uniform::kMaskMatrix0] = glGetUniformLocation( data.fProgram, "u_MaskMatrix0" );
@@ -360,29 +364,29 @@ GLProgram::Update( Program::Version version, VersionData& data )
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler1" ), Texture::kMask1 );
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler2" ), Texture::kMask2 );
 	glUseProgram( 0 );
-	GL_CHECK_ERROR();
+	GL_CHECK_ERROR();*/
 }
 
 void
-GLProgram::Reset( VersionData& data )
+VulkanProgram::Reset( VersionData& data )
 {
-	data.fProgram = 0;
-	data.fVertexShader = 0;
-	data.fFragmentShader = 0;
+	data.fVertexShader = VK_NULL_HANDLE;
+	data.fFragmentShader = VK_NULL_HANDLE;
 
 	for( U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i )
 	{
 		// OpenGL uses the location -1 for inactive uniforms
-		const GLint kInactiveLocation = -1;
+		// TODO!
+		const uint32_t kInactiveLocation = ~0U;
 		data.fUniformLocations[ i ] = kInactiveLocation;
-		
+
 		// CommandBuffer also initializes timestamp to zero
 		const U32 kTimestamp = 0;
 		data.fTimestamps[ i ] = kTimestamp;
 	}
 	
 	data.fHeaderNumLines = 0;
-}*/
+}
 
 // ----------------------------------------------------------------------------
 

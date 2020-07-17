@@ -10,16 +10,18 @@
 #ifndef _Rtt_VulkanProgram_H__
 #define _Rtt_VulkanProgram_H__
 
-//#include "Renderer/Rtt_GL.h"
 #include "Renderer/Rtt_GPUResource.h"
 #include "Renderer/Rtt_Program.h"
 #include "Renderer/Rtt_Uniform.h"
 #include "Core/Rtt_Assert.h"
+#include <vulkan/vulkan.h>
 
 // ----------------------------------------------------------------------------
 
 namespace Rtt
 {
+
+class VulkanState;
 
 // ----------------------------------------------------------------------------
 
@@ -30,15 +32,15 @@ class VulkanProgram : public GPUResource
 		typedef VulkanProgram Self;
 
 	public:
-		VulkanProgram();
+		VulkanProgram( VulkanState * state );
 
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 		virtual void Bind( Program::Version version );
-		/*
+
 		// TODO: cleanup these functions
-		inline GLint GetUniformLocation( U32 unit, Program::Version version )
+		inline uint32_t GetUniformLocation( U32 unit, Program::Version version )
 		{
 			Rtt_ASSERT( version <= Program::kNumVersions );
 			return fData[version].fUniformLocations[ unit ];
@@ -54,19 +56,23 @@ class VulkanProgram : public GPUResource
 		{
 			Rtt_ASSERT( version <= Program::kNumVersions );
 			fData[version].fTimestamps[ unit ] = timestamp;
-		}*/
+		}
 
-	private:/*
+	private:
 		// To make custom shader code work seamlessly with masking, multiple
 		// versions of each Program are automatically compiled and linked, 
 		// with each version supporting a different number of active masks.
 		struct VersionData
 		{
-			GLuint fProgram;
-			GLuint fVertexShader;
-			GLuint fFragmentShader;			
-			GLint fUniformLocations[Uniform::kNumBuiltInVariables];
+			bool IsValid() const { return fVertexShader != VK_NULL_HANDLE && fFragmentShader != VK_NULL_HANDLE; }
+
+			VkShaderModule fVertexShader;
+			// TODO? mask counts as specialization info
+			VkShaderModule fFragmentShader;
+			uint32_t fUniformLocations[Uniform::kNumBuiltInVariables];
+			// TODO? divvy these up between uniforms and push constants
 			U32 fTimestamps[Uniform::kNumBuiltInVariables];
+			U32 fShadersID;
 			
 			// Metadata
 			int fHeaderNumLines;
@@ -77,8 +83,11 @@ class VulkanProgram : public GPUResource
 		void UpdateShaderSource( Program* program, Program::Version version, VersionData& data );
 		void Reset( VersionData& data );
 
+		VulkanState * fState;
 		VersionData fData[Program::kNumVersions];
-		CPUResource* fResource;*/
+		CPUResource* fResource;
+
+		static U32 sID;
 };
 
 // ----------------------------------------------------------------------------

@@ -47,7 +47,7 @@ VulkanRenderer::Create( const CPUResource* resource )
 	{
 		case CPUResource::kFrameBufferObject: return new VulkanFrameBufferObject;
 		case CPUResource::kGeometry: return new VulkanGeometry( fState );
-		case CPUResource::kProgram: return new VulkanProgram;
+		case CPUResource::kProgram: return new VulkanProgram( fState );
 		case CPUResource::kTexture: return new VulkanTexture( fState );
 		case CPUResource::kUniform: return NULL;
 		default: Rtt_ASSERT_NOT_REACHED(); return NULL; // iPhone irrelevant
