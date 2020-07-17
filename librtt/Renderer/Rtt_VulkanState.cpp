@@ -109,11 +109,11 @@ AppInfo()
 	VkApplicationInfo appInfo = {};
 
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = "Solar App"; // TODO?
-	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.pEngineName = "Solar2D";
-	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.apiVersion = VK_API_VERSION_1_0;
+	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.pApplicationName = "Solar App"; // TODO?
+	appInfo.pEngineName = "Solar2D";
 
 	return appInfo;
 }
@@ -385,10 +385,9 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 		VkDeviceQueueCreateInfo queueCreateInfo = {};
 
 		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queueCreateInfo.queueCount = 1;
 		queueCreateInfo.pQueuePriorities = queuePriorities;
-		queueCreateInfo.queueFamilyIndex = index;
 		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.queueFamilyIndex = index;
 
 		queueCreateInfos.push_back( queueCreateInfo );
 	}
@@ -468,10 +467,10 @@ VulkanState::BuildUpSwapchain()
 		createImageViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 		createImageViewInfo.format = fSwapchainFormat.format;
 		createImageViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		createImageViewInfo.subresourceRange.layerCount = 1;
-		createImageViewInfo.subresourceRange.levelCount = 1;
 		createImageViewInfo.subresourceRange.baseArrayLayer = 0;
 		createImageViewInfo.subresourceRange.baseMipLevel = 0;
+		createImageViewInfo.subresourceRange.layerCount = 1;
+		createImageViewInfo.subresourceRange.levelCount = 1;
 		createImageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 
 		for ( const VkImage & image : images )
@@ -661,12 +660,6 @@ VulkanState::GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t 
 
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities);
 
-	state.fTransformFlagBits = capabilities.currentTransform;
-    state.fSwapchainExtent.width = std::max( capabilities.minImageExtent.width, std::min( capabilities.maxImageExtent.width, width ) );
-	state.fSwapchainExtent.height = std::max( capabilities.minImageExtent.height, std::min( capabilities.maxImageExtent.height, height ) );
-	state.fSwapchainFormat = format;
-	state.fPresentMode = mode;
-
 	uint32_t imageCount = capabilities.minImageCount + 1;
 
 	if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount)
@@ -675,6 +668,11 @@ VulkanState::GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t 
 	}
 
 	state.fMaxSwapImageCount = imageCount;
+    state.fSwapchainExtent.width = std::max( capabilities.minImageExtent.width, std::min( capabilities.maxImageExtent.width, width ) );
+	state.fSwapchainExtent.height = std::max( capabilities.minImageExtent.height, std::min( capabilities.maxImageExtent.height, height ) );
+	state.fSwapchainFormat = format;
+	state.fPresentMode = mode;
+	state.fTransformFlagBits = capabilities.currentTransform;
 
 	return true;
 }
