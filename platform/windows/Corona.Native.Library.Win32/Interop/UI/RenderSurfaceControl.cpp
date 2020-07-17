@@ -211,7 +211,7 @@ bool RenderSurfaceControl::CreateVulkanState()
 	surfaceCallback.data = GetWindowHandle();
 	surfaceCallback.extension = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
 
-	return Rtt::VulkanState::PopulatePreSwapChainDetails( *state, surfaceCallback );
+	return Rtt::VulkanState::PopulatePreSwapchainDetails( *state, surfaceCallback );
 }
 
 // /STEVE CHANGE
