@@ -33,48 +33,6 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 //	fBackCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator ) );
 	// N.B. this will probably be RADICALLY different in Vulkan
 	// maybe these can just be hints to some unified thing?
-
-	VkPhysicalDevice physicalDevice = state ? state->GetPhysicalDevice() : VK_NULL_HANDLE;
-
-	if (physicalDevice != VK_NULL_HANDLE)
-	{
-		VkDeviceCreateInfo createInfo = {};
-
-		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-
-		// TODO: extensions, layers, features
-
-		VkDeviceQueueCreateInfo queueCreateInfo = {};
-
-		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queueCreateInfo.queueFamilyIndex = 0;
-
-		float queuePriorities[] = { 1.0f };
-
-		queueCreateInfo.queueCount = 1;
-		queueCreateInfo.pQueuePriorities = queuePriorities;
-
-		createInfo.queueCreateInfoCount = 1;
-		createInfo.pQueueCreateInfos = &queueCreateInfo;
-
-		VkDevice device;
-		VkResult result = vkCreateDevice( physicalDevice, &createInfo, NULL, &device );
-
-		if (VK_SUCCESS == result)
-		{
-			state->SetDevice( device );
-		}
-
-		else
-		{
-			Rtt_LogException( "Failed creating logical device: %d\n", result );
-		}
-	}
-
-	else
-	{
-		Rtt_LogException( "Vulkan physical device unavailable" );
-	}
 }
 
 VulkanRenderer::~VulkanRenderer()

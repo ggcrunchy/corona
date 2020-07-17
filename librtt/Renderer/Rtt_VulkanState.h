@@ -12,6 +12,7 @@
 
 #include "Renderer/Rtt_Renderer.h"
 #include <vulkan/vulkan.h>
+#include <vector>
 
 #ifdef free
 #undef free
@@ -36,18 +37,20 @@ class VulkanState
 	public:
 		VkAllocationCallbacks * GetAllocationCallbacks() const { return fAllocationCallbacks; }
 		VkInstance GetInstance() const { return fInstance; }
-		void SetInstance( VkInstance instance ) { fInstance = instance; }
 		VkDevice GetDevice() const { return fDevice; }
-		void SetDevice( VkDevice device ) { fDevice = device; }
 		VkPhysicalDevice GetPhysicalDevice() const { return fPhysicalDevice; }
-		void SetPhysicalDevice( VkPhysicalDevice physicalDevice ) { fPhysicalDevice = physicalDevice; }
 		VkQueue GetGraphicsQueue() const { return fGraphicsQueue; }
-		void SetGraphicsQueue( VkQueue queue ) { fGraphicsQueue = queue; }
 		VkQueue GetPresentQueue() const { return fPresentQueue; }
-		void SetPresentQueue( VkQueue queue ) { fPresentQueue = queue; }
 		VkSurfaceKHR GetSurface() const { return fSurface; }
-		void SetSurface( VkSurfaceKHR surface ) { fSurface = surface; }
 		VkSampleCountFlags GetSampleCountFlags() const { return fSampleCountFlags; }
+
+	#ifndef NDEBUG
+		void SetDebugMessenger( VkDebugUtilsMessengerEXT messenger ) { fDebugMessenger = messenger; }
+	#endif
+
+	public:
+		void BuildUpSwapchain();
+		void TearDownSwapchain();
 
 	public:
 		struct NewSurfaceCallback {
@@ -56,15 +59,16 @@ class VulkanState
 			void * data;
 		};
 
-		static bool PopulatePreSwapChainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
+		static bool PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
 		static bool GetMultisampleDetails( VulkanState & state );
 		static bool GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height );
 
-	#ifndef NDEBUG
-		void SetDebugMessenger( VkDebugUtilsMessengerEXT messenger ) { fDebugMessenger = messenger; }
-	#endif
-
 	private:
+		struct SwapchainImage {
+			VkImage image;
+			VkImageView view;
+		};
+
 		VkAllocationCallbacks * fAllocationCallbacks;
 		VkInstance fInstance;
 	#ifndef NDEBUG
@@ -76,9 +80,14 @@ class VulkanState
 		VkQueue fPresentQueue;
 		VkSurfaceKHR fSurface;
 		VkSampleCountFlags fSampleCountFlags;
+		VkSurfaceTransformFlagBitsKHR fTransformFlagBits;
+		VkSwapchainKHR fSwapchain;
 		VkExtent2D fSwapchainExtent;
 		VkSurfaceFormatKHR fSwapchainFormat;
+		uint32_t fMaxSwapImageCount;
 		VkPresentModeKHR fPresentMode;
+		std::vector< SwapchainImage > fSwapchainImages;
+		std::vector< uint32_t > fQueueFamilies;
 };
 
 // ----------------------------------------------------------------------------

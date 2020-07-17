@@ -12,7 +12,6 @@
 #include "CoronaLog.h"
 #include <algorithm>
 #include <utility>
-#include <vector>
 
 // ----------------------------------------------------------------------------
 
@@ -32,12 +31,15 @@ VulkanState::VulkanState()
     fGraphicsQueue( VK_NULL_HANDLE ),
     fPresentQueue( VK_NULL_HANDLE ),
     fSurface( VK_NULL_HANDLE ),
+	fSwapchain( VK_NULL_HANDLE ),
 	fSampleCountFlags( VK_SAMPLE_COUNT_1_BIT )
 {
 }
 
 VulkanState::~VulkanState()
 {
+	TearDownSwapchain();
+
     vkDestroySurfaceKHR( fInstance, fSurface, fAllocationCallbacks );
     vkDestroyDevice( fDevice, fAllocationCallbacks );
 #ifndef NDEBUG
@@ -49,6 +51,8 @@ VulkanState::~VulkanState()
     }
 #endif
     vkDestroyInstance( fInstance, fAllocationCallbacks );
+
+	// allocator?
 }
 
 const char *
@@ -374,11 +378,15 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 
 	std::vector< VkDeviceQueueCreateInfo > queueCreateInfos;
 
+	float queuePriorities[] = { 1.0f };
+
 	for (uint32_t index : families)
 	{
 		VkDeviceQueueCreateInfo queueCreateInfo = {};
 
 		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.pQueuePriorities = queuePriorities;
 		queueCreateInfo.queueFamilyIndex = index;
 		queueCreateInfo.queueCount = 1;
 
@@ -409,8 +417,108 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 	return device;
 }
 
+void
+VulkanState::BuildUpSwapchain()
+{
+	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
+
+	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapchainCreateInfo.imageArrayLayers = 1U;
+	swapchainCreateInfo.imageColorSpace = fSwapchainFormat.colorSpace;
+	swapchainCreateInfo.imageExtent = fSwapchainExtent;
+	swapchainCreateInfo.imageFormat = fSwapchainFormat.format;
+	swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	swapchainCreateInfo.minImageCount = fMaxSwapImageCount;
+
+	if (fQueueFamilies.size() > 1U)
+	{
+		swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		swapchainCreateInfo.pQueueFamilyIndices = fQueueFamilies.data();
+		swapchainCreateInfo.queueFamilyIndexCount = 2U;
+	}
+
+	swapchainCreateInfo.clipped = VK_TRUE;
+	swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE; // TODO!
+	swapchainCreateInfo.presentMode = fPresentMode;
+	swapchainCreateInfo.preTransform = fTransformFlagBits; // TODO: relevant to portrait, landscape, etc?
+	swapchainCreateInfo.surface = fSurface;
+
+	VkSwapchainKHR swapchain;
+
+	if (VK_SUCCESS == vkCreateSwapchainKHR( fDevice, &swapchainCreateInfo, fAllocationCallbacks, &swapchain ))
+	{
+		fSwapchain = swapchain;
+
+		uint32_t imageCount = 0U;
+
+		vkGetSwapchainImagesKHR( fDevice, swapchain, &imageCount, NULL );
+
+		std::vector< VkImage > images( imageCount );
+
+		vkGetSwapchainImagesKHR( fDevice, swapchain, &imageCount, images.data() );
+		
+		VkImageViewCreateInfo createImageViewInfo = {};
+
+		createImageViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		createImageViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createImageViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createImageViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createImageViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createImageViewInfo.format = fSwapchainFormat.format;
+		createImageViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		createImageViewInfo.subresourceRange.layerCount = 1;
+		createImageViewInfo.subresourceRange.levelCount = 1;
+		createImageViewInfo.subresourceRange.baseArrayLayer = 0;
+		createImageViewInfo.subresourceRange.baseMipLevel = 0;
+		createImageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
+		for ( const VkImage & image : images )
+		{
+			createImageViewInfo.image = image;
+
+			VkImageView view;
+
+			if (VK_SUCCESS == vkCreateImageView( fDevice, &createImageViewInfo, nullptr, &view ))
+			{
+				SwapchainImage si = { image, view };
+
+				fSwapchainImages.push_back( si );
+			}
+
+			else
+			{
+				CoronaLog( "Failed to create image views!" );
+
+				// TODO: Error
+			}
+		}
+	}
+
+	else
+	{
+		CoronaLog( "Failed to create swap chain!" );
+
+		// TODO: error
+	}
+}
+
+void
+VulkanState::TearDownSwapchain()
+{
+	for (SwapchainImage & image : fSwapchainImages)
+	{
+		vkDestroyImageView( fDevice, image.view, fAllocationCallbacks ); 
+	}
+
+	fSwapchainImages.clear();
+
+	vkDestroySwapchainKHR( fDevice, fSwapchain, fAllocationCallbacks );
+}
+
 bool
-VulkanState::PopulatePreSwapChainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback )
+VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback )
 {
 	VkApplicationInfo appInfo = AppInfo();
 	const VkAllocationCallbacks * allocator = state.GetAllocationCallbacks();
@@ -426,21 +534,22 @@ VulkanState::PopulatePreSwapChainDetails( VulkanState & state, const NewSurfaceC
 
 	if (instance != VK_NULL_HANDLE)
 	{
-		state.SetInstance( instance );
+		state.fInstance = instance;
 
 		VkSurfaceKHR surface = surfaceCallback.make( instance, surfaceCallback.data, allocator );
 
 		if (surface != VK_NULL_HANDLE)
 		{
-			state.SetSurface( surface );
+			state.fSurface = surface;
 
 			auto physicalDeviceData = ChoosePhysicalDevice( instance, surface );
 
 			if (physicalDeviceData.first != VK_NULL_HANDLE)
 			{
-				state.SetPhysicalDevice( physicalDeviceData.first );
+				state.fPhysicalDevice = physicalDeviceData.first;
 
-				VkDevice device = MakeLogicalDevice( physicalDeviceData.first, physicalDeviceData.second.GetFamilies(), allocator );
+				auto families = physicalDeviceData.second.GetFamilies();
+				VkDevice device = MakeLogicalDevice( physicalDeviceData.first, families, allocator );
 
 				if (device != VK_NULL_HANDLE)
 				{
@@ -449,8 +558,10 @@ VulkanState::PopulatePreSwapChainDetails( VulkanState & state, const NewSurfaceC
 					vkGetDeviceQueue( device, physicalDeviceData.second.fGraphicsQueue, 0, &graphicsQueue );
 					vkGetDeviceQueue( device, physicalDeviceData.second.fPresentQueue, 0, &presentQueue );
 
-					state.SetGraphicsQueue( graphicsQueue );
-					state.SetPresentQueue( presentQueue );
+					state.fDevice = device;
+					state.fGraphicsQueue = graphicsQueue;
+					state.fPresentQueue = presentQueue;
+					state.fQueueFamilies = families;
 
 					return true;
 				}
@@ -550,10 +661,20 @@ VulkanState::GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t 
 
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities);
 
+	state.fTransformFlagBits = capabilities.currentTransform;
     state.fSwapchainExtent.width = std::max( capabilities.minImageExtent.width, std::min( capabilities.maxImageExtent.width, width ) );
 	state.fSwapchainExtent.height = std::max( capabilities.minImageExtent.height, std::min( capabilities.maxImageExtent.height, height ) );
 	state.fSwapchainFormat = format;
 	state.fPresentMode = mode;
+
+	uint32_t imageCount = capabilities.minImageCount + 1;
+
+	if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount)
+	{
+		imageCount = capabilities.maxImageCount;
+	}
+
+	state.fMaxSwapImageCount = imageCount;
 
 	return true;
 }
