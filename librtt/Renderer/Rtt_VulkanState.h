@@ -88,6 +88,8 @@ class VulkanState
 		VkPresentModeKHR fPresentMode;
 		std::vector< SwapchainImage > fSwapchainImages;
 		std::vector< uint32_t > fQueueFamilies;
+
+		friend class Rtt_VulkanRenderer;
 };
 
 // ----------------------------------------------------------------------------
