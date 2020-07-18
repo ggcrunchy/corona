@@ -18,6 +18,7 @@
 	#include "Renderer/Rtt_ShaderBinaryVersions.h"
 #endif
 #include "Core/Rtt_Assert.h"
+#include "CoronaLog.h"
 #include <shaderc/shaderc.h>
 #include <string>
 /*
@@ -180,6 +181,41 @@ U32 VulkanProgram::sID;
 void
 VulkanProgram::Create( Program::Version version, VersionData& data )
 {
+/*
+shaderc_compiler_t shaderc_compiler_initialize(void)
+void shaderc_compiler_release(shaderc_compiler_t)
+
+shaderc_compile_options_t
+    shaderc_compile_options_initialize(void)
+shaderc_compile_options_t shaderc_compile_options_clone(
+    const shaderc_compile_options_t options)
+void shaderc_compile_options_release(
+    shaderc_compile_options_t options)
+
+void shaderc_compile_options_set_generate_debug_info(
+    shaderc_compile_options_t options)
+void shaderc_compile_options_set_optimization_level(
+    shaderc_compile_options_t options, shaderc_optimization_level level)
+void shaderc_compile_options_set_invert_y(
+    shaderc_compile_options_t options, bool enable)
+
+shaderc_compilation_result_t shaderc_compile_into_spv(
+    const shaderc_compiler_t compiler, const char* source_text,
+    size_t source_text_size, shaderc_shader_kind shader_kind,
+    const char* input_file_name, const char* entry_point_name,
+    const shaderc_compile_options_t additional_options)
+void shaderc_result_release(shaderc_compilation_result_t result)
+size_t shaderc_result_get_length(const shaderc_compilation_result_t result)
+size_t shaderc_result_get_num_warnings(
+    const shaderc_compilation_result_t result)
+size_t shaderc_result_get_num_errors(const shaderc_compilation_result_t result)
+shaderc_compilation_status shaderc_result_get_compilation_status(
+    const shaderc_compilation_result_t)
+const char* shaderc_result_get_bytes(const shaderc_compilation_result_t result)
+const char* shaderc_result_get_error_message(
+    const shaderc_compilation_result_t result)
+*/
+
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
 /*
 	data.fVertexShader = glCreateShader( GL_VERTEX_SHADER );
@@ -188,12 +224,12 @@ VulkanProgram::Create( Program::Version version, VersionData& data )
 */
 #endif
 
+	Update( version, data );
+
 	if (data.IsValid())
 	{
 		data.fShadersID = sID++;
 	}
-
-	Update( version, data );
 }
 
 static int
@@ -248,12 +284,49 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 	// Vertex shader.
 	{
 		shader_source[4] = program->GetVertexShaderSource();
+
+		std::string code;
+
+		for (int i = 0; i < 4; ++i)
+		{
+			code += shader_source[i];
+		}
+
+		shaderc_compiler_t compiler=NULL; // TODO!
+		shaderc_compilation_result_t result = shaderc_compile_into_spv( compiler, code.data(), code.size(), shaderc_vertex_shader, "TODO_NAME_OF_FILE", "main", NULL /* compile options */ );
+
+		shaderc_compilation_status status = shaderc_result_get_compilation_status( result );
+
+		if (shaderc_compilation_status_success == status)
+		{
+			VkShaderModuleCreateInfo createShaderModuleInfo = {};
+
+			createShaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+			createShaderModuleInfo.codeSize = shaderc_result_get_length( result );
+			createShaderModuleInfo.pCode = reinterpret_cast< const uint32_t * >( shaderc_result_get_bytes( result ) );
+
+			VkShaderModule vertexShaderModule;
+
+			if (VK_SUCCESS == vkCreateShaderModule( fState->GetDevice(), &createShaderModuleInfo, nullptr, &vertexShaderModule ))
+			{
+				// TODO: put this somewhere...
+			}
+
+			else
+			{
+				CoronaLog( "Failed to create shader module!" );
+			}
+		}
+
+		else
+		{
+			CoronaLog( "Failed to compile vertex shader: %s", shaderc_result_get_error_message( result ) );
+		}
 /*
-		glShaderSource( data.fVertexShader,
-						( sizeof(shader_source) / sizeof(shader_source[0]) ),
-						shader_source,
-						NULL );
-		GL_CHECK_ERROR();*/
+void shaderc_result_release(shaderc_compilation_result_t result)
+size_t shaderc_result_get_num_warnings(const shaderc_compilation_result_t result)
+size_t shaderc_result_get_num_errors(const shaderc_compilation_result_t result)
+*/
 	}
 
 	// Fragment shader.
@@ -265,6 +338,12 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 						shader_source,
 						NULL );
 		GL_CHECK_ERROR();*/
+		std::string code;
+
+		for (int i = 0; i < 4; ++i)
+		{
+			code += shader_source[i];
+		}
 	}
 #endif
 }
