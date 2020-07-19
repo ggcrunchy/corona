@@ -20,6 +20,9 @@
 
 // ----------------------------------------------------------------------------
 
+struct shaderc_compiler;
+struct shaderc_compile_options;
+
 namespace Rtt
 {
 
@@ -44,13 +47,12 @@ class VulkanState
 		VkSurfaceKHR GetSurface() const { return fSurface; }
 		VkSampleCountFlags GetSampleCountFlags() const { return fSampleCountFlags; }
 
+		struct shaderc_compiler * GetCompiler() const { return fCompiler; }
+		struct shaderc_compile_options * GetCompileOptions() const { return fCompileOptions; }
+
 	#ifndef NDEBUG
 		void SetDebugMessenger( VkDebugUtilsMessengerEXT messenger ) { fDebugMessenger = messenger; }
 	#endif
-
-	public:
-		void BuildUpSwapchain();
-		void TearDownSwapchain();
 
 	public:
 		struct NewSurfaceCallback {
@@ -62,6 +64,10 @@ class VulkanState
 		static bool PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
 		static bool GetMultisampleDetails( VulkanState & state );
 		static bool GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height );
+
+	public:
+		void BuildUpSwapchain();
+		void TearDownSwapchain();
 
 	private:
 		struct SwapchainImage {
@@ -88,6 +94,9 @@ class VulkanState
 		VkPresentModeKHR fPresentMode;
 		std::vector< SwapchainImage > fSwapchainImages;
 		std::vector< uint32_t > fQueueFamilies;
+				
+		struct shaderc_compiler * fCompiler;
+		struct shaderc_compile_options * fCompileOptions;
 
 		friend class Rtt_VulkanRenderer;
 };
