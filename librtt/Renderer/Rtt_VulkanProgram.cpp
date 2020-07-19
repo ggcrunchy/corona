@@ -19,6 +19,7 @@
 #endif
 #include "Core/Rtt_Assert.h"
 #include "CoronaLog.h"
+
 #include <shaderc/shaderc.h>
 #include <string>
 /*
@@ -43,53 +44,29 @@ namespace /*anonymous*/
 	// Check that the given shader compiled and log any errors
 	void CheckShaderCompilationStatus( GLuint name, bool isVerbose, const char *label, int startLine )
 	{
-		GLint result;
-		glGetShaderiv( name, GL_COMPILE_STATUS, &result );
-		if( result == GL_FALSE )
+		if ( isVerbose )
 		{
-			GLint length;
-			glGetShaderiv( name, GL_INFO_LOG_LENGTH, &length );
-
-			GLchar* infoLog = new GLchar[length];
-			glGetShaderInfoLog( name, length, NULL, infoLog );
-
-			if ( isVerbose )
+			if ( label )
 			{
-				if ( label )
-				{
-					Rtt_LogException( "ERROR: An error occurred in the %s kernel.\n", label );
-				}
-				Rtt_LogException( "%s", infoLog );
-				Rtt_LogException( "\tNOTE: Kernel starts at line number (%d), so subtract that from the line numbers above.\n", startLine );
+				Rtt_LogException( "ERROR: An error occurred in the %s kernel.\n", label );
 			}
-			delete[] infoLog;
+			Rtt_LogException( "%s", infoLog );
+			Rtt_LogException( "\tNOTE: Kernel starts at line number (%d), so subtract that from the line numbers above.\n", startLine );
 		}
 	}
 
 	// Check that the given program linked and log any errors
 	void CheckProgramLinkStatus( GLuint name, bool isVerbose )
 	{
-		GLint result;
-		glGetProgramiv( name, GL_LINK_STATUS, &result );
-		if( result == GL_FALSE )
+		if ( isVerbose )
 		{
-			GLint length;
-			glGetProgramiv( name, GL_INFO_LOG_LENGTH, &length );
-
-			GLchar* infoLog = new GLchar[length];
-			glGetProgramInfoLog( name, length, NULL, infoLog );
-
-			if ( isVerbose )
-			{
-				Rtt_LogException( "%s", infoLog );
-			}
-			else
-			{
-				Rtt_LogException(
-					"ERROR: A shader failed to compile. To see errors, add the following to the top of your main.lua:\n"
-					"\tdisplay.setDefault( 'isShaderCompilerVerbose', true )\n" );
-			}
-			delete[] infoLog;
+			Rtt_LogException( "%s", infoLog );
+		}
+		else
+		{
+			Rtt_LogException(
+				"ERROR: A shader failed to compile. To see errors, add the following to the top of your main.lua:\n"
+				"\tdisplay.setDefault( 'isShaderCompilerVerbose', true )\n" );
 		}
 	}
 	*/
@@ -161,7 +138,7 @@ VulkanProgram::Destroy()
 	}
 }
 
-void
+VulkanProgram::PipelineStages
 VulkanProgram::Bind( Program::Version version )
 {
 	VersionData& data = fData[version];
@@ -173,7 +150,24 @@ VulkanProgram::Bind( Program::Version version )
 		}
 	#endif
 
-	// TODO: add to pipeline
+	PipelineStages stageCreateInfo( data.fShadersID );
+
+	VkPipelineShaderStageCreateInfo shaderStageInfo = {};
+
+	shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStageInfo.pName = "main";
+
+	shaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	shaderStageInfo.module = data.fVertexShader;
+
+	stageCreateInfo.fStages.push_back( shaderStageInfo );
+
+	shaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shaderStageInfo.module = data.fFragmentShader;
+
+	stageCreateInfo.fStages.push_back( shaderStageInfo );
+
+	return stageCreateInfo;
 }
 
 U32 VulkanProgram::sID;
@@ -181,49 +175,6 @@ U32 VulkanProgram::sID;
 void
 VulkanProgram::Create( Program::Version version, VersionData& data )
 {
-/*
-shaderc_compiler_t shaderc_compiler_initialize(void)
-void shaderc_compiler_release(shaderc_compiler_t)
-
-shaderc_compile_options_t
-    shaderc_compile_options_initialize(void)
-shaderc_compile_options_t shaderc_compile_options_clone(
-    const shaderc_compile_options_t options)
-void shaderc_compile_options_release(
-    shaderc_compile_options_t options)
-
-void shaderc_compile_options_set_generate_debug_info(
-    shaderc_compile_options_t options)
-void shaderc_compile_options_set_optimization_level(
-    shaderc_compile_options_t options, shaderc_optimization_level level)
-void shaderc_compile_options_set_invert_y(
-    shaderc_compile_options_t options, bool enable)
-
-shaderc_compilation_result_t shaderc_compile_into_spv(
-    const shaderc_compiler_t compiler, const char* source_text,
-    size_t source_text_size, shaderc_shader_kind shader_kind,
-    const char* input_file_name, const char* entry_point_name,
-    const shaderc_compile_options_t additional_options)
-void shaderc_result_release(shaderc_compilation_result_t result)
-size_t shaderc_result_get_length(const shaderc_compilation_result_t result)
-size_t shaderc_result_get_num_warnings(
-    const shaderc_compilation_result_t result)
-size_t shaderc_result_get_num_errors(const shaderc_compilation_result_t result)
-shaderc_compilation_status shaderc_result_get_compilation_status(
-    const shaderc_compilation_result_t)
-const char* shaderc_result_get_bytes(const shaderc_compilation_result_t result)
-const char* shaderc_result_get_error_message(
-    const shaderc_compilation_result_t result)
-*/
-
-#ifndef Rtt_USE_PRECOMPILED_SHADERS
-/*
-	data.fVertexShader = glCreateShader( GL_VERTEX_SHADER );
-	data.fFragmentShader = glCreateShader( GL_FRAGMENT_SHADER );
-	GL_CHECK_ERROR();
-*/
-#endif
-
 	Update( version, data );
 
 	if (data.IsValid())
@@ -246,6 +197,52 @@ CountLines( const char **segments, int numSegments )
 }
 
 void
+VulkanProgram::Compile( const char * sources[], int sourceCount, const char * what, VkShaderModule & module )
+{
+	std::string code;
+
+	for (int i = 0; i < sourceCount; ++i)
+	{
+		code += sources[i];
+	}
+
+	shaderc_compilation_result_t result = shaderc_compile_into_spv( fState->GetCompiler(), code.data(), code.size(), shaderc_vertex_shader, what, "main", fState->GetCompileOptions() );
+	shaderc_compilation_status status = shaderc_result_get_compilation_status( result );
+
+	if (shaderc_compilation_status_success == status)
+	{
+		VkShaderModuleCreateInfo createShaderModuleInfo = {};
+
+		createShaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		createShaderModuleInfo.codeSize = shaderc_result_get_length( result );
+		createShaderModuleInfo.pCode = reinterpret_cast< const uint32_t * >( shaderc_result_get_bytes( result ) );
+
+		VkShaderModule shaderModule;
+
+		if (VK_SUCCESS == vkCreateShaderModule( fState->GetDevice(), &createShaderModuleInfo, nullptr, &shaderModule ))
+		{
+			module = shaderModule;
+		}
+
+		else
+		{
+			CoronaLog( "Failed to create shader module!" );
+		}
+	}
+
+	else
+	{
+		CoronaLog( "Failed to compile %s: %s", what, shaderc_result_get_error_message( result ) );
+/*
+size_t shaderc_result_get_num_warnings(const shaderc_compilation_result_t result)
+size_t shaderc_result_get_num_errors(const shaderc_compilation_result_t result)
+*/
+	}
+
+	shaderc_result_release( result );
+}
+
+void
 VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data )
 {
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
@@ -258,21 +255,14 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 		default: break;
 	}
 
-	char highp_support[] = "#define FRAGMENT_SHADER_SUPPORTS_HIGHP 0\n";
-	highp_support[ sizeof( highp_support ) - 3 ] = ( CommandBuffer::GetGpuSupportsHighPrecisionFragmentShaders() ? '1' : '0' );
-
-	//! \TODO Make the definition of "TEX_COORD_Z" conditional.
-	char texCoordZBuffer[] = "";//#define TEX_COORD_Z 1\n";
-
 	const char *program_header_source = program->GetHeaderSource();
 	const char *header = ( program_header_source ? program_header_source : "" );
 
 	const char* shader_source[5];
 	memset( shader_source, 0, sizeof( shader_source ) );
 	shader_source[0] = header;
-	shader_source[1] = highp_support;
+	shader_source[1] = "#define FRAGMENT_SHADER_SUPPORTS_HIGHP 1\n"; // TODO: safe assumption?
 	shader_source[2] = maskBuffer;
-	shader_source[3] = texCoordZBuffer;
 
 	if ( program->IsCompilerVerbose() )
 	{
@@ -283,67 +273,16 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 
 	// Vertex shader.
 	{
-		shader_source[4] = program->GetVertexShaderSource();
+		shader_source[3] = program->GetVertexShaderSource();
 
-		std::string code;
-
-		for (int i = 0; i < 4; ++i)
-		{
-			code += shader_source[i];
-		}
-
-		shaderc_compiler_t compiler=NULL; // TODO!
-		shaderc_compilation_result_t result = shaderc_compile_into_spv( compiler, code.data(), code.size(), shaderc_vertex_shader, "TODO_NAME_OF_FILE", "main", NULL /* compile options */ );
-
-		shaderc_compilation_status status = shaderc_result_get_compilation_status( result );
-
-		if (shaderc_compilation_status_success == status)
-		{
-			VkShaderModuleCreateInfo createShaderModuleInfo = {};
-
-			createShaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-			createShaderModuleInfo.codeSize = shaderc_result_get_length( result );
-			createShaderModuleInfo.pCode = reinterpret_cast< const uint32_t * >( shaderc_result_get_bytes( result ) );
-
-			VkShaderModule vertexShaderModule;
-
-			if (VK_SUCCESS == vkCreateShaderModule( fState->GetDevice(), &createShaderModuleInfo, nullptr, &vertexShaderModule ))
-			{
-				// TODO: put this somewhere...
-			}
-
-			else
-			{
-				CoronaLog( "Failed to create shader module!" );
-			}
-		}
-
-		else
-		{
-			CoronaLog( "Failed to compile vertex shader: %s", shaderc_result_get_error_message( result ) );
-		}
-/*
-void shaderc_result_release(shaderc_compilation_result_t result)
-size_t shaderc_result_get_num_warnings(const shaderc_compilation_result_t result)
-size_t shaderc_result_get_num_errors(const shaderc_compilation_result_t result)
-*/
+		Compile( shader_source, 4, "vertex shader", data.fVertexShader );
 	}
 
 	// Fragment shader.
 	{
-		shader_source[4] = ( version == Program::kWireframe ) ? kWireframeSource : program->GetFragmentShaderSource();
-/*
-		glShaderSource( data.fFragmentShader,
-						( sizeof(shader_source) / sizeof(shader_source[0]) ),
-						shader_source,
-						NULL );
-		GL_CHECK_ERROR();*/
-		std::string code;
+		shader_source[3] = ( version == Program::kWireframe ) ? kWireframeSource : program->GetFragmentShaderSource();
 
-		for (int i = 0; i < 4; ++i)
-		{
-			code += shader_source[i];
-		}
+		Compile( shader_source, 4, "fragment shader", data.fFragmentShader );
 	}
 #endif
 }
@@ -367,7 +306,7 @@ VulkanProgram::Update( Program::Version version, VersionData& data )
 						version,
 						data );
 
-#ifdef Rtt_USE_PRECOMPILED_SHADERS
+#ifdef Rtt_USE_PRECOMPILED_SHADERS // TODO! (can probably just load spv?)
 	ShaderBinary *shaderBinary = program->GetCompiledShaders()->Get(version);
 	glProgramBinaryOES(data.fProgram, GL_PROGRAM_BINARY_ANGLE, shaderBinary->GetBytes(), shaderBinary->GetByteCount());
 	GL_CHECK_ERROR();
@@ -390,25 +329,17 @@ VulkanProgram::Update( Program::Version version, VersionData& data )
 	bool isVerbose = program->IsCompilerVerbose();
 	int kernelStartLine = 0;
 
-//	glCompileShader( data.fVertexShader );
+	// TODO!
+
 	if ( isVerbose )
 	{
 		kernelStartLine = data.fHeaderNumLines + program->GetVertexShellNumLines();
-	}/*
-	CheckShaderCompilationStatus( data.fVertexShader, isVerbose, "vertex", kernelStartLine );
-	GL_CHECK_ERROR();
+	}
 
-	glCompileShader( data.fFragmentShader );*/
 	if ( isVerbose )
 	{
 		kernelStartLine = data.fHeaderNumLines + program->GetFragmentShellNumLines();
-	}/*
-	CheckShaderCompilationStatus( data.fFragmentShader, isVerbose, "fragment", kernelStartLine );
-	GL_CHECK_ERROR();
-
-	glLinkProgram( data.fProgram );
-	CheckProgramLinkStatus( data.fProgram, isVerbose );
-	GL_CHECK_ERROR();*/
+	}
 #endif
 	/*
 	data.fUniformLocations[Uniform::kViewProjectionMatrix] = glGetUniformLocation( data.fProgram, "u_ViewProjectionMatrix" );
@@ -465,6 +396,41 @@ VulkanProgram::Reset( VersionData& data )
 	}
 	
 	data.fHeaderNumLines = 0;
+}
+
+void VulkanProgram::InitializeCompiler( shaderc_compiler_t * compiler, shaderc_compile_options_t * options )
+{
+	if (compiler && options)
+	{
+		*compiler = shaderc_compiler_initialize();
+		*options = shaderc_compile_options_initialize();
+
+		#ifndef Rtt_OPENGLES
+			shaderc_compile_options_set_forced_version_profile( *options,
+
+			#ifdef Rtt_MAC_ENV
+				120
+			#else
+				110
+			#endif
+
+			, shaderc_profile_none );
+		#endif
+/*
+void shaderc_compile_options_set_generate_debug_info(
+    shaderc_compile_options_t options)
+void shaderc_compile_options_set_optimization_level(
+    shaderc_compile_options_t options, shaderc_optimization_level level)
+void shaderc_compile_options_set_invert_y(
+    shaderc_compile_options_t options, bool enable)
+*/
+	}
+}
+
+void VulkanProgram::CleanUpCompiler( shaderc_compiler_t compiler, shaderc_compile_options_t options )
+{
+	shaderc_compiler_release( compiler );
+	shaderc_compile_options_release( options );
 }
 
 // ----------------------------------------------------------------------------

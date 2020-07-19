@@ -15,8 +15,12 @@
 #include "Renderer/Rtt_Uniform.h"
 #include "Core/Rtt_Assert.h"
 #include <vulkan/vulkan.h>
+#include <vector>
 
 // ----------------------------------------------------------------------------
+
+struct shaderc_compiler;
+struct shaderc_compile_options;
 
 namespace Rtt
 {
@@ -34,10 +38,21 @@ class VulkanProgram : public GPUResource
 	public:
 		VulkanProgram( VulkanState * state );
 
+		struct PipelineStages {
+			PipelineStages( U32 id ) : fID( id )
+			{
+			}
+
+			std::vector< VkPipelineShaderStageCreateInfo > fStages;
+			U32 fID;
+		};
+
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
-		virtual void Bind( Program::Version version );
+		
+		// Bind() was virtual in GLProgram but such a method was missing in GPUResource, nor were there derived classes...
+		PipelineStages Bind( Program::Version version );
 
 		// TODO: cleanup these functions
 		inline uint32_t GetUniformLocation( U32 unit, Program::Version version )
@@ -83,11 +98,18 @@ class VulkanProgram : public GPUResource
 		void UpdateShaderSource( Program* program, Program::Version version, VersionData& data );
 		void Reset( VersionData& data );
 
+		void Compile( const char * sources[], int sourceCount, const char * what, VkShaderModule & module );
+
+		static void InitializeCompiler( struct shaderc_compiler ** compiler, struct shaderc_compile_options ** options );
+		static void CleanUpCompiler( struct shaderc_compiler * compiler, struct shaderc_compile_options * options );
+
 		VulkanState * fState;
 		VersionData fData[Program::kNumVersions];
 		CPUResource* fResource;
 
 		static U32 sID;
+
+		friend class VulkanState;
 };
 
 // ----------------------------------------------------------------------------
