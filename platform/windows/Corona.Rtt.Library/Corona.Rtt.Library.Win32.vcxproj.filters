@@ -2278,5 +2278,8 @@
     <LuaToCpp Include="..\..\resources\ValidateSettings.lua">
       <Filter>platform\resources</Filter>
     </LuaToCpp>
+    <LuaToCpp Include="..\..\..\librtt\Display\Shader\shell_default_vulkan.lua">
+      <Filter>librtt\Display\Shader</Filter>
+    </LuaToCpp>
   </ItemGroup>
 </Project>

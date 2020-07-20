@@ -319,7 +319,7 @@ static const char kOpenGL_2_1_Header[] =
 		// by with GL 2.0.  The rest of the header stays the same.  This isn't
 		// technically "correct" since some shaders won't work, but it is better
 		// than before (i.e. blank screens)
-		"#version 110\n"
+		"#version 450\n"
 	#endif
 
 		"\n"
