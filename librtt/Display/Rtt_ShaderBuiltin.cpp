@@ -405,11 +405,11 @@ ShaderBuiltin::Exists( ShaderTypes::Category category, const char *name )
 // Default
 int luaload_shell_default_gl(lua_State* L);
 int luaload_kernel_default_gl(lua_State* L);
-
+int luaload_shell_default_vulkan(lua_State * L);
 bool
 ShaderBuiltin::PushDefaultShell( lua_State *L )
 {
-	lua_pushcfunction( L, Corona::Lua::Open< luaload_shell_default_gl > );
+	lua_pushcfunction( L, Corona::Lua::Open< luaload_shell_default_vulkan/*gl*/ > );
 
 	return ( !! Rtt_VERIFY( 0 == Corona::Lua::DoCall( L, 0, 1 ) ) );
 }
