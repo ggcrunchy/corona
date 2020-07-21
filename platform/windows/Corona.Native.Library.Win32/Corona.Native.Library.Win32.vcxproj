@@ -104,7 +104,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalDependencies>vulkan-1.lib;shaderc_combinedd.lib</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;shaderc_combinedd.lib;spirv-cross-cored.lib;spirv-cross-glsld.lib</AdditionalDependencies>
     </Lib>
     <Lib>
       <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -124,7 +124,7 @@
       <IgnoreAllDefaultLibraries>
       </IgnoreAllDefaultLibraries>
       <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib32;</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;shaderc_combinedd.lib;..\Corona.Rtt.Library\$(Configuration)\$(Platform)\Corona.Rtt.Library.Win32\*.obj;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;shaderc_combinedd.lib;spirv-cross-cored.lib;spirv-cross-glsld.lib;..\Corona.Rtt.Library\$(Configuration)\$(Platform)\Corona.Rtt.Library.Win32\*.obj;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release.Simulator|Win32'">

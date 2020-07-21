@@ -24,6 +24,12 @@
 #endif
 // STEVE CHANGE HACK
 #include <shaderc/shaderc.h>
+
+#ifdef free
+#undef free
+#endif
+
+#include <spirv_cross/spirv_glsl.hpp>
 #include <map>
 #include "CoronaLog.h"
 // /STEVE CHANGE HACK
@@ -351,6 +357,35 @@ Compile( shaderc_compiler_t compiler, shaderc_compile_options_t options, std::ma
 	if (shaderc_compilation_status_success == status)
 	{
 		//
+		const uint32_t * ir = reinterpret_cast< const uint32_t * >( shaderc_result_get_bytes( result ) );
+
+		spirv_cross::CompilerGLSL comp( ir, shaderc_result_get_length( result ) / 4U );
+		spirv_cross::ShaderResources resources = comp.get_shader_resources();
+
+		for (auto & uniform : resources.uniform_buffers)
+		{
+			for (auto & range : comp.get_active_buffer_ranges( uniform.id ))
+			{
+				std::string n = comp.get_member_name( uniform.base_type_id, range.index );
+
+				size_t o = range.offset;
+				size_t r = range.range;
+
+				// TODO: give these to the uniform (see if we can suss out the details like mat3, etc.) (although strictly speaking what we have on the Solar side should work)
+			}
+
+			// uniform.name; 
+			// this is giving us "UniformBufferObject"
+		}
+
+		for (auto & sampler : resources.sampled_images)
+		{
+			spirv_cross::ID id = sampler.id;
+			spirv_cross::TypeID typeID = sampler.type_id;
+			std::string n = sampler.name;
+
+			int j = 0;
+		}
 	}
 
 	else
