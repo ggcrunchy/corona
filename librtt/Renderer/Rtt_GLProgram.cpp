@@ -22,17 +22,6 @@
 #ifdef Rtt_WIN_PHONE_ENV
 	#include <GLES2/gl2ext.h>
 #endif
-// STEVE CHANGE HACK
-#include <shaderc/shaderc.h>
-
-#ifdef free
-#undef free
-#endif
-
-#include <spirv_cross/spirv_glsl.hpp>
-#include <map>
-#include "CoronaLog.h"
-// /STEVE CHANGE HACK
 
 // To reduce memory consumption and startup cost, defer the
 // creation of GL shaders and programs until they're needed.
@@ -213,222 +202,20 @@ CountLines( const char **segments, int numSegments )
 
 	return result;
 }
-// STEVE ChANGE HACK
-static void
-Compile( shaderc_compiler_t compiler, shaderc_compile_options_t options, std::map< std::string, size_t > & varyings, const char * sources[], int sourceCount, const char * what )
-{
-	std::string code;
 
-	for (int i = 0; i < sourceCount; ++i)
-	{
-		code += sources[i];
-	}
-
-	CoronaLog(" code: %s", code.c_str() );
-
-	bool isVertexSource = 'v' == what[0];
-
-	size_t offset = 0U, varyingLocation = 0U;
-
-	while (true)
-	{
-		size_t pos = code.find( "varying ", offset );
-
-		if (pos != std::string::npos)
-		{
-			char precision[256], type[256], name[256];
-
-			sscanf( code.c_str() + pos, "varying %s %s %s", precision, type, name );
-
-			char buf[256];
-
-			sprintf( buf, "layout(location = %u) %s ", isVertexSource ? varyingLocation : varyings[name], isVertexSource ? "out" : "in" );
-				
-			code.replace( pos, sizeof( "varying" ), buf );
-
-			if (isVertexSource)
-			{
-				varyings[name] = varyingLocation++;
-			}
-
-			offset = pos + 1U;
-		}
-
-		else
-		{
-			break;
-		}
-	}
-	/*
-	size_t attributeLocation = 0U;
-
-	while (true)
-	{
-		size_t pos = code.find( "attribute" );
-
-		if (pos != std::string::npos)
-		{
-			char buf[256];
-
-			sprintf( buf, "layout(location = %u) in ", attributeLocation++ );
-
-			code.replace( pos, sizeof( "attribute" ), buf );
-		}
-
-		else
-		{
-			break;
-		}
-	}
-
-	struct Pair {
-		std::string name;
-		size_t count;
-	};
-
-	std::vector< Pair > pairs;
-	size_t offset = 0U;
-
-	while (true)
-	{
-		size_t pos = code.find( "uniform ", offset );
-
-		if (pos != std::string::npos)
-		{
-			char precision[256], type[256], name[256];
-
-			sscanf( code.c_str() + pos, "uniform %s %s %s", precision, type, name );
-
-			Pair p;
-
-			p.name = name;
-
-			switch (Uniform::DataTypeForString( type ))
-			{
-			case Uniform::kScalar:
-			case Uniform::kVec2:
-			case Uniform::kVec3:
-			case Uniform::kVec4:
-				p.count = 1U;
-				break;
-			case Uniform::kMat3:
-				p.count = 3U;
-				break;
-			case Uniform::kMat4:
-				p.count = 4U;
-				break;
-			}
-
-			pairs.push_back( p );
-
-			offset = pos + 1U;
-		}
-
-		else
-		{
-			break;
-		}
-	}
-
-	offset = 0U;
-
-	size_t uniformLocation = 0U;
-
-	for (const Pair & p : pairs)
-	{
-		char buf[256];
-
-		sprintf( buf, "layout(location = %u) ", uniformLocation );
-
-		uniformLocation += p.count;
-
-		size_t pos = code.find( "uniform", offset );
-
-		offset = pos + sizeof( "layout(location = 00) uniform" );
-
-		code.insert( pos, buf );
-	}
-	*/
-	shaderc_compilation_result_t result = shaderc_compile_into_spv( compiler, code.data(), code.size(), isVertexSource ? shaderc_vertex_shader : shaderc_fragment_shader, what, "main", options );
-	shaderc_compilation_status status = shaderc_result_get_compilation_status( result );
-
-//	CoronaLog(" code: %s", code.c_str() );
-
-	if (shaderc_compilation_status_success == status)
-	{
-		//
-		const uint32_t * ir = reinterpret_cast< const uint32_t * >( shaderc_result_get_bytes( result ) );
-
-		spirv_cross::CompilerGLSL comp( ir, shaderc_result_get_length( result ) / 4U );
-		spirv_cross::ShaderResources resources = comp.get_shader_resources();
-
-		for (auto & uniform : resources.uniform_buffers)
-		{
-			for (auto & range : comp.get_active_buffer_ranges( uniform.id ))
-			{
-				std::string n = comp.get_member_name( uniform.base_type_id, range.index );
-
-				size_t o = range.offset;
-				size_t r = range.range;
-
-				// TODO: give these to the uniform (see if we can suss out the details like mat3, etc.) (although strictly speaking what we have on the Solar side should work)
-			}
-
-			// uniform.name; 
-			// this is giving us "UniformBufferObject"
-		}
-
-		for (auto & sampler : resources.sampled_images)
-		{
-			spirv_cross::ID id = sampler.id;
-			spirv_cross::TypeID typeID = sampler.type_id;
-			std::string n = sampler.name;
-
-			int j = 0;
-		}
-	}
-
-	else
-	{
-		CoronaLog( "Failed to compile %s: %s", what, shaderc_result_get_error_message( result ) );
-/*
-size_t shaderc_result_get_num_warnings(const shaderc_compilation_result_t result)
-size_t shaderc_result_get_num_errors(const shaderc_compilation_result_t result)
-*/
-	}
-
-	shaderc_result_release( result );
-}
-// /STEVE CHANGE HACK
 void
 GLProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data )
 {
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
 	char maskBuffer[] = "#define MASK_COUNT 0\n";
-	switch( version + 1 )
+	switch( version )
 	{
 		case Program::kMaskCount1:	maskBuffer[sizeof( maskBuffer ) - 3] = '1'; break;
 		case Program::kMaskCount2:	maskBuffer[sizeof( maskBuffer ) - 3] = '2'; break;
 		case Program::kMaskCount3:	maskBuffer[sizeof( maskBuffer ) - 3] = '3'; break;
 		default: break;
 	}
-// STEVE ChANGE HACK
-shaderc_compiler_t compiler = shaderc_compiler_initialize();
-shaderc_compile_options_t options = shaderc_compile_options_initialize();
-/*
-		#ifndef Rtt_OPENGLES
-			shaderc_compile_options_set_forced_version_profile( options,
 
-			#ifdef Rtt_MAC_ENV
-				120
-			#else
-				140//110
-			#endif
-
-			, shaderc_profile_none );
-		#endif
-*/
-// /STEVE CHANGE HACK
 	char highp_support[] = "#define FRAGMENT_SHADER_SUPPORTS_HIGHP 0\n";
 	highp_support[ sizeof( highp_support ) - 3 ] = ( CommandBuffer::GetGpuSupportsHighPrecisionFragmentShaders() ? '1' : '0' );
 
@@ -451,41 +238,30 @@ shaderc_compile_options_t options = shaderc_compile_options_initialize();
 		int numSegments = sizeof( shader_source ) / sizeof( shader_source[0] ) - 1;
 		data.fHeaderNumLines = CountLines( shader_source, numSegments );
 	}
-// STEVE CHANGE HACK
-	std::map< std::string, size_t > varyings;
-// /STEVE CHANGE HACK
+
 	// Vertex shader.
 	{
 		shader_source[4] = program->GetVertexShaderSource();
-// STEVE CHANGE HACK
-		Compile( compiler, options, varyings, shader_source, 5, "vertex source ");
-// /STEVE CHANGE HACK
-		/*
+
 		glShaderSource( data.fVertexShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
 						shader_source,
 						NULL );
-		GL_CHECK_ERROR();*/
+		GL_CHECK_ERROR();
 	}
 
 	// Fragment shader.
 	{
 		shader_source[4] = ( version == Program::kWireframe ) ? kWireframeSource : program->GetFragmentShaderSource();
-// STEVE CHANGE HACK
-		Compile( compiler, options, varyings, shader_source, 5, "fragment source ");
-// /STEVE CHANGE HACK
-		/*
+
 		glShaderSource( data.fFragmentShader,
 						( sizeof(shader_source) / sizeof(shader_source[0]) ),
 						shader_source,
 						NULL );
-		GL_CHECK_ERROR();*/
+		GL_CHECK_ERROR();
 	}
 #endif
-// STEVE CHANGE HACK
-	shaderc_compiler_release( compiler );
-	shaderc_compile_options_release( options );
-// /STEVE CHANGE HACK
+
 }
 
 void

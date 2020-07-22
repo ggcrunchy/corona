@@ -15,7 +15,15 @@
 #include "Renderer/Rtt_Uniform.h"
 #include "Core/Rtt_Assert.h"
 #include <vulkan/vulkan.h>
+#include <map>
+#include <utility>
 #include <vector>
+
+#ifdef free
+#undef free
+#endif
+
+#include <spirv_cross/spirv_glsl.hpp>
 
 // ----------------------------------------------------------------------------
 
@@ -84,7 +92,8 @@ class VulkanProgram : public GPUResource
 			VkShaderModule fVertexShader;
 			// TODO? mask counts as specialization info
 			VkShaderModule fFragmentShader;
-			uint32_t fUniformLocations[Uniform::kNumBuiltInVariables];
+			U32 fUniformLocations[Uniform::kNumBuiltInVariables];
+			// TODO? also supply ranges (else assume always in proper form)
 			// TODO? divvy these up between uniforms and push constants
 			U32 fTimestamps[Uniform::kNumBuiltInVariables];
 			U32 fShadersID;
@@ -95,13 +104,27 @@ class VulkanProgram : public GPUResource
 
 		void Create( Program::Version version, VersionData& data );
 		void Update( Program::Version version, VersionData& data );
-		void UpdateShaderSource( Program* program, Program::Version version, VersionData& data );
 		void Reset( VersionData& data );
 
-		void Compile( const char * sources[], int sourceCount, const char * what, VkShaderModule & module );
+		struct Maps {
+			typedef spirv_cross::SPIRType::ImageType SamplersValueType;
+			typedef std::pair< size_t, size_t > UniformsValueType;
+
+			std::map< std::string, SamplersValueType > samplers;
+			std::map< std::string, UniformsValueType > uniforms;
+			std::map< std::string, int > varyings;
+
+			U32 CheckForSampler( const std::string & key /* TODO: info... */ );
+			U32 CheckForUniform( const std::string & key );
+		};
+
+		void Compile( int kind, const char * sources[], int sourceCount, Maps & maps, VkShaderModule & module );
+		Maps UpdateShaderSource( Program* program, Program::Version version, VersionData& data );
 
 		static void InitializeCompiler( struct shaderc_compiler ** compiler, struct shaderc_compile_options ** options );
 		static void CleanUpCompiler( struct shaderc_compiler * compiler, struct shaderc_compile_options * options );
+			
+		static std::vector< VkVertexInputAttributeDescription > AttributeDescriptions();
 
 		VulkanState * fState;
 		VersionData fData[Program::kNumVersions];

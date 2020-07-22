@@ -26,6 +26,11 @@ layout(binding = 0) uniform UniformBufferObject {
     mat3 MaskMatrix2;
 } ubo;
 
+#define MAX_FILL_SAMPLERS 2
+
+layout(binding = 1) uniform sampler2D u_FillSampler0;
+layout(binding = 2) uniform sampler2D u_FillSampler1;
+
 #define CoronaVertexUserData a_UserData
 #define CoronaTexCoord a_TexCoord.xy
 
@@ -97,6 +102,8 @@ void main()
 
 shell.fragment =
 [[
+#define MAX_FILL_SAMPLERS 2
+
 layout(binding = 1) uniform sampler2D u_FillSampler0;
 layout(binding = 2) uniform sampler2D u_FillSampler1;
 
@@ -131,17 +138,17 @@ varying P_DEFAULT vec4 v_UserData;
 #define CoronaSampler1 u_FillSampler1
 
 #if MASK_COUNT > 0
-    layout(binding = 3) uniform sampler2D u_MaskSampler0;
+    layout(binding = MAX_FILL_SAMPLERS + 1) uniform sampler2D u_MaskSampler0;
     varying P_UV vec2 v_MaskUV0;
 #endif
 
 #if MASK_COUNT > 1
-    layout(binding = 4) uniform sampler2D u_MaskSampler1;
+    layout(binding = MAX_FILL_SAMPLERS + 2) uniform sampler2D u_MaskSampler1;
     varying P_UV vec2 v_MaskUV1;
 #endif
 
 #if MASK_COUNT > 2
-    layout(binding = 5) uniform sampler2D u_MaskSampler2;
+    layout(binding = MAX_FILL_SAMPLERS + 3) uniform sampler2D u_MaskSampler2;
     varying P_UV vec2 v_MaskUV2;
 #endif
 
