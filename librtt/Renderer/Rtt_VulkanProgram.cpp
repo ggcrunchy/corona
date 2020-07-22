@@ -22,6 +22,7 @@
 
 #include <shaderc/shaderc.h>
 #include <string>
+#include <stdlib.h>
 /*
 #include <cstdio>
 #include <string.h> // memset.
@@ -197,7 +198,7 @@ CountLines( const char **segments, int numSegments )
 }
 
 void
-VulkanProgram::Compile( const char * sources[], int sourceCount, const char * what, VkShaderModule & module )
+VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps & maps, VkShaderModule & module )
 {
 	std::string code;
 
@@ -205,17 +206,42 @@ VulkanProgram::Compile( const char * sources[], int sourceCount, const char * wh
 	{
 		code += sources[i];
 	}
-
+	
+	shaderc_shader_kind kind = shaderc_shader_kind( ikind );
+	const char * what = shaderc_vertex_shader == kind ? "vertex shader" : "fragment shader";
 	shaderc_compilation_result_t result = shaderc_compile_into_spv( fState->GetCompiler(), code.data(), code.size(), shaderc_vertex_shader, what, "main", fState->GetCompileOptions() );
 	shaderc_compilation_status status = shaderc_result_get_compilation_status( result );
 
 	if (shaderc_compilation_status_success == status)
 	{
+		const uint32_t * ir = reinterpret_cast< const uint32_t * >( shaderc_result_get_bytes( result ) );
 		VkShaderModuleCreateInfo createShaderModuleInfo = {};
 
 		createShaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 		createShaderModuleInfo.codeSize = shaderc_result_get_length( result );
-		createShaderModuleInfo.pCode = reinterpret_cast< const uint32_t * >( shaderc_result_get_bytes( result ) );
+		createShaderModuleInfo.pCode = ir;
+
+		spirv_cross::CompilerGLSL comp( ir, createShaderModuleInfo.codeSize / 4U );
+		spirv_cross::ShaderResources resources = comp.get_shader_resources();
+
+		for (auto & uniform : resources.uniform_buffers)
+		{
+			for (auto & range : comp.get_active_buffer_ranges( uniform.id ))
+			{
+				std::string name = comp.get_member_name( uniform.base_type_id, range.index );
+
+				maps.uniforms[name] = std::make_pair( range.offset, range.range );
+				// TODO: compare, if found in both?
+			}
+		}
+
+		for (auto & sampler : resources.sampled_images)
+		{
+			const spirv_cross::SPIRType & type = comp.get_type_from_variable( sampler.id );
+
+			maps.samplers[sampler.name] = type.image;
+			// TODO: ditto (although far less likely in vertex shader)
+		}
 
 		VkShaderModule shaderModule;
 
@@ -232,19 +258,17 @@ VulkanProgram::Compile( const char * sources[], int sourceCount, const char * wh
 
 	else
 	{
-		CoronaLog( "Failed to compile %s: %s", what, shaderc_result_get_error_message( result ) );
-/*
-size_t shaderc_result_get_num_warnings(const shaderc_compilation_result_t result)
-size_t shaderc_result_get_num_errors(const shaderc_compilation_result_t result)
-*/
+		CoronaLog( "Failed to compile %s:\n\n%s", what, shaderc_result_get_error_message( result ) );
 	}
 
 	shaderc_result_release( result );
 }
 
-void
+VulkanProgram::Maps
 VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data )
 {
+	Maps maps;
+
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
 	char maskBuffer[] = "#define MASK_COUNT 0\n";
 	switch( version )
@@ -261,7 +285,7 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 	const char* shader_source[5];
 	memset( shader_source, 0, sizeof( shader_source ) );
 	shader_source[0] = header;
-	shader_source[1] = "#define FRAGMENT_SHADER_SUPPORTS_HIGHP 1\n"; // TODO: safe assumption?
+	shader_source[1] = "#define FRAGMENT_SHADER_SUPPORTS_HIGHP 1\n"; // TODO? this seems a safe assumption on Vulkan...
 	shader_source[2] = maskBuffer;
 
 	if ( program->IsCompilerVerbose() )
@@ -275,16 +299,56 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 	{
 		shader_source[3] = program->GetVertexShaderSource();
 
-		Compile( shader_source, 4, "vertex shader", data.fVertexShader );
+		Compile( shaderc_vertex_shader, shader_source, sizeof( shader_source ) / sizeof( shader_source[0] ), maps, data.fVertexShader );
 	}
 
 	// Fragment shader.
 	{
 		shader_source[3] = ( version == Program::kWireframe ) ? kWireframeSource : program->GetFragmentShaderSource();
 
-		Compile( shader_source, 4, "fragment shader", data.fFragmentShader );
+		Compile( shaderc_fragment_shader, shader_source, sizeof( shader_source ) / sizeof( shader_source[0] ), maps, data.fFragmentShader );
 	}
+#else
+	// no need to compile, but reflection here...
 #endif
+	return maps;
+}
+
+U32
+VulkanProgram::Maps::CheckForSampler( const std::string & key /* TODO: info... */ )
+{
+	auto iter = samplers.find( key );
+
+	if (iter != samplers.end())
+	{
+		auto imageType = iter->second;
+
+		return 0U;	// TODO: maybe just want binding decorator, from above?
+					// imageType would be handy for later expansion...
+	}
+
+	else
+	{
+		return ~0U;
+	}
+}
+
+U32
+VulkanProgram::Maps::CheckForUniform( const std::string & key )
+{
+	auto iter = uniforms.find( key );
+
+	if (iter != uniforms.end())
+	{
+		auto & pair = iter->second;
+
+		return pair.first; // TODO: not sure we need second, cf. note in VersionData
+	}
+
+	else
+	{
+		return ~0U;
+	}
 }
 
 void
@@ -292,19 +356,9 @@ VulkanProgram::Update( Program::Version version, VersionData& data )
 {
 	Program* program = static_cast<Program*>( fResource );
 
-#ifndef Rtt_USE_PRECOMPILED_SHADERS
-/*
-	glBindAttribLocation( data.fProgram, Geometry::kVertexPositionAttribute, "a_Position" );
-	glBindAttribLocation( data.fProgram, Geometry::kVertexTexCoordAttribute, "a_TexCoord" );
-	glBindAttribLocation( data.fProgram, Geometry::kVertexColorScaleAttribute, "a_ColorScale" );
-	glBindAttribLocation( data.fProgram, Geometry::kVertexUserDataAttribute, "a_UserData" );
-	GL_CHECK_ERROR();
-*/
-#endif
-
-	UpdateShaderSource( program,
-						version,
-						data );
+	Maps maps = UpdateShaderSource( program,
+									version,
+									data );
 
 #ifdef Rtt_USE_PRECOMPILED_SHADERS // TODO! (can probably just load spv?)
 	ShaderBinary *shaderBinary = program->GetCompiledShaders()->Get(version);
@@ -341,40 +395,27 @@ VulkanProgram::Update( Program::Version version, VersionData& data )
 		kernelStartLine = data.fHeaderNumLines + program->GetFragmentShellNumLines();
 	}
 #endif
-	/*
-	data.fUniformLocations[Uniform::kViewProjectionMatrix] = glGetUniformLocation( data.fProgram, "u_ViewProjectionMatrix" );
-	GL_CHECK_ERROR();
-	data.fUniformLocations[Uniform::kMaskMatrix0] = glGetUniformLocation( data.fProgram, "u_MaskMatrix0" );
-	GL_CHECK_ERROR();
-	data.fUniformLocations[Uniform::kMaskMatrix1] = glGetUniformLocation( data.fProgram, "u_MaskMatrix1" );
-	GL_CHECK_ERROR();
-	data.fUniformLocations[Uniform::kMaskMatrix2] = glGetUniformLocation( data.fProgram, "u_MaskMatrix2" );
-	GL_CHECK_ERROR();
-	data.fUniformLocations[Uniform::kTotalTime] = glGetUniformLocation( data.fProgram, "u_TotalTime" );
-	GL_CHECK_ERROR();
-	data.fUniformLocations[Uniform::kDeltaTime] = glGetUniformLocation( data.fProgram, "u_DeltaTime" );
-	GL_CHECK_ERROR();
-	data.fUniformLocations[Uniform::kTexelSize] = glGetUniformLocation( data.fProgram, "u_TexelSize" );
-	GL_CHECK_ERROR();
-	data.fUniformLocations[Uniform::kContentScale] = glGetUniformLocation( data.fProgram, "u_ContentScale" );
-	GL_CHECK_ERROR();
-	data.fUniformLocations[Uniform::kUserData0] = glGetUniformLocation( data.fProgram, "u_UserData0" );
-	GL_CHECK_ERROR();
-	data.fUniformLocations[Uniform::kUserData1] = glGetUniformLocation( data.fProgram, "u_UserData1" );
-	GL_CHECK_ERROR();
-	data.fUniformLocations[Uniform::kUserData2] = glGetUniformLocation( data.fProgram, "u_UserData2" );
-	GL_CHECK_ERROR();
-	data.fUniformLocations[Uniform::kUserData3] = glGetUniformLocation( data.fProgram, "u_UserData3" );
-	GL_CHECK_ERROR();
 
-	glUseProgram( data.fProgram );
+	data.fUniformLocations[Uniform::kViewProjectionMatrix] = maps.CheckForUniform( "ViewProjectionMatrix" );
+	data.fUniformLocations[Uniform::kMaskMatrix0] = maps.CheckForUniform( "MaskMatrix0" );
+	data.fUniformLocations[Uniform::kMaskMatrix1] = maps.CheckForUniform( "MaskMatrix1" );
+	data.fUniformLocations[Uniform::kMaskMatrix2] = maps.CheckForUniform( "MaskMatrix2" );
+	data.fUniformLocations[Uniform::kTotalTime] = maps.CheckForUniform( "TotalTime" );
+	data.fUniformLocations[Uniform::kDeltaTime] = maps.CheckForUniform( "DeltaTime" );
+	data.fUniformLocations[Uniform::kTexelSize] = maps.CheckForUniform( "TexelSize" );
+	data.fUniformLocations[Uniform::kContentScale] = maps.CheckForUniform( "ContentScale" );
+	data.fUniformLocations[Uniform::kUserData0] = maps.CheckForUniform( "UserData0" );
+	data.fUniformLocations[Uniform::kUserData1] = maps.CheckForUniform( "UserData1" );
+	data.fUniformLocations[Uniform::kUserData2] = maps.CheckForUniform( "UserData2" );
+	data.fUniformLocations[Uniform::kUserData3] = maps.CheckForUniform( "UserData3" );
+
+/*
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_FillSampler0" ), Texture::kFill0 );
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_FillSampler1" ), Texture::kFill1 );
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler0" ), Texture::kMask0 );
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler1" ), Texture::kMask1 );
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler2" ), Texture::kMask2 );
-	glUseProgram( 0 );
-	GL_CHECK_ERROR();*/
+*/
 }
 
 void
@@ -385,8 +426,6 @@ VulkanProgram::Reset( VersionData& data )
 
 	for( U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i )
 	{
-		// OpenGL uses the location -1 for inactive uniforms
-		// TODO!
 		const uint32_t kInactiveLocation = ~0U;
 		data.fUniformLocations[ i ] = kInactiveLocation;
 
@@ -398,39 +437,59 @@ VulkanProgram::Reset( VersionData& data )
 	data.fHeaderNumLines = 0;
 }
 
-void VulkanProgram::InitializeCompiler( shaderc_compiler_t * compiler, shaderc_compile_options_t * options )
+void
+VulkanProgram::InitializeCompiler( shaderc_compiler_t * compiler, shaderc_compile_options_t * options )
 {
 	if (compiler && options)
 	{
 		*compiler = shaderc_compiler_initialize();
 		*options = shaderc_compile_options_initialize();
 
-		#ifndef Rtt_OPENGLES
-			shaderc_compile_options_set_forced_version_profile( *options,
-
-			#ifdef Rtt_MAC_ENV
-				120
-			#else
-				110
-			#endif
-
-			, shaderc_profile_none );
-		#endif
-/*
-void shaderc_compile_options_set_generate_debug_info(
-    shaderc_compile_options_t options)
-void shaderc_compile_options_set_optimization_level(
-    shaderc_compile_options_t options, shaderc_optimization_level level)
-void shaderc_compile_options_set_invert_y(
-    shaderc_compile_options_t options, bool enable)
-*/
+// void shaderc_compile_options_set_generate_debug_info(shaderc_compile_options_t options)
+// void shaderc_compile_options_set_optimization_level(shaderc_compile_options_t options, shaderc_optimization_level level)
+// void shaderc_compile_options_set_invert_y(shaderc_compile_options_t options, bool enable)
 	}
 }
 
-void VulkanProgram::CleanUpCompiler( shaderc_compiler_t compiler, shaderc_compile_options_t options )
+void
+VulkanProgram::CleanUpCompiler( shaderc_compiler_t compiler, shaderc_compile_options_t options )
 {
 	shaderc_compiler_release( compiler );
 	shaderc_compile_options_release( options );
+}
+
+std::vector< VkVertexInputAttributeDescription >
+VulkanProgram::AttributeDescriptions()
+{
+	std::vector< VkVertexInputAttributeDescription > attributeDescriptions;
+
+	VkVertexInputAttributeDescription description = {};
+
+	description.location = Geometry::kVertexPositionAttribute;
+	description.format = VK_FORMAT_R32G32B32_SFLOAT;
+	description.offset = offsetof( Geometry::Vertex, x );
+
+	attributeDescriptions.push_back( description );
+
+	description.location = Geometry::kVertexTexCoordAttribute;
+	description.format = VK_FORMAT_R32G32B32_SFLOAT;
+	description.offset = offsetof( Geometry::Vertex, u );
+
+	attributeDescriptions.push_back( description );
+
+	description.location = Geometry::kVertexColorScaleAttribute;
+	description.format = VK_FORMAT_R8G8B8A8_UNORM;
+	description.offset = offsetof( Geometry::Vertex, rs );
+
+	attributeDescriptions.push_back( description );
+
+	description.location = Geometry::kVertexUserDataAttribute;
+	description.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	description.offset = offsetof( Geometry::Vertex, ux );
+
+	attributeDescriptions.push_back( description );
+
+	return attributeDescriptions;
 }
 
 // ----------------------------------------------------------------------------
@@ -528,19 +587,5 @@ void VulkanProgram::CleanUpCompiler( shaderc_compiler_t compiler, shaderc_compil
 
             vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
         }
-    }
-
-	VkShaderModule createShaderModule(const std::vector<char>& code) {
-        VkShaderModuleCreateInfo createInfo = {};
-        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        createInfo.codeSize = code.size();
-        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-        VkShaderModule shaderModule;
-        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create shader module!");
-        }
-
-        return shaderModule;
     }
 */
