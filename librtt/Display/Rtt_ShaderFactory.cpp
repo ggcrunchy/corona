@@ -82,7 +82,7 @@ ShaderFactory::RegisterBuiltin( lua_State *L, ShaderTypes::Category category )
 
 // ----------------------------------------------------------------------------
 
-ShaderFactory::ShaderFactory( Display& owner, const ProgramHeader& programHeader )
+ShaderFactory::ShaderFactory( Display& owner, const ProgramHeader& programHeader, const char * backend ) // <- STEVE CHANGE
 :	fAllocator( owner.GetAllocator() ),
 	fDefaultColorShader( NULL ),
 	fDefaultShader( NULL ),
@@ -90,7 +90,10 @@ ShaderFactory::ShaderFactory( Display& owner, const ProgramHeader& programHeader
 	fOwner( owner ),
 	fDefaultShell( NULL ),
 	fDefaultKernel( NULL ),
-	fProgramHeader( Rtt_NEW( fAllocator, ProgramHeader( programHeader ) ) )
+	fProgramHeader( Rtt_NEW( fAllocator, ProgramHeader( programHeader ) ) ),
+// STEVE CHANGE
+	fBackend( backend )
+// /STEVE CHANGE
 {
 	lua_State *L = fL;
 
@@ -148,7 +151,7 @@ ShaderFactory::Initialize()
 	}
 #else
 	// Load the default shell and kernel shader source code to be dynamically compiled later.
-	if ( ShaderBuiltin::PushDefaultShell( L ) )
+	if ( ShaderBuiltin::PushDefaultShell( L, fBackend ) ) // <- STEVE CHANGE
 	{
 		int tableIndex = lua_gettop( L );
 
@@ -301,15 +304,29 @@ ShaderFactory::NewProgram(
 
 	//TODO - move this into a delegate block, rather than extending this
 	{
+		// STEVE CHANGE
+		Program::Language language;
+
+		if (strcmp( fBackend, "vulkanBackend" ) == 0)
+		{
+			language = Program::kVulkanGLSL;
+		}
+
+		else
+		{
+		// /STEVE CHANGE
 		#if defined( Rtt_OPENGLES )
 			// We are using OpenGL ES, so assume it's v.2.0
 			// We could also look at GL_ES_VERSION_2_0 and GL_ES_VERSION_3_0.
-			Program::Language language = Program::kOpenGL_ES_2;
+			/*Program::Language */language = Program::kOpenGL_ES_2; // <- STEVE CHANGE
 		#else // NOT Rtt_OPENGLES
 			// We are using Desktop OpenGL, so assume it's OpenGL 2.1
 			// We could also look at GL_VERSION_2_0 and GL_VERSION_2_1.
-			Program::Language language = Program::kOpenGL_2_1;
+			/*Program::Language */language = Program::kOpenGL_2_1; // <- STEVE CHANGE
 		#endif
+		// STEVE CHANGE
+		}
+		// /STEVE CHANGE
 		
 		std::string header = Program::HeaderForLanguage( language, * fProgramHeader );
 		

@@ -319,7 +319,7 @@ static const char kOpenGL_2_1_Header[] =
 		// by with GL 2.0.  The rest of the header stays the same.  This isn't
 		// technically "correct" since some shaders won't work, but it is better
 		// than before (i.e. blank screens)
-		"#version 450\n"
+		"#version 110\n"
 	#endif
 
 		"\n"
@@ -334,7 +334,22 @@ static const char kOpenGL_2_1_Header[] =
 		"#define P_UV\n"
 		"#define P_COLOR\n"
 		"\n";
-
+// STEVE CHANGE
+static const char kVulkanGLSL_Header[] =
+		"#version 450\n"
+		"\n"
+		"#define lowp\n"
+		"#define mediump\n"
+		"#define highp\n"
+		"\n"
+		"#define P_DEFAULT\n"
+		"#define P_RANDOM\n"
+		"#define P_POSITION\n"
+		"#define P_NORMAL\n"
+		"#define P_UV\n"
+		"#define P_COLOR\n"
+		"\n";
+// /STEVE CHANGE
 // Copy the header string to 'dst' up to (dstSize-1) chars.
 // Always terminates '\0'
 void
@@ -349,6 +364,15 @@ ProgramHeader::CopyHeaderSource( Program::Language language, char *dst, int dstS
 
 			Rtt_ASSERT( sizeof( kOpenGL_2_1_Header ) < dstSize );
 		}
+	// STEVE CHANGE
+		else if ( Program::kVulkanGLSL == language )
+		{
+			strncpy( dst, kVulkanGLSL_Header, dstSize );
+			dst[dstSize - 1] = '\0'; // strncpy does not '\0' terminate if src is larger than dst
+
+			Rtt_ASSERT( sizeof( kVulkanGLSL_Header ) < dstSize );
+		}
+	// /STEVE CHANGE
 		else
 		{
 			Rtt_ASSERT( Program::kOpenGL_ES_2 == language );

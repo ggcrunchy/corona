@@ -53,7 +53,23 @@ class VulkanGeometry : public GPUResource
 		VkBuffer fIndexBuffer;
 		VkDeviceMemory fVertexBufferMemory;
 		VkDeviceMemory fIndexBufferMemory;
+/*
+
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+*/
 };
+
+/*
+    static VkVertexInputBindingDescription getBindingDescription() {
+        VkVertexInputBindingDescription bindingDescription = {};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(Vertex);
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        return bindingDescription;
+    }
+*/
 
 // ----------------------------------------------------------------------------
 

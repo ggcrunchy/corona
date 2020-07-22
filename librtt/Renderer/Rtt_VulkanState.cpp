@@ -32,6 +32,7 @@ VulkanState::VulkanState()
     fPhysicalDevice( VK_NULL_HANDLE ),
     fGraphicsQueue( VK_NULL_HANDLE ),
     fPresentQueue( VK_NULL_HANDLE ),
+	fCommandPool( VK_NULL_HANDLE ),
     fSurface( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE ),
 	fSampleCountFlags( VK_SAMPLE_COUNT_1_BIT ),
@@ -40,6 +41,36 @@ VulkanState::VulkanState()
 {
 }
 
+/*
+    void initVulkan() {
+        createInstance();
+        setupDebugMessenger();
+        createSurface();
+        pickPhysicalDevice();
+        createLogicalDevice();
+        createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createDescriptorSetLayout();
+        createGraphicsPipeline();
+        createCommandPool();
+        createColorResources();
+        createDepthResources();
+        createFramebuffers();
+        createTextureImage();
+        createTextureImageView();
+        createTextureSampler();
+        loadModel();
+        createVertexBuffer();
+        createIndexBuffer();
+        createUniformBuffers();
+        createDescriptorPool();
+        createDescriptorSets();
+        createCommandBuffers();
+        createSyncObjects();
+    }
+*/
+
 VulkanState::~VulkanState()
 {
 	VulkanProgram::CleanUpCompiler( fCompiler, fCompileOptions );
@@ -47,6 +78,7 @@ VulkanState::~VulkanState()
 	TearDownSwapchain();
 
     vkDestroySurfaceKHR( fInstance, fSurface, fAllocationCallbacks );
+	vkDestroyCommandPool( fDevice, fCommandPool, fAllocationCallbacks );
     vkDestroyDevice( fDevice, fAllocationCallbacks );
 #ifndef NDEBUG
     auto func = ( PFN_vkDestroyDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( fInstance, "vkDestroyDebugUtilsMessengerEXT" );
@@ -60,6 +92,235 @@ VulkanState::~VulkanState()
 
 	// allocator?
 }
+
+std::pair< VkBuffer, VkDeviceMemory >
+VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties )
+{
+    VkBufferCreateInfo createBufferInfo = {};
+
+    createBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    createBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    createBufferInfo.size = size;
+    createBufferInfo.usage = usage;
+
+	VkBuffer buffer = VK_NULL_HANDLE;
+	VkDeviceMemory bufferMemory = VK_NULL_HANDLE;
+
+    if (VK_SUCCESS == vkCreateBuffer( fDevice, &createBufferInfo, NULL, &buffer ))
+	{
+		VkMemoryRequirements memRequirements;
+
+		vkGetBufferMemoryRequirements( fDevice, buffer, &memRequirements );
+
+		VkMemoryAllocateInfo allocInfo = {};
+
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;
+
+		if (FindMemoryType( memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex ))
+		{
+
+			if (VK_SUCCESS == vkAllocateMemory( fDevice, &allocInfo, nullptr, &bufferMemory ))
+			{
+				vkBindBufferMemory( fDevice, buffer, bufferMemory, 0 );
+			}
+
+			else
+			{
+				CoronaLog( "Failed to allocate buffer memory!" );
+			}
+		}
+
+		if (VK_NULL_HANDLE == bufferMemory)
+		{
+			vkDestroyBuffer( fDevice, buffer, fAllocationCallbacks );
+
+			buffer = VK_NULL_HANDLE;
+		}
+	}
+
+	else
+	{
+        CoronaLog( "Failed to create buffer!" );
+    }
+
+	return std::make_pair( buffer, bufferMemory );
+}
+
+bool
+VulkanState::FindMemoryType( uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t & type )
+{
+    VkPhysicalDeviceMemoryProperties memProperties;
+
+    vkGetPhysicalDeviceMemoryProperties( fPhysicalDevice, &memProperties );
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
+	{
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+		{
+            type = i;
+
+			return true;
+        }
+    }
+
+    CoronaLog( "Failed to find suitable memory type!" );
+
+	return false;
+}
+
+VkCommandBuffer
+VulkanState::BeginSingleTimeCommands()
+{
+    VkCommandBufferAllocateInfo allocInfo = {};
+
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandBufferCount = 1;
+    allocInfo.commandPool = fCommandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+    VkCommandBuffer commandBuffer;
+
+    vkAllocateCommandBuffers( fDevice, &allocInfo, &commandBuffer );
+
+    VkCommandBufferBeginInfo beginInfo = {};
+
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer( commandBuffer, &beginInfo );
+
+    return commandBuffer;
+}
+
+void
+VulkanState::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
+{
+    vkEndCommandBuffer( commandBuffer );
+
+    VkSubmitInfo submitInfo = {};
+
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkQueueSubmit( fGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE );
+    vkQueueWaitIdle( fGraphicsQueue );
+    vkFreeCommandBuffers( fDevice, fCommandPool, 1, &commandBuffer );
+}
+
+void
+VulkanState::CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size )
+{
+    VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
+    VkBufferCopy copyRegion = {};
+
+    copyRegion.size = size;
+
+    vkCmdCopyBuffer( commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion );
+
+    EndSingleTimeCommands( commandBuffer );
+}
+
+/*
+
+
+    void cleanupSwapChain() {
+        vkDestroyImageView(device, depthImageView, nullptr);
+        vkDestroyImage(device, depthImage, nullptr);
+        vkFreeMemory(device, depthImageMemory, nullptr);
+
+        vkDestroyImageView(device, colorImageView, nullptr);
+        vkDestroyImage(device, colorImage, nullptr);
+        vkFreeMemory(device, colorImageMemory, nullptr);
+
+        for (auto framebuffer : swapChainFramebuffers) {
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
+        }
+
+        vkFreeCommandBuffers(device, commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+
+        vkDestroyPipeline(device, graphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+        vkDestroyRenderPass(device, renderPass, nullptr);
+
+        for (auto imageView : swapChainImageViews) {
+            vkDestroyImageView(device, imageView, nullptr);
+        }
+
+        vkDestroySwapchainKHR(device, swapChain, nullptr);
+
+        for (size_t i = 0; i < swapChainImages.size(); i++) {
+            vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+            vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+        }
+
+        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+    }
+
+    void cleanup() {
+        cleanupSwapChain();
+
+        vkDestroySampler(device, textureSampler, nullptr);
+        vkDestroyImageView(device, textureImageView, nullptr);
+
+        vkDestroyImage(device, textureImage, nullptr);
+        vkFreeMemory(device, textureImageMemory, nullptr);
+
+        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+
+        vkDestroyBuffer(device, indexBuffer, nullptr);
+        vkFreeMemory(device, indexBufferMemory, nullptr);
+
+        vkDestroyBuffer(device, vertexBuffer, nullptr);
+        vkFreeMemory(device, vertexBufferMemory, nullptr);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+            vkDestroyFence(device, inFlightFences[i], nullptr);
+        }
+
+        vkDestroyCommandPool(device, commandPool, nullptr);
+
+        vkDestroyDevice(device, nullptr);
+
+        if (enableValidationLayers) {
+            DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+        }
+
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+        vkDestroyInstance(instance, nullptr);
+
+        glfwDestroyWindow(window);
+
+        glfwTerminate();
+    }
+
+    void recreateSwapChain() {
+        int width = 0, height = 0;
+        while (width == 0 || height == 0) {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+        }
+
+        vkDeviceWaitIdle(device);
+
+        cleanupSwapChain();
+
+        createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createGraphicsPipeline();
+        createColorResources();
+        createDepthResources();
+        createFramebuffers();
+        createUniformBuffers();
+        createDescriptorPool();
+        createDescriptorSets();
+        createCommandBuffers();
+    }
+*/
 
 const char *
 StringIdentity( const char * str )
@@ -100,11 +361,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 ) {
     CoronaLog( "validation layer: %s", pCallbackData->pMessage );
 
-/*
-	VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT: Some event has happened that is unrelated to the specification or performance
-	VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT: Something has happened that violates the specification or indicates a possible mistake
-	VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT: Potential non-optimal use of Vulkan
-*/
+//	VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT: Some event has happened that is unrelated to the specification or performance
+//	VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT: Something has happened that violates the specification or indicates a possible mistake
+//	VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT: Potential non-optimal use of Vulkan
 
     return VK_FALSE;
 }
@@ -422,6 +681,26 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 	return device;
 }
 
+static VkCommandPool
+MakeCommandPool( VkDevice device, uint32_t graphicsFamily )
+{
+    VkCommandPoolCreateInfo createPoolInfo = {};
+
+    createPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    createPoolInfo.queueFamilyIndex = graphicsFamily;
+
+	VkCommandPool commandPool;
+
+    if (vkCreateCommandPool( device, &createPoolInfo, nullptr, &commandPool ) != VK_SUCCESS)
+	{
+        CoronaLog( "Failed to create graphics command pool!" );
+
+		return VK_NULL_HANDLE;
+    }
+
+	return commandPool;
+}
+
 bool
 VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback )
 {
@@ -458,19 +737,26 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 
 				if (device != VK_NULL_HANDLE)
 				{
-					VkQueue graphicsQueue, presentQueue;
-
-					vkGetDeviceQueue( device, physicalDeviceData.second.fGraphicsQueue, 0, &graphicsQueue );
-					vkGetDeviceQueue( device, physicalDeviceData.second.fPresentQueue, 0, &presentQueue );
-
-					VulkanProgram::InitializeCompiler( &state.fCompiler, &state.fCompileOptions );
-
 					state.fDevice = device;
-					state.fGraphicsQueue = graphicsQueue;
-					state.fPresentQueue = presentQueue;
-					state.fQueueFamilies = families;
 
-					return true;
+					VkCommandPool commandPool = MakeCommandPool( device, physicalDeviceData.second.fGraphicsQueue );
+
+					if (commandPool != VK_NULL_HANDLE)
+					{
+						VkQueue graphicsQueue, presentQueue;
+
+						vkGetDeviceQueue( device, physicalDeviceData.second.fGraphicsQueue, 0, &graphicsQueue );
+						vkGetDeviceQueue( device, physicalDeviceData.second.fPresentQueue, 0, &presentQueue );
+
+						VulkanProgram::InitializeCompiler( &state.fCompiler, &state.fCompileOptions );
+						
+						state.fCommandPool = commandPool;
+						state.fGraphicsQueue = graphicsQueue;
+						state.fPresentQueue = presentQueue;
+						state.fQueueFamilies = families;
+
+						return true;
+					}
 				}
 			}
 		}
@@ -672,6 +958,33 @@ VulkanState::BuildUpSwapchain()
 	}
 }
 
+/*
+    void createFramebuffers() {
+        swapChainFramebuffers.resize(swapChainImageViews.size());
+
+        for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+            std::array<VkImageView, 3> attachments = {
+                colorImageView,
+                depthImageView,
+                swapChainImageViews[i]
+            };
+
+            VkFramebufferCreateInfo framebufferInfo = {};
+            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            framebufferInfo.renderPass = renderPass;
+            framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+            framebufferInfo.pAttachments = attachments.data();
+            framebufferInfo.width = swapChainExtent.width;
+            framebufferInfo.height = swapChainExtent.height;
+            framebufferInfo.layers = 1;
+
+            if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
+                throw std::runtime_error("failed to create framebuffer!");
+            }
+        }
+    }
+*/
+
 void
 VulkanState::TearDownSwapchain()
 {
@@ -684,6 +997,24 @@ VulkanState::TearDownSwapchain()
 
 	vkDestroySwapchainKHR( fDevice, fSwapchain, fAllocationCallbacks );
 }
+
+/*
+    void run() {
+        initWindow();
+        initVulkan();
+        mainLoop();
+        cleanup();
+    }
+
+    void mainLoop() {
+        while (!glfwWindowShouldClose(window)) {
+            glfwPollEvents();
+            drawFrame();
+        }
+
+        vkDeviceWaitIdle(device);
+    }
+*/
 
 // ----------------------------------------------------------------------------
 

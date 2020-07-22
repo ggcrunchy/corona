@@ -12,6 +12,7 @@
 
 #include "Renderer/Rtt_Renderer.h"
 #include <vulkan/vulkan.h>
+#include <utility>
 #include <vector>
 
 #ifdef free
@@ -55,6 +56,15 @@ class VulkanState
 	#endif
 
 	public:
+		bool FindMemoryType( uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t & type );
+		std::pair< VkBuffer, VkDeviceMemory > CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties );
+	
+	public:
+	    VkCommandBuffer BeginSingleTimeCommands();
+		void EndSingleTimeCommands( VkCommandBuffer commandBuffer );
+		void CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size );
+
+	public:
 		struct NewSurfaceCallback {
 			VkSurfaceKHR (*make)( VkInstance, void *, const VkAllocationCallbacks * );
 			const char * extension;
@@ -64,7 +74,6 @@ class VulkanState
 		static bool PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
 		static bool GetMultisampleDetails( VulkanState & state );
 		static bool GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height );
-
 	public:
 		void BuildUpSwapchain();
 		void TearDownSwapchain();
@@ -73,6 +82,7 @@ class VulkanState
 		struct SwapchainImage {
 			VkImage image;
 			VkImageView view;
+			// VkFramebuffer
 		};
 
 		VkAllocationCallbacks * fAllocationCallbacks;
@@ -84,6 +94,7 @@ class VulkanState
 		VkPhysicalDevice fPhysicalDevice;
 		VkQueue fGraphicsQueue;
 		VkQueue fPresentQueue;
+		VkCommandPool fCommandPool;
 		VkSurfaceKHR fSurface;
 		VkSampleCountFlags fSampleCountFlags;
 		VkSurfaceTransformFlagBitsKHR fTransformFlagBits;
@@ -94,7 +105,7 @@ class VulkanState
 		VkPresentModeKHR fPresentMode;
 		std::vector< SwapchainImage > fSwapchainImages;
 		std::vector< uint32_t > fQueueFamilies;
-				
+
 		struct shaderc_compiler * fCompiler;
 		struct shaderc_compile_options * fCompileOptions;
 

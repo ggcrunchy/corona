@@ -47,6 +47,7 @@ class VulkanTexture : public GPUResource
 		VkDeviceMemory fImageMemory;
 		VkImageView fImageView;
 		VkSampler fSampler;
+		uint32_t fMipLevels;
 };
 
 // ----------------------------------------------------------------------------

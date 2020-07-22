@@ -297,7 +297,7 @@ Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orie
 
 		result = true;
 
-		fShaderFactory = Rtt_NEW( allocator, ShaderFactory( *this, programHeader ) );
+		fShaderFactory = Rtt_NEW( allocator, ShaderFactory( *this, programHeader, backend ) ); // <- STEVE CHANGE
 	}
 
 	return result;
