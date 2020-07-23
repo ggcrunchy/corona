@@ -63,6 +63,7 @@ class VulkanState
 	    VkCommandBuffer BeginSingleTimeCommands();
 		void EndSingleTimeCommands( VkCommandBuffer commandBuffer );
 		void CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size );
+		void UploadData( VkDeviceMemory stagingMemory, const uint8_t * source, VkDeviceSize count, VkDeviceSize offset = 0U );
 
 	public:
 		struct NewSurfaceCallback {
@@ -74,6 +75,7 @@ class VulkanState
 		static bool PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
 		static bool GetMultisampleDetails( VulkanState & state );
 		static bool GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height );
+
 	public:
 		void BuildUpSwapchain();
 		void TearDownSwapchain();

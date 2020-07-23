@@ -12,6 +12,7 @@
 
 #include "Renderer/Rtt_GPUResource.h"
 #include <vulkan/vulkan.h>
+#include <utility>
 
 // ----------------------------------------------------------------------------
 
@@ -37,17 +38,24 @@ class VulkanTexture : public GPUResource
 		virtual void Destroy();
 		virtual void Bind( U32 unit );
 
-//		virtual GLuint GetName();
+	public:
+		void CopyBufferToImage( VkBuffer buffer, VkImage image, uint32_t width, uint32_t height );
+		std::pair< VkImage, VkDeviceMemory > CreateImage( uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties );
+		bool Load( Texture * texture );
+		bool TransitionImageLayout( VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels );
+
+	public:
+		static VkImageView CreateImageView( VulkanState * state, VkImage image, VkFormat format, VkImageAspectFlags flags, uint32_t mipLevels );
+
 	private:
-		/*
-		GLint fCachedFormat;
-		unsigned long fCachedWidth, fCachedHeight;*/
+//		GLint fCachedFormat;
+//		unsigned long fCachedWidth, fCachedHeight;
 		VulkanState * fState;
-		VkImage fImage;
 		VkDeviceMemory fImageMemory;
 		VkImageView fImageView;
+		VkImage fImage;
 		VkSampler fSampler;
-		uint32_t fMipLevels;
+//		uint32_t fMipLevels;
 };
 
 // ----------------------------------------------------------------------------

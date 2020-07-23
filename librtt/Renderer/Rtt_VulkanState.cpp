@@ -9,6 +9,7 @@
 
 #include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanProgram.h"
+#include "Renderer/Rtt_VulkanTexture.h"
 #include "Core/Rtt_Assert.h"
 #include "CoronaLog.h"
 #include <shaderc/shaderc.h>
@@ -220,6 +221,16 @@ VulkanState::CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize si
     vkCmdCopyBuffer( commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion );
 
     EndSingleTimeCommands( commandBuffer );
+}
+
+void
+VulkanState::UploadData( VkDeviceMemory stagingMemory, const uint8_t * source, VkDeviceSize count, VkDeviceSize offset )
+{
+	void * data;
+
+	vkMapMemory( fDevice, stagingMemory, offset, count, 0, &data );
+	memcpy( data, source, static_cast<size_t>( count ) );
+    vkUnmapMemory( fDevice, stagingMemory );
 }
 
 /*
@@ -913,28 +924,11 @@ VulkanState::BuildUpSwapchain()
 
 		vkGetSwapchainImagesKHR( fDevice, swapchain, &imageCount, images.data() );
 		
-		VkImageViewCreateInfo createImageViewInfo = {};
-
-		createImageViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		createImageViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		createImageViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		createImageViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		createImageViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-		createImageViewInfo.format = fSwapchainFormat.format;
-		createImageViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		createImageViewInfo.subresourceRange.baseArrayLayer = 0;
-		createImageViewInfo.subresourceRange.baseMipLevel = 0;
-		createImageViewInfo.subresourceRange.layerCount = 1;
-		createImageViewInfo.subresourceRange.levelCount = 1;
-		createImageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-
 		for ( const VkImage & image : images )
 		{
-			createImageViewInfo.image = image;
+			VkImageView view = VulkanTexture::CreateImageView( this, image, fSwapchainFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
-			VkImageView view;
-
-			if (VK_SUCCESS == vkCreateImageView( fDevice, &createImageViewInfo, nullptr, &view ))
+			if (view != VK_NULL_HANDLE)
 			{
 				SwapchainImage si = { image, view };
 
