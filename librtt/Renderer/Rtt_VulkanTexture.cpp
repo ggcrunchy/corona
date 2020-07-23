@@ -15,6 +15,9 @@
 #include "Core/Rtt_Assert.h"
 #include "CoronaLog.h"
 
+#include <algorithm>
+#include <cmath>
+
 // ----------------------------------------------------------------------------
 /*
 #define ENABLE_DEBUG_PRINT	0
@@ -31,14 +34,9 @@ namespace /*anonymous*/
 { 
 	using namespace Rtt;
 
-	void getFormatTokens( Texture::Format format, VkFormat & vulkanFormat, VkComponentMapping & mapping )
+	VkFormat getFormatTokens( Texture::Format format, VkComponentMapping & mapping )
 	{
-        vulkanFormat = VK_FORMAT_R8G8B8A8_SRGB;
-
-        if (Texture::kRGBA == format)
-        {
-            return;
-        }
+        VkFormat vulkanFormat = VK_FORMAT_R8G8B8A8_SRGB;
 
 		switch( format )
 		{
@@ -48,9 +46,17 @@ namespace /*anonymous*/
 
                 break;
             // ^^ TODO: guess!
-			case Texture::kLuminance:	vulkanFormat = VK_FORMAT_R8_SRGB; break;
+			case Texture::kLuminance:
+                vulkanFormat = VK_FORMAT_R8_SRGB;
+                
+                break;
             // ^^ TODO: guess!
-            case Texture::kRGB:			vulkanFormat = VK_FORMAT_R8G8B8_SRGB; break;
+            case Texture::kRGB:
+                vulkanFormat = VK_FORMAT_R8G8B8_SRGB;
+                
+                break;
+            case Texture::kRGBA:
+                break;
 			case Texture::kARGB:
                 mapping.r = VK_COMPONENT_SWIZZLE_A;
                 mapping.g = VK_COMPONENT_SWIZZLE_R;
@@ -73,6 +79,8 @@ namespace /*anonymous*/
                 break;
 			default: Rtt_ASSERT_NOT_REACHED();
 		}
+
+        return vulkanFormat;
 	}
 
 	void getFilterTokens( Texture::Filter filter, VkFilter & minFilter, VkFilter & magFilter )
@@ -120,16 +128,32 @@ VulkanTexture::Create( CPUResource* resource )
 	Rtt_ASSERT( CPUResource::kTexture == resource->GetType() || CPUResource::kVideoTexture == resource->GetType() );
 	Texture* texture = static_cast<Texture*>( resource );
 
-	Texture::Format textureFormat = texture->GetFormat();
-
-    VkFormat format;
-    VkComponentMapping mapping;
-
-	mapping.r = mapping.g = mapping.b = mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    VkComponentMapping mapping = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+    VkFormat format = getFormatTokens( texture->GetFormat(), mapping );
     
-    getFormatTokens( textureFormat, format, mapping );
+    VkDeviceSize imageSize = texture->GetSizeInBytes();
+    U32 mipLevels = static_cast<uint32_t>( std::floor( std::log2( std::max( texture->GetWidth(), texture->GetHeight() ) ) ) ) + 1U;
+    auto stagingData = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+    bool ok = stagingData.first != VK_NULL_HANDLE; // ^^ TODO: also non-buffered approach
 
-    bool ok = Load( texture/* format stuff */ );
+    if (ok)
+    {
+        CreateImage(
+            texture->GetWidth(), texture->GetHeight(),
+            1U, // mip levels
+            VK_SAMPLE_COUNT_1_BIT,
+            VK_FORMAT_R8G8B8A8_UNORM,
+            VK_IMAGE_TILING_OPTIMAL, // might not want if frequently changed?
+            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
+
+        ok = fImage != VK_NULL_HANDLE;
+
+        if (ok)
+        {
+            ok = Load( texture, stagingData.first, stagingData.second, mipLevels );
+        }
+    }
     
     texture->ReleaseData();
 
@@ -162,15 +186,12 @@ VulkanTexture::Create( CPUResource* resource )
         if (VK_SUCCESS == vkCreateSampler( fState->GetDevice(), &samplerInfo, fState->GetAllocationCallbacks(), &sampler))
         {
             fSampler = sampler;
-            // image, memory not yet returned...
-        //    fView = todo (use mapping)
+            fImageView = CreateImageView( fState, fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels, &mapping );
         }
         
         else
         {
             CoronaLog( "Failed to create texture sampler!" );
-
-            // TODO: tear down...
         }
     }
 }
@@ -248,7 +269,7 @@ VulkanTexture::CopyBufferToImage( VkBuffer buffer, VkImage image, uint32_t width
     fState->EndSingleTimeCommands( commandBuffer );
 }
 
-std::pair< VkImage, VkDeviceMemory >
+void
 VulkanTexture::CreateImage( uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties )
 {
     VkImageCreateInfo createImageInfo = {};
@@ -265,16 +286,14 @@ VulkanTexture::CreateImage( uint32_t width, uint32_t height, uint32_t mipLevels,
     createImageInfo.tiling = tiling;
     createImageInfo.usage = usage;
 
-    VkImage image = VK_NULL_HANDLE;
-    VkDeviceMemory imageMemory = VK_NULL_HANDLE;
     const VkAllocationCallbacks * allocator = fState->GetAllocationCallbacks();
     VkDevice device = fState->GetDevice();
 
-    if (VK_SUCCESS == vkCreateImage( device, &createImageInfo, allocator, &image ))
+    if (VK_SUCCESS == vkCreateImage( device, &createImageInfo, allocator, &fImage ))
     {
         VkMemoryRequirements memRequirements;
 
-        vkGetImageMemoryRequirements( device, image, &memRequirements );
+        vkGetImageMemoryRequirements( device, fImage, &memRequirements );
 
         VkMemoryAllocateInfo allocInfo = {};
 
@@ -283,16 +302,21 @@ VulkanTexture::CreateImage( uint32_t width, uint32_t height, uint32_t mipLevels,
 
         bool foundMemoryType = fState->FindMemoryType( memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex );
 
-        if (foundMemoryType && vkAllocateMemory( device, &allocInfo, allocator, &imageMemory ) != VK_SUCCESS)
+        if (foundMemoryType && vkAllocateMemory( device, &allocInfo, allocator, &fImageMemory ) != VK_SUCCESS)
         {
             CoronaLog( "Failed to allocate image memory!" );
         }
 
-        if (VK_NULL_HANDLE == imageMemory)
+        if (fImageMemory != VK_NULL_HANDLE)
         {
-            vkDestroyImage( device, image, allocator );
+            vkBindImageMemory( device, fImage, fImageMemory, 0 );
+        }
 
-            image = VK_NULL_HANDLE;
+        else
+        {
+            vkDestroyImage( device, fImage, allocator );
+
+            fImage = VK_NULL_HANDLE;
         }
     }
 
@@ -300,46 +324,32 @@ VulkanTexture::CreateImage( uint32_t width, uint32_t height, uint32_t mipLevels,
     {
         CoronaLog( "Failed to create image!" );
     }
-
-    vkBindImageMemory(device, image, imageMemory, 0);
-
-    return std::make_pair( image, imageMemory );
 }
 
 bool
-VulkanTexture::Load( Texture * texture )
+VulkanTexture::Load( Texture * texture, VkBuffer buffer, VkDeviceMemory bufferMemory, U32 mipLevels )
 {
-    U32 w = texture->GetWidth(), h = texture->GetHeight(), mipLevels = 1U;
-    VkDeviceSize imageSize = texture->GetSizeInBytes();
     bool ok = false;
-//  mipLevels = static_cast<uint32_t>( std::floor( std::log2( std::max( w, h ) ) ) ) + 1;
 
-    auto stagingData = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
-
-    if (stagingData.first != VK_NULL_HANDLE)
+    if (buffer != VK_NULL_HANDLE)
     {
-        fState->UploadData( stagingData.second, texture->GetData(), imageSize );
+        fState->StageData( bufferMemory, texture->GetData(), texture->GetSizeInBytes() );
+        
+        ok = TransitionImageLayout( fImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels );
 
-        auto imageData = CreateImage( w, h, mipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-
-        if (imageData.first != VK_NULL_HANDLE)
+        if (ok)
         {
-            ok = TransitionImageLayout( imageData.first, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels );
-
-            if (ok)
-            {
-                CopyBufferToImage( stagingData.first, imageData.first, w, h );
-            }
-
-            // transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
-            // TODO: ^^ bring this in, then
+            CopyBufferToImage( buffer, fImage, texture->GetWidth(), texture->GetHeight() );
         }
+
+        // transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
+        // TODO: ^^ bring this in, then
     
         const VkAllocationCallbacks * allocator = fState->GetAllocationCallbacks();
         VkDevice device = fState->GetDevice();
 
-        vkDestroyBuffer( device, stagingData.first, allocator );
-        vkFreeMemory( device, stagingData.second, allocator );
+        vkDestroyBuffer( device, buffer, allocator );
+        vkFreeMemory( device, bufferMemory, allocator );
 
 //  generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_UNORM, texWidth, texHeight, mipLevels);
     }
@@ -434,15 +444,25 @@ VulkanTexture::TransitionImageLayout( VkImage image, VkFormat format, VkImageLay
 }
 
 VkImageView
-VulkanTexture::CreateImageView( VulkanState * state, VkImage image, VkFormat format, VkImageAspectFlags flags, uint32_t mipLevels )
+VulkanTexture::CreateImageView( VulkanState * state, VkImage image, VkFormat format, VkImageAspectFlags flags, uint32_t mipLevels, const VkComponentMapping * componentMapping )
 {
 	VkImageViewCreateInfo createImageViewInfo = {};
 
 	createImageViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	createImageViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-	createImageViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-	createImageViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-	createImageViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    if (componentMapping)
+    {
+        createImageViewInfo.components = *componentMapping;
+    }
+
+    else
+    {
+	    createImageViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	    createImageViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	    createImageViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	    createImageViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    }
+
 	createImageViewInfo.format = format;
 	createImageViewInfo.image = image;
 	createImageViewInfo.subresourceRange.aspectMask = flags;
