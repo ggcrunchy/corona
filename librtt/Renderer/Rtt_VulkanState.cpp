@@ -224,12 +224,12 @@ VulkanState::CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize si
 }
 
 void
-VulkanState::UploadData( VkDeviceMemory stagingMemory, const uint8_t * source, VkDeviceSize count, VkDeviceSize offset )
+VulkanState::StageData( VkDeviceMemory stagingMemory, const uint8_t * data, VkDeviceSize count, VkDeviceSize offset )
 {
-	void * data;
+	void * mapping;
 
-	vkMapMemory( fDevice, stagingMemory, offset, count, 0, &data );
-	memcpy( data, source, static_cast<size_t>( count ) );
+	vkMapMemory( fDevice, stagingMemory, offset, count, 0, &mapping );
+	memcpy( mapping, data, static_cast<size_t>( count ) );
     vkUnmapMemory( fDevice, stagingMemory );
 }
 

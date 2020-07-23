@@ -63,7 +63,7 @@ class VulkanState
 	    VkCommandBuffer BeginSingleTimeCommands();
 		void EndSingleTimeCommands( VkCommandBuffer commandBuffer );
 		void CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size );
-		void UploadData( VkDeviceMemory stagingMemory, const uint8_t * source, VkDeviceSize count, VkDeviceSize offset = 0U );
+		void StageData( VkDeviceMemory stagingMemory, const uint8_t * data, VkDeviceSize count, VkDeviceSize offset = 0U );
 
 	public:
 		struct NewSurfaceCallback {
