@@ -120,10 +120,9 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 
 		if (FindMemoryType( memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex ))
 		{
-
 			if (VK_SUCCESS == vkAllocateMemory( fDevice, &allocInfo, nullptr, &bufferMemory ))
 			{
-				vkBindBufferMemory( fDevice, buffer, bufferMemory, 0 );
+				vkBindBufferMemory( fDevice, buffer, bufferMemory, 0U );
 			}
 
 			else
@@ -176,7 +175,7 @@ VulkanState::BeginSingleTimeCommands()
     VkCommandBufferAllocateInfo allocInfo = {};
 
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandBufferCount = 1;
+    allocInfo.commandBufferCount = 1U;
     allocInfo.commandPool = fCommandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
@@ -218,7 +217,7 @@ VulkanState::CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize si
 
     copyRegion.size = size;
 
-    vkCmdCopyBuffer( commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion );
+    vkCmdCopyBuffer( commandBuffer, srcBuffer, dstBuffer, 1U, &copyRegion );
 
     EndSingleTimeCommands( commandBuffer );
 }
@@ -386,8 +385,8 @@ AppInfo()
 
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	appInfo.apiVersion = VK_API_VERSION_1_0;
-	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.applicationVersion = VK_MAKE_VERSION( 1, 0, 0 );
+	appInfo.engineVersion = VK_MAKE_VERSION( 1, 0, 0 );
 	appInfo.pApplicationName = "Solar App"; // TODO?
 	appInfo.pEngineName = "Solar2D";
 
