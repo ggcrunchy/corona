@@ -357,6 +357,12 @@ VulkanTexture::Load( Texture * texture, VkBuffer buffer, VkDeviceMemory bufferMe
     return ok;
 }
 
+static bool
+HasStencilComponent( VkFormat format )
+{
+    return VK_FORMAT_D32_SFLOAT_S8_UINT == format || VK_FORMAT_D24_UNORM_S8_UINT == format;
+}
+
 bool
 VulkanTexture::TransitionImageLayout( VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels )
 {
@@ -373,10 +379,11 @@ VulkanTexture::TransitionImageLayout( VkImage image, VkFormat format, VkImageLay
     if (VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL == newLayout)
     {
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        /* TODO!
-        if (hasStencilComponent(format)) {
+
+        if (HasStencilComponent(format))
+        {
             barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-        }*/
+        }
     }
         
     else
