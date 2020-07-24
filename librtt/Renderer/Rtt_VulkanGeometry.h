@@ -31,10 +31,20 @@ class VulkanGeometry : public GPUResource
 	public:
 		VulkanGeometry( VulkanState * state );
 
+		struct VertexDescription {
+			VertexDescription()
+			{
+			}
+
+			VkVertexInputBindingDescription fDescription;
+		//	U32 fID;
+		};
+
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
-		virtual void Bind();
+
+		VertexDescription Bind();
 
 	private:
 		/*
@@ -42,9 +52,6 @@ class VulkanGeometry : public GPUResource
 		GLvoid* fTexCoordStart;
 		GLvoid* fColorScaleStart;
 		GLvoid* fUserDataStart;
-		GLuint fVAO;
-		GLuint fVBO;
-		GLuint fIBO;
 		U32 fVertexCount;
 		U32 fIndexCount;
 		*/
@@ -59,17 +66,6 @@ class VulkanGeometry : public GPUResource
     std::vector<uint32_t> indices;
 */
 };
-
-/*
-    static VkVertexInputBindingDescription getBindingDescription() {
-        VkVertexInputBindingDescription bindingDescription = {};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex);
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-        return bindingDescription;
-    }
-*/
 
 // ----------------------------------------------------------------------------
 
