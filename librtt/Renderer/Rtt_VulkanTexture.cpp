@@ -41,7 +41,6 @@ namespace /*anonymous*/
 		switch( format )
 		{
 			case Texture::kAlpha:
-                vulkanFormat = VK_FORMAT_R8G8B8A8_SRGB;
                 mapping.r = mapping.g = mapping.b = VK_COMPONENT_SWIZZLE_A;
 
                 break;
@@ -326,6 +325,22 @@ VulkanTexture::CreateImage( uint32_t width, uint32_t height, uint32_t mipLevels,
     }
 }
 
+static VkImageMemoryBarrier
+PrepareBarrier( VkImage image, VkImageAspectFlags aspectFlags, uint32_t mipLevels )
+{
+    VkImageMemoryBarrier barrier = {};
+
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.image = image;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.layerCount = 1U;
+    barrier.subresourceRange.levelCount = mipLevels;
+
+    return barrier;
+}
+
 bool
 VulkanTexture::Load( Texture * texture, VkBuffer buffer, VkDeviceMemory bufferMemory, U32 mipLevels )
 {
@@ -351,7 +366,29 @@ VulkanTexture::Load( Texture * texture, VkBuffer buffer, VkDeviceMemory bufferMe
         vkDestroyBuffer( device, buffer, allocator );
         vkFreeMemory( device, bufferMemory, allocator );
 
-//  generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_UNORM, texWidth, texHeight, mipLevels);
+        if (ok)
+        {
+            VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
+            VkImageMemoryBarrier barrier = PrepareBarrier( fImage, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
+
+            // generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_UNORM, texWidth, texHeight, mipLevels);
+             
+            barrier.subresourceRange.baseMipLevel = mipLevels - 1U;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // todo: if we forgo a staging buffer, is this GENERAL or something?
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+            vkCmdPipelineBarrier(
+                commandBuffer,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+                0U, NULL,
+                0U, NULL,
+                1U, &barrier
+            );
+
+            fState->EndSingleTimeCommands( commandBuffer );
+        }
     }
 
     return ok;
@@ -366,41 +403,29 @@ HasStencilComponent( VkFormat format )
 bool
 VulkanTexture::TransitionImageLayout( VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels )
 {
-    VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
-    VkImageMemoryBarrier barrier = {};
-
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.image = image;
-    barrier.oldLayout = oldLayout;
-    barrier.newLayout = newLayout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 
     if (VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL == newLayout)
     {
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
 
         if (HasStencilComponent(format))
         {
-            barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+            aspectFlags |= VK_IMAGE_ASPECT_STENCIL_BIT;
         }
     }
-        
-    else
-    {
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    }
 
-    barrier.subresourceRange.levelCount = mipLevels;
-    barrier.subresourceRange.layerCount = 1U;
+    VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
+    VkImageMemoryBarrier barrier = PrepareBarrier( image, aspectFlags, mipLevels );
 
-    VkPipelineStageFlags sourceStage, destinationStage;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+
+    VkPipelineStageFlags destinationStage, sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
     if (VK_IMAGE_LAYOUT_UNDEFINED == oldLayout && VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL == newLayout)
     {
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     }
     
@@ -408,24 +433,23 @@ VulkanTexture::TransitionImageLayout( VkImage image, VkFormat format, VkImageLay
     {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
         sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         // TODO: where do we want unstaged writes? (frequent texture updates)
+        // maybe oldLayout == undefined and changes like:
+            // srcAccessMask = 0
+            // sourceStage = top of pipe
     }
     
     else if (VK_IMAGE_LAYOUT_UNDEFINED == oldLayout && VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL == newLayout)
     {
         barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     }
 
-    else if (VK_IMAGE_LAYOUT_UNDEFINED == oldLayout  && VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL == newLayout)
+    else if (VK_IMAGE_LAYOUT_UNDEFINED == oldLayout && VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL == newLayout)
     {
         barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     }
 
@@ -504,18 +528,6 @@ void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
         throw std::runtime_error("texture image format does not support linear blitting!");
     }
 
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-
-    VkImageMemoryBarrier barrier = {};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.image = image;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.subresourceRange.levelCount = 1;
-
     int32_t mipWidth = texWidth;
     int32_t mipHeight = texHeight;
 
@@ -566,20 +578,6 @@ void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
         if (mipWidth > 1) mipWidth /= 2;
         if (mipHeight > 1) mipHeight /= 2;
     }
-
-    barrier.subresourceRange.baseMipLevel = mipLevels - 1;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-    vkCmdPipelineBarrier(commandBuffer,
-        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier);
-
-    endSingleTimeCommands(commandBuffer);
 }
 */
 
