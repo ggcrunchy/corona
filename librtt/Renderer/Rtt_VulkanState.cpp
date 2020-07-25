@@ -14,6 +14,7 @@
 #include "CoronaLog.h"
 #include <shaderc/shaderc.h>
 #include <algorithm>
+#include <limits>
 #include <utility>
 
 // ----------------------------------------------------------------------------
@@ -22,6 +23,61 @@ namespace Rtt
 {
 
 // ----------------------------------------------------------------------------
+
+VulkanBufferData::VulkanBufferData( VkDevice device, VkAllocationCallbacks * allocator )
+:	fDevice( device ),
+	fAllocator( allocator ),
+	fBuffer( VK_NULL_HANDLE ),
+	fMemory( VK_NULL_HANDLE )
+{
+}
+
+VulkanBufferData::~VulkanBufferData()
+{
+	Clear();
+}
+
+VkBuffer
+VulkanBufferData::GetBuffer() const
+{
+	return fBuffer;
+}
+
+VkDeviceMemory
+VulkanBufferData::GetMemory() const
+{
+	return fMemory;
+}
+
+VulkanBufferData *
+VulkanBufferData::Extract( Rtt_Allocator * allocator )
+{
+	VulkanBufferData * bufferData = Rtt_NEW( allocator, VulkanBufferData( fDevice, fAllocator ) );
+	
+	bufferData->fBuffer = fBuffer;
+	bufferData->fMemory = fMemory;
+
+	fBuffer = VK_NULL_HANDLE;
+	fMemory = VK_NULL_HANDLE;
+
+	return bufferData;
+}
+
+void
+VulkanBufferData::Clear()
+{
+    vkDestroyBuffer( fDevice, fBuffer, fAllocator );
+    vkFreeMemory( fDevice, fMemory, fAllocator );
+
+	fBuffer = VK_NULL_HANDLE;
+	fMemory = VK_NULL_HANDLE;
+}
+
+bool
+VulkanBufferData::IsValid() const
+{
+	return fBuffer != VK_NULL_HANDLE && fMemory != VK_NULL_HANDLE;
+}
 
 VulkanState::VulkanState()
 :   fAllocationCallbacks( NULL ),
@@ -94,7 +150,7 @@ VulkanState::~VulkanState()
 	// allocator?
 }
 
-std::pair< VkBuffer, VkDeviceMemory >
+VulkanBufferData
 VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties )
 {
     VkBufferCreateInfo createBufferInfo = {};
@@ -104,8 +160,9 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
     createBufferInfo.size = size;
     createBufferInfo.usage = usage;
 
-	VkBuffer buffer = VK_NULL_HANDLE;
-	VkDeviceMemory bufferMemory = VK_NULL_HANDLE;
+	VulkanBufferData bufferData( fDevice, fAllocationCallbacks );
+
+	VkBuffer buffer;
 
     if (VK_SUCCESS == vkCreateBuffer( fDevice, &createBufferInfo, NULL, &buffer ))
 	{
@@ -120,9 +177,14 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 
 		if (FindMemoryType( memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex ))
 		{
-			if (VK_SUCCESS == vkAllocateMemory( fDevice, &allocInfo, nullptr, &bufferMemory ))
+			VkDeviceMemory bufferMemory;
+
+			if (VK_SUCCESS == vkAllocateMemory( fDevice, &allocInfo, fAllocationCallbacks, &bufferMemory ))
 			{
 				vkBindBufferMemory( fDevice, buffer, bufferMemory, 0U );
+
+				bufferData.fBuffer = buffer;
+				bufferData.fMemory = bufferMemory;
 			}
 
 			else
@@ -131,11 +193,9 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 			}
 		}
 
-		if (VK_NULL_HANDLE == bufferMemory)
+		if (!bufferData.IsValid())
 		{
 			vkDestroyBuffer( fDevice, buffer, fAllocationCallbacks );
-
-			buffer = VK_NULL_HANDLE;
 		}
 	}
 
@@ -144,7 +204,7 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
         CoronaLog( "Failed to create buffer!" );
     }
 
-	return std::make_pair( buffer, bufferMemory );
+	return bufferData;
 }
 
 bool
@@ -156,7 +216,7 @@ VulkanState::FindMemoryType( uint32_t typeFilter, VkMemoryPropertyFlags properti
 
     for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
 	{
-        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+        if ((typeFilter & (1U << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
 		{
             type = i;
 
@@ -198,15 +258,29 @@ VulkanState::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
 {
     vkEndCommandBuffer( commandBuffer );
 
-    VkSubmitInfo submitInfo = {};
+	VkFenceCreateInfo fenceCreateInfo = {};
 
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 
-    vkQueueSubmit( fGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE );
-    vkQueueWaitIdle( fGraphicsQueue );
-    vkFreeCommandBuffers( fDevice, fCommandPool, 1, &commandBuffer );
+	VkFence fence;
+	
+	if (VK_SUCCESS == vkCreateFence( fDevice, &fenceCreateInfo, fAllocationCallbacks, &fence ))
+	{
+		VkSubmitInfo submitInfo = {};
+
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.commandBufferCount = 1U;
+		submitInfo.pCommandBuffers = &commandBuffer;
+
+		if (VK_SUCCESS == vkQueueSubmit( fGraphicsQueue, 1U, &submitInfo, fence ))
+		{
+			vkWaitForFences( fDevice, 1U, &fence, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+		}
+
+		vkDestroyFence( fDevice, fence, fAllocationCallbacks );
+	}
+
+    vkFreeCommandBuffers( fDevice, fCommandPool, 1U, &commandBuffer );
 }
 
 void
@@ -222,13 +296,22 @@ VulkanState::CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize si
     EndSingleTimeCommands( commandBuffer );
 }
 
-void
-VulkanState::StageData( VkDeviceMemory stagingMemory, const uint8_t * data, VkDeviceSize count, VkDeviceSize offset )
+void *
+VulkanState::MapData( VkDeviceMemory memory, VkDeviceSize count, VkDeviceSize offset )
 {
 	void * mapping;
 
-	vkMapMemory( fDevice, stagingMemory, offset, count, 0, &mapping );
-	memcpy( mapping, data, static_cast<size_t>( count ) );
+	vkMapMemory( fDevice, memory, offset, count, 0, &mapping );
+
+	return mapping;
+}
+
+void
+VulkanState::StageData( VkDeviceMemory stagingMemory, const void * data, VkDeviceSize count, VkDeviceSize offset )
+{
+	void * mapping = MapData( stagingMemory, count, offset );
+
+	memcpy( mapping, data, static_cast< size_t >( count ) );
     vkUnmapMemory( fDevice, stagingMemory );
 }
 
@@ -864,7 +947,7 @@ VulkanState::GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t 
 
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities);
 
-	uint32_t imageCount = capabilities.minImageCount + 1;
+	uint32_t imageCount = capabilities.minImageCount + 1U;
 
 	if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount)
 	{
@@ -969,7 +1052,7 @@ VulkanState::BuildUpSwapchain()
             framebufferInfo.pAttachments = attachments.data();
             framebufferInfo.width = swapChainExtent.width;
             framebufferInfo.height = swapChainExtent.height;
-            framebufferInfo.layers = 1;
+            framebufferInfo.layers = 1U;
 
             if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
                 throw std::runtime_error("failed to create framebuffer!");

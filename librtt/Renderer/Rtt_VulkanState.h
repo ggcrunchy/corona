@@ -29,6 +29,28 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
+class VulkanBufferData {
+public:
+	VulkanBufferData( VkDevice device, VkAllocationCallbacks * allocator );
+	~VulkanBufferData();
+
+	VkBuffer GetBuffer() const;
+	VkDeviceMemory GetMemory() const;
+
+	VulkanBufferData * Extract( Rtt_Allocator * allocator );
+
+	void Clear();
+	bool IsValid() const;
+
+private:
+	VkAllocationCallbacks * fAllocator;
+	VkDevice fDevice;
+	VkBuffer fBuffer;
+	VkDeviceMemory fMemory;
+
+	friend class VulkanState;
+};
+
 class VulkanState
 {
 	public:
@@ -56,14 +78,15 @@ class VulkanState
 	#endif
 
 	public:
+		VulkanBufferData CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties );
 		bool FindMemoryType( uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t & type );
-		std::pair< VkBuffer, VkDeviceMemory > CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties );
 	
 	public:
 	    VkCommandBuffer BeginSingleTimeCommands();
 		void EndSingleTimeCommands( VkCommandBuffer commandBuffer );
 		void CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size );
-		void StageData( VkDeviceMemory stagingMemory, const uint8_t * data, VkDeviceSize count, VkDeviceSize offset = 0U );
+		void * MapData( VkDeviceMemory memory, VkDeviceSize count, VkDeviceSize offset = 0U );
+		void StageData( VkDeviceMemory stagingMemory, const void * data, VkDeviceSize count, VkDeviceSize offset = 0U );
 
 	public:
 		struct NewSurfaceCallback {

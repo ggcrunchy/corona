@@ -13,6 +13,7 @@
 #include "Renderer/Rtt_VulkanGeometry.h"
 
 #include "Renderer/Rtt_Geometry_Renderer.h"
+#include "CoronaLog.h"
 /*
 #include "Renderer/Rtt_GL.h"
 
@@ -22,86 +23,6 @@
 
 #include <stdio.h>
 	*/
-// ----------------------------------------------------------------------------
-
-namespace /*anonymous*/
-{
-	using namespace Rtt;
-/*
-	void createVBO(Geometry* geometry, GLuint& VBO, GLuint& IBO)
-	{
-		glGenBuffers( 1, &VBO ); GL_CHECK_ERROR();
-		glBindBuffer( GL_ARRAY_BUFFER, VBO ); GL_CHECK_ERROR();
-
-		glEnableVertexAttribArray( Geometry::kVertexPositionAttribute );
-		glEnableVertexAttribArray( Geometry::kVertexTexCoordAttribute );
-		glEnableVertexAttribArray( Geometry::kVertexColorScaleAttribute );
-		glEnableVertexAttribArray( Geometry::kVertexUserDataAttribute );
-		GL_CHECK_ERROR();
-
-		const Geometry::Vertex* vertexData = geometry->GetVertexData();
-		if ( !vertexData )
-		{
-			GL_LOG_ERROR( "Unable to initialize GPU geometry. Data is NULL" );
-		}
-
-		// It is valid to pass a NULL pointer, so allocation is done either way
-		const U32 vertexCount = geometry->GetVerticesAllocated();
-		glBufferData( GL_ARRAY_BUFFER, vertexCount * sizeof(Geometry::Vertex), vertexData, GL_STATIC_DRAW );
-		GL_CHECK_ERROR();
-		
-		const Geometry::Index* indexData = geometry->GetIndexData();
-		if ( indexData )
-		{
-			const U32 indexCount = geometry->GetIndicesAllocated();
-			glGenBuffers( 1, &IBO );
-			glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, IBO );
-			glBufferData( GL_ELEMENT_ARRAY_BUFFER, indexCount * sizeof(Geometry::Index), indexData, GL_STATIC_DRAW );
-		}
-
-	}
-
-    void createVertexBuffer() {
-        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
-
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-            memcpy(data, vertices.data(), (size_t) bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
-
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
-
-        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
-
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
-    }
-
-    void createIndexBuffer() {
-        VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
-
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-            memcpy(data, indices.data(), (size_t) bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
-
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-
-        copyBuffer(stagingBuffer, indexBuffer, bufferSize);
-
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
-    }
-	*/
-}
 
 // ----------------------------------------------------------------------------
 
@@ -112,16 +33,11 @@ namespace Rtt
 
 VulkanGeometry::VulkanGeometry( VulkanState * state )
 :	fState( state ),
-	fVertexBuffer( VK_NULL_HANDLE ),
-	fIndexBuffer( VK_NULL_HANDLE ),
-	fVertexBufferMemory( VK_NULL_HANDLE ),
-	fIndexBufferMemory( VK_NULL_HANDLE )
-/*
-:	fPositionStart( NULL ),
-	fTexCoordStart( NULL ),
-	fColorScaleStart( NULL ),
-	fUserDataStart( NULL )
-*/
+	fVertexBufferData( NULL ),
+	fIndexBufferData( NULL ),
+	fMappedVertices( NULL ),
+	fVertexCount( 0U ),
+	fIndexCount( 0U )
 {
 }
 
@@ -129,28 +45,36 @@ void
 VulkanGeometry::Create( CPUResource* resource )
 {
 	Rtt_ASSERT( CPUResource::kGeometry == resource->GetType() );
-	Geometry* geometry = static_cast<Geometry*>( resource );
+	Geometry* geometry = static_cast< Geometry * >( resource );
+	VkDeviceSize verticesSize = fVertexCount * sizeof( Geometry::Vertex );
+	
+	fVertexCount = geometry->GetVerticesAllocated();
+	fIndexCount = geometry->GetIndicesAllocated();
 
-	bool shouldStoreOnGPU = geometry->GetStoredOnGPU();
-	if ( shouldStoreOnGPU )
+	if ( geometry->GetStoredOnGPU() )
 	{
-/*
-		createVBO( geometry, fVBO, fIBO );
+		fVertexBufferData = CreateBufferOnGPU( verticesSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT );
 
-		Geometry::Vertex kVertex; // Uninitialized! Used for offset calculation only.
+		TransferToGPU( fVertexBufferData->GetBuffer(), geometry->GetVertexData(), verticesSize );
 
-		// Initialize offsets
-		fPositionStart = NULL;
-		fTexCoordStart = (GLvoid *)((S8*)&kVertex.u - (S8*)&kVertex);
-		fColorScaleStart = (GLvoid *)((S8*)&kVertex.rs - (S8*)&kVertex);
-		fUserDataStart = (GLvoid *)((S8*)&kVertex.ux - (S8*)&kVertex);
+		Geometry::Index * indices = geometry->GetIndexData();
 
-		fVertexCount = geometry->GetVerticesAllocated();
-		fIndexCount = geometry->GetIndicesAllocated();
-*/
+		if (indices)
+		{
+			VkDeviceSize indicesSize = fIndexCount * sizeof( Geometry::Index );
+
+			fIndexBufferData = CreateBufferOnGPU( indicesSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT );
+
+			TransferToGPU( fIndexBufferData->GetBuffer(), indices, indicesSize );
+		}
 	}
 	else
 	{
+        VulkanBufferData bufferData = fState->CreateBuffer( verticesSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+
+		fMappedVertices = fState->MapData( bufferData.GetMemory(), verticesSize );
+		fVertexBufferData = bufferData.Extract( NULL );
+
 		Update( resource );
 	}
 }
@@ -160,65 +84,49 @@ VulkanGeometry::Update( CPUResource* resource )
 {
 	Rtt_ASSERT( CPUResource::kGeometry == resource->GetType() );
 	Geometry* geometry = static_cast<Geometry*>( resource );
-	/*
-	if ( fVBO )
+	const Geometry::Vertex* vertexData = geometry->GetVertexData();
+
+	if ( !fMappedVertices )
 	{
 		// The user may have resized the given Geometry instance
 		// since the last call to update (see Geometry::Resize()).
 		if ( fVertexCount < geometry->GetVerticesAllocated() ||
 			 fIndexCount < geometry->GetIndicesAllocated() )
 		{
-			destroyVBO( fVBO, fIBO );
-			createVBO( geometry, fVBO, fIBO );
-			fVertexCount = geometry->GetVerticesAllocated();
-			fIndexCount = geometry->GetIndicesAllocated();
+			Destroy();
+			Create( resource );
 		}
 		
 		// Copy the vertex data from main memory to GPU memory.
-		const Geometry::Vertex* vertexData = geometry->GetVertexData();
-		if ( vertexData )
+		else if ( vertexData )
 		{
-			glBindBuffer( GL_ARRAY_BUFFER, fVBO );
-			glBufferSubData( GL_ARRAY_BUFFER, 0, fVertexCount * sizeof(Geometry::Vertex), vertexData );
-			glBindBuffer( GL_ARRAY_BUFFER, 0 );
+			TransferToGPU( fVertexBufferData->GetBuffer(), vertexData, fVertexCount * sizeof( Geometry::Vertex ) );
 		}
 		else
 		{
-			GL_LOG_ERROR( "Unable to update GPU geometry. Data is NULL" );
+			CoronaLog( "Unable to update GPU geometry. Data is NULL" );
 		}
 	}
 	else
 	{
-		Geometry::Vertex* data = geometry->GetVertexData();
-		fPositionStart = data;
-		fTexCoordStart = &data[0].u;
-		fColorScaleStart = &data[0].rs;
-		fUserDataStart = &data[0].ux;
+		memcpy( fMappedVertices, vertexData, fVertexCount * sizeof( Geometry::Vertex ) );
 	}
-	GL_CHECK_ERROR();*/
 }
 
 void
 VulkanGeometry::Destroy()
 {
-	/*
-		fPositionStart = NULL;
-		fTexCoordStart = NULL;
-		fColorScaleStart = NULL;
-		fUserDataStart = NULL;
-	*/
+	if (fMappedVertices)
+	{
+		vkUnmapMemory( fState->GetDevice(), fVertexBufferData->GetMemory() );
 
-	VkDevice device = fState->GetDevice();
-	VkAllocationCallbacks * callbacks = fState->GetAllocationCallbacks();
+		fMappedVertices = NULL;
+	}
 
-    vkDestroyBuffer( device, fIndexBuffer, callbacks );
-	vkFreeMemory( device, fIndexBufferMemory, callbacks );
+	Rtt_DELETE( fVertexBufferData );
+	Rtt_DELETE( fIndexBufferData );
 
-    vkDestroyBuffer( device, fVertexBuffer, callbacks );
-    vkFreeMemory( device, fVertexBufferMemory, callbacks );
-
-	fIndexBuffer = fVertexBuffer = VK_NULL_HANDLE;
-	fIndexBufferMemory = fVertexBufferMemory = VK_NULL_HANDLE;
+	fVertexBufferData = fIndexBufferData = NULL;
 }
 
 VulkanGeometry::VertexDescription 
@@ -231,22 +139,29 @@ VulkanGeometry::Bind()
 	desc.fDescription.stride = sizeof( Geometry::Vertex );
 
 	return desc;
-/*
-	Rtt_ASSERT( fPositionStart || fVBO); // offset is 0 when VBO is available
-	Rtt_ASSERT( fTexCoordStart );
-	Rtt_ASSERT( fColorScaleStart );
-	Rtt_ASSERT( fUserDataStart );
-		
-	glBindBuffer( GL_ARRAY_BUFFER, fVBO ); GL_CHECK_ERROR();
-		
-	const size_t size = sizeof(Geometry::Vertex);
-	glVertexAttribPointer( Geometry::kVertexPositionAttribute, 3, GL_FLOAT, GL_FALSE, size, fPositionStart ); GL_CHECK_ERROR();
-	glVertexAttribPointer( Geometry::kVertexTexCoordAttribute, 3, GL_FLOAT, GL_FALSE, size, fTexCoordStart ); GL_CHECK_ERROR();
-	glVertexAttribPointer( Geometry::kVertexColorScaleAttribute, 4, GL_UNSIGNED_BYTE, GL_TRUE, size, fColorScaleStart ); GL_CHECK_ERROR();
-	glVertexAttribPointer( Geometry::kVertexUserDataAttribute, 4, GL_FLOAT, GL_FALSE, size, fUserDataStart ); GL_CHECK_ERROR();
-		
-	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, fIBO ); GL_CHECK_ERROR();
-*/
+}
+
+VulkanBufferData *
+VulkanGeometry::CreateBufferOnGPU( VkDeviceSize bufferSize, VkBufferUsageFlags usage )
+{
+    VulkanBufferData bufferData = fState->CreateBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+	return bufferData.Extract( NULL );
+}
+
+bool
+VulkanGeometry::TransferToGPU( VkBuffer bufferOnGPU, const void * data, VkDeviceSize bufferSize )
+{
+    VulkanBufferData stagingBuffer = fState->CreateBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	bool ableToTransfer = stagingBuffer.IsValid();
+
+	if (ableToTransfer)
+	{
+		fState->StageData( stagingBuffer.GetMemory(), data, bufferSize );
+		fState->CopyBuffer( stagingBuffer.GetBuffer(), bufferOnGPU, bufferSize );
+	}
+
+	return ableToTransfer;
 }
 
 // ----------------------------------------------------------------------------
