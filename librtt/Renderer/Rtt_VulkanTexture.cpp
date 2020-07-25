@@ -132,8 +132,8 @@ VulkanTexture::Create( CPUResource* resource )
     
     VkDeviceSize imageSize = texture->GetSizeInBytes();
     U32 mipLevels = static_cast<uint32_t>( std::floor( std::log2( std::max( texture->GetWidth(), texture->GetHeight() ) ) ) ) + 1U;
-    auto stagingData = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
-    bool ok = stagingData.first != VK_NULL_HANDLE; // ^^ TODO: also non-buffered approach
+    VulkanBufferData stagingData = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+    bool ok = stagingData.IsValid(); // ^^ TODO: also non-buffered approach
 
     if (ok)
     {
@@ -150,7 +150,7 @@ VulkanTexture::Create( CPUResource* resource )
 
         if (ok)
         {
-            ok = Load( texture, stagingData.first, stagingData.second, mipLevels );
+            ok = Load( texture, stagingData, mipLevels );
         }
     }
     
@@ -342,29 +342,23 @@ PrepareBarrier( VkImage image, VkImageAspectFlags aspectFlags, uint32_t mipLevel
 }
 
 bool
-VulkanTexture::Load( Texture * texture, VkBuffer buffer, VkDeviceMemory bufferMemory, U32 mipLevels )
+VulkanTexture::Load( Texture * texture, const VulkanBufferData & bufferData, U32 mipLevels )
 {
     bool ok = false;
 
-    if (buffer != VK_NULL_HANDLE)
+    if (bufferData.IsValid())
     {
-        fState->StageData( bufferMemory, texture->GetData(), texture->GetSizeInBytes() );
+        fState->StageData( bufferData.GetMemory(), texture->GetData(), texture->GetSizeInBytes() );
         
         ok = TransitionImageLayout( fImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels );
 
         if (ok)
         {
-            CopyBufferToImage( buffer, fImage, texture->GetWidth(), texture->GetHeight() );
+            CopyBufferToImage( bufferData.GetBuffer(), fImage, texture->GetWidth(), texture->GetHeight() );
         }
 
         // transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
         // TODO: ^^ bring this in, then
-    
-        const VkAllocationCallbacks * allocator = fState->GetAllocationCallbacks();
-        VkDevice device = fState->GetDevice();
-
-        vkDestroyBuffer( device, buffer, allocator );
-        vkFreeMemory( device, bufferMemory, allocator );
 
         if (ok)
         {

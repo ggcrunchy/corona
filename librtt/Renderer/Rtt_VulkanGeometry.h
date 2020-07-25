@@ -18,6 +18,7 @@
 namespace Rtt
 {
 
+class VulkanBufferData;
 class VulkanState;
 
 // ----------------------------------------------------------------------------
@@ -47,24 +48,16 @@ class VulkanGeometry : public GPUResource
 		VertexDescription Bind();
 
 	private:
-		/*
-		GLvoid* fPositionStart;
-		GLvoid* fTexCoordStart;
-		GLvoid* fColorScaleStart;
-		GLvoid* fUserDataStart;
+		VulkanBufferData * CreateBufferOnGPU( VkDeviceSize bufferSize, VkBufferUsageFlags usage );
+		bool TransferToGPU( VkBuffer bufferOnGPU, const void * data, VkDeviceSize bufferSize );
+
+	private:
+		VulkanState * fState;
+		VulkanBufferData * fVertexBufferData;
+		VulkanBufferData * fIndexBufferData;
+		void * fMappedVertices;
 		U32 fVertexCount;
 		U32 fIndexCount;
-		*/
-		VulkanState * fState;
-		VkBuffer fVertexBuffer;
-		VkBuffer fIndexBuffer;
-		VkDeviceMemory fVertexBufferMemory;
-		VkDeviceMemory fIndexBufferMemory;
-/*
-
-    std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
-*/
 };
 
 // ----------------------------------------------------------------------------
