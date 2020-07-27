@@ -128,21 +128,25 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator )
-:    CommandBuffer( allocator ),
-	 fCurrentPrepVersion( Program::kMaskCount0 ),
-	 fCurrentDrawVersion( Program::kMaskCount0 ),/*
-	 fProgram( NULL ),
-     fDefaultFBO( 0 ),*/
-	 fTimeTransform( NULL ),/*
-	 fTimerQueries( new U32[kTimerQueryCount] ),
-	 fTimerQueryIndex( 0 ),*/
-	 fElapsedTimeGPU( 0.0f )
+:	CommandBuffer( allocator ),
+	fCurrentPrepVersion( Program::kMaskCount0 ),
+	fCurrentDrawVersion( Program::kMaskCount0 ),/*
+	fProgram( NULL ),
+	fDefaultFBO( 0 ),*/
+	fTimeTransform( NULL ),/*
+	fTimerQueries( new U32[kTimerQueryCount] ),
+	fTimerQueryIndex( 0 ),*/
+	fElapsedTimeGPU( 0.0f ),
+	fFirstPipeline( VK_NULL_HANDLE )
+
 {
 	for(U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
 	{
 		fUniformUpdates[i].uniform = NULL;
 		fUniformUpdates[i].timestamp = 0;
 	}
+
+	InitializePipelineState();
 }
 
 VulkanCommandBuffer::~VulkanCommandBuffer()
@@ -199,12 +203,10 @@ VulkanCommandBuffer::InitializeFBO()
 void 
 VulkanCommandBuffer::InitializeCachedParams()
 {
-	/*
 	for (int i = 0; i < kNumQueryableParams; i++)
 	{
 		fCachedQuery[i] = -1;
 	}
-	*/
 }
 
 void 
@@ -232,11 +234,9 @@ VulkanCommandBuffer::CacheQueryParam( CommandBuffer::QueryableParams param )
 void 
 VulkanCommandBuffer::Denitialize()
 {
-	/*
 #ifdef ENABLE_GPU_TIMER_QUERIES
-	glDeleteQueries( kTimerQueryCount, fTimerQueries );
+//	glDeleteQueries( kTimerQueryCount, fTimerQueries );
 #endif
-*/
 }
 
 void
@@ -374,26 +374,6 @@ VulkanCommandBuffer::SetBlendFunction( const BlendMode& mode )
 	Write<GLenum>( srcAlpha );
 	Write<GLenum>( dstAlpha );
 	*/
-/*
-	GLenum source = GL_SRC_ALPHA;
-	GLenum dest = GL_ONE_MINUS_SRC_ALPHA;
-
-	switch( mode )
-	{
-		case BlendMode::kDisabled:				source = GL_SRC_ALPHA;	dest = GL_ONE_MINUS_SRC_ALPHA;	break;
-		case BlendMode::kNormalNonPremultiplied:	source = GL_SRC_ALPHA;	dest = GL_ONE_MINUS_SRC_ALPHA;	break;
-		case BlendMode::kNormalPremultiplied:		source = GL_ONE;		dest = GL_ONE_MINUS_SRC_ALPHA;	break;
-		case BlendMode::kAdditiveNonPremultiplied:source = GL_SRC_ALPHA;	dest = GL_ONE;					break;
-		case BlendMode::kAdditivePremultiplied:	source = GL_ONE;		dest = GL_ONE;					break;
-		case BlendMode::kScreenNonPremultiplied:	source = GL_SRC_ALPHA;	dest = GL_ONE_MINUS_SRC_COLOR;	break;
-		case BlendMode::kScreenPremultiplied:		source = GL_ONE;		dest = GL_ONE_MINUS_SRC_COLOR;	break;
-		case BlendMode::kMultiplyNonPremultiplied:source = GL_DST_COLOR;	dest = GL_ONE_MINUS_SRC_ALPHA;	break;
-		case BlendMode::kMultiplyPremultiplied:	source = GL_DST_COLOR;	dest = GL_ONE_MINUS_SRC_ALPHA;	break;
-		default:									Rtt_ASSERT_NOT_REACHED();								break;
-	}
-	Write<GLenum>( source );
-	Write<GLenum>( dest );
-*/
 }
 
 void 
@@ -469,6 +449,15 @@ VulkanCommandBuffer::Clear(Real r, Real g, Real b, Real a)
 void 
 VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 {
+	auto iter = fCachedPipelines.find( fWorkingPipeline );
+
+	if (iter == fCachedPipelines.end())
+	{
+		// build pipeline
+		// register it
+		// if first, make default; else, derive from first
+	}
+
 	// TODO: build pipeline if necessary, bind it, clear state
 /*
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
@@ -492,7 +481,7 @@ VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 void 
 VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 {
-	// TODO: build pipeline if necessary, bind it, clear state
+	// TODO: as per draw
 /*
 	// The first argument, offset, is currently unused. If support for non-
 	// VBO based indexed rendering is added later, an offset may be needed.
@@ -950,10 +939,45 @@ void VulkanCommandBuffer::WriteUniform( Uniform* uniform )
 	}
 }
 
+static void
+SetDynamicStateBit( uint8_t states[], uint8_t value )
+{
+	uint8_t offset = value - VK_DYNAMIC_STATE_BEGIN_RANGE;
+	uint8_t byteIndex = offset / 8U;
+
+	states[byteIndex] |= 1U << (offset - byteIndex * 8U);
+}
+
+void
+VulkanCommandBuffer::InitializePipelineState()
+{
+	PackedPipeline packedPipeline = {};
+
+	// TODO: this should be fleshed out with defaults
+	// these need not be relevant, but should properly handle being manually updated...
+
+	packedPipeline.fPolygonMode = VK_POLYGON_MODE_FILL;
+	packedPipeline.fCullMode = VK_CULL_MODE_BACK_BIT;
+	packedPipeline.fFrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	packedPipeline.fBlendAttachmentCount = 1U;
+	packedPipeline.fBlendAttachments[0].fColorWriteMask = 0x0F;
+
+	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_SCISSOR );
+	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_VIEWPORT );
+
+	fDefaultPipeline = packedPipeline;
+}
+
 bool
-VulkanCommandBuffer::PackedPipeline::operator < ( const PackedPipeline & other )
+VulkanCommandBuffer::PackedPipeline::operator < ( const PackedPipeline & other ) const
 {
 	return memcmp( this, &other, sizeof( PackedPipeline ) ) < 0;
+}
+
+bool
+VulkanCommandBuffer::PackedPipeline::operator == ( const PackedPipeline & other ) const
+{
+	return !(*this < other) && !(other < *this);
 }
 
 // ----------------------------------------------------------------------------

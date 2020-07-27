@@ -82,7 +82,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		virtual void InitializeFBO();
 		virtual void InitializeCachedParams();
 		virtual void CacheQueryParam( CommandBuffer::QueryableParams param );
-		
+
 	private:
 	/*
 		// Templatized helper function for reading an arbitrary argument from
@@ -109,15 +109,17 @@ class VulkanCommandBuffer : public CommandBuffer
 
 		Program::Version fCurrentPrepVersion;
 		Program::Version fCurrentDrawVersion;
+		
+	private:
+		void InitializePipelineState();
 	/*
 		Program* fProgram;
 		S32 fDefaultFBO;
 		U32* fTimerQueries;
 		U32 fTimerQueryIndex;*/
 		Real fElapsedTimeGPU;
-		TimeTransform* fTimeTransform;/*
+		TimeTransform* fTimeTransform;
 		S32 fCachedQuery[kNumQueryableParams];
-		*/
 
 		struct PackedBlendAttachment {
 			U32 fEnable : 1;
@@ -144,7 +146,11 @@ class VulkanCommandBuffer : public CommandBuffer
 		};
 
 		struct PackedPipeline {
-			U64 fDynamicStates : BitsNeeded( VK_DYNAMIC_STATE_RANGE_SIZE );
+			enum {
+				kDynamicStateCountRoundedUp = (VK_DYNAMIC_STATE_RANGE_SIZE + 7U) & ~7U,
+				kDynamicStateByteCount = kDynamicStateCountRoundedUp / 8U
+			};
+
             U64 fTopology : BitsNeeded( VK_PRIMITIVE_TOPOLOGY_RANGE_SIZE );
             U64 fPrimitiveRestartEnable : 1;
 			U64 fRasterizerDiscardEnable : 1;
@@ -178,23 +184,26 @@ class VulkanCommandBuffer : public CommandBuffer
 			PackedBlendAttachment fBlendAttachments[8];
 			PackedVertexAttributeDescription fAttributeDescriptions[4];
 			PackedVertexBindingDescription fBindingDescriptions[4];
+			uint8_t fDynamicStates[kDynamicStateByteCount];
 
-			bool operator < ( const PackedPipeline & other );
+			bool operator < ( const PackedPipeline & other ) const;
+			bool operator == ( const PackedPipeline & other ) const;
 		};
 
 		std::map< PackedPipeline, VkPipeline > fCachedPipelines;
 		std::vector< VkDynamicState > fDynamicState;
 		std::vector< VkPipelineShaderStageCreateInfo > fShaderStageCreateInfo;
-		PackedPipeline fDefaultPipeline;
-		PackedPipeline fWorkingPipeline;
 	/*
 		std::vector< VkSpecializationInfo > fSpecializationInfo;
 		std::vector< VkSpecializationMapEntry > fSpecializationMapEntry;
 	*/
-		std::vector< VkVertexInputAttributeDescription> fVertexAttributeDescriptions;
+		std::vector< VkVertexInputAttributeDescription > fVertexAttributeDescriptions;
         std::vector< VkVertexInputBindingDescription > fVertexBindingDescriptions;
         VkRect2D fScissorRect;
         VkViewport fViewport;
+		VkPipeline fFirstPipeline;
+		PackedPipeline fDefaultPipeline;
+		PackedPipeline fWorkingPipeline;
 };
 
 /*
