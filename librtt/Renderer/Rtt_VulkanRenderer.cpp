@@ -29,10 +29,8 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 :   Super( allocator ),
 	fState( state )
 {
-//	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator ) );
-//	fBackCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator ) );
-	// N.B. this will probably be RADICALLY different in Vulkan
-	// maybe these can just be hints to some unified thing?
+	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator ) );
+	fBackCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator ) );
 }
 
 VulkanRenderer::~VulkanRenderer()
