@@ -91,6 +91,7 @@ VulkanState::VulkanState()
     fPresentQueue( VK_NULL_HANDLE ),
 	fCommandPool( VK_NULL_HANDLE ),
     fSurface( VK_NULL_HANDLE ),
+	fPipelineCache( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE ),
 	fSampleCountFlags( VK_SAMPLE_COUNT_1_BIT ),
 	fCompiler( NULL ),

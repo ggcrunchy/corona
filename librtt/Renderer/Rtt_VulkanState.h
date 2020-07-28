@@ -68,6 +68,7 @@ class VulkanState
 		VkQueue GetGraphicsQueue() const { return fGraphicsQueue; }
 		VkQueue GetPresentQueue() const { return fPresentQueue; }
 		VkSurfaceKHR GetSurface() const { return fSurface; }
+		VkPipelineCache GetPipelineCache() const { return fPipelineCache; }
 		VkSampleCountFlags GetSampleCountFlags() const { return fSampleCountFlags; }
 
 		struct shaderc_compiler * GetCompiler() const { return fCompiler; }
@@ -121,6 +122,7 @@ class VulkanState
 		VkQueue fPresentQueue;
 		VkCommandPool fCommandPool;
 		VkSurfaceKHR fSurface;
+		VkPipelineCache fPipelineCache;
 		VkSampleCountFlags fSampleCountFlags;
 		VkSurfaceTransformFlagBitsKHR fTransformFlagBits;
 		VkSwapchainKHR fSwapchain;

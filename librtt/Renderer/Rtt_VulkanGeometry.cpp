@@ -133,10 +133,14 @@ VulkanGeometry::VertexDescription
 VulkanGeometry::Bind()
 {
 	VertexDescription desc;
+	VkVertexInputBindingDescription description;
 
-	desc.fDescription.binding = 0U;
-	desc.fDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	desc.fDescription.stride = sizeof( Geometry::Vertex );
+	description.binding = 0U;
+	description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	description.stride = sizeof( Geometry::Vertex );
+
+	desc.fDescriptions.push_back( description );
+	desc.fID = 0U; // n.b. for future use
 
 	return desc;
 }
