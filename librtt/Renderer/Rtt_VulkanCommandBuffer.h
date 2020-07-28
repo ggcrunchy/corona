@@ -124,30 +124,42 @@ class VulkanCommandBuffer : public CommandBuffer
 		TimeTransform* fTimeTransform;
 		S32 fCachedQuery[kNumQueryableParams];
 
+		enum {
+			kFinalBlendFactor = VK_BLEND_OP_MAX,
+			kFinalBlendOp = VK_BLEND_OP_MAX,
+			kFinalCompareOp = VK_COMPARE_OP_ALWAYS,
+			kFinalDynamicState = VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+			kFinalFrontFace = VK_FRONT_FACE_CLOCKWISE,
+			kFinalLogicOp = VK_LOGIC_OP_SET,
+			kFinalPolygonMode = VK_POLYGON_MODE_POINT,
+			kFinalPrimitiveTopology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,
+			kFinalStencilOp = VK_STENCIL_OP_DECREMENT_AND_WRAP
+		};
+
 		struct PackedBlendAttachment {
 			U32 fEnable : 1;
-			U32 fSrcColorFactor : BitsNeeded( VK_BLEND_FACTOR_RANGE_SIZE );
-			U32 fDstColorFactor : BitsNeeded( VK_BLEND_FACTOR_RANGE_SIZE );
-			U32 fColorOp : BitsNeeded( VK_BLEND_OP_RANGE_SIZE );
-			U32 fSrcAlphaFactor : BitsNeeded( VK_BLEND_FACTOR_RANGE_SIZE );
-			U32 fDstAlphaFactor : BitsNeeded( VK_BLEND_FACTOR_RANGE_SIZE );
-			U32 fAlphaOp : BitsNeeded( VK_BLEND_OP_RANGE_SIZE );
+			U32 fSrcColorFactor : BitsNeeded( kFinalBlendFactor );
+			U32 fDstColorFactor : BitsNeeded( kFinalBlendFactor );
+			U32 fColorOp : BitsNeeded( kFinalBlendOp );
+			U32 fSrcAlphaFactor : BitsNeeded( kFinalBlendFactor );
+			U32 fDstAlphaFactor : BitsNeeded( kFinalBlendFactor );
+			U32 fAlphaOp : BitsNeeded( kFinalBlendOp );
 			U32 fColorWriteMask : 4;
 		};
 
 		struct PackedPipeline {
 			enum {
-				kDynamicStateCountRoundedUp = (VK_DYNAMIC_STATE_RANGE_SIZE + 7U) & ~7U,
+				kDynamicStateCountRoundedUp = (kFinalDynamicState + 7U) & ~7U,
 				kDynamicStateByteCount = kDynamicStateCountRoundedUp / 8U
 			};
 
-            U64 fTopology : BitsNeeded( VK_PRIMITIVE_TOPOLOGY_RANGE_SIZE );
+            U64 fTopology : BitsNeeded( kFinalPrimitiveTopology );
             U64 fPrimitiveRestartEnable : 1;
 			U64 fRasterizerDiscardEnable : 1;
-			U64 fPolygonMode : BitsNeeded( VK_POLYGON_MODE_RANGE_SIZE );
+			U64 fPolygonMode : BitsNeeded( kFinalPolygonMode );
 			U64 fLineWidth : 4; // lineWidth = (X + 1) / 16
 			U64 fCullMode : 2;
-			U64 fFrontFace : BitsNeeded( VK_FRONT_FACE_RANGE_SIZE );
+			U64 fFrontFace : BitsNeeded( kFinalFrontFace );
 			U64 fRasterSamplesFlags : 7;
 			U64 fSampleShadingEnable : 1;
 			U64 fSampleShading : 5; // minSampleShading = X / 32
@@ -155,15 +167,15 @@ class VulkanCommandBuffer : public CommandBuffer
 			U64 fAlphaToOneEnable : 1;
 			U64 fDepthTestEnable : 1;
 			U64 fDepthWriteEnable : 1;
-			U64 fDepthCompareOp : BitsNeeded( VK_COMPARE_OP_RANGE_SIZE );
+			U64 fDepthCompareOp : BitsNeeded( kFinalCompareOp );
 			U64 fDepthBoundsTestEnable : 1;
 			U64 fStencilTestEnable : 1;
-			U64 fFront : BitsNeeded( VK_STENCIL_OP_RANGE_SIZE );
-			U64 fBack : BitsNeeded( VK_STENCIL_OP_RANGE_SIZE );
+			U64 fFront : BitsNeeded( kFinalStencilOp );
+			U64 fBack : BitsNeeded( kFinalStencilOp );
 			U64 fMinDepthBounds : 5; // minDepthBounds = X / 32
 			U64 fMaxDepthBounds : 5; // maxDepthBounds = (X + 1) / 32
 			U64 fLogicOpEnable : 1;
-			U64 fLogicOp : BitsNeeded( VK_LOGIC_OP_RANGE_SIZE );
+			U64 fLogicOp : BitsNeeded( kFinalLogicOp );
 			U64 fBlendConstant1 : 4; // blendConstants = X / 15
 			U64 fBlendConstant2 : 4;
 			U64 fBlendConstant3 : 4;
@@ -187,8 +199,9 @@ class VulkanCommandBuffer : public CommandBuffer
 		std::vector< VkPipelineColorBlendAttachmentState > fColorBlendAttachments;
 		std::vector< VkVertexInputAttributeDescription > fVertexAttributeDescriptions;
         std::vector< VkVertexInputBindingDescription > fVertexBindingDescriptions;
-        VkRect2D fScissorRect;
-        VkViewport fViewport;
+VkRect2D fScissorRect;
+VkViewport fViewport;
+// ^^ TODO: do we need these, or just do immediate bind commands?
 		VkPipeline fFirstPipeline;
 		VkPipeline fBoundPipeline;
 		PackedPipeline fDefaultPipeline;
