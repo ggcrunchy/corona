@@ -342,10 +342,10 @@ VulkanCommandBuffer::SetBlendFunction( const BlendMode& mode )
 	attachment.srcAlphaBlendFactor = srcAlpha;
 	attachment.dstAlphaBlendFactor = dstAlpha;
 
-	fWorkingPipeline.fBlendAttachments[0].fSrcColorFactor = srcColor - VK_BLEND_FACTOR_BEGIN_RANGE;
-	fWorkingPipeline.fBlendAttachments[0].fDstColorFactor = dstColor - VK_BLEND_FACTOR_BEGIN_RANGE;
-	fWorkingPipeline.fBlendAttachments[0].fSrcAlphaFactor = srcAlpha - VK_BLEND_FACTOR_BEGIN_RANGE;
-	fWorkingPipeline.fBlendAttachments[0].fDstAlphaFactor = dstAlpha - VK_BLEND_FACTOR_BEGIN_RANGE;
+	fWorkingPipeline.fBlendAttachments[0].fSrcColorFactor = srcColor;
+	fWorkingPipeline.fBlendAttachments[0].fDstColorFactor = dstColor;
+	fWorkingPipeline.fBlendAttachments[0].fSrcAlphaFactor = srcAlpha;
+	fWorkingPipeline.fBlendAttachments[0].fDstAlphaFactor = dstAlpha;
 }
 
 void 
@@ -369,8 +369,8 @@ VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 
 	attachment.alphaBlendOp = attachment.colorBlendOp = equation;
 
-	fWorkingPipeline.fBlendAttachments[0].fAlphaOp = equation - VK_BLEND_OP_BEGIN_RANGE;
-	fWorkingPipeline.fBlendAttachments[0].fColorOp = equation - VK_BLEND_OP_BEGIN_RANGE;
+	fWorkingPipeline.fBlendAttachments[0].fAlphaOp = equation;
+	fWorkingPipeline.fBlendAttachments[0].fColorOp = equation;
 }
 
 void
@@ -509,7 +509,7 @@ VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 		default: Rtt_ASSERT_NOT_REACHED(); break;
 	}
 
-	fWorkingPipeline.fTopology = fInputAssemblyStateCreateInfo.topology - VK_PRIMITIVE_TOPOLOGY_BEGIN_RANGE;
+	fWorkingPipeline.fTopology = fInputAssemblyStateCreateInfo.topology;
 
 	ResolvePipeline();
 /*
@@ -531,7 +531,7 @@ VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 		default: Rtt_ASSERT_NOT_REACHED(); break;
 	}
 
-	fWorkingPipeline.fTopology = fInputAssemblyStateCreateInfo.topology - VK_PRIMITIVE_TOPOLOGY_BEGIN_RANGE;
+	fWorkingPipeline.fTopology = fInputAssemblyStateCreateInfo.topology;
 
 	ResolvePipeline();
 /*
@@ -843,7 +843,7 @@ void VulkanCommandBuffer::WriteUniform( Uniform* uniform )
 static void
 SetDynamicStateBit( uint8_t states[], uint8_t value )
 {
-	uint8_t offset = value - VK_DYNAMIC_STATE_BEGIN_RANGE;
+	uint8_t offset = value;
 	uint8_t byteIndex = offset / 8U;
 
 	states[byteIndex] |= 1U << (offset - byteIndex * 8U);
