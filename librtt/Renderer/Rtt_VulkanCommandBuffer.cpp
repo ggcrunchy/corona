@@ -959,6 +959,8 @@ VulkanCommandBuffer::ResolvePipeline()
         VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
 
         pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipelineCreateInfo.basePipelineHandle = fFirstPipeline;
+		pipelineCreateInfo.flags = fFirstPipeline != VK_NULL_HANDLE ? VK_PIPELINE_CREATE_DERIVATIVE_BIT : VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
         pipelineCreateInfo.pInputAssemblyState = &fInputAssemblyStateCreateInfo;
         pipelineCreateInfo.pColorBlendState = &fColorBlendStateCreateInfo;
         pipelineCreateInfo.pDepthStencilState = &fDepthStencilStateCreateInfo;
@@ -970,12 +972,16 @@ VulkanCommandBuffer::ResolvePipeline()
 		pipelineCreateInfo.pViewportState = &viewportInfo;
 //      pipelineCreateInfo.layout = pipelineLayout;
 //      pipelineCreateInfo.renderPass = renderPass;
-		pipelineCreateInfo.basePipelineHandle = fFirstPipeline;
 
 		const VkAllocationCallbacks * allocator = fState->GetAllocationCallbacks();
 
         if (VK_SUCCESS == vkCreateGraphicsPipelines( fState->GetDevice(), fState->GetPipelineCache(), 1U, &pipelineCreateInfo, allocator, &pipeline ))
 		{
+			if (VK_NULL_HANDLE == fFirstPipeline)
+			{
+				fFirstPipeline = pipeline;
+			}
+
 			fBuiltPipelines[fWorkingPipeline] = pipeline;
 		}
 
@@ -995,6 +1001,7 @@ VulkanCommandBuffer::ResolvePipeline()
 		vkCmdBindPipeline( fCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
 	}
 
+	fBoundPipeline = pipeline;
 	fWorkingPipeline = fDefaultPipeline;
 }
 
