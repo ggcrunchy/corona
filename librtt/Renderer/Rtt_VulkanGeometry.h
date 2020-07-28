@@ -11,6 +11,8 @@
 #define _Rtt_VulkanGeometry_H__
 
 #include "Renderer/Rtt_GPUResource.h"
+
+#include <vector>
 #include <vulkan/vulkan.h>
 
 // ----------------------------------------------------------------------------
@@ -37,8 +39,8 @@ class VulkanGeometry : public GPUResource
 			{
 			}
 
-			VkVertexInputBindingDescription fDescription;
-		//	U32 fID;
+			std::vector< VkVertexInputBindingDescription > fDescriptions;
+			U32 fID;
 		};
 
 		virtual void Create( CPUResource* resource );

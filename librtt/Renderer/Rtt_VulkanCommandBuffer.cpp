@@ -7,15 +7,16 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanCommandBuffer.h"
+
 /*
 #include "Renderer/Rtt_FrameBufferObject.h"
-#include "Renderer/Rtt_Geometry_Renderer.h"
-#include "Renderer/Rtt_GL.h"
-#include "Renderer/Rtt_GLFrameBufferObject.h"
-#include "Renderer/Rtt_GLGeometry.h"*/
-#include "Renderer/Rtt_VulkanProgram.h"/*
-#include "Renderer/Rtt_GLTexture.h"*/
+#include "Renderer/Rtt_Geometry_Renderer.h"*/
+#include "Renderer/Rtt_VulkanFrameBufferObject.h"
+#include "Renderer/Rtt_VulkanGeometry.h"
+#include "Renderer/Rtt_VulkanProgram.h"
+#include "Renderer/Rtt_VulkanTexture.h"/*
 #include "Renderer/Rtt_Program.h"/*
 #include "Renderer/Rtt_Texture.h"
 #include "Renderer/Rtt_Uniform.h"*/
@@ -28,47 +29,13 @@
 #include <string.h>
 #include "Core/Rtt_String.h"
 */
+#include "CoronaLog.h"
 
 // ----------------------------------------------------------------------------
 
 namespace /*anonymous*/
 {
 /*
-	enum Command
-	{
-		kCommandBindFrameBufferObject,
-		kCommandUnBindFrameBufferObject,
-		kCommandBindGeometry,
-		kCommandBindTexture,
-		kCommandBindProgram,
-		kCommandApplyUniformScalar,
-		kCommandApplyUniformVec2,
-		kCommandApplyUniformVec3,
-		kCommandApplyUniformVec4,
-		kCommandApplyUniformMat3,
-		kCommandApplyUniformMat4,
-		kCommandApplyUniformFromPointerScalar,
-		kCommandApplyUniformFromPointerVec2,
-		kCommandApplyUniformFromPointerVec3,
-		kCommandApplyUniformFromPointerVec4,
-		kCommandApplyUniformFromPointerMat3,
-		kCommandApplyUniformFromPointerMat4,
-		kCommandEnableBlend,
-		kCommandDisableBlend,
-		kCommandSetBlendFunction,
-		kCommandSetBlendEquation,
-		kCommandSetViewport,
-		kCommandEnableScissor,
-		kCommandDisableScissor,
-		kCommandSetScissorRegion,
-		kCommandEnableMultisample,
-		kCommandDisableMultisample,
-		kCommandClear,
-		kCommandDraw,
-		kCommandDrawIndexed,
-		kNumCommands
-	};
-
 	// To ease reading/writing of arrays
 	struct Vec2 { Rtt::Real data[2]; };
 	struct Vec3 { Rtt::Real data[3]; };
@@ -100,9 +67,6 @@ namespace /*anonymous*/
 	
 	#define CHECK_ERROR_AND_BREAK GL_CHECK_ERROR(); break;
 
-	// Ensure command count is incremented
-	#define WRITE_COMMAND( command ) Write<Command>( command ); ++fNumCommands;
-	
 	// Used to validate that the appropriate OpenGL commands
 	// are being generated and that their arguments are correct
 	#if ENABLE_DEBUG_PRINT 
@@ -145,8 +109,6 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator )
 		fUniformUpdates[i].uniform = NULL;
 		fUniformUpdates[i].timestamp = 0;
 	}
-
-	InitializePipelineState();
 }
 
 VulkanCommandBuffer::~VulkanCommandBuffer()
@@ -167,22 +129,11 @@ VulkanCommandBuffer::Initialize()
 	}
 	GL_CHECK_ERROR();
 #endif
-	/*
-	// Initialize OpenGL state	
-	glDisable( GL_DEPTH_TEST );
-	glDisable( GL_STENCIL_TEST );
-	glDisable( GL_SCISSOR_TEST );
-	glDisable( GL_CULL_FACE );
-	glEnable( GL_BLEND );
-	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-	glEnableVertexAttribArray( Geometry::kVertexPositionAttribute );
-	glEnableVertexAttribArray( Geometry::kVertexTexCoordAttribute );
-	glEnableVertexAttribArray( Geometry::kVertexColorScaleAttribute );
-	glEnableVertexAttribArray( Geometry::kVertexUserDataAttribute );
-	*/
 	InitializeFBO();
 	InitializeCachedParams();
 	//CacheQueryParam(kMaxTextureSize);
+
+	InitializePipelineState();
 	
 	GetMaxTextureSize();
 
@@ -268,8 +219,17 @@ VulkanCommandBuffer::BindFrameBufferObject(FrameBufferObject* fbo)
 void 
 VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 {
+	VulkanGeometry * vulkanGeometry = static_cast< VulkanGeometry * >( geometry->GetGPUResource() );
+	VulkanGeometry::VertexDescription description = vulkanGeometry->Bind();
+
+	fWorkingPipeline.fBindingDescriptionID = description.fID;
+	fVertexBindingDescriptions = description.fDescriptions;
 //	WRITE_COMMAND( kCommandBindGeometry );
 //	Write<GPUResource*>( geometry->GetGPUResource() );
+	
+//                vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+//                vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 }
 
 void 
@@ -278,11 +238,18 @@ VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 //	WRITE_COMMAND( kCommandBindTexture );
 //	Write<U32>( unit );
 //	Write<GPUResource*>( texture->GetGPUResource() );
+//	vkUpdateDescriptorSets(device, 1, WRITES, 1, 0);
+//                vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
 }
 
 void 
 VulkanCommandBuffer::BindProgram( Program* program, Program::Version version )
 {
+	VulkanProgram * vulkanProgram = static_cast< VulkanProgram * >( program->GetGPUResource() );
+	VulkanProgram::PipelineStages shaderStages = vulkanProgram->Bind( version );
+
+	fWorkingPipeline.fShaderID = shaderStages.fID;
+	fShaderStageCreateInfo = shaderStages.fStages;
 /*
 	WRITE_COMMAND( kCommandBindProgram );
 	Write<Program::Version>( version );
@@ -307,7 +274,8 @@ VulkanCommandBuffer::BindUniform( Uniform* uniform, U32 unit )
 void
 VulkanCommandBuffer::SetBlendEnabled( bool enabled )
 {
-//	WRITE_COMMAND( enabled ? kCommandEnableBlend : kCommandDisableBlend );
+	fColorBlendAttachments.front().blendEnable = enabled ? VK_TRUE : VK_FALSE;
+	fWorkingPipeline.fBlendAttachments[0].fEnable = enabled;
 }
 
 static VkBlendFactor
@@ -361,26 +329,28 @@ VulkanFactorForBlendParam( BlendMode::Param param )
 void
 VulkanCommandBuffer::SetBlendFunction( const BlendMode& mode )
 {
-//	WRITE_COMMAND( kCommandSetBlendFunction );
-
 	VkBlendFactor srcColor = VulkanFactorForBlendParam( mode.fSrcColor );
 	VkBlendFactor dstColor = VulkanFactorForBlendParam( mode.fDstColor );
 
 	VkBlendFactor srcAlpha = VulkanFactorForBlendParam( mode.fSrcAlpha );
 	VkBlendFactor dstAlpha = VulkanFactorForBlendParam( mode.fDstAlpha );
-/*
-	Write<GLenum>( srcColor );
-	Write<GLenum>( dstColor );
-	Write<GLenum>( srcAlpha );
-	Write<GLenum>( dstAlpha );
-	*/
+
+	auto attachment = fColorBlendAttachments.front();
+
+	attachment.srcColorBlendFactor = srcColor;
+	attachment.dstColorBlendFactor = dstColor;
+	attachment.srcAlphaBlendFactor = srcAlpha;
+	attachment.dstAlphaBlendFactor = dstAlpha;
+
+	fWorkingPipeline.fBlendAttachments[0].fSrcColorFactor = srcColor - VK_BLEND_FACTOR_BEGIN_RANGE;
+	fWorkingPipeline.fBlendAttachments[0].fDstColorFactor = dstColor - VK_BLEND_FACTOR_BEGIN_RANGE;
+	fWorkingPipeline.fBlendAttachments[0].fSrcAlphaFactor = srcAlpha - VK_BLEND_FACTOR_BEGIN_RANGE;
+	fWorkingPipeline.fBlendAttachments[0].fDstAlphaFactor = dstAlpha - VK_BLEND_FACTOR_BEGIN_RANGE;
 }
 
 void 
 VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 {
-//	WRITE_COMMAND( kCommandSetBlendEquation );
-
 	VkBlendOp equation = VK_BLEND_OP_ADD;
 
 	switch( mode )
@@ -395,7 +365,12 @@ VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 			break;
 	}
 
-//	Write<GLenum>( equation );
+	auto attachment = fColorBlendAttachments.front();
+
+	attachment.alphaBlendOp = attachment.colorBlendOp = equation;
+
+	fWorkingPipeline.fBlendAttachments[0].fAlphaOp = equation - VK_BLEND_OP_BEGIN_RANGE;
+	fWorkingPipeline.fBlendAttachments[0].fColorOp = equation - VK_BLEND_OP_BEGIN_RANGE;
 }
 
 void
@@ -408,12 +383,33 @@ VulkanCommandBuffer::SetViewport( int x, int y, int width, int height )
 	Write<GLsizei>(width);
 	Write<GLsizei>(height);
 */
+	/*
+					GLint x = Read<GLint>();
+				GLint y = Read<GLint>();
+				GLsizei width = Read<GLsizei>();
+				GLsizei height = Read<GLsizei>();
+				glViewport( x, y, width, height );
+				DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );
+				CHECK_ERROR_AND_BREAK;
+				*/
 }
 
 void 
 VulkanCommandBuffer::SetScissorEnabled( bool enabled )
 {
 //	WRITE_COMMAND( enabled ? kCommandEnableScissor : kCommandDisableScissor );
+	/*
+				glEnable( GL_SCISSOR_TEST );
+				DEBUG_PRINT( "Enable scissor test" );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandDisableScissor:
+			{
+				glDisable( GL_SCISSOR_TEST );
+				DEBUG_PRINT( "Disable scissor test" );
+				CHECK_ERROR_AND_BREAK;
+			}
+		*/
 }
 
 void 
@@ -426,17 +422,45 @@ VulkanCommandBuffer::SetScissorRegion(int x, int y, int width, int height)
 	Write<GLsizei>(width);
 	Write<GLsizei>(height);
 */
+	/*
+			case kCommandSetScissorRegion:
+			{
+				GLint x = Read<GLint>();
+				GLint y = Read<GLint>();
+				GLsizei width = Read<GLsizei>();
+				GLsizei height = Read<GLsizei>();
+				glScissor( x, y, width, height );
+				DEBUG_PRINT( "Set scissor window x=%i, y=%i, width=%i, height=%i", x, y, width, height );
+				CHECK_ERROR_AND_BREAK;
+				*/
 }
 
 void
 VulkanCommandBuffer::SetMultisampleEnabled( bool enabled )
 {
 //	WRITE_COMMAND( enabled ? kCommandEnableMultisample : kCommandDisableMultisample );
+//	fMultisampleStateCreateInfo.rasterizationSamples
+/*
+			case kCommandEnableMultisample:
+			{
+				Rtt_glEnableMultisample();
+				DEBUG_PRINT( "Enable multisample test" );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandDisableMultisample:
+			{
+				Rtt_glDisableMultisample();
+				DEBUG_PRINT( "Disable multisample test" );
+				CHECK_ERROR_AND_BREAK;
+			}
+*/
 }
 
 void 
 VulkanCommandBuffer::Clear(Real r, Real g, Real b, Real a)
 {
+//	vkCmdClearColorImage( fCommands, IMAgE?, IMAGE_LAYOUT?, vkClearColorValue, 1U, full size );
+// URGH... might be unnecessary since also part of rendering?
 /*
 	WRITE_COMMAND( kCommandClear );
 	Write<GLfloat>(r);
@@ -444,59 +468,80 @@ VulkanCommandBuffer::Clear(Real r, Real g, Real b, Real a)
 	Write<GLfloat>(b);
 	Write<GLfloat>(a);
 */
+
+	/*
+					GLfloat r = Read<GLfloat>();
+				GLfloat g = Read<GLfloat>();
+				GLfloat b = Read<GLfloat>();
+				GLfloat a = Read<GLfloat>();
+				glClearColor( r, g, b, a );
+				glClear( GL_COLOR_BUFFER_BIT );
+				DEBUG_PRINT( "Clear: r=%f, g=%f, b=%f, a=%f", r, g, b, a );
+				CHECK_ERROR_AND_BREAK;
+	*/
 }
 
 void 
 VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 {
-	auto iter = fCachedPipelines.find( fWorkingPipeline );
-
-	if (iter == fCachedPipelines.end())
+	switch( type )
 	{
-		// build pipeline
-		// register it
-		// if first, make default; else, derive from first
+		case Geometry::kTriangleStrip:
+			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+			
+			break;
+		case Geometry::kTriangleFan:
+			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+			
+			break;
+		case Geometry::kTriangles:
+			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+			
+			break;
+		case Geometry::kLines:
+			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+
+			break;
+		case Geometry::kLineLoop:
+			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+			
+			break;
+		default: Rtt_ASSERT_NOT_REACHED(); break;
 	}
 
-	// TODO: build pipeline if necessary, bind it, clear state
+	fWorkingPipeline.fTopology = fInputAssemblyStateCreateInfo.topology - VK_PRIMITIVE_TOPOLOGY_BEGIN_RANGE;
+
+	ResolvePipeline();
 /*
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
 	ApplyUniforms( fProgram->GetGPUResource() );
-	
-	WRITE_COMMAND( kCommandDraw );
-	switch( type )
-	{
-		case Geometry::kTriangleStrip:	Write<GLenum>(GL_TRIANGLE_STRIP);	break;
-		case Geometry::kTriangleFan:	Write<GLenum>(GL_TRIANGLE_FAN);		break;
-		case Geometry::kTriangles:		Write<GLenum>(GL_TRIANGLES);		break;
-		case Geometry::kLines:			Write<GLenum>(GL_LINES);			break;
-		case Geometry::kLineLoop:		Write<GLenum>(GL_LINE_LOOP);		break;
-		default: Rtt_ASSERT_NOT_REACHED(); break;
-	}
-	Write<GLint>(offset);
-	Write<GLsizei>(count);
 */
+	vkCmdDraw( fCommands, count, 1U, offset, 0U );
 }
 
 void 
 VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 {
-	// TODO: as per draw
+	switch( type )
+	{
+		case Geometry::kIndexedTriangles:
+			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+			break;
+		default: Rtt_ASSERT_NOT_REACHED(); break;
+	}
+
+	fWorkingPipeline.fTopology = fInputAssemblyStateCreateInfo.topology - VK_PRIMITIVE_TOPOLOGY_BEGIN_RANGE;
+
+	ResolvePipeline();
 /*
 	// The first argument, offset, is currently unused. If support for non-
 	// VBO based indexed rendering is added later, an offset may be needed.
 
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
 	ApplyUniforms( fProgram->GetGPUResource() );
-	
-	WRITE_COMMAND( kCommandDrawIndexed );
-	switch( type )
-	{
-		case Geometry::kIndexedTriangles:	Write<GLenum>(GL_TRIANGLES);	break;
-		default: Rtt_ASSERT_NOT_REACHED(); break;
-	}
-	Write<GLsizei>(count);
 */
+	vkCmdDrawIndexed( fCommands, count, 1U, 0U, 0U, 0U );
 }
 
 S32
@@ -595,14 +640,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 								texture->GetName() );
 				CHECK_ERROR_AND_BREAK;
 			}
-			case kCommandBindProgram:
-			{
-				fCurrentDrawVersion = Read<Program::Version>();
-				GLProgram* program = Read<GLProgram*>();
-				program->Bind( fCurrentDrawVersion );
-				DEBUG_PRINT( "Bind Program: program=%p version=%i", program, fCurrentDrawVersion );
-				CHECK_ERROR_AND_BREAK;
-			}
+
 			case kCommandApplyUniformScalar:
 			{
 				READ_UNIFORM_DATA( Real );
@@ -687,111 +725,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
 				CHECK_ERROR_AND_BREAK;
 			}
-			case kCommandEnableBlend:
-			{
-				glEnable( GL_BLEND );
-				DEBUG_PRINT( "Enable blend" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDisableBlend:
-			{
-				glDisable( GL_BLEND );
-				DEBUG_PRINT( "Disable blend" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandSetBlendFunction:
-			{
-				GLenum srcColor = Read<GLenum>();
-				GLenum dstColor = Read<GLenum>();
 
-				GLenum srcAlpha = Read<GLenum>();
-				GLenum dstAlpha = Read<GLenum>();
-
-				glBlendFuncSeparate( srcColor, dstColor, srcAlpha, dstAlpha );
-				DEBUG_PRINT(
-					"Set blend function: srcColor=%i, dstColor=%i, srcAlpha=%i, dstAlpha=%i",
-					srcColor, dstColor, srcAlpha, dstAlpha );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandSetBlendEquation:
-			{
-				GLenum mode = Read<GLenum>();
-				glBlendEquation( mode );
-				DEBUG_PRINT( "Set blend equation: mode=%i", mode );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandSetViewport:
-			{
-				GLint x = Read<GLint>();
-				GLint y = Read<GLint>();
-				GLsizei width = Read<GLsizei>();
-				GLsizei height = Read<GLsizei>();
-				glViewport( x, y, width, height );
-				DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandEnableScissor:
-			{
-				glEnable( GL_SCISSOR_TEST );
-				DEBUG_PRINT( "Enable scissor test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDisableScissor:
-			{
-				glDisable( GL_SCISSOR_TEST );
-				DEBUG_PRINT( "Disable scissor test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandSetScissorRegion:
-			{
-				GLint x = Read<GLint>();
-				GLint y = Read<GLint>();
-				GLsizei width = Read<GLsizei>();
-				GLsizei height = Read<GLsizei>();
-				glScissor( x, y, width, height );
-				DEBUG_PRINT( "Set scissor window x=%i, y=%i, width=%i, height=%i", x, y, width, height );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandEnableMultisample:
-			{
-				Rtt_glEnableMultisample();
-				DEBUG_PRINT( "Enable multisample test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDisableMultisample:
-			{
-				Rtt_glDisableMultisample();
-				DEBUG_PRINT( "Disable multisample test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandClear:
-			{
-				GLfloat r = Read<GLfloat>();
-				GLfloat g = Read<GLfloat>();
-				GLfloat b = Read<GLfloat>();
-				GLfloat a = Read<GLfloat>();
-				glClearColor( r, g, b, a );
-				glClear( GL_COLOR_BUFFER_BIT );
-				DEBUG_PRINT( "Clear: r=%f, g=%f, b=%f, a=%f", r, g, b, a );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDraw:
-			{
-				GLenum mode = Read<GLenum>();
-				GLint offset = Read<GLint>();
-				GLsizei count = Read<GLsizei>();
-				glDrawArrays( mode, offset, count );
-				DEBUG_PRINT( "Draw: mode=%i, offset=%i, count=%i", mode, offset, count );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDrawIndexed:
-			{
-				GLenum mode = Read<GLenum>();
-				GLsizei count = Read<GLsizei>();
-				glDrawElements( mode, count, GL_UNSIGNED_SHORT, NULL );
-				DEBUG_PRINT( "Draw indexed: mode=%i, count=%i", mode, count );
-				CHECK_ERROR_AND_BREAK;
-			}
 			default:
 				DEBUG_PRINT( "Unknown command(%d)", command );
 				Rtt_ASSERT_NOT_REACHED();
@@ -815,40 +749,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 */
 	return fElapsedTimeGPU;
 }
-/*
-template <typename T>
-T 
-GLCommandBuffer::Read()
-{
-	Rtt_ASSERT( fOffset < fBuffer + fBytesAllocated );
-	T result = reinterpret_cast<T*>( fOffset )[0];
-	fOffset += sizeof( T );
-	return result;
-}
 
-template <typename T>
-void 
-GLCommandBuffer::Write( T value )
-{
-	U32 size = sizeof(T);
-	U32 bytesNeeded = fBytesUsed + size;
-	if( bytesNeeded > fBytesAllocated )
-	{
-		U32 doubleSize = fBytesUsed ? 2 * fBytesUsed : 4;
-		U32 newSize = Max( bytesNeeded, doubleSize );
-		U8* newBuffer = new U8[newSize];
-
-		memcpy( newBuffer, fBuffer, fBytesUsed );
-		delete [] fBuffer;
-
-		fBuffer = newBuffer;
-		fBytesAllocated = newSize;
-	}
-
-	memcpy( fBuffer + fBytesUsed, &value, size );
-	fBytesUsed += size;
-}
-*/
 void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 {
 	VulkanProgram* vulkanProgram = static_cast< VulkanProgram * >(resource);
@@ -951,21 +852,150 @@ SetDynamicStateBit( uint8_t states[], uint8_t value )
 void
 VulkanCommandBuffer::InitializePipelineState()
 {
+/*
+	glDisable( GL_SCISSOR_TEST );
+*/
 	PackedPipeline packedPipeline = {};
 
 	// TODO: this should be fleshed out with defaults
 	// these need not be relevant, but should properly handle being manually updated...
 
-	packedPipeline.fPolygonMode = VK_POLYGON_MODE_FILL;
-	packedPipeline.fCullMode = VK_CULL_MODE_BACK_BIT;
-	packedPipeline.fFrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	packedPipeline.fBlendAttachmentCount = 1U;
+	packedPipeline.fBlendAttachments[0].fEnable = VK_TRUE;
 	packedPipeline.fBlendAttachments[0].fColorWriteMask = 0x0F;
+	packedPipeline.fBlendAttachments[0].fSrcColorFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	packedPipeline.fBlendAttachments[0].fSrcAlphaFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	packedPipeline.fBlendAttachments[0].fDstColorFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	packedPipeline.fBlendAttachments[0].fDstAlphaFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 
 	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_SCISSOR );
 	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_VIEWPORT );
 
 	fDefaultPipeline = packedPipeline;
+
+	RestartWorkingPipeline();
+}
+
+void
+VulkanCommandBuffer::RestartWorkingPipeline()
+{
+	fShaderStageCreateInfo.clear();
+
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+        
+	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+
+	fInputAssemblyStateCreateInfo = inputAssembly;
+
+	VkPipelineRasterizationStateCreateInfo rasterizer = {};
+
+	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer.lineWidth = 1.0f;
+	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+	fRasterizationStateCreateInfo = rasterizer;
+
+	VkPipelineMultisampleStateCreateInfo multisampling = {};
+
+	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+
+    fMultisampleStateCreateInfo = multisampling;
+
+	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+
+	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+
+	fDepthStencilStateCreateInfo = depthStencil;
+
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+
+	colorBlendAttachment.srcAlphaBlendFactor = colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	colorBlendAttachment.dstAlphaBlendFactor = colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+	fColorBlendAttachments.clear();
+	fColorBlendAttachments.push_back( colorBlendAttachment );
+
+	VkPipelineColorBlendStateCreateInfo colorBlending = {};
+
+	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlending.attachmentCount = 1U;
+	fColorBlendStateCreateInfo = colorBlending;
+}
+
+void
+VulkanCommandBuffer::ResolvePipeline()
+{
+	auto iter = fBuiltPipelines.find( fWorkingPipeline );
+	VkPipeline pipeline = VK_NULL_HANDLE;
+
+	if (iter == fBuiltPipelines.end())
+	{
+	/*
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+
+        if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create pipeline layout!");
+        }
+	*/
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		
+        vertexInputInfo.pVertexAttributeDescriptions = fVertexAttributeDescriptions.data();
+        vertexInputInfo.pVertexBindingDescriptions = fVertexBindingDescriptions.data();
+        vertexInputInfo.vertexAttributeDescriptionCount = fVertexAttributeDescriptions.size();
+        vertexInputInfo.vertexBindingDescriptionCount = fVertexBindingDescriptions.size();
+
+		VkPipelineViewportStateCreateInfo viewportInfo = {};
+
+		viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+
+        VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
+
+        pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineCreateInfo.pInputAssemblyState = &fInputAssemblyStateCreateInfo;
+        pipelineCreateInfo.pColorBlendState = &fColorBlendStateCreateInfo;
+        pipelineCreateInfo.pDepthStencilState = &fDepthStencilStateCreateInfo;
+        pipelineCreateInfo.pMultisampleState = &fMultisampleStateCreateInfo;
+        pipelineCreateInfo.pRasterizationState = &fRasterizationStateCreateInfo;
+        pipelineCreateInfo.pStages = fShaderStageCreateInfo.data();
+        pipelineCreateInfo.stageCount = fShaderStageCreateInfo.size();
+        pipelineCreateInfo.pVertexInputState = &vertexInputInfo;
+		pipelineCreateInfo.pViewportState = &viewportInfo;
+//      pipelineCreateInfo.layout = pipelineLayout;
+//      pipelineCreateInfo.renderPass = renderPass;
+		pipelineCreateInfo.basePipelineHandle = fFirstPipeline;
+
+		const VkAllocationCallbacks * allocator = fState->GetAllocationCallbacks();
+
+        if (VK_SUCCESS == vkCreateGraphicsPipelines( fState->GetDevice(), fState->GetPipelineCache(), 1U, &pipelineCreateInfo, allocator, &pipeline ))
+		{
+			fBuiltPipelines[fWorkingPipeline] = pipeline;
+		}
+
+		else
+		{
+			CoronaLog( "Failed to create pipeline!" );
+        }
+	}
+
+	else
+	{
+		pipeline = iter->second;
+	}
+
+	if (pipeline != VK_NULL_HANDLE && (VK_NULL_HANDLE == fBoundPipeline || pipeline != fBoundPipeline))
+	{
+		vkCmdBindPipeline( fCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
+	}
+
+	fWorkingPipeline = fDefaultPipeline;
 }
 
 bool

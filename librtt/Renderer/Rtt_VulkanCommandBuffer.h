@@ -37,6 +37,7 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
+class VulkanState;
 struct TimeTransform;
 
 // 
@@ -112,6 +113,8 @@ class VulkanCommandBuffer : public CommandBuffer
 		
 	private:
 		void InitializePipelineState();
+		void RestartWorkingPipeline();
+		void ResolvePipeline();
 	/*
 		Program* fProgram;
 		S32 fDefaultFBO;
@@ -130,19 +133,6 @@ class VulkanCommandBuffer : public CommandBuffer
 			U32 fDstAlphaFactor : BitsNeeded( VK_BLEND_FACTOR_RANGE_SIZE );
 			U32 fAlphaOp : BitsNeeded( VK_BLEND_OP_RANGE_SIZE );
 			U32 fColorWriteMask : 4;
-		};
-
-		struct PackedVertexAttributeDescription {
-			U64 fLocation : 8; // TODO: compare these against device limits?
-			U64 fBinding: 8;
-			U64 fFormat : BitsNeeded( VK_FORMAT_RANGE_SIZE );
-			U64 fOffset : 8;
-		};
-
-		struct PackedVertexBindingDescription {
-			U32 fBinding : 8; // TODO: ditto...
-			U32 fStride : 10;
-			U32 fInputRate : BitsNeeded( VK_VERTEX_INPUT_RATE_RANGE_SIZE );
 		};
 
 		struct PackedPipeline {
@@ -178,32 +168,37 @@ class VulkanCommandBuffer : public CommandBuffer
 			U64 fBlendConstant2 : 4;
 			U64 fBlendConstant3 : 4;
 			U64 fBlendConstant4 : 4;
+			U64 fLayoutID : 4;
+			U64 fShaderID : 16;
+			U64 fAttributeDescriptionID : 3;
+			U64 fBindingDescriptionID : 3;
 			U64 fBlendAttachmentCount : 3; // 0-7
-			U64 fVertexAttributeDescriptionCount : 2; // 0-3
-			U64 fVertexAttributeBindingCount : 2; // 0-3
 			PackedBlendAttachment fBlendAttachments[8];
-			PackedVertexAttributeDescription fAttributeDescriptions[4];
-			PackedVertexBindingDescription fBindingDescriptions[4];
 			uint8_t fDynamicStates[kDynamicStateByteCount];
 
 			bool operator < ( const PackedPipeline & other ) const;
 			bool operator == ( const PackedPipeline & other ) const;
 		};
 
-		std::map< PackedPipeline, VkPipeline > fCachedPipelines;
+		VulkanState * fState;
+		std::map< PackedPipeline, VkPipeline > fBuiltPipelines;
 		std::vector< VkDynamicState > fDynamicState;
 		std::vector< VkPipelineShaderStageCreateInfo > fShaderStageCreateInfo;
-	/*
-		std::vector< VkSpecializationInfo > fSpecializationInfo;
-		std::vector< VkSpecializationMapEntry > fSpecializationMapEntry;
-	*/
+		std::vector< VkPipelineColorBlendAttachmentState > fColorBlendAttachments;
 		std::vector< VkVertexInputAttributeDescription > fVertexAttributeDescriptions;
         std::vector< VkVertexInputBindingDescription > fVertexBindingDescriptions;
         VkRect2D fScissorRect;
         VkViewport fViewport;
 		VkPipeline fFirstPipeline;
+		VkPipeline fBoundPipeline;
 		PackedPipeline fDefaultPipeline;
 		PackedPipeline fWorkingPipeline;
+		VkPipelineInputAssemblyStateCreateInfo fInputAssemblyStateCreateInfo;
+        VkPipelineRasterizationStateCreateInfo fRasterizationStateCreateInfo;
+        VkPipelineMultisampleStateCreateInfo fMultisampleStateCreateInfo;
+        VkPipelineDepthStencilStateCreateInfo fDepthStencilStateCreateInfo;
+        VkPipelineColorBlendStateCreateInfo fColorBlendStateCreateInfo;
+		VkCommandBuffer fCommands;
 };
 
 /*
