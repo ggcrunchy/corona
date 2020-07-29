@@ -61,7 +61,7 @@ class VulkanState
 		~VulkanState();
 
 	public:
-		VkAllocationCallbacks * GetAllocationCallbacks() const { return fAllocationCallbacks; }
+		VkAllocationCallbacks * GetAllocator() const { return fAllocator; }
 		VkInstance GetInstance() const { return fInstance; }
 		VkDevice GetDevice() const { return fDevice; }
 		VkPhysicalDevice GetPhysicalDevice() const { return fPhysicalDevice; }
@@ -105,13 +105,21 @@ class VulkanState
 		void TearDownSwapchain();
 
 	private:
-		struct SwapchainImage {
+		struct Attachment {
 			VkImage image;
 			VkImageView view;
-			// VkFramebuffer
+			VkDeviceMemory memory;
 		};
 
-		VkAllocationCallbacks * fAllocationCallbacks;
+		struct SwapchainImage {
+			std::vector< Attachment > attachments;
+
+			VkImage image;
+			VkImageView view;
+			VkFramebuffer framebuffer;
+		};
+
+		VkAllocationCallbacks * fAllocator;
 		VkInstance fInstance;
 	#ifndef NDEBUG
 		VkDebugUtilsMessengerEXT fDebugMessenger;

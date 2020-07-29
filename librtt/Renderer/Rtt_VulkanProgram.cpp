@@ -122,7 +122,7 @@ VulkanProgram::Update( CPUResource* resource )
 void 
 VulkanProgram::Destroy()
 {
-	const VkAllocationCallbacks * allocator = fState->GetAllocationCallbacks();
+	const VkAllocationCallbacks * allocator = fState->GetAllocator();
 	VkDevice device = fState->GetDevice();
 
 	for( U32 i = 0; i < Program::kNumVersions; ++i )

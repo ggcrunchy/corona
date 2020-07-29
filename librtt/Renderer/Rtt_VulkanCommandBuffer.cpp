@@ -861,6 +861,7 @@ VulkanCommandBuffer::InitializePipelineState()
 	// TODO: this should be fleshed out with defaults
 	// these need not be relevant, but should properly handle being manually updated...
 
+	packedPipeline.fRasterSamplesFlags = 1U;
 	packedPipeline.fBlendAttachmentCount = 1U;
 	packedPipeline.fBlendAttachments[0].fEnable = VK_TRUE;
 	packedPipeline.fBlendAttachments[0].fColorWriteMask = 0xF;
@@ -898,6 +899,7 @@ VulkanCommandBuffer::RestartWorkingPipeline()
 	VkPipelineMultisampleStateCreateInfo multisampling = {};
 
 	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
     fMultisampleStateCreateInfo = multisampling;
 
@@ -971,7 +973,7 @@ VulkanCommandBuffer::ResolvePipeline()
 //      pipelineCreateInfo.layout = pipelineLayout;
 //      pipelineCreateInfo.renderPass = renderPass;
 
-		const VkAllocationCallbacks * allocator = fState->GetAllocationCallbacks();
+		const VkAllocationCallbacks * allocator = fState->GetAllocator();
 
         if (VK_SUCCESS == vkCreateGraphicsPipelines( fState->GetDevice(), fState->GetPipelineCache(), 1U, &pipelineCreateInfo, allocator, &pipeline ))
 		{

@@ -117,7 +117,8 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 VulkanTexture::VulkanTexture( VulkanState * state )
-	:	fState( state )
+:	fState( state ),
+    fData()
 {
 }
 
@@ -137,7 +138,8 @@ VulkanTexture::Create( CPUResource* resource )
 
     if (ok)
     {
-        CreateImage(
+        fData = CreateImage(
+            fState,
             texture->GetWidth(), texture->GetHeight(),
             1U, // mip levels
             VK_SAMPLE_COUNT_1_BIT,
@@ -146,7 +148,7 @@ VulkanTexture::Create( CPUResource* resource )
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
 
-        ok = fImage != VK_NULL_HANDLE;
+        ok = fData.fImage != VK_NULL_HANDLE;
 
         if (ok)
         {
@@ -182,10 +184,10 @@ VulkanTexture::Create( CPUResource* resource )
 
         VkSampler sampler;
 
-        if (VK_SUCCESS == vkCreateSampler( fState->GetDevice(), &samplerInfo, fState->GetAllocationCallbacks(), &sampler))
+        if (VK_SUCCESS == vkCreateSampler( fState->GetDevice(), &samplerInfo, fState->GetAllocator(), &sampler ))
         {
             fSampler = sampler;
-            fImageView = CreateImageView( fState, fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels, &mapping );
+            fImageView = CreateImageView( fState, fData.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels, &mapping );
         }
         
         else
@@ -230,23 +232,21 @@ VulkanTexture::Update( CPUResource* resource )
 
 void 
 VulkanTexture::Destroy()
-{/*
-	GLuint name = GetName();
-	if ( 0 != name )
-	{
-		glDeleteTextures( 1, &name );
-		GL_CHECK_ERROR();
-		fHandle = 0;	
-	}
+{
+    const VkAllocationCallbacks * allocator = fState->GetAllocator();
+    VkDevice device = fState->GetDevice();
 
-	DEBUG_PRINT( "%s : OpenGL name: %d\n",
-					Rtt_FUNCTION,
-					name );*/
+    vkDestroySampler( device, fSampler, allocator );
+    vkDestroyImageView( device, fImageView, allocator );
+    vkDestroyImage( device, fData.fImage, allocator );
+    vkFreeMemory( device, fData.fMemory, allocator );
 }
 
 void 
 VulkanTexture::Bind( U32 unit )
-{/*
+{
+    // TODO: sampler, view?
+    /*
 	glActiveTexture( GL_TEXTURE0 + unit );
 	glBindTexture( GL_TEXTURE_2D, GetName() );
 	GL_CHECK_ERROR();*/
@@ -256,73 +256,15 @@ void
 VulkanTexture::CopyBufferToImage( VkBuffer buffer, VkImage image, uint32_t width, uint32_t height )
 {
     VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
-
     VkBufferImageCopy region = {};
 
     region.imageExtent = { width, height, 1U };
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.layerCount = 1;
+    region.imageSubresource.layerCount = 1U;
 
     vkCmdCopyBufferToImage( commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, &region );
 
     fState->EndSingleTimeCommands( commandBuffer );
-}
-
-void
-VulkanTexture::CreateImage( uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties )
-{
-    VkImageCreateInfo createImageInfo = {};
-
-    createImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    createImageInfo.arrayLayers = 1U;
-    createImageInfo.imageType = VK_IMAGE_TYPE_2D;
-    createImageInfo.extent = { width, height, 1U };
-    createImageInfo.format = format;
-    createImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    createImageInfo.mipLevels = mipLevels;
-    createImageInfo.samples = numSamples;
-    createImageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    createImageInfo.tiling = tiling;
-    createImageInfo.usage = usage;
-
-    const VkAllocationCallbacks * allocator = fState->GetAllocationCallbacks();
-    VkDevice device = fState->GetDevice();
-
-    if (VK_SUCCESS == vkCreateImage( device, &createImageInfo, allocator, &fImage ))
-    {
-        VkMemoryRequirements memRequirements;
-
-        vkGetImageMemoryRequirements( device, fImage, &memRequirements );
-
-        VkMemoryAllocateInfo allocInfo = {};
-
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-
-        bool foundMemoryType = fState->FindMemoryType( memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex );
-
-        if (foundMemoryType && vkAllocateMemory( device, &allocInfo, allocator, &fImageMemory ) != VK_SUCCESS)
-        {
-            CoronaLog( "Failed to allocate image memory!" );
-        }
-
-        if (fImageMemory != VK_NULL_HANDLE)
-        {
-            vkBindImageMemory( device, fImage, fImageMemory, 0 );
-        }
-
-        else
-        {
-            vkDestroyImage( device, fImage, allocator );
-
-            fImage = VK_NULL_HANDLE;
-        }
-    }
-
-    else
-    {
-        CoronaLog( "Failed to create image!" );
-    }
 }
 
 static VkImageMemoryBarrier
@@ -350,20 +292,17 @@ VulkanTexture::Load( Texture * texture, const VulkanBufferData & bufferData, U32
     {
         fState->StageData( bufferData.GetMemory(), texture->GetData(), texture->GetSizeInBytes() );
         
-        ok = TransitionImageLayout( fImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels );
+        ok = TransitionImageLayout( fData.fImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels );
 
         if (ok)
         {
-            CopyBufferToImage( bufferData.GetBuffer(), fImage, texture->GetWidth(), texture->GetHeight() );
+            CopyBufferToImage( bufferData.GetBuffer(), fData.fImage, texture->GetWidth(), texture->GetHeight() );
         }
-
-        // transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
-        // TODO: ^^ bring this in, then
 
         if (ok)
         {
             VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
-            VkImageMemoryBarrier barrier = PrepareBarrier( fImage, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
+            VkImageMemoryBarrier barrier = PrepareBarrier( fData.fImage, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
             // generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_UNORM, texWidth, texHeight, mipLevels);
              
@@ -468,6 +407,67 @@ VulkanTexture::TransitionImageLayout( VkImage image, VkFormat format, VkImageLay
     return true;
 }
 
+VulkanTexture::ImageData
+VulkanTexture::CreateImage( VulkanState * state, uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties )
+{
+    VkImageCreateInfo createImageInfo = {};
+
+    createImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    createImageInfo.arrayLayers = 1U;
+    createImageInfo.extent = { width, height, 1U };
+    createImageInfo.format = format;
+    createImageInfo.imageType = VK_IMAGE_TYPE_2D;
+    createImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    createImageInfo.mipLevels = mipLevels;
+    createImageInfo.samples = numSamples;
+    createImageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    createImageInfo.tiling = tiling;
+    createImageInfo.usage = usage;
+
+    const VkAllocationCallbacks * allocator = state->GetAllocator();
+    VkDevice device = state->GetDevice();
+    ImageData imageData;
+    VkImage image;
+
+    if (VK_SUCCESS == vkCreateImage( device, &createImageInfo, allocator, &image ))
+    {
+        VkMemoryRequirements memRequirements;
+
+        vkGetImageMemoryRequirements( device, image, &memRequirements );
+
+        VkMemoryAllocateInfo allocInfo = {};
+
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+
+        bool foundMemoryType = state->FindMemoryType( memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex );
+
+        if (foundMemoryType && vkAllocateMemory( device, &allocInfo, allocator, &imageData.fMemory ) != VK_SUCCESS)
+        {
+            CoronaLog( "Failed to allocate image memory!" );
+        }
+
+        if (imageData.fMemory != VK_NULL_HANDLE)
+        {
+            vkBindImageMemory( device, image, imageData.fMemory, 0U );
+
+            imageData.fImage = image;
+        }
+
+        else
+        {
+            vkDestroyImage( device, image, allocator );
+        }
+    }
+
+    else
+    {
+        CoronaLog( "Failed to create image!" );
+    }
+
+    return imageData;
+}
+
 VkImageView
 VulkanTexture::CreateImageView( VulkanState * state, VkImage image, VkFormat format, VkImageAspectFlags flags, uint32_t mipLevels, const VkComponentMapping * componentMapping )
 {
@@ -491,15 +491,15 @@ VulkanTexture::CreateImageView( VulkanState * state, VkImage image, VkFormat for
 	createImageViewInfo.format = format;
 	createImageViewInfo.image = image;
 	createImageViewInfo.subresourceRange.aspectMask = flags;
-	createImageViewInfo.subresourceRange.baseArrayLayer = 0;
-	createImageViewInfo.subresourceRange.baseMipLevel = 0;
-	createImageViewInfo.subresourceRange.layerCount = 1;
+	createImageViewInfo.subresourceRange.baseArrayLayer = 0U;
+	createImageViewInfo.subresourceRange.baseMipLevel = 0U;
+	createImageViewInfo.subresourceRange.layerCount = 1U;
 	createImageViewInfo.subresourceRange.levelCount = mipLevels;
 	createImageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 
 	VkImageView view;
 
-	if (VK_SUCCESS == vkCreateImageView( state->GetDevice(), &createImageViewInfo, state->GetAllocationCallbacks(), &view ))
+	if (VK_SUCCESS == vkCreateImageView( state->GetDevice(), &createImageViewInfo, state->GetAllocator(), &view ))
 	{
         return view;
     }
