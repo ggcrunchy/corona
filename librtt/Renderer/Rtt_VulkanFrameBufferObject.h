@@ -12,6 +12,8 @@
 
 #include "Renderer/Rtt_GPUResource.h"
 
+#include <vulkan/vulkan.h>
+
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -30,9 +32,12 @@ class VulkanFrameBufferObject : public GPUResource
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 		virtual void Bind();
-		/*
-		virtual GLuint GetName();
-		virtual GLuint GetTextureName();*/
+
+	private:
+		VkImage fImage;
+		VkImageView fView;
+		VkFramebuffer fFramebuffer;
+
 };
 
 // ----------------------------------------------------------------------------
