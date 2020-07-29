@@ -854,6 +854,7 @@ VulkanCommandBuffer::InitializePipelineState()
 {
 /*
 	glDisable( GL_SCISSOR_TEST );
+	// based on framebuffers, looks like we do NOT want this, but rather a full-screen scissor as default
 */
 	PackedPipeline packedPipeline = {};
 
@@ -862,7 +863,7 @@ VulkanCommandBuffer::InitializePipelineState()
 
 	packedPipeline.fBlendAttachmentCount = 1U;
 	packedPipeline.fBlendAttachments[0].fEnable = VK_TRUE;
-	packedPipeline.fBlendAttachments[0].fColorWriteMask = 0x0F;
+	packedPipeline.fBlendAttachments[0].fColorWriteMask = 0xF;
 	packedPipeline.fBlendAttachments[0].fSrcColorFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 	packedPipeline.fBlendAttachments[0].fSrcAlphaFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 	packedPipeline.fBlendAttachments[0].fDstColorFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -890,10 +891,7 @@ VulkanCommandBuffer::RestartWorkingPipeline()
 	VkPipelineRasterizationStateCreateInfo rasterizer = {};
 
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer.lineWidth = 1.0f;
-	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
 	fRasterizationStateCreateInfo = rasterizer;
 
