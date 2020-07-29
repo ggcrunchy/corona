@@ -80,7 +80,7 @@ VulkanBufferData::IsValid() const
 }
 
 VulkanState::VulkanState()
-:   fAllocationCallbacks( NULL ),
+:   fAllocator( NULL ),
     fInstance( VK_NULL_HANDLE ),
 #ifndef NDEBUG
 	fDebugMessenger( VK_NULL_HANDLE ),
@@ -135,18 +135,18 @@ VulkanState::~VulkanState()
 
 	TearDownSwapchain();
 
-    vkDestroySurfaceKHR( fInstance, fSurface, fAllocationCallbacks );
-	vkDestroyCommandPool( fDevice, fCommandPool, fAllocationCallbacks );
-    vkDestroyDevice( fDevice, fAllocationCallbacks );
+    vkDestroySurfaceKHR( fInstance, fSurface, fAllocator );
+	vkDestroyCommandPool( fDevice, fCommandPool, fAllocator );
+    vkDestroyDevice( fDevice, fAllocator );
 #ifndef NDEBUG
     auto func = ( PFN_vkDestroyDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( fInstance, "vkDestroyDebugUtilsMessengerEXT" );
 
     if (func)
     {
-        func( fInstance, fDebugMessenger, fAllocationCallbacks );
+        func( fInstance, fDebugMessenger, fAllocator );
     }
 #endif
-    vkDestroyInstance( fInstance, fAllocationCallbacks );
+    vkDestroyInstance( fInstance, fAllocator );
 
 	// allocator?
 }
@@ -161,11 +161,11 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
     createBufferInfo.size = size;
     createBufferInfo.usage = usage;
 
-	VulkanBufferData bufferData( fDevice, fAllocationCallbacks );
+	VulkanBufferData bufferData( fDevice, fAllocator );
 
 	VkBuffer buffer;
 
-    if (VK_SUCCESS == vkCreateBuffer( fDevice, &createBufferInfo, NULL, &buffer ))
+    if (VK_SUCCESS == vkCreateBuffer( fDevice, &createBufferInfo, fAllocator, &buffer ))
 	{
 		VkMemoryRequirements memRequirements;
 
@@ -180,7 +180,7 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 		{
 			VkDeviceMemory bufferMemory;
 
-			if (VK_SUCCESS == vkAllocateMemory( fDevice, &allocInfo, fAllocationCallbacks, &bufferMemory ))
+			if (VK_SUCCESS == vkAllocateMemory( fDevice, &allocInfo, fAllocator, &bufferMemory ))
 			{
 				vkBindBufferMemory( fDevice, buffer, bufferMemory, 0U );
 
@@ -196,7 +196,7 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 
 		if (!bufferData.IsValid())
 		{
-			vkDestroyBuffer( fDevice, buffer, fAllocationCallbacks );
+			vkDestroyBuffer( fDevice, buffer, fAllocator );
 		}
 	}
 
@@ -265,7 +265,7 @@ VulkanState::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
 
 	VkFence fence;
 	
-	if (VK_SUCCESS == vkCreateFence( fDevice, &fenceCreateInfo, fAllocationCallbacks, &fence ))
+	if (VK_SUCCESS == vkCreateFence( fDevice, &fenceCreateInfo, fAllocator, &fence ))
 	{
 		VkSubmitInfo submitInfo = {};
 
@@ -278,7 +278,7 @@ VulkanState::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
 			vkWaitForFences( fDevice, 1U, &fence, VK_TRUE, std::numeric_limits< uint64_t >::max() );
 		}
 
-		vkDestroyFence( fDevice, fence, fAllocationCallbacks );
+		vkDestroyFence( fDevice, fence, fAllocator );
 	}
 
     vkFreeCommandBuffers( fDevice, fCommandPool, 1U, &commandBuffer );
@@ -765,14 +765,17 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 
 	VkDevice device;
 
-	if (vkCreateDevice( physicalDevice, &createDeviceInfo, allocator, &device ) != VK_SUCCESS)
+	if (VK_SUCCESS == vkCreateDevice( physicalDevice, &createDeviceInfo, allocator, &device ))
+	{
+		return device;
+	}
+
+	else
 	{
 		CoronaLog( "Failed to create logical device!" );
 
 		return VK_NULL_HANDLE;
 	}
-
-	return device;
 }
 
 static VkCommandPool
@@ -785,21 +788,24 @@ MakeCommandPool( VkDevice device, uint32_t graphicsFamily )
 
 	VkCommandPool commandPool;
 
-    if (vkCreateCommandPool( device, &createPoolInfo, nullptr, &commandPool ) != VK_SUCCESS)
+    if (VK_SUCCESS == vkCreateCommandPool( device, &createPoolInfo, nullptr, &commandPool ))
+	{
+		return commandPool;
+	}
+
+	else
 	{
         CoronaLog( "Failed to create graphics command pool!" );
 
 		return VK_NULL_HANDLE;
     }
-
-	return commandPool;
 }
 
 bool
 VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback )
 {
 	VkApplicationInfo appInfo = AppInfo();
-	const VkAllocationCallbacks * allocator = state.GetAllocationCallbacks();
+	const VkAllocationCallbacks * allocator = state.GetAllocator();
 	auto instanceData = MakeInstance( &appInfo, surfaceCallback.extension, allocator );
 
 #ifndef NDEBUG
@@ -995,7 +1001,7 @@ VulkanState::BuildUpSwapchain()
 
 	VkSwapchainKHR swapchain;
 
-	if (VK_SUCCESS == vkCreateSwapchainKHR( fDevice, &swapchainCreateInfo, fAllocationCallbacks, &swapchain ))
+	if (VK_SUCCESS == vkCreateSwapchainKHR( fDevice, &swapchainCreateInfo, fAllocator, &swapchain ))
 	{
 		fSwapchain = swapchain;
 
@@ -1013,7 +1019,10 @@ VulkanState::BuildUpSwapchain()
 
 			if (view != VK_NULL_HANDLE)
 			{
-				SwapchainImage si = { image, view };
+				SwapchainImage si;
+				
+				si.image = image;
+				si.view = view;
 
 				fSwapchainImages.push_back( si );
 			}
@@ -1067,12 +1076,12 @@ VulkanState::TearDownSwapchain()
 {
 	for (SwapchainImage & image : fSwapchainImages)
 	{
-		vkDestroyImageView( fDevice, image.view, fAllocationCallbacks ); 
+		vkDestroyImageView( fDevice, image.view, fAllocator ); 
 	}
 
 	fSwapchainImages.clear();
 
-	vkDestroySwapchainKHR( fDevice, fSwapchain, fAllocationCallbacks );
+	vkDestroySwapchainKHR( fDevice, fSwapchain, fAllocator );
 }
 
 /*

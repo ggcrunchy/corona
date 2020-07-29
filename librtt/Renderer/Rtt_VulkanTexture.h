@@ -41,20 +41,30 @@ class VulkanTexture : public GPUResource
 
 	public:
 		void CopyBufferToImage( VkBuffer buffer, VkImage image, uint32_t width, uint32_t height );
-		void CreateImage( uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties );
 		bool Load( Texture * texture, const VulkanBufferData & bufferData, U32 mipLevels );
 		bool TransitionImageLayout( VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels );
 
 	public:
+		struct ImageData {
+			ImageData()
+			:	fImage( VK_NULL_HANDLE ),
+				fMemory( VK_NULL_HANDLE )
+			{
+			}
+
+			VkImage fImage;
+			VkDeviceMemory fMemory;
+		};
+
+		static ImageData CreateImage( VulkanState * state, uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties );
 		static VkImageView CreateImageView( VulkanState * state, VkImage image, VkFormat format, VkImageAspectFlags flags, uint32_t mipLevels, const VkComponentMapping * componentMapping = NULL );
 
 	private:
 //		GLint fCachedFormat;
 //		unsigned long fCachedWidth, fCachedHeight;
 		VulkanState * fState;
-		VkDeviceMemory fImageMemory;
+		ImageData fData;
 		VkImageView fImageView;
-		VkImage fImage;
 		VkSampler fSampler;
 //		uint32_t fMipLevels;
 };
