@@ -18,11 +18,6 @@
 #include <GL\gl.h>
 #include <GL\glu.h>
 
-
-#ifdef free
-#undef free
-#endif
-
 #include <vulkan\vulkan.h>
 #include "CoronaLog.h"
 #include "Renderer/Rtt_VulkanState.h"
