@@ -89,7 +89,7 @@ VulkanState::VulkanState()
     fPhysicalDevice( VK_NULL_HANDLE ),
     fGraphicsQueue( VK_NULL_HANDLE ),
     fPresentQueue( VK_NULL_HANDLE ),
-	fCommandPool( VK_NULL_HANDLE ),
+	fCurrentCommandPool( VK_NULL_HANDLE ),
     fSurface( VK_NULL_HANDLE ),
 	fPipelineCache( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE ),
@@ -133,10 +133,7 @@ VulkanState::~VulkanState()
 {
 	VulkanProgram::CleanUpCompiler( fCompiler, fCompileOptions );
 
-	TearDownSwapchain();
-
     vkDestroySurfaceKHR( fInstance, fSurface, fAllocator );
-	vkDestroyCommandPool( fDevice, fCommandPool, fAllocator );
     vkDestroyDevice( fDevice, fAllocator );
 #ifndef NDEBUG
     auto func = ( PFN_vkDestroyDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( fInstance, "vkDestroyDebugUtilsMessengerEXT" );
@@ -237,7 +234,7 @@ VulkanState::BeginSingleTimeCommands()
 
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandBufferCount = 1U;
-    allocInfo.commandPool = fCommandPool;
+    allocInfo.commandPool = fCurrentCommandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
     VkCommandBuffer commandBuffer;
@@ -281,7 +278,7 @@ VulkanState::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
 		vkDestroyFence( fDevice, fence, fAllocator );
 	}
 
-    vkFreeCommandBuffers( fDevice, fCommandPool, 1U, &commandBuffer );
+    vkFreeCommandBuffers( fDevice, fCurrentCommandPool, 1U, &commandBuffer );
 }
 
 void
@@ -778,29 +775,6 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 	}
 }
 
-static VkCommandPool
-MakeCommandPool( VkDevice device, uint32_t graphicsFamily )
-{
-    VkCommandPoolCreateInfo createPoolInfo = {};
-
-    createPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    createPoolInfo.queueFamilyIndex = graphicsFamily;
-
-	VkCommandPool commandPool;
-
-    if (VK_SUCCESS == vkCreateCommandPool( device, &createPoolInfo, nullptr, &commandPool ))
-	{
-		return commandPool;
-	}
-
-	else
-	{
-        CoronaLog( "Failed to create graphics command pool!" );
-
-		return VK_NULL_HANDLE;
-    }
-}
-
 bool
 VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback )
 {
@@ -839,24 +813,18 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 				{
 					state.fDevice = device;
 
-					VkCommandPool commandPool = MakeCommandPool( device, physicalDeviceData.second.fGraphicsQueue );
+					VkQueue graphicsQueue, presentQueue;
 
-					if (commandPool != VK_NULL_HANDLE)
-					{
-						VkQueue graphicsQueue, presentQueue;
+					vkGetDeviceQueue( device, physicalDeviceData.second.fGraphicsQueue, 0, &graphicsQueue );
+					vkGetDeviceQueue( device, physicalDeviceData.second.fPresentQueue, 0, &presentQueue );
 
-						vkGetDeviceQueue( device, physicalDeviceData.second.fGraphicsQueue, 0, &graphicsQueue );
-						vkGetDeviceQueue( device, physicalDeviceData.second.fPresentQueue, 0, &presentQueue );
-
-						VulkanProgram::InitializeCompiler( &state.fCompiler, &state.fCompileOptions );
+					VulkanProgram::InitializeCompiler( &state.fCompiler, &state.fCompileOptions );
 						
-						state.fCommandPool = commandPool;
-						state.fGraphicsQueue = graphicsQueue;
-						state.fPresentQueue = presentQueue;
-						state.fQueueFamilies = families;
+					state.fGraphicsQueue = graphicsQueue;
+					state.fPresentQueue = presentQueue;
+					state.fQueueFamilies = families;
 
-						return true;
-					}
+					return true;
 				}
 			}
 		}
@@ -969,119 +937,6 @@ VulkanState::GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t 
 	state.fTransformFlagBits = capabilities.currentTransform;
 
 	return true;
-}
-
-void
-VulkanState::BuildUpSwapchain()
-{
-	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
-
-	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-	swapchainCreateInfo.imageArrayLayers = 1U;
-	swapchainCreateInfo.imageColorSpace = fSwapchainFormat.colorSpace;
-	swapchainCreateInfo.imageExtent = fSwapchainExtent;
-	swapchainCreateInfo.imageFormat = fSwapchainFormat.format;
-	swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	swapchainCreateInfo.minImageCount = fMaxSwapImageCount;
-
-	if (fQueueFamilies.size() > 1U)
-	{
-		swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-		swapchainCreateInfo.pQueueFamilyIndices = fQueueFamilies.data();
-		swapchainCreateInfo.queueFamilyIndexCount = 2U;
-	}
-
-	swapchainCreateInfo.clipped = VK_TRUE;
-	swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE; // TODO!
-	swapchainCreateInfo.presentMode = fPresentMode;
-	swapchainCreateInfo.preTransform = fTransformFlagBits; // TODO: relevant to portrait, landscape, etc?
-	swapchainCreateInfo.surface = fSurface;
-
-	VkSwapchainKHR swapchain;
-
-	if (VK_SUCCESS == vkCreateSwapchainKHR( fDevice, &swapchainCreateInfo, fAllocator, &swapchain ))
-	{
-		fSwapchain = swapchain;
-
-		uint32_t imageCount = 0U;
-
-		vkGetSwapchainImagesKHR( fDevice, swapchain, &imageCount, NULL );
-
-		std::vector< VkImage > images( imageCount );
-
-		vkGetSwapchainImagesKHR( fDevice, swapchain, &imageCount, images.data() );
-		
-		for ( const VkImage & image : images )
-		{
-			VkImageView view = VulkanTexture::CreateImageView( this, image, fSwapchainFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
-
-			if (view != VK_NULL_HANDLE)
-			{
-				SwapchainImage si;
-				
-				si.image = image;
-				si.view = view;
-
-				fSwapchainImages.push_back( si );
-			}
-
-			else
-			{
-				CoronaLog( "Failed to create image views!" );
-
-				// TODO: Error
-			}
-		}
-	}
-
-	else
-	{
-		CoronaLog( "Failed to create swap chain!" );
-
-		// TODO: error
-	}
-}
-
-/*
-    void createFramebuffers() {
-        swapChainFramebuffers.resize(swapChainImageViews.size());
-
-        for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-            std::array<VkImageView, 3> attachments = {
-                colorImageView,
-                depthImageView,
-                swapChainImageViews[i]
-            };
-
-            VkFramebufferCreateInfo framebufferInfo = {};
-            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            framebufferInfo.renderPass = renderPass;
-            framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-            framebufferInfo.pAttachments = attachments.data();
-            framebufferInfo.width = swapChainExtent.width;
-            framebufferInfo.height = swapChainExtent.height;
-            framebufferInfo.layers = 1U;
-
-            if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
-                throw std::runtime_error("failed to create framebuffer!");
-            }
-        }
-    }
-*/
-
-void
-VulkanState::TearDownSwapchain()
-{
-	for (SwapchainImage & image : fSwapchainImages)
-	{
-		vkDestroyImageView( fDevice, image.view, fAllocator ); 
-	}
-
-	fSwapchainImages.clear();
-
-	vkDestroySwapchainKHR( fDevice, fSwapchain, fAllocator );
 }
 
 /*

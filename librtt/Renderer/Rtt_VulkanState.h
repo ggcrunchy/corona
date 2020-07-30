@@ -100,25 +100,7 @@ class VulkanState
 		static bool GetMultisampleDetails( VulkanState & state );
 		static bool GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height );
 
-	public:
-		void BuildUpSwapchain();
-		void TearDownSwapchain();
-
 	private:
-		struct Attachment {
-			VkImage image;
-			VkImageView view;
-			VkDeviceMemory memory;
-		};
-
-		struct SwapchainImage {
-			std::vector< Attachment > attachments;
-
-			VkImage image;
-			VkImageView view;
-			VkFramebuffer framebuffer;
-		};
-
 		VkAllocationCallbacks * fAllocator;
 		VkInstance fInstance;
 	#ifndef NDEBUG
@@ -128,7 +110,7 @@ class VulkanState
 		VkPhysicalDevice fPhysicalDevice;
 		VkQueue fGraphicsQueue;
 		VkQueue fPresentQueue;
-		VkCommandPool fCommandPool;
+		VkCommandPool fCurrentCommandPool;
 		VkSurfaceKHR fSurface;
 		VkPipelineCache fPipelineCache;
 		VkSampleCountFlags fSampleCountFlags;
@@ -138,13 +120,12 @@ class VulkanState
 		VkSurfaceFormatKHR fSwapchainFormat;
 		uint32_t fMaxSwapImageCount;
 		VkPresentModeKHR fPresentMode;
-		std::vector< SwapchainImage > fSwapchainImages;
 		std::vector< uint32_t > fQueueFamilies;
 
 		struct shaderc_compiler * fCompiler;
 		struct shaderc_compile_options * fCompileOptions;
 
-		friend class Rtt_VulkanRenderer;
+		friend class VulkanRenderer;
 };
 
 // ----------------------------------------------------------------------------

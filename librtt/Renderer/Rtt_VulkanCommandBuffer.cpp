@@ -16,7 +16,9 @@
 #include "Renderer/Rtt_VulkanFrameBufferObject.h"
 #include "Renderer/Rtt_VulkanGeometry.h"
 #include "Renderer/Rtt_VulkanProgram.h"
-#include "Renderer/Rtt_VulkanTexture.h"/*
+#include "Renderer/Rtt_VulkanTexture.h"
+#include "Renderer/Rtt_VulkanRenderer.h"
+/*
 #include "Renderer/Rtt_Program.h"/*
 #include "Renderer/Rtt_Texture.h"
 #include "Renderer/Rtt_Uniform.h"*/
@@ -91,7 +93,7 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator )
+VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRenderer & renderer )
 :	CommandBuffer( allocator ),
 	fCurrentPrepVersion( Program::kMaskCount0 ),
 	fCurrentDrawVersion( Program::kMaskCount0 ),/*
@@ -101,7 +103,11 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator )
 	fTimerQueries( new U32[kTimerQueryCount] ),
 	fTimerQueryIndex( 0 ),*/
 	fElapsedTimeGPU( 0.0f ),
-	fFirstPipeline( VK_NULL_HANDLE )
+	fRenderer( renderer ),
+	fCommands( VK_NULL_HANDLE ),
+	fInFlight( VK_NULL_HANDLE ),
+	fImageAvailableSemaphore( VK_NULL_HANDLE ),
+	fRenderFinishedSemaphore( VK_NULL_HANDLE )
 
 {
 	for(U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
@@ -109,10 +115,45 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator )
 		fUniformUpdates[i].uniform = NULL;
 		fUniformUpdates[i].timestamp = 0;
 	}
+
+	const VkAllocationCallbacks * vulkanAllocator = fRenderer.fState->GetAllocator();
+	VkDevice device = fRenderer.fState->GetDevice();
+	VkFenceCreateInfo createFenceInfo = {};
+
+    createFenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    createFenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	vkCreateFence( device, &createFenceInfo, vulkanAllocator, &fInFlight );
+
+	VkSemaphoreCreateInfo createSemaphoreInfo = {};
+
+	createSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fImageAvailableSemaphore );
+	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fRenderFinishedSemaphore );
+
+	if ( VK_NULL_HANDLE == fInFlight || VK_NULL_HANDLE == fImageAvailableSemaphore || VK_NULL_HANDLE == fRenderFinishedSemaphore)
+	{
+		CoronaLog( "Failed to create some synchronziation objects!" );
+
+		vkDestroyFence( device, fInFlight, vulkanAllocator );
+		vkDestroySemaphore( device, fImageAvailableSemaphore, vulkanAllocator );
+		vkDestroySemaphore( device, fRenderFinishedSemaphore, vulkanAllocator );
+
+		fInFlight = VK_NULL_HANDLE;
+		fImageAvailableSemaphore = VK_NULL_HANDLE;
+		fRenderFinishedSemaphore = VK_NULL_HANDLE;
+	}
 }
 
 VulkanCommandBuffer::~VulkanCommandBuffer()
 {
+	const VkAllocationCallbacks * allocator = fRenderer.fState->GetAllocator();
+	VkDevice device = fRenderer.fState->GetDevice();
+
+	vkDestroyFence( device, fInFlight, allocator );
+	vkDestroySemaphore( device, fImageAvailableSemaphore, allocator );
+	vkDestroySemaphore( device, fRenderFinishedSemaphore, allocator );
 //	delete [] fTimerQueries;
 }
 
@@ -132,8 +173,6 @@ VulkanCommandBuffer::Initialize()
 	InitializeFBO();
 	InitializeCachedParams();
 	//CacheQueryParam(kMaxTextureSize);
-
-	InitializePipelineState();
 	
 	GetMaxTextureSize();
 
@@ -203,7 +242,7 @@ VulkanCommandBuffer::ClearUserUniforms()
 }
 
 void
-VulkanCommandBuffer::BindFrameBufferObject(FrameBufferObject* fbo)
+VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
 	if( fbo )
 	{
@@ -222,8 +261,8 @@ VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 	VulkanGeometry * vulkanGeometry = static_cast< VulkanGeometry * >( geometry->GetGPUResource() );
 	VulkanGeometry::VertexDescription description = vulkanGeometry->Bind();
 
-	fWorkingPipeline.fBindingDescriptionID = description.fID;
-	fVertexBindingDescriptions = description.fDescriptions;
+	fRenderer.fWorkingPipeline.fBindingDescriptionID = description.fID;
+	fRenderer.fVertexBindingDescriptions = description.fDescriptions;
 //	WRITE_COMMAND( kCommandBindGeometry );
 //	Write<GPUResource*>( geometry->GetGPUResource() );
 	
@@ -248,8 +287,8 @@ VulkanCommandBuffer::BindProgram( Program* program, Program::Version version )
 	VulkanProgram * vulkanProgram = static_cast< VulkanProgram * >( program->GetGPUResource() );
 	VulkanProgram::PipelineStages shaderStages = vulkanProgram->Bind( version );
 
-	fWorkingPipeline.fShaderID = shaderStages.fID;
-	fShaderStageCreateInfo = shaderStages.fStages;
+	fRenderer.fWorkingPipeline.fShaderID = shaderStages.fID;
+	fRenderer.fShaderStageCreateInfo = shaderStages.fStages;
 /*
 	WRITE_COMMAND( kCommandBindProgram );
 	Write<Program::Version>( version );
@@ -274,8 +313,8 @@ VulkanCommandBuffer::BindUniform( Uniform* uniform, U32 unit )
 void
 VulkanCommandBuffer::SetBlendEnabled( bool enabled )
 {
-	fColorBlendAttachments.front().blendEnable = enabled ? VK_TRUE : VK_FALSE;
-	fWorkingPipeline.fBlendAttachments[0].fEnable = enabled;
+	fRenderer.fColorBlendAttachments.front().blendEnable = enabled ? VK_TRUE : VK_FALSE;
+	fRenderer.fWorkingPipeline.fBlendAttachments[0].fEnable = enabled;
 }
 
 static VkBlendFactor
@@ -335,17 +374,17 @@ VulkanCommandBuffer::SetBlendFunction( const BlendMode& mode )
 	VkBlendFactor srcAlpha = VulkanFactorForBlendParam( mode.fSrcAlpha );
 	VkBlendFactor dstAlpha = VulkanFactorForBlendParam( mode.fDstAlpha );
 
-	auto attachment = fColorBlendAttachments.front();
+	auto attachment = fRenderer.fColorBlendAttachments.front();
 
 	attachment.srcColorBlendFactor = srcColor;
 	attachment.dstColorBlendFactor = dstColor;
 	attachment.srcAlphaBlendFactor = srcAlpha;
 	attachment.dstAlphaBlendFactor = dstAlpha;
 
-	fWorkingPipeline.fBlendAttachments[0].fSrcColorFactor = srcColor;
-	fWorkingPipeline.fBlendAttachments[0].fDstColorFactor = dstColor;
-	fWorkingPipeline.fBlendAttachments[0].fSrcAlphaFactor = srcAlpha;
-	fWorkingPipeline.fBlendAttachments[0].fDstAlphaFactor = dstAlpha;
+	fRenderer.fWorkingPipeline.fBlendAttachments[0].fSrcColorFactor = srcColor;
+	fRenderer.fWorkingPipeline.fBlendAttachments[0].fDstColorFactor = dstColor;
+	fRenderer.fWorkingPipeline.fBlendAttachments[0].fSrcAlphaFactor = srcAlpha;
+	fRenderer.fWorkingPipeline.fBlendAttachments[0].fDstAlphaFactor = dstAlpha;
 }
 
 void 
@@ -365,79 +404,45 @@ VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 			break;
 	}
 
-	auto attachment = fColorBlendAttachments.front();
+	auto attachment = fRenderer.fColorBlendAttachments.front();
 
 	attachment.alphaBlendOp = attachment.colorBlendOp = equation;
 
-	fWorkingPipeline.fBlendAttachments[0].fAlphaOp = equation;
-	fWorkingPipeline.fBlendAttachments[0].fColorOp = equation;
+	fRenderer.fWorkingPipeline.fBlendAttachments[0].fAlphaOp = equation;
+	fRenderer.fWorkingPipeline.fBlendAttachments[0].fColorOp = equation;
 }
 
 void
 VulkanCommandBuffer::SetViewport( int x, int y, int width, int height )
 {
-/*
-	WRITE_COMMAND( kCommandSetViewport );
-	Write<GLint>(x);
-	Write<GLint>(y);
-	Write<GLsizei>(width);
-	Write<GLsizei>(height);
-*/
-	/*
-					GLint x = Read<GLint>();
-				GLint y = Read<GLint>();
-				GLsizei width = Read<GLsizei>();
-				GLsizei height = Read<GLsizei>();
-				glViewport( x, y, width, height );
-				DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );
-				CHECK_ERROR_AND_BREAK;
-				*/
+	VkViewport viewport;
+
+	viewport.x = x;
+	viewport.y = y;
+	viewport.width = width;
+	viewport.height = height;
+	viewport.minDepth = 0.f;
+	viewport.maxDepth = 1.f;
+
+	vkCmdSetViewport( fCommands, 0U, 1U, &viewport );
 }
 
 void 
 VulkanCommandBuffer::SetScissorEnabled( bool enabled )
 {
-//	WRITE_COMMAND( enabled ? kCommandEnableScissor : kCommandDisableScissor );
-	/*
-				glEnable( GL_SCISSOR_TEST );
-				DEBUG_PRINT( "Enable scissor test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDisableScissor:
-			{
-				glDisable( GL_SCISSOR_TEST );
-				DEBUG_PRINT( "Disable scissor test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-		*/
+	// No-op: always want scissor, possibly fullscreen
 }
 
 void 
-VulkanCommandBuffer::SetScissorRegion(int x, int y, int width, int height)
+VulkanCommandBuffer::SetScissorRegion( int x, int y, int width, int height )
 {
-/*
-	WRITE_COMMAND( kCommandSetScissorRegion );
-	Write<GLint>(x);
-	Write<GLint>(y);
-	Write<GLsizei>(width);
-	Write<GLsizei>(height);
-*/
-	/*
-			case kCommandSetScissorRegion:
-			{
-				GLint x = Read<GLint>();
-				GLint y = Read<GLint>();
-				GLsizei width = Read<GLsizei>();
-				GLsizei height = Read<GLsizei>();
-				glScissor( x, y, width, height );
-				DEBUG_PRINT( "Set scissor window x=%i, y=%i, width=%i, height=%i", x, y, width, height );
-				CHECK_ERROR_AND_BREAK;
-				*/
+	// TODO? seems to be dead code
 }
 
 void
 VulkanCommandBuffer::SetMultisampleEnabled( bool enabled )
 {
+// TODO: some flag to ignore these settings...
 //	WRITE_COMMAND( enabled ? kCommandEnableMultisample : kCommandDisableMultisample );
 //	fMultisampleStateCreateInfo.rasterizationSamples
 /*
@@ -457,10 +462,9 @@ VulkanCommandBuffer::SetMultisampleEnabled( bool enabled )
 }
 
 void 
-VulkanCommandBuffer::Clear(Real r, Real g, Real b, Real a)
+VulkanCommandBuffer::Clear( Real r, Real g, Real b, Real a )
 {
-//	vkCmdClearColorImage( fCommands, IMAgE?, IMAGE_LAYOUT?, vkClearColorValue, 1U, full size );
-// URGH... might be unnecessary since also part of rendering?
+// TODO: populate clearvalue[0] of current FBO render pass info...
 /*
 	WRITE_COMMAND( kCommandClear );
 	Write<GLfloat>(r);
@@ -484,34 +488,37 @@ VulkanCommandBuffer::Clear(Real r, Real g, Real b, Real a)
 void 
 VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 {
+	VkPrimitiveTopology topology;
+
 	switch( type )
 	{
 		case Geometry::kTriangleStrip:
-			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+			topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 			
 			break;
 		case Geometry::kTriangleFan:
-			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+			topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
 			
 			break;
 		case Geometry::kTriangles:
-			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+			topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 			
 			break;
 		case Geometry::kLines:
-			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+			topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
 
 			break;
 		case Geometry::kLineLoop:
-			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+			topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
 			
 			break;
 		default: Rtt_ASSERT_NOT_REACHED(); break;
 	}
 
-	fWorkingPipeline.fTopology = fInputAssemblyStateCreateInfo.topology;
+	fRenderer.fInputAssemblyStateCreateInfo.topology = topology;
+	fRenderer.fWorkingPipeline.fTopology = topology;
 
-	ResolvePipeline();
+	fRenderer.ResolvePipeline( fCommands );
 /*
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
 	ApplyUniforms( fProgram->GetGPUResource() );
@@ -522,18 +529,21 @@ VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 void 
 VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 {
+	VkPrimitiveTopology topology;
+
 	switch( type )
 	{
 		case Geometry::kIndexedTriangles:
-			fInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+			topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
 			break;
 		default: Rtt_ASSERT_NOT_REACHED(); break;
 	}
+	
+	fRenderer.fInputAssemblyStateCreateInfo.topology = topology;
+	fRenderer.fWorkingPipeline.fTopology = topology;
 
-	fWorkingPipeline.fTopology = fInputAssemblyStateCreateInfo.topology;
-
-	ResolvePipeline();
+	fRenderer.ResolvePipeline( fCommands );
 /*
 	// The first argument, offset, is currently unused. If support for non-
 	// VBO based indexed rendering is added later, an offset may be needed.
@@ -784,6 +794,7 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 void VulkanCommandBuffer::ApplyUniform( GPUResource* resource, U32 index )
 {
 	const UniformUpdate& update = fUniformUpdates[index];
+// write memory OR update push constant(s)...
 	/*
 	GLProgram* glProgram = static_cast<GLProgram*>( resource );
 	glProgram->SetUniformTimestamp( index, fCurrentPrepVersion, update.timestamp );
@@ -840,182 +851,32 @@ void VulkanCommandBuffer::WriteUniform( Uniform* uniform )
 	}
 }
 
-static void
-SetDynamicStateBit( uint8_t states[], uint8_t value )
-{
-	uint8_t offset = value;
-	uint8_t byteIndex = offset / 8U;
-
-	states[byteIndex] |= 1U << (offset - byteIndex * 8U);
-}
-
-void
-VulkanCommandBuffer::InitializePipelineState()
-{
 /*
-	glDisable( GL_SCISSOR_TEST );
-	// based on framebuffers, looks like we do NOT want this, but rather a full-screen scissor as default
-*/
-	PackedPipeline packedPipeline = {};
 
-	// TODO: this should be fleshed out with defaults
-	// these need not be relevant, but should properly handle being manually updated...
 
-	packedPipeline.fRasterSamplesFlags = 1U;
-	packedPipeline.fBlendAttachmentCount = 1U;
-	packedPipeline.fBlendAttachments[0].fEnable = VK_TRUE;
-	packedPipeline.fBlendAttachments[0].fColorWriteMask = 0xF;
-	packedPipeline.fBlendAttachments[0].fSrcColorFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	packedPipeline.fBlendAttachments[0].fSrcAlphaFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	packedPipeline.fBlendAttachments[0].fDstColorFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	packedPipeline.fBlendAttachments[0].fDstAlphaFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-
-	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_SCISSOR );
-	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_VIEWPORT );
-
-	fDefaultPipeline = packedPipeline;
-
-	RestartWorkingPipeline();
-}
-
-void
-VulkanCommandBuffer::RestartWorkingPipeline()
+static VkCommandPool
+MakeCommandPool( VkDevice device, uint32_t graphicsFamily )
 {
-	fShaderStageCreateInfo.clear();
+    VkCommandPoolCreateInfo createPoolInfo = {};
 
-	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
-        
-	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    createPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    createPoolInfo.queueFamilyIndex = graphicsFamily;
 
-	fInputAssemblyStateCreateInfo = inputAssembly;
+	VkCommandPool commandPool;
 
-	VkPipelineRasterizationStateCreateInfo rasterizer = {};
-
-	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer.lineWidth = 1.0f;
-
-	fRasterizationStateCreateInfo = rasterizer;
-
-	VkPipelineMultisampleStateCreateInfo multisampling = {};
-
-	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-    fMultisampleStateCreateInfo = multisampling;
-
-	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
-
-	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-
-	fDepthStencilStateCreateInfo = depthStencil;
-
-	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-
-	colorBlendAttachment.srcAlphaBlendFactor = colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	colorBlendAttachment.dstAlphaBlendFactor = colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-	fColorBlendAttachments.clear();
-	fColorBlendAttachments.push_back( colorBlendAttachment );
-
-	VkPipelineColorBlendStateCreateInfo colorBlending = {};
-
-	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlending.attachmentCount = 1U;
-	fColorBlendStateCreateInfo = colorBlending;
-}
-
-void
-VulkanCommandBuffer::ResolvePipeline()
-{
-	auto iter = fBuiltPipelines.find( fWorkingPipeline );
-	VkPipeline pipeline = VK_NULL_HANDLE;
-
-	if (iter == fBuiltPipelines.end())
+    if (VK_SUCCESS == vkCreateCommandPool( device, &createPoolInfo, nullptr, &commandPool ))
 	{
-	/*
-        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-
-        if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create pipeline layout!");
-        }
-	*/
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
-
-        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		
-        vertexInputInfo.pVertexAttributeDescriptions = fVertexAttributeDescriptions.data();
-        vertexInputInfo.pVertexBindingDescriptions = fVertexBindingDescriptions.data();
-        vertexInputInfo.vertexAttributeDescriptionCount = fVertexAttributeDescriptions.size();
-        vertexInputInfo.vertexBindingDescriptionCount = fVertexBindingDescriptions.size();
-
-		VkPipelineViewportStateCreateInfo viewportInfo = {};
-
-		viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-
-        VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
-
-        pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		pipelineCreateInfo.basePipelineHandle = fFirstPipeline;
-		pipelineCreateInfo.flags = fFirstPipeline != VK_NULL_HANDLE ? VK_PIPELINE_CREATE_DERIVATIVE_BIT : VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
-        pipelineCreateInfo.pInputAssemblyState = &fInputAssemblyStateCreateInfo;
-        pipelineCreateInfo.pColorBlendState = &fColorBlendStateCreateInfo;
-        pipelineCreateInfo.pDepthStencilState = &fDepthStencilStateCreateInfo;
-        pipelineCreateInfo.pMultisampleState = &fMultisampleStateCreateInfo;
-        pipelineCreateInfo.pRasterizationState = &fRasterizationStateCreateInfo;
-        pipelineCreateInfo.pStages = fShaderStageCreateInfo.data();
-        pipelineCreateInfo.stageCount = fShaderStageCreateInfo.size();
-        pipelineCreateInfo.pVertexInputState = &vertexInputInfo;
-		pipelineCreateInfo.pViewportState = &viewportInfo;
-//      pipelineCreateInfo.layout = pipelineLayout;
-//      pipelineCreateInfo.renderPass = renderPass;
-
-		const VkAllocationCallbacks * allocator = fState->GetAllocator();
-
-        if (VK_SUCCESS == vkCreateGraphicsPipelines( fState->GetDevice(), fState->GetPipelineCache(), 1U, &pipelineCreateInfo, allocator, &pipeline ))
-		{
-			if (VK_NULL_HANDLE == fFirstPipeline)
-			{
-				fFirstPipeline = pipeline;
-			}
-
-			fBuiltPipelines[fWorkingPipeline] = pipeline;
-		}
-
-		else
-		{
-			CoronaLog( "Failed to create pipeline!" );
-        }
+		return commandPool;
 	}
 
 	else
 	{
-		pipeline = iter->second;
-	}
+        CoronaLog( "Failed to create graphics command pool!" );
 
-	if (pipeline != VK_NULL_HANDLE && (VK_NULL_HANDLE == fBoundPipeline || pipeline != fBoundPipeline))
-	{
-		vkCmdBindPipeline( fCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
-	}
-
-	fBoundPipeline = pipeline;
-	fWorkingPipeline = fDefaultPipeline;
+		return VK_NULL_HANDLE;
+    }
 }
-
-bool
-VulkanCommandBuffer::PackedPipeline::operator < ( const PackedPipeline & other ) const
-{
-	return memcmp( this, &other, sizeof( PackedPipeline ) ) < 0;
-}
-
-bool
-VulkanCommandBuffer::PackedPipeline::operator == ( const PackedPipeline & other ) const
-{
-	return !(*this < other) && !(other < *this);
-}
+*/
 
 // ----------------------------------------------------------------------------
 
