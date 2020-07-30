@@ -104,7 +104,6 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fTimerQueryIndex( 0 ),*/
 	fElapsedTimeGPU( 0.0f ),
 	fRenderer( renderer ),
-	fCommands( VK_NULL_HANDLE ),
 	fInFlight( VK_NULL_HANDLE ),
 	fImageAvailableSemaphore( VK_NULL_HANDLE ),
 	fRenderFinishedSemaphore( VK_NULL_HANDLE )
@@ -261,8 +260,8 @@ VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 	VulkanGeometry * vulkanGeometry = static_cast< VulkanGeometry * >( geometry->GetGPUResource() );
 	VulkanGeometry::VertexDescription description = vulkanGeometry->Bind();
 
-	fRenderer.fWorkingPipeline.fBindingDescriptionID = description.fID;
-	fRenderer.fVertexBindingDescriptions = description.fDescriptions;
+	fRenderer.fWorkingKey.fBindingDescriptionID = description.fID;
+	fRenderer.fPipelineCreateInfo.fVertexBindingDescriptions = description.fDescriptions;
 //	WRITE_COMMAND( kCommandBindGeometry );
 //	Write<GPUResource*>( geometry->GetGPUResource() );
 	
@@ -288,7 +287,7 @@ VulkanCommandBuffer::BindProgram( Program* program, Program::Version version )
 	VulkanProgram::PipelineStages shaderStages = vulkanProgram->Bind( version );
 
 	fRenderer.fWorkingPipeline.fShaderID = shaderStages.fID;
-	fRenderer.fShaderStageCreateInfo = shaderStages.fStages;
+	fRenderer.fPipelineCreateInfo.fShaderStages = shaderStages.fStages;
 /*
 	WRITE_COMMAND( kCommandBindProgram );
 	Write<Program::Version>( version );
@@ -313,7 +312,7 @@ VulkanCommandBuffer::BindUniform( Uniform* uniform, U32 unit )
 void
 VulkanCommandBuffer::SetBlendEnabled( bool enabled )
 {
-	fRenderer.fColorBlendAttachments.front().blendEnable = enabled ? VK_TRUE : VK_FALSE;
+	fRenderer.fPipelineCreateInfo.fColorBlendAttachments.front().blendEnable = enabled ? VK_TRUE : VK_FALSE;
 	fRenderer.fWorkingPipeline.fBlendAttachments[0].fEnable = enabled;
 }
 
@@ -374,7 +373,7 @@ VulkanCommandBuffer::SetBlendFunction( const BlendMode& mode )
 	VkBlendFactor srcAlpha = VulkanFactorForBlendParam( mode.fSrcAlpha );
 	VkBlendFactor dstAlpha = VulkanFactorForBlendParam( mode.fDstAlpha );
 
-	auto attachment = fRenderer.fColorBlendAttachments.front();
+	auto attachment = fRenderer.fPipelineCreateInfo.fColorBlendAttachments.front();
 
 	attachment.srcColorBlendFactor = srcColor;
 	attachment.dstColorBlendFactor = dstColor;
@@ -404,7 +403,7 @@ VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 			break;
 	}
 
-	auto attachment = fRenderer.fColorBlendAttachments.front();
+	auto attachment = fRenderer.fPipelineCreateInfo.fColorBlendAttachments.front();
 
 	attachment.alphaBlendOp = attachment.colorBlendOp = equation;
 
@@ -424,7 +423,7 @@ VulkanCommandBuffer::SetViewport( int x, int y, int width, int height )
 	viewport.minDepth = 0.f;
 	viewport.maxDepth = 1.f;
 
-	vkCmdSetViewport( fCommands, 0U, 1U, &viewport );
+	vkCmdSetViewport( fRenderer.fCurrentCommandBuffer, 0U, 1U, &viewport );
 }
 
 void 
@@ -515,15 +514,15 @@ VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 		default: Rtt_ASSERT_NOT_REACHED(); break;
 	}
 
-	fRenderer.fInputAssemblyStateCreateInfo.topology = topology;
+	fRenderer.fPipelineCreateInfo.fInputAssembly.topology = topology;
 	fRenderer.fWorkingPipeline.fTopology = topology;
 
-	fRenderer.ResolvePipeline( fCommands );
+	fRenderer.ResolvePipeline();
 /*
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
 	ApplyUniforms( fProgram->GetGPUResource() );
 */
-	vkCmdDraw( fCommands, count, 1U, offset, 0U );
+	vkCmdDraw( fRenderer.fCurrentCommandBuffer, count, 1U, offset, 0U );
 }
 
 void 
@@ -540,10 +539,10 @@ VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 		default: Rtt_ASSERT_NOT_REACHED(); break;
 	}
 	
-	fRenderer.fInputAssemblyStateCreateInfo.topology = topology;
+	fRenderer.fPipelineCreateInfo.fInputAssembly.topology = topology;
 	fRenderer.fWorkingPipeline.fTopology = topology;
 
-	fRenderer.ResolvePipeline( fCommands );
+	fRenderer.ResolvePipeline();
 /*
 	// The first argument, offset, is currently unused. If support for non-
 	// VBO based indexed rendering is added later, an offset may be needed.
@@ -551,7 +550,7 @@ VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
 	ApplyUniforms( fProgram->GetGPUResource() );
 */
-	vkCmdDrawIndexed( fCommands, count, 1U, 0U, 0U, 0U );
+	vkCmdDrawIndexed( fRenderer.fCurrentCommandBuffer, count, 1U, 0U, 0U, 0U );
 }
 
 S32

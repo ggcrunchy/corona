@@ -29,6 +29,7 @@ namespace Rtt
 VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 :   Super( allocator ),
 	fState( state ),
+    fCurrentCommandBuffer( VK_NULL_HANDLE ),
 	fFirstPipeline( VK_NULL_HANDLE )
 {
 	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
@@ -183,6 +184,80 @@ VulkanRenderer::Create( const CPUResource* resource )
 	}
 }
 
+const size_t kFinalBlendFactor = VK_BLEND_OP_MAX;
+const size_t kFinalBlendOp = VK_BLEND_OP_MAX;
+
+constexpr int BitsNeeded( int x ) // n.b. x > 0
+{
+	int result = 0;
+
+	for (int power = 1; power <= x; power *= 2)
+	{
+		++result;
+	}
+
+	return result;
+}
+
+struct PackedBlendAttachment {
+	U32 fEnable : 1;
+	U32 fSrcColorFactor : BitsNeeded( kFinalBlendFactor );
+	U32 fDstColorFactor : BitsNeeded( kFinalBlendFactor );
+	U32 fColorOp : BitsNeeded( kFinalBlendOp );
+	U32 fSrcAlphaFactor : BitsNeeded( kFinalBlendFactor );
+	U32 fDstAlphaFactor : BitsNeeded( kFinalBlendFactor );
+	U32 fAlphaOp : BitsNeeded( kFinalBlendOp );
+	U32 fColorWriteMask : 4;
+};
+
+const size_t kFinalDynamicState = VK_DYNAMIC_STATE_STENCIL_REFERENCE;
+const size_t kDynamicStateCountRoundedUp = (kFinalDynamicState + 7U) & ~7U;
+const size_t kDynamicStateByteCount = kDynamicStateCountRoundedUp / 8U;
+
+const size_t kFinalCompareOp = VK_COMPARE_OP_ALWAYS;
+const size_t kFinalFrontFace = VK_FRONT_FACE_CLOCKWISE;
+const size_t kFinalLogicOp = VK_LOGIC_OP_SET;
+const size_t kFinalPolygonMode = VK_POLYGON_MODE_POINT;
+const size_t kFinalPrimitiveTopology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+const size_t kFinalStencilOp = VK_STENCIL_OP_DECREMENT_AND_WRAP;
+
+struct PackedPipeline {
+    U64 fTopology : BitsNeeded( kFinalPrimitiveTopology );
+    U64 fPrimitiveRestartEnable : 1;
+	U64 fRasterizerDiscardEnable : 1;
+	U64 fPolygonMode : BitsNeeded( kFinalPolygonMode );
+	U64 fLineWidth : 4; // lineWidth = (X + 1) / 16
+	U64 fCullMode : 2;
+	U64 fFrontFace : BitsNeeded( kFinalFrontFace );
+	U64 fRasterSamplesFlags : 7;
+	U64 fSampleShadingEnable : 1;
+	U64 fSampleShading : 5; // minSampleShading = X / 32
+	U64 fAlphaToCoverageEnable : 1;
+	U64 fAlphaToOneEnable : 1;
+	U64 fDepthTestEnable : 1;
+	U64 fDepthWriteEnable : 1;
+	U64 fDepthCompareOp : BitsNeeded( kFinalCompareOp );
+	U64 fDepthBoundsTestEnable : 1;
+	U64 fStencilTestEnable : 1;
+	U64 fFront : BitsNeeded( kFinalStencilOp );
+	U64 fBack : BitsNeeded( kFinalStencilOp );
+	U64 fMinDepthBounds : 5; // minDepthBounds = X / 32
+	U64 fMaxDepthBounds : 5; // maxDepthBounds = (X + 1) / 32
+	U64 fLogicOpEnable : 1;
+	U64 fLogicOp : BitsNeeded( kFinalLogicOp );
+	U64 fBlendConstant1 : 4; // blendConstants = X / 15
+	U64 fBlendConstant2 : 4;
+	U64 fBlendConstant3 : 4;
+	U64 fBlendConstant4 : 4;
+	U64 fLayoutID : 4;
+	U64 fShaderID : 16;
+	U64 fAttributeDescriptionID : 3;
+	U64 fBindingDescriptionID : 3;
+	U64 fBlendAttachmentCount : 3; // 0-7
+	PackedBlendAttachment fBlendAttachments[8];
+	uint8_t fDynamicStates[kDynamicStateByteCount];
+};
+
 static void
 SetDynamicStateBit( uint8_t states[], uint8_t value )
 {
@@ -216,7 +291,7 @@ VulkanRenderer::InitializePipelineState()
 	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_SCISSOR );
 	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_VIEWPORT );
 
-	fDefaultPipeline = packedPipeline;
+	memcpy( fDefaultKey.fContents.data(), &packedPipeline, sizeof( PackedPipeline ) );
 
 	RestartWorkingPipeline();
 }
@@ -224,54 +299,13 @@ VulkanRenderer::InitializePipelineState()
 void
 VulkanRenderer::RestartWorkingPipeline()
 {
-	fShaderStageCreateInfo.clear();
-
-	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
-        
-	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-
-	fInputAssemblyStateCreateInfo = inputAssembly;
-
-	VkPipelineRasterizationStateCreateInfo rasterizer = {};
-
-	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer.lineWidth = 1.0f;
-
-	fRasterizationStateCreateInfo = rasterizer;
-
-	VkPipelineMultisampleStateCreateInfo multisampling = {};
-
-	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-    fMultisampleStateCreateInfo = multisampling;
-
-	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
-
-	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-
-	fDepthStencilStateCreateInfo = depthStencil;
-
-	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-
-	colorBlendAttachment.srcAlphaBlendFactor = colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	colorBlendAttachment.dstAlphaBlendFactor = colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-	fColorBlendAttachments.clear();
-	fColorBlendAttachments.push_back( colorBlendAttachment );
-
-	VkPipelineColorBlendStateCreateInfo colorBlending = {};
-
-	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlending.attachmentCount = 1U;
-	fColorBlendStateCreateInfo = colorBlending;
+    fPipelineCreateInfo = PipelineCreateInfo();
 }
 
 void
-VulkanRenderer::ResolvePipeline( VkCommandBuffer commandBuffer )
+VulkanRenderer::ResolvePipeline()
 {
-	auto iter = fBuiltPipelines.find( fWorkingPipeline );
+	auto iter = fBuiltPipelines.find( fWorkingKey );
 	VkPipeline pipeline = VK_NULL_HANDLE;
 
 	if (iter == fBuiltPipelines.end())
@@ -290,10 +324,10 @@ VulkanRenderer::ResolvePipeline( VkCommandBuffer commandBuffer )
 
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		
-        vertexInputInfo.pVertexAttributeDescriptions = fVertexAttributeDescriptions.data();
-        vertexInputInfo.pVertexBindingDescriptions = fVertexBindingDescriptions.data();
-        vertexInputInfo.vertexAttributeDescriptionCount = fVertexAttributeDescriptions.size();
-        vertexInputInfo.vertexBindingDescriptionCount = fVertexBindingDescriptions.size();
+        vertexInputInfo.pVertexAttributeDescriptions = fPipelineCreateInfo.fVertexAttributeDescriptions.data();
+        vertexInputInfo.pVertexBindingDescriptions = fPipelineCreateInfo.fVertexBindingDescriptions.data();
+        vertexInputInfo.vertexAttributeDescriptionCount = fPipelineCreateInfo.fVertexAttributeDescriptions.size();
+        vertexInputInfo.vertexBindingDescriptionCount = fPipelineCreateInfo.fVertexBindingDescriptions.size();
 
 		VkPipelineViewportStateCreateInfo viewportInfo = {};
 
@@ -304,13 +338,13 @@ VulkanRenderer::ResolvePipeline( VkCommandBuffer commandBuffer )
         pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		pipelineCreateInfo.basePipelineHandle = fFirstPipeline;
 		pipelineCreateInfo.flags = fFirstPipeline != VK_NULL_HANDLE ? VK_PIPELINE_CREATE_DERIVATIVE_BIT : VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
-        pipelineCreateInfo.pInputAssemblyState = &fInputAssemblyStateCreateInfo;
-        pipelineCreateInfo.pColorBlendState = &fColorBlendStateCreateInfo;
-        pipelineCreateInfo.pDepthStencilState = &fDepthStencilStateCreateInfo;
-        pipelineCreateInfo.pMultisampleState = &fMultisampleStateCreateInfo;
-        pipelineCreateInfo.pRasterizationState = &fRasterizationStateCreateInfo;
-        pipelineCreateInfo.pStages = fShaderStageCreateInfo.data();
-        pipelineCreateInfo.stageCount = fShaderStageCreateInfo.size();
+        pipelineCreateInfo.pInputAssemblyState = &fPipelineCreateInfo.fInputAssembly;
+        pipelineCreateInfo.pColorBlendState = &fPipelineCreateInfo.fColorBlend;
+        pipelineCreateInfo.pDepthStencilState = &fPipelineCreateInfo.fDepthStencil;
+        pipelineCreateInfo.pMultisampleState = &fPipelineCreateInfo.fMultisample;
+        pipelineCreateInfo.pRasterizationState = &fPipelineCreateInfo.fRasterization;
+        pipelineCreateInfo.pStages = fPipelineCreateInfo.fShaderStages.data();
+        pipelineCreateInfo.stageCount = fPipelineCreateInfo.fShaderStages.size();
         pipelineCreateInfo.pVertexInputState = &vertexInputInfo;
 		pipelineCreateInfo.pViewportState = &viewportInfo;
 //      pipelineCreateInfo.layout = pipelineLayout;
@@ -325,7 +359,7 @@ VulkanRenderer::ResolvePipeline( VkCommandBuffer commandBuffer )
 				fFirstPipeline = pipeline;
 			}
 
-			fBuiltPipelines[fWorkingPipeline] = pipeline;
+			fBuiltPipelines[fWorkingKey] = pipeline;
 		}
 
 		else
@@ -341,21 +375,73 @@ VulkanRenderer::ResolvePipeline( VkCommandBuffer commandBuffer )
 
 	if (pipeline != VK_NULL_HANDLE && (VK_NULL_HANDLE == fBoundPipeline || pipeline != fBoundPipeline))
 	{
-		vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
+		vkCmdBindPipeline( fCurrentCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
 	}
 
 	fBoundPipeline = pipeline;
-	fWorkingPipeline = fDefaultPipeline;
+	fWorkingKey = fDefaultKey;
 }
 
-bool
-VulkanRenderer::PackedPipeline::operator < ( const PackedPipeline & other ) const
+VulkanRenderer::PipelineCreateInfo::PipelineCreateInfo()
 {
-	return memcmp( this, &other, sizeof( PackedPipeline ) ) < 0;
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+        
+	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+
+	fInputAssembly = inputAssembly;
+
+	VkPipelineRasterizationStateCreateInfo rasterizer = {};
+
+	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizer.lineWidth = 1.0f;
+
+	fRasterization = rasterizer;
+
+	VkPipelineMultisampleStateCreateInfo multisampling = {};
+
+	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    fMultisample = multisampling;
+
+	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+
+	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+
+	fDepthStencil = depthStencil;
+
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+
+	colorBlendAttachment.srcAlphaBlendFactor = colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	colorBlendAttachment.dstAlphaBlendFactor = colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+	fColorBlendAttachments.clear();
+	fColorBlendAttachments.push_back( colorBlendAttachment );
+
+	VkPipelineColorBlendStateCreateInfo colorBlending = {};
+
+	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlending.attachmentCount = 1U;
+	fColorBlend = colorBlending;
+}
+
+const size_t kByteCountRoundedUp = (sizeof( PackedPipeline ) + 7U) & ~7U;
+const size_t kU64Count = kByteCountRoundedUp / 8U;
+
+VulkanRenderer::PipelineKey::PipelineKey()
+:   fContents( kU64Count, U64{} )
+{
 }
 
 bool
-VulkanRenderer::PackedPipeline::operator == ( const PackedPipeline & other ) const
+VulkanRenderer::PipelineKey::operator < ( const PipelineKey & other ) const
+{
+	return memcmp( fContents.data(), other.fContents.data(), sizeof( PipelineKey ) ) < 0;
+}
+
+bool
+VulkanRenderer::PipelineKey::operator == ( const PipelineKey & other ) const
 {
 	return !(*this < other) && !(other < *this);
 }

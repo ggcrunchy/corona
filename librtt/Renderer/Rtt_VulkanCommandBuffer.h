@@ -107,17 +107,10 @@ class VulkanCommandBuffer : public CommandBuffer
 		TimeTransform* fTimeTransform;
 		S32 fCachedQuery[kNumQueryableParams];
 		VulkanRenderer & fRenderer;
-VkCommandBuffer fCommands;
 		VkFence fInFlight;
 		VkSemaphore fImageAvailableSemaphore;
 		VkSemaphore fRenderFinishedSemaphore;
 };
-
-/*
-    std::vector<VkBuffer> uniformBuffers;
-    std::vector<VkDeviceMemory> uniformBuffersMemory;
-    std::vector<VkDescriptorSet> descriptorSets;
-*/
 
 // ----------------------------------------------------------------------------
 
