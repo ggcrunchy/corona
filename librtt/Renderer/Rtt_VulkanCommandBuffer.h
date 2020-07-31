@@ -71,17 +71,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		virtual void CacheQueryParam( CommandBuffer::QueryableParams param );
 
 	private:
-	/*
-		// Templatized helper function for reading an arbitrary argument from
-		// the command buffer.
-		template <typename T>
-		T Read();
-
-		// Templatized helper function for writing an arbitrary argument to the
-		// command buffer.
-		template <typename T>
-		void Write(T);
-		*/
 		struct UniformUpdate
 		{
 			Uniform* uniform;
