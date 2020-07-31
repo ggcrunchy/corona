@@ -12,6 +12,7 @@
 
 #include "Renderer/Rtt_GPUResource.h"
 
+#include <vector>
 #include <vulkan/vulkan.h>
 
 // ----------------------------------------------------------------------------
@@ -34,10 +35,14 @@ class VulkanFrameBufferObject : public GPUResource
 		virtual void Bind();
 
 	private:
+
+	private:
 		VkImage fImage;
 		VkImageView fView;
 		VkFramebuffer fFramebuffer;
-
+		VkRenderPass fRenderPass;
+		U32 fIndex;
+		bool fOwnsImages;
 };
 
 // ----------------------------------------------------------------------------

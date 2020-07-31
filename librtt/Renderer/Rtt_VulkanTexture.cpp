@@ -246,10 +246,8 @@ void
 VulkanTexture::Bind( U32 unit )
 {
     // TODO: sampler, view?
-    /*
-	glActiveTexture( GL_TEXTURE0 + unit );
-	glBindTexture( GL_TEXTURE_2D, GetName() );
-	GL_CHECK_ERROR();*/
+    // something to hook up to descriptor: unit + 1
+    // reset when program changes?
 }
 
 void
@@ -286,21 +284,14 @@ PrepareBarrier( VkImage image, VkImageAspectFlags aspectFlags, uint32_t mipLevel
 bool
 VulkanTexture::Load( Texture * texture, const VulkanBufferData & bufferData, U32 mipLevels )
 {
-    bool ok = false;
-
     if (bufferData.IsValid())
     {
         fState->StageData( bufferData.GetMemory(), texture->GetData(), texture->GetSizeInBytes() );
         
-        ok = TransitionImageLayout( fData.fImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels );
-
-        if (ok)
+        if (TransitionImageLayout( fData.fImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels ))
         {
             CopyBufferToImage( bufferData.GetBuffer(), fData.fImage, texture->GetWidth(), texture->GetHeight() );
-        }
 
-        if (ok)
-        {
             VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
             VkImageMemoryBarrier barrier = PrepareBarrier( fData.fImage, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
@@ -321,10 +312,12 @@ VulkanTexture::Load( Texture * texture, const VulkanBufferData & bufferData, U32
             );
 
             fState->EndSingleTimeCommands( commandBuffer );
+
+            return true;
         }
     }
 
-    return ok;
+    return false;
 }
 
 static bool
@@ -342,7 +335,7 @@ VulkanTexture::TransitionImageLayout( VkImage image, VkFormat format, VkImageLay
     {
         aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-        if (HasStencilComponent(format))
+        if (HasStencilComponent( format ))
         {
             aspectFlags |= VK_IMAGE_ASPECT_STENCIL_BIT;
         }
