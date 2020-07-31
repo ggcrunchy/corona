@@ -50,30 +50,33 @@ VulkanRenderer::~VulkanRenderer()
 void
 VulkanRenderer::BuildUpSwapchain()
 {
+    const VulkanState::SwapchainDetails & details = fState->GetSwapchainDetails();
 	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
 
 	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	swapchainCreateInfo.imageArrayLayers = 1U;
-	swapchainCreateInfo.imageColorSpace = fState->fSwapchainFormat.colorSpace;
-	swapchainCreateInfo.imageExtent = fState->fSwapchainExtent;
-	swapchainCreateInfo.imageFormat = fState->fSwapchainFormat.format;
+	swapchainCreateInfo.imageColorSpace = details.fFormat.colorSpace;
+	swapchainCreateInfo.imageExtent = details.fExtent;
+	swapchainCreateInfo.imageFormat = details.fFormat.format;
 	swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	swapchainCreateInfo.minImageCount = fState->fMaxSwapImageCount;
+	swapchainCreateInfo.minImageCount = details.fMaxImageCount;
 
-	if (fState->fQueueFamilies.size() > 1U)
+    auto queueFamilies = fState->GetQueueFamilies();
+
+	if (queueFamilies.size() > 1U)
 	{
 		swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-		swapchainCreateInfo.pQueueFamilyIndices = fState->fQueueFamilies.data();
+		swapchainCreateInfo.pQueueFamilyIndices = queueFamilies.data();
 		swapchainCreateInfo.queueFamilyIndexCount = 2U;
 	}
 
 	swapchainCreateInfo.clipped = VK_TRUE;
 	swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE; // TODO!
-	swapchainCreateInfo.presentMode = fState->fPresentMode;
-	swapchainCreateInfo.preTransform = fState->fTransformFlagBits; // TODO: relevant to portrait, landscape, etc?
-	swapchainCreateInfo.surface = fState->fSurface;
+	swapchainCreateInfo.presentMode = details.fPresentMode;
+	swapchainCreateInfo.preTransform = details.fTransformFlagBits; // TODO: relevant to portrait, landscape, etc?
+	swapchainCreateInfo.surface = fState->GetSurface();
 
     const VkAllocationCallbacks * allocator = fState->GetAllocator();
     VkDevice device = fState->GetDevice();
@@ -81,7 +84,7 @@ VulkanRenderer::BuildUpSwapchain()
 
 	if (VK_SUCCESS == vkCreateSwapchainKHR( device, &swapchainCreateInfo, allocator, &swapchain ))
 	{
-		fState->fSwapchain = swapchain;
+		fState->SetSwapchain( swapchain );
 
 		uint32_t imageCount = 0U;
 
@@ -93,7 +96,7 @@ VulkanRenderer::BuildUpSwapchain()
 		
 		for ( const VkImage & image : images )
 		{
-			VkImageView view = VulkanTexture::CreateImageView( fState, image, fState->fSwapchainFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
+			VkImageView view = VulkanTexture::CreateImageView( fState, image, details.fFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
 			if (view != VK_NULL_HANDLE)
 			{
@@ -167,21 +170,9 @@ VulkanRenderer::TearDownSwapchain()
 //	fPerImageData.clear();
     // ^^ any good doing this? some of this WON'T need rebuilding...
 
-	vkDestroySwapchainKHR( device, fState->fSwapchain, allocator );
-}
+	vkDestroySwapchainKHR( device, fState->GetSwapchain(), allocator );
 
-GPUResource* 
-VulkanRenderer::Create( const CPUResource* resource )
-{
-	switch( resource->GetType() )
-	{
-		case CPUResource::kFrameBufferObject: return new VulkanFrameBufferObject;
-		case CPUResource::kGeometry: return new VulkanGeometry( fState );
-		case CPUResource::kProgram: return new VulkanProgram( fState );
-		case CPUResource::kTexture: return new VulkanTexture( fState );
-		case CPUResource::kUniform: return NULL;
-		default: Rtt_ASSERT_NOT_REACHED(); return NULL;
-	}
+    fState->SetSwapchain( VK_NULL_HANDLE );
 }
 
 const size_t kFinalBlendFactor = VK_BLEND_OP_MAX;
@@ -257,6 +248,101 @@ struct PackedPipeline {
 	PackedBlendAttachment fBlendAttachments[8];
 	uint8_t fDynamicStates[kDynamicStateByteCount];
 };
+
+static PackedPipeline &
+GetPackedPipeline( std::vector< U64 > & contents )
+{
+    return *reinterpret_cast< PackedPipeline * >( contents.data() );
+}
+
+void
+VulkanRenderer::EnableBlend( bool enabled )
+{
+    fPipelineCreateInfo.fColorBlendAttachments.front().blendEnable = enabled ? VK_TRUE : VK_FALSE;
+
+	GetPackedPipeline( fWorkingKey.fContents ).fBlendAttachments[0].fEnable = enabled;
+}
+
+void
+VulkanRenderer::SetAttributeDescriptions( U32 id, const std::vector< VkVertexInputAttributeDescription > & descriptions )
+{
+    // TODO!
+}
+
+void
+VulkanRenderer::SetBindingDescriptions( U32 id, const std::vector< VkVertexInputBindingDescription > & descriptions )
+{
+	fPipelineCreateInfo.fVertexBindingDescriptions = descriptions;
+
+	GetPackedPipeline( fWorkingKey.fContents ).fBindingDescriptionID = id;
+}
+
+void
+VulkanRenderer::SetBlendEquations( VkBlendOp color, VkBlendOp alpha )
+{
+	auto attachment = fPipelineCreateInfo.fColorBlendAttachments.front();
+
+    attachment.alphaBlendOp = alpha;
+	attachment.colorBlendOp = color;
+    	
+    PackedPipeline & packedPipeline = GetPackedPipeline( fWorkingKey.fContents );
+
+	packedPipeline.fBlendAttachments[0].fAlphaOp = alpha;
+	packedPipeline.fBlendAttachments[0].fColorOp = color;
+}
+
+void
+VulkanRenderer::SetBlendFactors( VkBlendFactor srcColor, VkBlendFactor srcAlpha, VkBlendFactor dstColor, VkBlendFactor dstAlpha )
+{
+	auto attachment = fPipelineCreateInfo.fColorBlendAttachments.front();
+
+	attachment.srcColorBlendFactor = srcColor;
+	attachment.dstColorBlendFactor = dstColor;
+	attachment.srcAlphaBlendFactor = srcAlpha;
+	attachment.dstAlphaBlendFactor = dstAlpha;
+    	
+    PackedPipeline & packedPipeline = GetPackedPipeline( fWorkingKey.fContents );
+
+	packedPipeline.fBlendAttachments[0].fSrcColorFactor = srcColor;
+	packedPipeline.fBlendAttachments[0].fDstColorFactor = dstColor;
+	packedPipeline.fBlendAttachments[0].fSrcAlphaFactor = srcAlpha;
+	packedPipeline.fBlendAttachments[0].fDstAlphaFactor = dstAlpha;
+}
+
+void
+VulkanRenderer::SetPrimitiveTopology( VkPrimitiveTopology topology, bool resolvePipeline )
+{
+    fPipelineCreateInfo.fInputAssembly.topology = topology;
+
+	GetPackedPipeline( fWorkingKey.fContents ).fTopology = topology;
+
+    if (resolvePipeline)
+    {
+        ResolvePipeline();
+    }
+}
+
+void
+VulkanRenderer::SetShaderStages( U32 id, const std::vector< VkPipelineShaderStageCreateInfo > & stages )
+{
+	fPipelineCreateInfo.fShaderStages = stages;
+
+	GetPackedPipeline( fWorkingKey.fContents ).fShaderID = id;
+}
+
+GPUResource* 
+VulkanRenderer::Create( const CPUResource* resource )
+{
+	switch( resource->GetType() )
+	{
+		case CPUResource::kFrameBufferObject: return new VulkanFrameBufferObject;
+		case CPUResource::kGeometry: return new VulkanGeometry( fState );
+		case CPUResource::kProgram: return new VulkanProgram( fState );
+		case CPUResource::kTexture: return new VulkanTexture( fState );
+		case CPUResource::kUniform: return NULL;
+		default: Rtt_ASSERT_NOT_REACHED(); return NULL;
+	}
+}
 
 static void
 SetDynamicStateBit( uint8_t states[], uint8_t value )

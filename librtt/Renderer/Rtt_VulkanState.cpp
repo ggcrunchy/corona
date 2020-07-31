@@ -834,7 +834,7 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 }
 
 bool
-VulkanState::GetMultisampleDetails( VulkanState & state )
+VulkanState::PopulateMultisampleDetails( VulkanState & state )
 {
     VkPhysicalDeviceProperties physicalDeviceProperties;
 
@@ -881,7 +881,7 @@ VulkanState::GetMultisampleDetails( VulkanState & state )
 }
 
 bool
-VulkanState::GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height )
+VulkanState::PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height )
 {
 	VkPhysicalDevice device = state.GetPhysicalDevice();
 	VkSurfaceKHR surface = state.GetSurface();
@@ -929,12 +929,14 @@ VulkanState::GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t 
 		imageCount = capabilities.maxImageCount;
 	}
 
-	state.fMaxSwapImageCount = imageCount;
-    state.fSwapchainExtent.width = std::max( capabilities.minImageExtent.width, std::min( capabilities.maxImageExtent.width, width ) );
-	state.fSwapchainExtent.height = std::max( capabilities.minImageExtent.height, std::min( capabilities.maxImageExtent.height, height ) );
-	state.fSwapchainFormat = format;
-	state.fPresentMode = mode;
-	state.fTransformFlagBits = capabilities.currentTransform;
+	SwapchainDetails & details = state.fSwapchainDetails;
+
+	details.fMaxImageCount = imageCount;
+    details.fExtent.width = std::max( capabilities.minImageExtent.width, std::min( capabilities.maxImageExtent.width, width ) );
+	details.fExtent.height = std::max( capabilities.minImageExtent.height, std::min( capabilities.maxImageExtent.height, height ) );
+	details.fFormat = format;
+	details.fPresentMode = mode;
+	details.fTransformFlagBits = capabilities.currentTransform;
 
 	return true;
 }

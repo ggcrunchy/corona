@@ -70,6 +70,10 @@ class VulkanState
 		VkSurfaceKHR GetSurface() const { return fSurface; }
 		VkPipelineCache GetPipelineCache() const { return fPipelineCache; }
 		VkSampleCountFlags GetSampleCountFlags() const { return fSampleCountFlags; }
+		VkSwapchainKHR GetSwapchain() const { return fSwapchain; }
+		const std::vector< uint32_t > & GetQueueFamilies() const { return fQueueFamilies; }
+
+		void SetSwapchain( VkSwapchainKHR swapchain ) { fSwapchain = swapchain; }
 
 		struct shaderc_compiler * GetCompiler() const { return fCompiler; }
 		struct shaderc_compile_options * GetCompileOptions() const { return fCompileOptions; }
@@ -97,8 +101,18 @@ class VulkanState
 		};
 
 		static bool PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
-		static bool GetMultisampleDetails( VulkanState & state );
-		static bool GetSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height );
+		static bool PopulateMultisampleDetails( VulkanState & state );
+		static bool PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height );
+
+		struct SwapchainDetails {
+			VkSurfaceTransformFlagBitsKHR fTransformFlagBits;
+			VkExtent2D fExtent;
+			VkSurfaceFormatKHR fFormat;
+			uint32_t fMaxImageCount;
+			VkPresentModeKHR fPresentMode;
+		};
+
+		const SwapchainDetails & GetSwapchainDetails() const { return fSwapchainDetails; }
 
 	private:
 		VkAllocationCallbacks * fAllocator;
@@ -114,18 +128,12 @@ class VulkanState
 		VkSurfaceKHR fSurface;
 		VkPipelineCache fPipelineCache;
 		VkSampleCountFlags fSampleCountFlags;
-		VkSurfaceTransformFlagBitsKHR fTransformFlagBits;
 		VkSwapchainKHR fSwapchain;
-		VkExtent2D fSwapchainExtent;
-		VkSurfaceFormatKHR fSwapchainFormat;
-		uint32_t fMaxSwapImageCount;
-		VkPresentModeKHR fPresentMode;
+		SwapchainDetails fSwapchainDetails;
 		std::vector< uint32_t > fQueueFamilies;
 
 		struct shaderc_compiler * fCompiler;
 		struct shaderc_compile_options * fCompileOptions;
-
-		friend class VulkanRenderer;
 };
 
 // ----------------------------------------------------------------------------

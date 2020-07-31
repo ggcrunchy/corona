@@ -242,7 +242,7 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 	// STEVE CHANGE
 	if (fVulkanState)
 	{
-		if (!Rtt::VulkanState::GetSwapchainDetails( *static_cast< Rtt::VulkanState * >( fVulkanState ), uint32_t( GetClientWidth() ), uint32_t( GetClientHeight() ) ))
+		if (!Rtt::VulkanState::PopulateSwapchainDetails( *static_cast< Rtt::VulkanState * >( fVulkanState ), uint32_t( GetClientWidth() ), uint32_t( GetClientHeight() ) ))
 		{
 			DestroyContext();
 
@@ -403,7 +403,7 @@ RenderSurfaceControl::FetchMultisampleFormatResult RenderSurfaceControl::FetchMu
 	// STEVE CHANGE
 	if (fVulkanState)
 	{
-		Rtt::VulkanState::GetMultisampleDetails( *static_cast< Rtt::VulkanState * >( fVulkanState ) );
+		Rtt::VulkanState::PopulateMultisampleDetails( *static_cast< Rtt::VulkanState * >( fVulkanState ) );
 
 		result.IsSupported = true;
 

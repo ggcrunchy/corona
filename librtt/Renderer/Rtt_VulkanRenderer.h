@@ -61,12 +61,16 @@ class VulkanRenderer : public Renderer
 		void TearDownSwapchain();
 
 	public:
+		VulkanState * GetState() const { return fState; }
+		VkCommandBuffer GetCurrentCommandBuffer() const { return fCurrentCommandBuffer; }
+
+	public:
 		void EnableBlend( bool enabled );
 		void SetAttributeDescriptions( U32 id, const std::vector< VkVertexInputAttributeDescription > & descriptions );
 		void SetBindingDescriptions( U32 id, const std::vector< VkVertexInputBindingDescription > & descriptions );
 		void SetBlendEquations( VkBlendOp color, VkBlendOp alpha );
 		void SetBlendFactors( VkBlendFactor srcColor, VkBlendFactor srcAlpha, VkBlendFactor dstColor, VkBlendFactor dstAlpha );
-		void SetPrimitiveTopology( VkPrimitiveTopology topology );
+		void SetPrimitiveTopology( VkPrimitiveTopology topology, bool resolvePipeline = true );
 		void SetShaderStages( U32 id, const std::vector< VkPipelineShaderStageCreateInfo > & stages );
 
 	protected:
@@ -139,8 +143,6 @@ VkCommandBuffer fCurrentCommandBuffer;
 		PipelineCreateInfo fPipelineCreateInfo;
 		PipelineKey fDefaultKey;
 		PipelineKey fWorkingKey;
-
-		friend class VulkanCommandBuffer;
 /*
     VkRenderPass renderPass;
     VkDescriptorSetLayout descriptorSetLayout;
