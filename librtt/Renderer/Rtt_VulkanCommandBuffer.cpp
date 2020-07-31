@@ -115,8 +115,9 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 		fUniformUpdates[i].timestamp = 0;
 	}
 
-	const VkAllocationCallbacks * vulkanAllocator = fRenderer.fState->GetAllocator();
-	VkDevice device = fRenderer.fState->GetDevice();
+	VulkanState * state = fRenderer.GetState();
+	const VkAllocationCallbacks * vulkanAllocator = state->GetAllocator();
+	VkDevice device = state->GetDevice();
 	VkFenceCreateInfo createFenceInfo = {};
 
     createFenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -147,8 +148,9 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 
 VulkanCommandBuffer::~VulkanCommandBuffer()
 {
-	const VkAllocationCallbacks * allocator = fRenderer.fState->GetAllocator();
-	VkDevice device = fRenderer.fState->GetDevice();
+	VulkanState * state = fRenderer.GetState();
+	const VkAllocationCallbacks * allocator = state->GetAllocator();
+	VkDevice device = state->GetDevice();
 
 	vkDestroyFence( device, fInFlight, allocator );
 	vkDestroySemaphore( device, fImageAvailableSemaphore, allocator );
@@ -258,10 +260,9 @@ void
 VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 {
 	VulkanGeometry * vulkanGeometry = static_cast< VulkanGeometry * >( geometry->GetGPUResource() );
-	VulkanGeometry::VertexDescription description = vulkanGeometry->Bind();
+	VulkanGeometry::VertexDescription vertexData = vulkanGeometry->Bind();
 
-	fRenderer.fWorkingKey.fBindingDescriptionID = description.fID;
-	fRenderer.fPipelineCreateInfo.fVertexBindingDescriptions = description.fDescriptions;
+	fRenderer.SetBindingDescriptions( vertexData.fID, vertexData.fDescriptions );
 //	WRITE_COMMAND( kCommandBindGeometry );
 //	Write<GPUResource*>( geometry->GetGPUResource() );
 	
@@ -284,10 +285,9 @@ void
 VulkanCommandBuffer::BindProgram( Program* program, Program::Version version )
 {
 	VulkanProgram * vulkanProgram = static_cast< VulkanProgram * >( program->GetGPUResource() );
-	VulkanProgram::PipelineStages shaderStages = vulkanProgram->Bind( version );
+	VulkanProgram::PipelineStages stageData = vulkanProgram->Bind( version );
 
-	fRenderer.fWorkingPipeline.fShaderID = shaderStages.fID;
-	fRenderer.fPipelineCreateInfo.fShaderStages = shaderStages.fStages;
+	fRenderer.SetShaderStages( stageData.fID, stageData.fStages );
 /*
 	WRITE_COMMAND( kCommandBindProgram );
 	Write<Program::Version>( version );
@@ -312,8 +312,7 @@ VulkanCommandBuffer::BindUniform( Uniform* uniform, U32 unit )
 void
 VulkanCommandBuffer::SetBlendEnabled( bool enabled )
 {
-	fRenderer.fPipelineCreateInfo.fColorBlendAttachments.front().blendEnable = enabled ? VK_TRUE : VK_FALSE;
-	fRenderer.fWorkingPipeline.fBlendAttachments[0].fEnable = enabled;
+	fRenderer.EnableBlend( enabled );
 }
 
 static VkBlendFactor
@@ -373,17 +372,7 @@ VulkanCommandBuffer::SetBlendFunction( const BlendMode& mode )
 	VkBlendFactor srcAlpha = VulkanFactorForBlendParam( mode.fSrcAlpha );
 	VkBlendFactor dstAlpha = VulkanFactorForBlendParam( mode.fDstAlpha );
 
-	auto attachment = fRenderer.fPipelineCreateInfo.fColorBlendAttachments.front();
-
-	attachment.srcColorBlendFactor = srcColor;
-	attachment.dstColorBlendFactor = dstColor;
-	attachment.srcAlphaBlendFactor = srcAlpha;
-	attachment.dstAlphaBlendFactor = dstAlpha;
-
-	fRenderer.fWorkingPipeline.fBlendAttachments[0].fSrcColorFactor = srcColor;
-	fRenderer.fWorkingPipeline.fBlendAttachments[0].fDstColorFactor = dstColor;
-	fRenderer.fWorkingPipeline.fBlendAttachments[0].fSrcAlphaFactor = srcAlpha;
-	fRenderer.fWorkingPipeline.fBlendAttachments[0].fDstAlphaFactor = dstAlpha;
+	fRenderer.SetBlendFactors( srcColor, srcAlpha, dstColor, dstAlpha );
 }
 
 void 
@@ -403,12 +392,7 @@ VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 			break;
 	}
 
-	auto attachment = fRenderer.fPipelineCreateInfo.fColorBlendAttachments.front();
-
-	attachment.alphaBlendOp = attachment.colorBlendOp = equation;
-
-	fRenderer.fWorkingPipeline.fBlendAttachments[0].fAlphaOp = equation;
-	fRenderer.fWorkingPipeline.fBlendAttachments[0].fColorOp = equation;
+	fRenderer.SetBlendEquations( equation, equation );
 }
 
 void
@@ -423,7 +407,7 @@ VulkanCommandBuffer::SetViewport( int x, int y, int width, int height )
 	viewport.minDepth = 0.f;
 	viewport.maxDepth = 1.f;
 
-	vkCmdSetViewport( fRenderer.fCurrentCommandBuffer, 0U, 1U, &viewport );
+	vkCmdSetViewport( fRenderer.GetCurrentCommandBuffer(), 0U, 1U, &viewport );
 }
 
 void 
@@ -514,15 +498,12 @@ VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 		default: Rtt_ASSERT_NOT_REACHED(); break;
 	}
 
-	fRenderer.fPipelineCreateInfo.fInputAssembly.topology = topology;
-	fRenderer.fWorkingPipeline.fTopology = topology;
-
-	fRenderer.ResolvePipeline();
+	fRenderer.SetPrimitiveTopology( topology );
 /*
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
 	ApplyUniforms( fProgram->GetGPUResource() );
 */
-	vkCmdDraw( fRenderer.fCurrentCommandBuffer, count, 1U, offset, 0U );
+	vkCmdDraw( fRenderer.GetCurrentCommandBuffer(), count, 1U, offset, 0U );
 }
 
 void 
@@ -539,10 +520,7 @@ VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 		default: Rtt_ASSERT_NOT_REACHED(); break;
 	}
 	
-	fRenderer.fPipelineCreateInfo.fInputAssembly.topology = topology;
-	fRenderer.fWorkingPipeline.fTopology = topology;
-
-	fRenderer.ResolvePipeline();
+	fRenderer.SetPrimitiveTopology( topology );
 /*
 	// The first argument, offset, is currently unused. If support for non-
 	// VBO based indexed rendering is added later, an offset may be needed.
@@ -550,7 +528,7 @@ VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
 	ApplyUniforms( fProgram->GetGPUResource() );
 */
-	vkCmdDrawIndexed( fRenderer.fCurrentCommandBuffer, count, 1U, 0U, 0U, 0U );
+	vkCmdDrawIndexed( fRenderer.GetCurrentCommandBuffer(), count, 1U, 0U, 0U, 0U );
 }
 
 S32
