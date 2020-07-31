@@ -22,6 +22,27 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
+class RenderPassBuilder {
+public:
+	struct AttachmentOptions {
+		VkClearValue * clear = NULL;
+		VkSampleCountFlags samples = VK_SAMPLE_COUNT_1_BIT;
+		bool noClear = false;
+		bool isResolve = false;
+	};
+
+	void AddColorAttachment( VkFormat format, const AttachmentOptions & options = AttachmentOptions() );
+	void AddDepthStencilAttachment( VkFormat format, const AttachmentOptions & options = AttachmentOptions() );
+	void AddSubpassDependency( const VkSubpassDependency & dependency );
+
+	VkRenderPass BuildForSingleSubpass();
+
+private:
+	std::vector< VkSubpassDependency > fDependencies;
+	std::vector< VkAttachmentDescription > fDescriptions;
+	std::vector< VkAttachmentReference > fReferences;
+};
+
 class VulkanFrameBufferObject : public GPUResource
 {
 	public:
