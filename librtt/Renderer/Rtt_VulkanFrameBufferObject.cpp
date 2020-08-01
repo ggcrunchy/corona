@@ -7,12 +7,14 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanFrameBufferObject.h"
+#include "Renderer/Rtt_VulkanTexture.h"
 
 #include "Renderer/Rtt_FrameBufferObject.h"
 #include "Renderer/Rtt_Texture.h"
-#include "Renderer/Rtt_VulkanTexture.h"
 #include "Core/Rtt_Assert.h"
+#include "CoronaLog.h"
 
 // ----------------------------------------------------------------------------
 /*
@@ -32,48 +34,63 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
+static VkAttachmentLoadOp
+GetLoadOp( const RenderPassBuilder::AttachmentOptions & options )
+{
+	if (!options.isResolve)
+	{
+		return options.noClear ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+	}
+
+	else
+	{
+		return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	}
+}
+
+static VkAttachmentDescription
+PrepareAttachmentDescription( VkFormat format, bool noClear, VkAttachmentStoreOp storeOp )
+{
+	VkAttachmentDescription attachment = {};
+	
+	attachment.format = format;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachment.loadOp = noClear ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachment.storeOp = storeOp;
+
+	return attachment;
+}
+
 void
 RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions & options )
 {
-	/*
-	
+	VkAttachmentDescription colorAttachment = PrepareAttachmentDescription( format, options.noClear, VK_ATTACHMENT_STORE_OP_STORE );
 
-        VkAttachmentDescription colorAttachmentResolve = {};
-        colorAttachmentResolve.format = swapChainImageFormat;
-        colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-        colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	if (options.isResolve)
+	{
+		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		colorAttachment.samples = options.samples;
 
-        VkAttachmentReference colorAttachmentRef = {};
-        colorAttachmentRef.attachment = 0;
-        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		*/
+		AddAttachment( colorAttachment, fResolveReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, false );
+	}
+
+	else
+	{
+		AddAttachment( colorAttachment, fColorReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	}
 }
 
 
 void
 RenderPassBuilder::AddDepthStencilAttachment( VkFormat format, const AttachmentOptions & options )
 {
-	/*
+	VkAttachmentDescription depthAttachment = PrepareAttachmentDescription( format, options.noClear, VK_ATTACHMENT_STORE_OP_DONT_CARE );
 
-        VkAttachmentDescription depthAttachment = {};
-        depthAttachment.format = findDepthFormat();
-        depthAttachment.samples = msaaSamples;
-        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-        VkAttachmentReference depthAttachmentRef = {};
-        depthAttachmentRef.attachment = 1;
-        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	*/
+	AddAttachment( depthAttachment, fDepthStencilReferences, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 }
 
 void
@@ -83,30 +100,95 @@ RenderPassBuilder::AddSubpassDependency( const VkSubpassDependency & dependency 
 }
 
 VkRenderPass
-RenderPassBuilder::BuildForSingleSubpass()
+RenderPassBuilder::BuildForSingleSubpass( VkDevice device, const VkAllocationCallbacks * allocator )
 {
-	VkRenderPassCreateInfo renderPassInfo = {};
-/*
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        renderPassInfo.pAttachments = attachments.data();
-        renderPassInfo.subpassCount = 1;
-        renderPassInfo.pSubpasses = &subpass;
-        renderPassInfo.dependencyCount = 1;
-        renderPassInfo.pDependencies = &dependency;
+	VkSubpassDescription subpass = {};
 
-        if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create render pass!");
-        }
-		*/
-	return VK_NULL_HANDLE;
+	subpass.colorAttachmentCount = fColorReferences.size();
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.pColorAttachments = fColorReferences.data();
+	subpass.pDepthStencilAttachment = fDepthStencilReferences.data(); // 0 or 1
+	subpass.pResolveAttachments = fResolveReferences.data(); // 0 or same as color references
+
+	VkRenderPassCreateInfo createRenderPassInfo = {};
+
+    createRenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    createRenderPassInfo.attachmentCount = fDescriptions.size();
+    createRenderPassInfo.dependencyCount = fDependencies.size();
+    createRenderPassInfo.pAttachments = fDescriptions.data();
+    createRenderPassInfo.pDependencies = fDependencies.data();
+    createRenderPassInfo.pSubpasses = &subpass;
+    createRenderPassInfo.subpassCount = 1U;
+
+	VkRenderPass renderPass;
+
+    if (VK_SUCCESS == vkCreateRenderPass( device, &createRenderPassInfo, allocator, &renderPass ))
+	{
+		return renderPass;
+	}
+
+	else
+	{
+        CoronaLog( "Failed to create render pass!" );
+		
+		return VK_NULL_HANDLE;
+    }
+}
+
+void
+RenderPassBuilder::AddAttachment( VkAttachmentDescription description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, bool isFinalLayout )
+{
+	VkAttachmentReference attachmentRef = {};
+
+	attachmentRef.attachment = fDescriptions.size();
+	attachmentRef.layout = layout;
+
+	references.push_back( attachmentRef );
+
+	if (isFinalLayout)
+	{
+		description.finalLayout = layout;
+	}
+
+	fDescriptions.push_back( description );
+}
+
+VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanState * state, uint32_t imageCount, VkImage * swapchainImages )
+:	fState( state ),
+	fPerImageData( imageCount ),
+	fImage( VK_NULL_HANDLE )
+{
+	if (swapchainImages)
+	{
+		const VulkanState::SwapchainDetails & details = fState->GetSwapchainDetails();
+		VkFormat format = details.fFormat.format;
+
+		for (uint32_t i = 0; i < imageCount; ++i)
+		{
+			fPerImageData[i].fViews.push_back( VulkanTexture::CreateImageView( fState, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U ) );
+		}
+
+		MakeFramebuffers( details.fExtent.width, details.fExtent.height );
+	}
 }
 
 void 
 VulkanFrameBufferObject::Create( CPUResource* resource )
 {
 	Rtt_ASSERT( CPUResource::kFrameBufferObject == resource->GetType() );
-//	FrameBufferObject* fbo = static_cast<FrameBufferObject*>( resource );
+
+	Texture * texture = static_cast< FrameBufferObject * >( resource )->GetTexture();
+	VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() ); // n.b. GLFrameBufferObject says this will already exist
+	VkImageView view = vulkanTexture->GetImageView();
+
+	for (auto & perImageData : fPerImageData)
+	{
+		perImageData.fViews.push_back( view );
+	}
+
+	MakeFramebuffers( texture->GetWidth(), texture->GetHeight() );
+	Update( resource );
+
 	/*
 	GLuint name;
 	glGenFramebuffers( 1, &name );
@@ -172,6 +254,16 @@ VulkanFrameBufferObject::Destroy()
 	DEBUG_PRINT( "%s : OpenGL name: %d\n",
 					__FUNCTION__,
 					name );*/
+/*
+	for (PerImageData & data : fPerImageData)
+	{
+		vkDestroyImageView( device, data.view, allocator );
+        // TODO: frame buffer
+
+        data.image = VK_NULL_HANDLE;
+        data.view = VK_NULL_HANDLE;
+	}
+*/
 }
 
 void 
@@ -179,6 +271,33 @@ VulkanFrameBufferObject::Bind()
 {/*
 	glBindFramebuffer( GL_FRAMEBUFFER, GetName() );
 	GL_CHECK_ERROR();*/
+}
+
+void
+VulkanFrameBufferObject::MakeFramebuffers( uint32_t width, uint32_t height )
+{
+	const VkAllocationCallbacks * allocator = fState->GetAllocator();
+	VkDevice device = fState->GetDevice();
+
+	for (auto & perImageData : fPerImageData)
+	{
+        VkFramebufferCreateInfo createFramebufferInfo = {};
+
+        createFramebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    //    createFramebufferInfo.renderPass = renderPass;
+        createFramebufferInfo.attachmentCount = perImageData.fViews.size();
+        createFramebufferInfo.height = height;
+        createFramebufferInfo.layers = 1U;
+        createFramebufferInfo.pAttachments = perImageData.fViews.data();
+        createFramebufferInfo.width = width;
+
+        if (vkCreateFramebuffer( device, &createFramebufferInfo, nullptr, &perImageData.fFramebuffer ) != VK_SUCCESS)
+		{
+            CoronaLog( "Failed to create framebuffer!" );
+
+			// TODO?
+        }
+	}
 }
 /*
 GLuint

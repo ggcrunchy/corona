@@ -709,10 +709,16 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 			score += 1000U;
 		}
 
+		if (deviceFeatures.shaderSampledImageArrayDynamicIndexing)
+		{
+			score += 500U;
+		}
+
 		// Maximum possible size of textures affects graphics quality
 		score += deviceProperties.limits.maxImageDimension2D;
 
 		// other ideas: ETC2 etc. texture compression
+		// could make the rating adjustable in config.lua?
 
 		if (score > bestScore)
 		{
@@ -776,64 +782,6 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 }
 
 bool
-VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback )
-{
-	VkApplicationInfo appInfo = AppInfo();
-	const VkAllocationCallbacks * allocator = state.GetAllocator();
-	auto instanceData = MakeInstance( &appInfo, surfaceCallback.extension, allocator );
-
-#ifndef NDEBUG
-	state.SetDebugMessenger( instanceData.second );
-
-	VkInstance instance = instanceData.first;
-#else
-	VkInstance instance = instanceData;
-#endif
-
-	if (instance != VK_NULL_HANDLE)
-	{
-		state.fInstance = instance;
-
-		VkSurfaceKHR surface = surfaceCallback.make( instance, surfaceCallback.data, allocator );
-
-		if (surface != VK_NULL_HANDLE)
-		{
-			state.fSurface = surface;
-
-			auto physicalDeviceData = ChoosePhysicalDevice( instance, surface );
-
-			if (physicalDeviceData.first != VK_NULL_HANDLE)
-			{
-				state.fPhysicalDevice = physicalDeviceData.first;
-
-				auto families = physicalDeviceData.second.GetFamilies();
-				VkDevice device = MakeLogicalDevice( physicalDeviceData.first, families, allocator );
-
-				if (device != VK_NULL_HANDLE)
-				{
-					state.fDevice = device;
-
-					VkQueue graphicsQueue, presentQueue;
-
-					vkGetDeviceQueue( device, physicalDeviceData.second.fGraphicsQueue, 0, &graphicsQueue );
-					vkGetDeviceQueue( device, physicalDeviceData.second.fPresentQueue, 0, &presentQueue );
-
-					VulkanProgram::InitializeCompiler( &state.fCompiler, &state.fCompileOptions );
-						
-					state.fGraphicsQueue = graphicsQueue;
-					state.fPresentQueue = presentQueue;
-					state.fQueueFamilies = families;
-
-					return true;
-				}
-			}
-		}
-	}
-
-	return false;
-}
-
-bool
 VulkanState::PopulateMultisampleDetails( VulkanState & state )
 {
     VkPhysicalDeviceProperties physicalDeviceProperties;
@@ -878,6 +826,66 @@ VulkanState::PopulateMultisampleDetails( VulkanState & state )
 	}
 
 	return true;
+}
+
+bool
+VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback )
+{
+	VkApplicationInfo appInfo = AppInfo();
+	const VkAllocationCallbacks * allocator = state.GetAllocator();
+	auto instanceData = MakeInstance( &appInfo, surfaceCallback.extension, allocator );
+
+#ifndef NDEBUG
+	state.SetDebugMessenger( instanceData.second );
+
+	VkInstance instance = instanceData.first;
+#else
+	VkInstance instance = instanceData;
+#endif
+
+	if (instance != VK_NULL_HANDLE)
+	{
+		state.fInstance = instance;
+
+		VkSurfaceKHR surface = surfaceCallback.make( instance, surfaceCallback.data, allocator );
+
+		if (surface != VK_NULL_HANDLE)
+		{
+			state.fSurface = surface;
+
+			auto physicalDeviceData = ChoosePhysicalDevice( instance, surface );
+
+			if (physicalDeviceData.first != VK_NULL_HANDLE)
+			{
+				state.fPhysicalDevice = physicalDeviceData.first;
+
+				// TODO: enable any features and remember this
+
+				auto families = physicalDeviceData.second.GetFamilies();
+				VkDevice device = MakeLogicalDevice( physicalDeviceData.first, families, allocator );
+
+				if (device != VK_NULL_HANDLE)
+				{
+					state.fDevice = device;
+
+					VkQueue graphicsQueue, presentQueue;
+
+					vkGetDeviceQueue( device, physicalDeviceData.second.fGraphicsQueue, 0, &graphicsQueue );
+					vkGetDeviceQueue( device, physicalDeviceData.second.fPresentQueue, 0, &presentQueue );
+
+					VulkanProgram::InitializeCompiler( &state.fCompiler, &state.fCompileOptions );
+						
+					state.fGraphicsQueue = graphicsQueue;
+					state.fPresentQueue = presentQueue;
+					state.fQueueFamilies = families;
+
+					return true;
+				}
+			}
+		}
+	}
+
+	return false;
 }
 
 bool
@@ -931,7 +939,7 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint
 
 	SwapchainDetails & details = state.fSwapchainDetails;
 
-	details.fMaxImageCount = imageCount;
+	details.fImageCount = imageCount;
     details.fExtent.width = std::max( capabilities.minImageExtent.width, std::min( capabilities.maxImageExtent.width, width ) );
 	details.fExtent.height = std::max( capabilities.minImageExtent.height, std::min( capabilities.maxImageExtent.height, height ) );
 	details.fFormat = format;
