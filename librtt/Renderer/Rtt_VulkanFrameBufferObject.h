@@ -20,13 +20,14 @@
 namespace Rtt
 {
 
+class VulkanState;
+
 // ----------------------------------------------------------------------------
 
 class RenderPassBuilder {
 public:
 	struct AttachmentOptions {
-		VkClearValue * clear = NULL;
-		VkSampleCountFlags samples = VK_SAMPLE_COUNT_1_BIT;
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 		bool noClear = false;
 		bool isResolve = false;
 	};
@@ -35,12 +36,16 @@ public:
 	void AddDepthStencilAttachment( VkFormat format, const AttachmentOptions & options = AttachmentOptions() );
 	void AddSubpassDependency( const VkSubpassDependency & dependency );
 
-	VkRenderPass BuildForSingleSubpass();
+	VkRenderPass BuildForSingleSubpass( VkDevice device, const VkAllocationCallbacks * allocator );
 
 private:
+	void AddAttachment( VkAttachmentDescription description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, bool isFinalLayout = true );
+
 	std::vector< VkSubpassDependency > fDependencies;
 	std::vector< VkAttachmentDescription > fDescriptions;
-	std::vector< VkAttachmentReference > fReferences;
+	std::vector< VkAttachmentReference > fColorReferences;
+	std::vector< VkAttachmentReference > fDepthStencilReferences;
+	std::vector< VkAttachmentReference > fResolveReferences;
 };
 
 class VulkanFrameBufferObject : public GPUResource
@@ -50,20 +55,32 @@ class VulkanFrameBufferObject : public GPUResource
 		typedef VulkanFrameBufferObject Self;
 
 	public:
+		VulkanFrameBufferObject( VulkanState * state, uint32_t imageCount, VkImage * swapchainImages = NULL );
+
+	public:
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 		virtual void Bind();
 
 	private:
+		struct PerSwapchainImageData {
+			PerSwapchainImageData()
+			:	fFramebuffer( VK_NULL_HANDLE )
+			{
+			}
+
+			std::vector< VkImageView > fViews;
+			VkFramebuffer fFramebuffer;
+		};
+
+		void MakeFramebuffers( uint32_t width, uint32_t height );
 
 	private:
+		VulkanState * fState;
 		VkImage fImage;
-		VkImageView fView;
-		VkFramebuffer fFramebuffer;
-		VkRenderPass fRenderPass;
+		std::vector< PerSwapchainImageData > fPerImageData;
 		U32 fIndex;
-		bool fOwnsImages;
 };
 
 // ----------------------------------------------------------------------------

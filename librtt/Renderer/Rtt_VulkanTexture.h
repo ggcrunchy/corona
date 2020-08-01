@@ -44,6 +44,10 @@ class VulkanTexture : public GPUResource
 		bool Load( Texture * texture, const VulkanBufferData & bufferData, U32 mipLevels );
 		bool TransitionImageLayout( VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels );
 
+		VkImage GetImage() const { return fData.fImage; }
+		VkImageView GetImageView() const { return fImageView; }
+		VkSampler GetSampler() const { return fSampler; }
+
 	public:
 		struct ImageData {
 			ImageData()

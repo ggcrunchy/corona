@@ -43,6 +43,7 @@ namespace Rtt
 class GPUResource;
 class CPUResource;
 class VulkanState;
+class VulkanFrameBufferObject;
 
 // ----------------------------------------------------------------------------
 
@@ -83,6 +84,7 @@ class VulkanRenderer : public Renderer
 		void ResolvePipeline();
 
 	private:
+		/*
 		struct Attachment {
 			VkImage image;
 			VkImageView view;
@@ -102,6 +104,7 @@ VkDescriptorSet fDescriptorSet;
 			VkImage image;
 			VkImageView view;
 		};
+*/
 
 	private:
 		struct PipelineCreateInfo {
@@ -133,7 +136,9 @@ VkViewport fViewport;
 		};
 
 		VulkanState * fState;
-		std::vector< PerImageData > fPerImageData;
+		VulkanFrameBufferObject * fFBO;
+	//	std::vector< PerImageData > fPerImageData;
+		std::vector< VkImage > fSwapchainImages;
 		std::map< PipelineKey, VkPipeline > fBuiltPipelines;
 
 VkCommandBuffer fCurrentCommandBuffer;

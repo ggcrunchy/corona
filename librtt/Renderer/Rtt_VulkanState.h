@@ -100,15 +100,15 @@ class VulkanState
 			void * data;
 		};
 
-		static bool PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
 		static bool PopulateMultisampleDetails( VulkanState & state );
+		static bool PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
 		static bool PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height );
 
 		struct SwapchainDetails {
 			VkSurfaceTransformFlagBitsKHR fTransformFlagBits;
 			VkExtent2D fExtent;
 			VkSurfaceFormatKHR fFormat;
-			uint32_t fMaxImageCount;
+			uint32_t fImageCount;
 			VkPresentModeKHR fPresentMode;
 		};
 

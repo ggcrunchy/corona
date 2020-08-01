@@ -29,6 +29,7 @@ namespace Rtt
 VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 :   Super( allocator ),
 	fState( state ),
+    fFBO( NULL ),
     fCurrentCommandBuffer( VK_NULL_HANDLE ),
 	fFirstPipeline( VK_NULL_HANDLE )
 {
@@ -60,7 +61,7 @@ VulkanRenderer::BuildUpSwapchain()
 	swapchainCreateInfo.imageFormat = details.fFormat.format;
 	swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	swapchainCreateInfo.minImageCount = details.fMaxImageCount;
+	swapchainCreateInfo.minImageCount = details.fImageCount;
 
     auto queueFamilies = fState->GetQueueFamilies();
 
@@ -90,10 +91,13 @@ VulkanRenderer::BuildUpSwapchain()
 
 		vkGetSwapchainImagesKHR( device, swapchain, &imageCount, NULL );
 
-		std::vector< VkImage > images( imageCount );
+	//	std::vector< VkImage > images( imageCount );
+        fSwapchainImages.resize( imageCount );
 
-		vkGetSwapchainImagesKHR( device, swapchain, &imageCount, images.data() );
-		
+		vkGetSwapchainImagesKHR( device, swapchain, &imageCount, fSwapchainImages.data() );
+
+        fFBO = Rtt_NEW( NULL, VulkanFrameBufferObject( fState, imageCount, fSwapchainImages.data() ) );
+/*
 		for ( const VkImage & image : images )
 		{
 			VkImageView view = VulkanTexture::CreateImageView( fState, image, details.fFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
@@ -115,6 +119,7 @@ VulkanRenderer::BuildUpSwapchain()
 				// TODO: Error
 			}
 		}
+*/
 	}
 
 	else
@@ -125,49 +130,15 @@ VulkanRenderer::BuildUpSwapchain()
 	}
 }
 
-/*
-    void createFramebuffers() {
-        swapChainFramebuffers.resize(swapChainImageViews.size());
-
-        for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-            std::array<VkImageView, 3> attachments = {
-                colorImageView,
-                depthImageView,
-                swapChainImageViews[i]
-            };
-
-            VkFramebufferCreateInfo framebufferInfo = {};
-            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            framebufferInfo.renderPass = renderPass;
-            framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-            framebufferInfo.pAttachments = attachments.data();
-            framebufferInfo.width = swapChainExtent.width;
-            framebufferInfo.height = swapChainExtent.height;
-            framebufferInfo.layers = 1U;
-
-            if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
-                throw std::runtime_error("failed to create framebuffer!");
-            }
-        }
-    }
-*/
-
 void
 VulkanRenderer::TearDownSwapchain()
 {
     const VkAllocationCallbacks * allocator = fState->GetAllocator();
     VkDevice device = fState->GetDevice();
 
-	for (PerImageData & data : fPerImageData)
-	{
-		vkDestroyImageView( device, data.view, allocator );
-        // TODO: frame buffer
+    Rtt_DELETE( fFBO );
 
-        data.image = VK_NULL_HANDLE;
-        data.view = VK_NULL_HANDLE;
-	}
-
-//	fPerImageData.clear();
+    fFBO = NULL;
     // ^^ any good doing this? some of this WON'T need rebuilding...
 
 	vkDestroySwapchainKHR( device, fState->GetSwapchain(), allocator );
@@ -335,7 +306,7 @@ VulkanRenderer::Create( const CPUResource* resource )
 {
 	switch( resource->GetType() )
 	{
-		case CPUResource::kFrameBufferObject: return new VulkanFrameBufferObject;
+		case CPUResource::kFrameBufferObject: return new VulkanFrameBufferObject( fState, fSwapchainImages.size() );
 		case CPUResource::kGeometry: return new VulkanGeometry( fState );
 		case CPUResource::kProgram: return new VulkanProgram( fState );
 		case CPUResource::kTexture: return new VulkanTexture( fState );
