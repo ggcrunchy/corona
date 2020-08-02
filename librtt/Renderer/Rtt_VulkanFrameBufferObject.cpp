@@ -100,7 +100,7 @@ RenderPassBuilder::AddSubpassDependency( const VkSubpassDependency & dependency 
 }
 
 VkRenderPass
-RenderPassBuilder::BuildForSingleSubpass( VkDevice device, const VkAllocationCallbacks * allocator )
+RenderPassBuilder::BuildForSingleSubpass( VkDevice device, const VkAllocationCallbacks * allocator ) const
 {
 	VkSubpassDescription subpass = {};
 
@@ -133,6 +133,49 @@ RenderPassBuilder::BuildForSingleSubpass( VkDevice device, const VkAllocationCal
 		
 		return VK_NULL_HANDLE;
     }
+}
+
+void
+RenderPassBuilder::SingleSubpassKey( RenderPassKey & key ) const
+{
+	U8 descriptionCount = U8( fDescriptions.size() ), dependencyCount = U8( fDependencies.size() );
+
+	std::vector< U8 > contents(
+		2U + // counts
+		descriptionCount * 4U + // descriptions
+		dependencyCount * sizeof( VkSubpassDependency ) // dependencies
+	);
+
+	contents[0] = descriptionCount;
+	contents[1] = dependencyCount;
+
+	int index = 2;
+
+	for ( const VkAttachmentDescription & desc : fDescriptions )
+	{
+		contents[index++] = U8( desc.format );
+		contents[index++] = U8( (desc.loadOp & 0x0F) | ((desc.storeOp << 4U) & 0x0F) );
+		contents[index++] = U8( desc.samples );
+
+		if (desc.finalLayout != VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) // non-byte extension enum
+		{
+			contents[index++] = U8( desc.finalLayout );
+		}
+
+		else
+		{
+			contents[index++] = 0xFF;
+		}
+	}
+
+	for ( const VkSubpassDependency & dep : fDependencies )
+	{
+		memcpy( contents.data() + index, &dep, sizeof( VkSubpassDependency ) );
+
+		index += sizeof( VkSubpassDependency );
+	}
+
+	key.SetContents( contents );
 }
 
 void
@@ -291,7 +334,7 @@ VulkanFrameBufferObject::MakeFramebuffers( uint32_t width, uint32_t height )
         createFramebufferInfo.pAttachments = perImageData.fViews.data();
         createFramebufferInfo.width = width;
 
-        if (vkCreateFramebuffer( device, &createFramebufferInfo, nullptr, &perImageData.fFramebuffer ) != VK_SUCCESS)
+        if (vkCreateFramebuffer( device, &createFramebufferInfo, allocator, &perImageData.fFramebuffer ) != VK_SUCCESS)
 		{
             CoronaLog( "Failed to create framebuffer!" );
 

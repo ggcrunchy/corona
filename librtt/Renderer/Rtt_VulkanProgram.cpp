@@ -22,6 +22,7 @@
 
 #include <shaderc/shaderc.h>
 #include <string>
+#include <utility>
 #include <stdlib.h>
 /*
 #include <cstdio>
@@ -226,13 +227,29 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 
 		for (auto & uniform : resources.uniform_buffers)
 		{
-			for (auto & range : comp.get_active_buffer_ranges( uniform.id ))
+			for (auto & br : comp.get_active_buffer_ranges( uniform.id ))
 			{
-				std::string name = comp.get_member_name( uniform.base_type_id, range.index );
+				std::string name = comp.get_member_name( uniform.base_type_id, br.index );
+				Maps::BufferValue value( br.offset, br.range, true );
+				auto iter = maps.buffer_values.insert( std::make_pair( name, value ) );
 
-				maps.uniforms[name] = std::make_pair( range.offset, range.range );
+				iter.first->second.fStages |= 1U << kind;
+				// TODO: ensure no clashes when found in both
+			}
+		}
+
+		for (auto & push_constant : resources.push_constant_buffers)
+		{
+			// TODO: verify this...
+/*
+			for (auto & range : comp.get_???( push_constant.id ))
+			{
+				std::string name = comp.get_member_name( push_constant.base_type_id, range.index );
+
+				maps.push_constants[name] = std::make_pair( range.offset, range.range );
 				// TODO: compare, if found in both?
 			}
+*/
 		}
 
 		for (auto & sampler : resources.sampled_images)
@@ -325,6 +342,7 @@ VulkanProgram::Maps::CheckForSampler( const std::string & key /* TODO: info... *
 
 		return 0U;	// TODO: maybe just want binding decorator, from above?
 					// imageType would be handy for later expansion...
+					// TODO 2: might need array index, etc. now
 	}
 
 	else
@@ -336,18 +354,16 @@ VulkanProgram::Maps::CheckForSampler( const std::string & key /* TODO: info... *
 U32
 VulkanProgram::Maps::CheckForUniform( const std::string & key )
 {
-	auto iter = uniforms.find( key );
+	auto iter = buffer_values.find( key );
 
-	if (iter != uniforms.end())
+	if (iter != buffer_values.end() && iter->second.fIsUniform)
 	{
-		auto & pair = iter->second;
-
-		return pair.first; // TODO: not sure we need second, cf. note in VersionData
+		return iter->second.fOffset; // TODO: not sure we need second, cf. note in VersionData
 	}
 
 	else
 	{
-		return ~0U;
+		return ~0U; // TODO: maybe we want BufferValue with range = 0?
 	}
 }
 

@@ -21,31 +21,33 @@ namespace Rtt
 {
 
 class VulkanState;
+class RenderPassKey;
 
 // ----------------------------------------------------------------------------
 
 class RenderPassBuilder {
-public:
-	struct AttachmentOptions {
-		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-		bool noClear = false;
-		bool isResolve = false;
-	};
+	public:
+		struct AttachmentOptions {
+			VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+			bool noClear = false;
+			bool isResolve = false;
+		};
 
-	void AddColorAttachment( VkFormat format, const AttachmentOptions & options = AttachmentOptions() );
-	void AddDepthStencilAttachment( VkFormat format, const AttachmentOptions & options = AttachmentOptions() );
-	void AddSubpassDependency( const VkSubpassDependency & dependency );
+		void AddColorAttachment( VkFormat format, const AttachmentOptions & options = AttachmentOptions() );
+		void AddDepthStencilAttachment( VkFormat format, const AttachmentOptions & options = AttachmentOptions() );
+		void AddSubpassDependency( const VkSubpassDependency & dependency );
 
-	VkRenderPass BuildForSingleSubpass( VkDevice device, const VkAllocationCallbacks * allocator );
+		VkRenderPass BuildForSingleSubpass( VkDevice device, const VkAllocationCallbacks * allocator ) const;
+		void SingleSubpassKey( RenderPassKey & key ) const;
 
-private:
-	void AddAttachment( VkAttachmentDescription description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, bool isFinalLayout = true );
+	private:
+		void AddAttachment( VkAttachmentDescription description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, bool isFinalLayout = true );
 
-	std::vector< VkSubpassDependency > fDependencies;
-	std::vector< VkAttachmentDescription > fDescriptions;
-	std::vector< VkAttachmentReference > fColorReferences;
-	std::vector< VkAttachmentReference > fDepthStencilReferences;
-	std::vector< VkAttachmentReference > fResolveReferences;
+		std::vector< VkSubpassDependency > fDependencies;
+		std::vector< VkAttachmentDescription > fDescriptions;
+		std::vector< VkAttachmentReference > fColorReferences;
+		std::vector< VkAttachmentReference > fDepthStencilReferences;
+		std::vector< VkAttachmentReference > fResolveReferences;
 };
 
 class VulkanFrameBufferObject : public GPUResource

@@ -12,7 +12,7 @@
 
 #include "Renderer/Rtt_Renderer.h"
 #include <vulkan/vulkan.h>
-#include <utility>
+#include <map>
 #include <vector>
 
 #ifdef free
@@ -28,6 +28,17 @@ namespace Rtt
 {
 
 // ----------------------------------------------------------------------------
+
+class RenderPassKey {
+	public:
+		void SetContents( std::vector< U8 > & contents );
+
+		bool operator == ( const RenderPassKey & other ) const;
+		bool operator < ( const RenderPassKey & other ) const;
+
+	private:
+		std::vector< U8 > fContents;
+};
 
 class VulkanBufferData {
 public:
@@ -75,12 +86,21 @@ class VulkanState
 
 		void SetSwapchain( VkSwapchainKHR swapchain ) { fSwapchain = swapchain; }
 
-		struct shaderc_compiler * GetCompiler() const { return fCompiler; }
-		struct shaderc_compile_options * GetCompileOptions() const { return fCompileOptions; }
+		shaderc_compiler * GetCompiler() const { return fCompiler; }
+		shaderc_compile_options * GetCompileOptions() const { return fCompileOptions; }
 
 	#ifndef NDEBUG
 		void SetDebugMessenger( VkDebugUtilsMessengerEXT messenger ) { fDebugMessenger = messenger; }
 	#endif
+
+	public:
+		struct RenderPassData {
+			U32 fID;
+			VkRenderPass fPass;
+		};
+
+		bool FindRenderPassData( const RenderPassKey & key ) const;
+		bool AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass );
 
 	public:
 		VulkanBufferData CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties );
@@ -131,9 +151,9 @@ class VulkanState
 		VkSwapchainKHR fSwapchain;
 		SwapchainDetails fSwapchainDetails;
 		std::vector< uint32_t > fQueueFamilies;
-
-		struct shaderc_compiler * fCompiler;
-		struct shaderc_compile_options * fCompileOptions;
+		std::map< RenderPassKey, RenderPassData > fRenderPasses;
+		shaderc_compiler * fCompiler;
+		shaderc_compile_options * fCompileOptions;
 };
 
 // ----------------------------------------------------------------------------

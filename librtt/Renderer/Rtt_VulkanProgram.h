@@ -16,7 +16,6 @@
 #include "Core/Rtt_Assert.h"
 #include <vulkan/vulkan.h>
 #include <map>
-#include <utility>
 #include <vector>
 
 #ifdef free
@@ -107,11 +106,25 @@ class VulkanProgram : public GPUResource
 		void Reset( VersionData& data );
 
 		struct Maps {
-			typedef spirv_cross::SPIRType::ImageType SamplersValueType;
-			typedef std::pair< size_t, size_t > UniformsValueType;
+			struct BufferValue {
+				BufferValue( size_t offset, size_t range, bool isUniform )
+				:	fOffset( offset ),
+					fRange( range ),
+					fStages( 0U ),
+					fIsUniform( isUniform )
+				{
+				}
 
+				size_t fOffset;
+				size_t fRange;
+				U32 fStages;
+				bool fIsUniform;
+			};
+
+			typedef spirv_cross::SPIRType::ImageType SamplersValueType;
+
+			std::map< std::string, BufferValue > buffer_values;
 			std::map< std::string, SamplersValueType > samplers;
-			std::map< std::string, UniformsValueType > uniforms;
 			std::map< std::string, int > varyings;
 
 			U32 CheckForSampler( const std::string & key /* TODO: info... */ );
@@ -121,8 +134,8 @@ class VulkanProgram : public GPUResource
 		void Compile( int kind, const char * sources[], int sourceCount, Maps & maps, VkShaderModule & module );
 		Maps UpdateShaderSource( Program* program, Program::Version version, VersionData& data );
 
-		static void InitializeCompiler( struct shaderc_compiler ** compiler, struct shaderc_compile_options ** options );
-		static void CleanUpCompiler( struct shaderc_compiler * compiler, struct shaderc_compile_options * options );
+		static void InitializeCompiler( shaderc_compiler ** compiler, shaderc_compile_options ** options );
+		static void CleanUpCompiler( shaderc_compiler * compiler, shaderc_compile_options * options );
 			
 		static std::vector< VkVertexInputAttributeDescription > AttributeDescriptions();
 

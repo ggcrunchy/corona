@@ -74,6 +74,9 @@ class VulkanRenderer : public Renderer
 		void SetPrimitiveTopology( VkPrimitiveTopology topology, bool resolvePipeline = true );
 		void SetShaderStages( U32 id, const std::vector< VkPipelineShaderStageCreateInfo > & stages );
 
+	public:
+		void SetClearValue( U32 index, const VkClearValue & clearValue );
+
 	protected:
 		// Create an OpenGL resource appropriate for the given CPUResource.
 		virtual GPUResource* Create( const CPUResource* resource );
@@ -82,29 +85,6 @@ class VulkanRenderer : public Renderer
 		void InitializePipelineState();
 		void RestartWorkingPipeline();
 		void ResolvePipeline();
-
-	private:
-		/*
-		struct Attachment {
-			VkImage image;
-			VkImageView view;
-			VkDeviceMemory memory;
-		};
-
-		struct PerImageData {
-			std::vector< Attachment > attachments;
-
-VkBuffer fUniformBuffer;
-VkDeviceMemory fUniformBufferMemory;
-VkDescriptorSet fDescriptorSet;
-
-			VkCommandPool fCommandPool;
-			VkDescriptorPool fDescriptorPool;
-			VkFramebuffer framebuffer;
-			VkImage image;
-			VkImageView view;
-		};
-*/
 
 	private:
 		struct PipelineCreateInfo {
@@ -137,7 +117,7 @@ VkViewport fViewport;
 
 		VulkanState * fState;
 		VulkanFrameBufferObject * fFBO;
-	//	std::vector< PerImageData > fPerImageData;
+		std::vector< VkClearValue > fClearValues;
 		std::vector< VkImage > fSwapchainImages;
 		std::map< PipelineKey, VkPipeline > fBuiltPipelines;
 
