@@ -41,7 +41,7 @@ class VulkanTexture : public GPUResource
 
 	public:
 		void CopyBufferToImage( VkBuffer buffer, VkImage image, uint32_t width, uint32_t height );
-		bool Load( Texture * texture, const VulkanBufferData & bufferData, U32 mipLevels );
+		bool Load( Texture * texture, VkFormat format, const VulkanBufferData & bufferData, U32 mipLevels );
 		bool TransitionImageLayout( VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels );
 
 		VkImage GetImage() const { return fData.fImage; }

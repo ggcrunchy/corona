@@ -24,12 +24,15 @@ layout(binding = 0) uniform UniformBufferObject {
     mat3 MaskMatrix0;
     mat3 MaskMatrix1;
     mat3 MaskMatrix2;
+    mat4 UserData0;
+    mat4 UserData1;
+    mat4 UserData2;
+    mat4 UserData3;
 } ubo;
 
 #define MAX_FILL_SAMPLERS 2
 
-layout(binding = 1) uniform sampler2D u_FillSampler0;
-layout(binding = 2) uniform sampler2D u_FillSampler1;
+layout(binding = 1) uniform sampler2D u_FillSamplers[MAX_FILL_SAMPLERS + 3]; // TODO: can we drop the mask count here?
 
 #define CoronaVertexUserData a_UserData
 #define CoronaTexCoord a_TexCoord.xy
@@ -38,6 +41,8 @@ layout(binding = 2) uniform sampler2D u_FillSampler1;
 #define CoronaDeltaTime ubo.DeltaTime
 #define CoronaTexelSize ubo.TexelSize
 #define CoronaContentScale ubo.ContentScale
+#define u_FillSampler0 u_FillSamplers[0]
+#define u_FillSampler0 u_FillSamplers[1]
 
 varying P_POSITION vec2 v_Position;
 varying P_UV vec2 v_TexCoord;
@@ -104,8 +109,7 @@ shell.fragment =
 [[
 #define MAX_FILL_SAMPLERS 2
 
-layout(binding = 1) uniform sampler2D u_FillSampler0;
-layout(binding = 2) uniform sampler2D u_FillSampler1;
+layout(binding = 1) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3];
 
 layout(binding = 0) uniform UniformBufferObject {
     float TotalTime;
@@ -116,7 +120,12 @@ layout(binding = 0) uniform UniformBufferObject {
     mat3 MaskMatrix0;
     mat3 MaskMatrix1;
     mat3 MaskMatrix2;
+    mat4 UserData0;
+    mat4 UserData1;
+    mat4 UserData2;
+    mat4 UserData3;
 } ubo;
+// TODO: can we rearrange this and elide the irrelevant bits at the end? (masks, then projection?)
 
 varying P_POSITION vec2 v_Position;
 varying P_UV vec2 v_TexCoord;
@@ -134,21 +143,18 @@ varying P_DEFAULT vec4 v_UserData;
 #define CoronaDeltaTime ubo.DeltaTime
 #define CoronaTexelSize ubo.TexelSize
 #define CoronaContentScale ubo.ContentScale
-#define CoronaSampler0 u_FillSampler0
-#define CoronaSampler1 u_FillSampler1
+#define CoronaSampler0 u_Samplers[0]
+#define CoronaSampler1 u_Samplers[1]
 
 #if MASK_COUNT > 0
-    layout(binding = MAX_FILL_SAMPLERS + 1) uniform sampler2D u_MaskSampler0;
     varying P_UV vec2 v_MaskUV0;
 #endif
 
 #if MASK_COUNT > 1
-    layout(binding = MAX_FILL_SAMPLERS + 2) uniform sampler2D u_MaskSampler1;
     varying P_UV vec2 v_MaskUV1;
 #endif
 
 #if MASK_COUNT > 2
-    layout(binding = MAX_FILL_SAMPLERS + 3) uniform sampler2D u_MaskSampler2;
     varying P_UV vec2 v_MaskUV2;
 #endif
 
@@ -171,15 +177,15 @@ void main()
 #endif
     
     #if MASK_COUNT > 0
-        result *= texture2D( u_MaskSampler0, v_MaskUV0 ).r;
+        result *= texture2D( u_Samplers[MAX_FILL_SAMPLERS + 0], v_MaskUV0 ).r;
     #endif
 
     #if MASK_COUNT > 1
-        result *= texture2D( u_MaskSampler1, v_MaskUV1 ).r;
+        result *= texture2D( u_Samplers[MAX_FILL_SAMPLERS + 1], v_MaskUV1 ).r;
     #endif
 
     #if MASK_COUNT > 2
-        result *= texture2D( u_MaskSampler2, v_MaskUV2 ).r;
+        result *= texture2D( u_Samplers[MAX_FILL_SAMPLERS + 2], v_MaskUV2 ).r;
     #endif
 
     fragColor = result;

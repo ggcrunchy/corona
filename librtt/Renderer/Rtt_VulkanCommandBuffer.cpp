@@ -447,25 +447,16 @@ VulkanCommandBuffer::SetMultisampleEnabled( bool enabled )
 void 
 VulkanCommandBuffer::Clear( Real r, Real g, Real b, Real a )
 {
-// TODO: populate clearvalue[0] of current FBO render pass info...
-/*
-	WRITE_COMMAND( kCommandClear );
-	Write<GLfloat>(r);
-	Write<GLfloat>(g);
-	Write<GLfloat>(b);
-	Write<GLfloat>(a);
-*/
+	VkClearValue clearValue;
 
-	/*
-					GLfloat r = Read<GLfloat>();
-				GLfloat g = Read<GLfloat>();
-				GLfloat b = Read<GLfloat>();
-				GLfloat a = Read<GLfloat>();
-				glClearColor( r, g, b, a );
-				glClear( GL_COLOR_BUFFER_BIT );
-				DEBUG_PRINT( "Clear: r=%f, g=%f, b=%f, a=%f", r, g, b, a );
-				CHECK_ERROR_AND_BREAK;
-	*/
+	// TODO: allow this to accommodate float targets?
+
+	clearValue.color.uint32[0] = uint32_t( 255. * r );
+	clearValue.color.uint32[1] = uint32_t( 255. * g );
+	clearValue.color.uint32[2] = uint32_t( 255. * b );
+	clearValue.color.uint32[3] = uint32_t( 255. * a );
+
+	fRenderer.SetClearValue( 0U, clearValue );
 }
 
 void 

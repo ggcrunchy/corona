@@ -36,7 +36,7 @@ namespace /*anonymous*/
 
 	VkFormat getFormatTokens( Texture::Format format, VkComponentMapping & mapping )
 	{
-        VkFormat vulkanFormat = VK_FORMAT_R8G8B8A8_SRGB;
+        VkFormat vulkanFormat = VK_FORMAT_R8G8B8A8_UNORM; // TODO: allow sR* forms, floats, etc.
 
 		switch( format )
 		{
@@ -46,12 +46,12 @@ namespace /*anonymous*/
                 break;
             // ^^ TODO: guess!
 			case Texture::kLuminance:
-                vulkanFormat = VK_FORMAT_R8_SRGB;
+                vulkanFormat = VK_FORMAT_R8_UNORM;
                 
                 break;
             // ^^ TODO: guess!
             case Texture::kRGB:
-                vulkanFormat = VK_FORMAT_R8G8B8_SRGB;
+                vulkanFormat = VK_FORMAT_R8G8B8_UNORM;
                 
                 break;
             case Texture::kRGBA:
@@ -143,7 +143,7 @@ VulkanTexture::Create( CPUResource* resource )
             texture->GetWidth(), texture->GetHeight(),
             1U, // mip levels
             VK_SAMPLE_COUNT_1_BIT,
-            VK_FORMAT_R8G8B8A8_UNORM,
+            format,
             VK_IMAGE_TILING_OPTIMAL, // might not want if frequently changed?
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
@@ -152,7 +152,7 @@ VulkanTexture::Create( CPUResource* resource )
 
         if (ok)
         {
-            ok = Load( texture, stagingData, mipLevels );
+            ok = Load( texture, format, stagingData, mipLevels );
         }
     }
     
@@ -282,20 +282,20 @@ PrepareBarrier( VkImage image, VkImageAspectFlags aspectFlags, uint32_t mipLevel
 }
 
 bool
-VulkanTexture::Load( Texture * texture, const VulkanBufferData & bufferData, U32 mipLevels )
+VulkanTexture::Load( Texture * texture, VkFormat format, const VulkanBufferData & bufferData, U32 mipLevels )
 {
     if (bufferData.IsValid())
     {
         fState->StageData( bufferData.GetMemory(), texture->GetData(), texture->GetSizeInBytes() );
         
-        if (TransitionImageLayout( fData.fImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels ))
+        if (TransitionImageLayout( fData.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels ))
         {
             CopyBufferToImage( bufferData.GetBuffer(), fData.fImage, texture->GetWidth(), texture->GetHeight() );
 
             VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
             VkImageMemoryBarrier barrier = PrepareBarrier( fData.fImage, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
-            // generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_UNORM, texWidth, texHeight, mipLevels);
+            // generateMipmaps(textureImage, format, texWidth, texHeight, mipLevels);
              
             barrier.subresourceRange.baseMipLevel = mipLevels - 1U;
             barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // todo: if we forgo a staging buffer, is this GENERAL or something?

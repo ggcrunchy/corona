@@ -24,6 +24,27 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
+void
+RenderPassKey::SetContents( std::vector< U8 > & contents )
+{
+	fContents.swap( contents );
+}
+
+bool
+RenderPassKey::operator == ( const RenderPassKey & other ) const
+{
+	return fContents == other.fContents;
+}
+
+bool
+RenderPassKey::operator < ( const RenderPassKey & other ) const
+{
+	size_t minSize = std::min( fContents.size(), other.fContents.size() );
+	int result = memcmp( fContents.data(), other.fContents.data(), minSize );
+
+	return result < 0 || (0 == result && other.fContents.size() > minSize);
+}
+
 VulkanBufferData::VulkanBufferData( VkDevice device, VkAllocationCallbacks * allocator )
 :	fDevice( device ),
 	fAllocator( allocator ),
@@ -146,6 +167,21 @@ VulkanState::~VulkanState()
     vkDestroyInstance( fInstance, fAllocator );
 
 	// allocator?
+}
+
+bool
+VulkanState::FindRenderPassData( const RenderPassKey & key ) const
+{
+	return fRenderPasses.end() != fRenderPasses.find( key );
+}
+
+bool
+VulkanState::AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass )
+{
+	RenderPassData data = { fRenderPasses.size(), renderPass };
+	auto result = fRenderPasses.insert( std::make_pair( key, data ) );
+
+	return result.second;
 }
 
 VulkanBufferData
@@ -908,7 +944,7 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint
 
 	for (const VkSurfaceFormatKHR & formatInfo : formats)
 	{
-		if (VK_FORMAT_B8G8R8A8_SRGB == formatInfo.format && VK_COLOR_SPACE_SRGB_NONLINEAR_KHR == formatInfo.colorSpace)
+		if (VK_FORMAT_B8G8R8A8_SRGB == formatInfo.format && VK_COLOR_SPACE_SRGB_NONLINEAR_KHR == formatInfo.colorSpace) // TODO: use a rating system, in case not present?
 		{
             format = formatInfo;
 
