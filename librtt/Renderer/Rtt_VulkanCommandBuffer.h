@@ -70,9 +70,10 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkResult WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain );
 		VkResult GetExecuteResult() const { return fExecuteResult; }
 		uint32_t GetImageIndex() const { return fImageIndex; }
-
+		
+		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorPoolList * descriptorPoolList );
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
-		void PrepareToExecute( VkCommandBuffer commandBuffer, DescriptorPoolList * descriptorPoolList );
+		void PrepareDraw( VkPrimitiveTopology topology );
 
 	public:
 		void AddGraphicsPipeline( VkPipeline pipeline );
@@ -95,10 +96,8 @@ class VulkanCommandBuffer : public CommandBuffer
 		UniformUpdate fUniformUpdates[Uniform::kNumBuiltInVariables];
 
 		Program::Version fCurrentPrepVersion;
-		Program::Version fCurrentDrawVersion;
 		
-	private:
-	/*
+	private:/*
 		Program* fProgram;
 		S32 fDefaultFBO;
 		U32* fTimerQueries;
@@ -107,11 +106,11 @@ class VulkanCommandBuffer : public CommandBuffer
 		TimeTransform* fTimeTransform;
 		S32 fCachedQuery[kNumQueryableParams];
 		VulkanRenderer & fRenderer;
-		VkFence fInFlight;
 		VkSemaphore fImageAvailableSemaphore;
 		VkSemaphore fRenderFinishedSemaphore;
+		VkFence fInFlight;
 
-		// retained for frame
+		// non-owned, retained only for frame:
 		DescriptorPoolList * fDescriptorPoolList;
 		VkCommandBuffer fCommandBuffer;
 		VkSwapchainKHR fSwapchain;

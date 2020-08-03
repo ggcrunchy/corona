@@ -72,6 +72,11 @@ class VulkanState
 		~VulkanState();
 
 	public:
+		struct Features {
+			bool shaderSampledImageArrayDynamicIndexing;
+		};
+
+	public:
 		VkAllocationCallbacks * GetAllocator() const { return fAllocator; }
 		VkInstance GetInstance() const { return fInstance; }
 		VkDevice GetDevice() const { return fDevice; }
@@ -84,6 +89,8 @@ class VulkanState
 		VkSampleCountFlags GetSampleCountFlags() const { return fSampleCountFlags; }
 		VkSwapchainKHR GetSwapchain() const { return fSwapchain; }
 		const std::vector< uint32_t > & GetQueueFamilies() const { return fQueueFamilies; }
+		const Features & GetFeatures() const { return fDeviceDetails.features; }
+		const VkPhysicalDeviceProperties & GetProperties() const { return fDeviceDetails.properties; }
 
 		void SetSwapchain( VkSwapchainKHR swapchain ) { fSwapchain = swapchain; }
 
@@ -113,6 +120,12 @@ class VulkanState
 		void CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size );
 		void * MapData( VkDeviceMemory memory, VkDeviceSize count, VkDeviceSize offset = 0U );
 		void StageData( VkDeviceMemory stagingMemory, const void * data, VkDeviceSize count, VkDeviceSize offset = 0U );
+
+	public:
+		struct DeviceDetails {
+			Features features;
+			VkPhysicalDeviceProperties properties;
+		};
 
 	public:
 		struct NewSurfaceCallback {
@@ -151,6 +164,7 @@ class VulkanState
 		VkSampleCountFlags fSampleCountFlags;
 		VkSwapchainKHR fSwapchain;
 		SwapchainDetails fSwapchainDetails;
+		DeviceDetails fDeviceDetails;
 		std::vector< uint32_t > fQueueFamilies;
 		std::map< RenderPassKey, RenderPassData > fRenderPasses;
 		shaderc_compiler * fCompiler;

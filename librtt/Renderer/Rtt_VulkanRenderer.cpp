@@ -66,7 +66,7 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 	{
 		uint32_t index = vulkanCommandBuffer->GetImageIndex();
 
-		vulkanCommandBuffer->PrepareToExecute( fCommandBuffers[index], &fDescriptorPools[index] );
+		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], &fDescriptorPools[index] );
 	}
 
 	else
@@ -501,7 +501,7 @@ VulkanRenderer::ResolvePipeline()
 
 	if (pipeline != VK_NULL_HANDLE && (VK_NULL_HANDLE == fBoundPipeline || pipeline != fBoundPipeline))
 	{
-		static_cast< VulkanCommandBuffer * >( fFrontCommandBuffer )->AddGraphicsPipeline( pipeline );
+		static_cast< VulkanCommandBuffer * >( fBackCommandBuffer )->AddGraphicsPipeline( pipeline );
 	}
 
 	fBoundPipeline = pipeline;

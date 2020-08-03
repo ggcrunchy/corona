@@ -95,8 +95,7 @@ namespace Rtt
 
 VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRenderer & renderer )
 :	CommandBuffer( allocator ),
-	fCurrentPrepVersion( Program::kMaskCount0 ),
-	fCurrentDrawVersion( Program::kMaskCount0 ),/*
+	fCurrentPrepVersion( Program::kMaskCount0 ),/*
 	fProgram( NULL ),
 	fDefaultFBO( 0 ),*/
 	fTimeTransform( NULL ),/*
@@ -104,9 +103,9 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fTimerQueryIndex( 0 ),*/
 	fElapsedTimeGPU( 0.0f ),
 	fRenderer( renderer ),
-	fInFlight( VK_NULL_HANDLE ),
 	fImageAvailableSemaphore( VK_NULL_HANDLE ),
 	fRenderFinishedSemaphore( VK_NULL_HANDLE ),
+	fInFlight( VK_NULL_HANDLE ),
 	fDescriptorPoolList( NULL ),
 	fCommandBuffer( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE )
@@ -141,13 +140,13 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	{
 		CoronaLog( "Failed to create some synchronziation objects!" );
 
-		vkDestroyFence( device, fInFlight, vulkanAllocator );
 		vkDestroySemaphore( device, fImageAvailableSemaphore, vulkanAllocator );
 		vkDestroySemaphore( device, fRenderFinishedSemaphore, vulkanAllocator );
+		vkDestroyFence( device, fInFlight, vulkanAllocator );
 
-		fInFlight = VK_NULL_HANDLE;
 		fImageAvailableSemaphore = VK_NULL_HANDLE;
 		fRenderFinishedSemaphore = VK_NULL_HANDLE;
+		fInFlight = VK_NULL_HANDLE;
 	}
 }
 
@@ -178,7 +177,7 @@ VulkanCommandBuffer::Initialize()
 #endif
 	InitializeFBO();
 	InitializeCachedParams();
-	//CacheQueryParam(kMaxTextureSize);
+	CacheQueryParam( kMaxTextureSize );
 	
 	GetMaxTextureSize();
 
@@ -208,23 +207,12 @@ VulkanCommandBuffer::InitializeCachedParams()
 void 
 VulkanCommandBuffer::CacheQueryParam( CommandBuffer::QueryableParams param )
 {
-/*
-	GLenum glQueryParam = GL_MAX_TEXTURE_SIZE;
-	switch (param)
+	const VkPhysicalDeviceProperties & properties = fRenderer.GetState()->GetProperties();
+
+	if (CommandBuffer::kMaxTextureSize == param)
 	{
-		case CommandBuffer::kMaxTextureSize:
-			glQueryParam = GL_MAX_TEXTURE_SIZE;
-			break;
-		default:
-			break;
+		fCachedQuery[param] = S32( properties.limits.maxImageDimension2D );
 	}
-	
-	GLint retVal = -1;
-	glGetIntegerv( glQueryParam, &retVal );
-	fCachedQuery[param] = retVal;
-	
-	GL_CHECK_ERROR();
-*/
 }
 
 void 
@@ -270,7 +258,8 @@ VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 	fRenderer.SetBindingDescriptions( vertexData.fID, vertexData.fDescriptions );
 //	WRITE_COMMAND( kCommandBindGeometry );
 //	Write<GPUResource*>( geometry->GetGPUResource() );
-	
+//        VkBuffer vertexBuffers[] = {vertexBuffer};
+//        VkDeviceSize offsets[] = {0};	
 //                vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 
 //                vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
@@ -472,39 +461,36 @@ VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 {
 	if (fCommandBuffer != VK_NULL_HANDLE)
 	{
-	VkPrimitiveTopology topology;
+		VkPrimitiveTopology topology;
 
-	switch( type )
-	{
-		case Geometry::kTriangleStrip:
-			topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+		switch( type )
+		{
+			case Geometry::kTriangleStrip:
+				topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 			
-			break;
-		case Geometry::kTriangleFan:
-			topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+				break;
+			case Geometry::kTriangleFan:
+				topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
 			
-			break;
-		case Geometry::kTriangles:
-			topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+				break;
+			case Geometry::kTriangles:
+				topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 			
-			break;
-		case Geometry::kLines:
-			topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+				break;
+			case Geometry::kLines:
+				topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
 
-			break;
-		case Geometry::kLineLoop:
-			topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+				break;
+			case Geometry::kLineLoop:
+				topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
 			
-			break;
-		default: Rtt_ASSERT_NOT_REACHED(); break;
-	}
+				break;
+			default: Rtt_ASSERT_NOT_REACHED(); break;
+		}
 
-	fRenderer.SetPrimitiveTopology( topology );
-/*
-	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-	ApplyUniforms( fProgram->GetGPUResource() );
-*/
-	vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
+		PrepareDraw( topology );
+
+		vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
 	}
 }
 
@@ -523,15 +509,12 @@ VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 				break;
 			default: Rtt_ASSERT_NOT_REACHED(); break;
 		}
-	
-		fRenderer.SetPrimitiveTopology( topology );
-	/*
+
+		PrepareDraw( topology );
+
 		// The first argument, offset, is currently unused. If support for non-
 		// VBO based indexed rendering is added later, an offset may be needed.
 
-		Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-		ApplyUniforms( fProgram->GetGPUResource() );
-	*/
 		vkCmdDrawIndexed( fCommandBuffer, count, 1U, 0U, 0U, 0U );
 	}
 }
@@ -543,7 +526,7 @@ VulkanCommandBuffer::GetCachedParam( CommandBuffer::QueryableParams param )
 
 	if (param < kNumQueryableParams)
 	{
-//		result = fCachedQuery[param];
+		result = fCachedQuery[param];
 	}
 
 	Rtt_ASSERT_MSG(result != -1, "Parameter not cached");
@@ -632,54 +615,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 								texture->GetName() );
 				CHECK_ERROR_AND_BREAK;
 			}
-
-			case kCommandApplyUniformScalar:
-			{
-				READ_UNIFORM_DATA( Real );
-				glUniform1f( location, value );
-				DEBUG_PRINT( "Set Uniform: value=%f location=%i", value, location );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformVec2:
-			{
-				READ_UNIFORM_DATA( Vec2 );
-				glUniform2fv( location, 1, &value.data[0] );
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f) location=%i", value.data[0], value.data[1], location);
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformVec3:
-			{
-				READ_UNIFORM_DATA( Vec3 );
-				glUniform3fv( location, 1, &value.data[0] );
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location);
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformVec4:
-			{
-				READ_UNIFORM_DATA( Vec4 );
-				glUniform4fv( location, 1, &value.data[0] );
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location);
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformMat3:
-			{
-				READ_UNIFORM_DATA( Mat3 );
-				glUniformMatrix3fv( location, 1, GL_FALSE, &value.data[0] );
-				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 9 );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformMat4:
-			{
-				READ_UNIFORM_DATA( Mat4 );
-				glUniformMatrix4fv( location, 1, GL_FALSE, &value.data[0] );
-				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
-				CHECK_ERROR_AND_BREAK;
-			}
-
-			default:
-				DEBUG_PRINT( "Unknown command(%d)", command );
-				Rtt_ASSERT_NOT_REACHED();
-				break;
 		}
 	}
 
@@ -777,34 +712,27 @@ VulkanCommandBuffer::Execute( bool measureGPU )
     // begin
 
     VkRenderPassBeginInfo renderPassInfo = {};
+
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = renderPass;
+    renderPassInfo.clearValueCount = fClearValues.size();
     renderPassInfo.framebuffer = swapChainFramebuffers[i];
+    renderPassInfo.pClearValues = fClearValues.data();
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = swapChainExtent;
-
-    std::array<VkClearValue, 2> clearValues = {};
-    clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
-    clearValues[1].depthStencil = {1.0f, 0};
-
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
+    renderPassInfo.renderPass = renderPass;
 
     vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+	^^ FBO?
 
-        VkBuffer vertexBuffers[] = {vertexBuffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-
-        vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
-
-        vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+		geometry
+        draw
+			descriptors
+			pipeline
 
     vkCmdEndRenderPass(commandBuffers[i]);
+
+	^^ /FBO?
 
 	// end
 */
@@ -825,7 +753,7 @@ VkResult VulkanCommandBuffer::WaitAndAcquire( VkDevice device, VkSwapchainKHR sw
 	}
 }
 
-void VulkanCommandBuffer::PrepareToExecute( VkCommandBuffer commandBuffer, DescriptorPoolList * descriptorPoolList )
+void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, DescriptorPoolList * descriptorPoolList )
 {
 	if (commandBuffer != VK_NULL_HANDLE && descriptorPoolList)
 	{
@@ -855,6 +783,17 @@ void VulkanCommandBuffer::PrepareToExecute( VkCommandBuffer commandBuffer, Descr
 	}
 }
 
+void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
+{
+	fRenderer.SetPrimitiveTopology( topology );
+
+	// Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
+	// ApplyUniforms( fProgram->GetGPUResource() );
+
+//  vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0U, 1U, &descriptorSets[i], 0U, NULL );
+	// ^^ offsets...
+}
+
 void VulkanCommandBuffer::AddGraphicsPipeline( VkPipeline pipeline )
 {
 	if (fCommandBuffer != VK_NULL_HANDLE)
@@ -865,7 +804,7 @@ void VulkanCommandBuffer::AddGraphicsPipeline( VkPipeline pipeline )
 
 void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 {
-	VulkanProgram* vulkanProgram = static_cast< VulkanProgram * >(resource);
+	VulkanProgram* vulkanProgram = static_cast< VulkanProgram * >( resource );
 
 	Real rawTotalTime;
 	bool transformed = false;
@@ -897,25 +836,45 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 void VulkanCommandBuffer::ApplyUniform( GPUResource* resource, U32 index )
 {
 	const UniformUpdate& update = fUniformUpdates[index];
-// write memory OR update push constant(s)...
-	/*
-	GLProgram* glProgram = static_cast<GLProgram*>( resource );
-	glProgram->SetUniformTimestamp( index, fCurrentPrepVersion, update.timestamp );
+	VulkanProgram * vulkanProgram = static_cast< VulkanProgram * >( resource );
+	vulkanProgram->SetUniformTimestamp( index, fCurrentPrepVersion, update.timestamp );
 
-	GLint location = glProgram->GetUniformLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );*/
-		// The OpenGL program already exists and actually uses the specified uniform
-		Uniform* uniform = update.uniform;
-		switch( uniform->GetDataType() )
-		{/*
-			case Uniform::kScalar:	WRITE_COMMAND( kCommandApplyUniformScalar );	break;
-			case Uniform::kVec2:	WRITE_COMMAND( kCommandApplyUniformVec2 );		break;
-			case Uniform::kVec3:	WRITE_COMMAND( kCommandApplyUniformVec3 );		break;
-			case Uniform::kVec4:	WRITE_COMMAND( kCommandApplyUniformVec4 );		break;
-			case Uniform::kMat3:	WRITE_COMMAND( kCommandApplyUniformMat3 );		break;
-			case Uniform::kMat4:	WRITE_COMMAND( kCommandApplyUniformMat4 );		break;
-			default:				Rtt_ASSERT_NOT_REACHED();						break;*/
-		}
-	//	Write<GLint>( location );
+	VulkanProgram::Location location = vulkanProgram->GetUniformLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
+	Uniform* uniform = update.uniform;
+
+	switch( uniform->GetDataType() )
+	{
+		case Uniform::kScalar:
+			// WRITE_COMMAND( kCommandApplyUniformScalar );
+
+			break;
+		case Uniform::kVec2:
+			// WRITE_COMMAND( kCommandApplyUniformVec2 );
+			
+			break;
+		case Uniform::kVec3: // TODO: see if Cross handles this robustly (a few sources sound the alarm with these types)
+			// WRITE_COMMAND( kCommandApplyUniformVec3 );
+			
+			break;
+		case Uniform::kVec4:
+			// WRITE_COMMAND( kCommandApplyUniformVec4 );
+			
+			break;
+		case Uniform::kMat3: // TODO: ditto here
+			// WRITE_COMMAND( kCommandApplyUniformMat3 );
+			// split into three rows
+			
+			break;
+		case Uniform::kMat4:
+			// WRITE_COMMAND( kCommandApplyUniformMat4 );
+			
+			break;
+		default:
+			Rtt_ASSERT_NOT_REACHED();
+			
+			break;
+	}
+	// dirty bounds: { bin(lower), bin(upper) }
 }
 
 // ----------------------------------------------------------------------------
