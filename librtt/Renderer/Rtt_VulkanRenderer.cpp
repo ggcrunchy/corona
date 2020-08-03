@@ -30,7 +30,6 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 :   Super( allocator ),
 	fState( state ),
     fFBO( NULL ),
-    fCurrentCommandBuffer( VK_NULL_HANDLE ),
 	fFirstPipeline( VK_NULL_HANDLE )
 {
 	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
@@ -41,15 +40,56 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 VulkanRenderer::~VulkanRenderer()
 {
-	TearDownSwapchain();
+	vkQueueWaitIdle( fState->GetGraphicsQueue() );
 
-    // vkDestroyCommandPool( fDevice, fCommandPool, fAllocator );
+	TearDownSwapchain();
 
 	Rtt_DELETE( fState );
 }
 
 void
-VulkanRenderer::BuildUpSwapchain()
+VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY )
+{
+	Super::BeginFrame( totalTime, deltaTime, contentScaleX, contentScaleY );
+
+	VulkanCommandBuffer * vulkanCommandBuffer = static_cast< VulkanCommandBuffer * >( fBackCommandBuffer );
+	VkResult result = vulkanCommandBuffer->GetExecuteResult();
+	bool canContinue = VK_SUCCESS == result;
+
+	if (canContinue)
+	{
+		result = vulkanCommandBuffer->WaitAndAcquire( fState->GetDevice(), fState->GetSwapchain() );
+		canContinue = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
+	}
+
+	if (canContinue)
+	{
+		uint32_t index = vulkanCommandBuffer->GetImageIndex();
+
+		vulkanCommandBuffer->PrepareToExecute( fCommandBuffers[index], &fDescriptorPools[index] );
+	}
+
+	else
+	{
+		if (VK_ERROR_OUT_OF_DATE_KHR == result)
+		{
+		//	fState->RebuildSwapChain();
+			// TODO: should we then try again?
+			// or can we just do that straight out?
+				// if an acquire fails, then what????
+		}
+	
+		else
+		{
+			CoronaLog( "Failed to acquire swap chain image!" );
+		}
+	}
+
+	vulkanCommandBuffer->ClearExecuteResult();
+}
+
+VkSwapchainKHR
+VulkanRenderer::MakeSwapchain()
 {
     const VulkanState::SwapchainDetails & details = fState->GetSwapchainDetails();
 	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
@@ -74,74 +114,92 @@ VulkanRenderer::BuildUpSwapchain()
 
 	swapchainCreateInfo.clipped = VK_TRUE;
 	swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE; // TODO!
+	swapchainCreateInfo.oldSwapchain = fState->GetSwapchain();
 	swapchainCreateInfo.presentMode = details.fPresentMode;
 	swapchainCreateInfo.preTransform = details.fTransformFlagBits; // TODO: relevant to portrait, landscape, etc?
 	swapchainCreateInfo.surface = fState->GetSurface();
 
-    const VkAllocationCallbacks * allocator = fState->GetAllocator();
-    VkDevice device = fState->GetDevice();
 	VkSwapchainKHR swapchain;
 
-	if (VK_SUCCESS == vkCreateSwapchainKHR( device, &swapchainCreateInfo, allocator, &swapchain ))
+	if (VK_SUCCESS == vkCreateSwapchainKHR( fState->GetDevice(), &swapchainCreateInfo, fState->GetAllocator(), &swapchain ))
 	{
-		fState->SetSwapchain( swapchain );
-
-		uint32_t imageCount = 0U;
-
-		vkGetSwapchainImagesKHR( device, swapchain, &imageCount, NULL );
-
-	//	std::vector< VkImage > images( imageCount );
-        fSwapchainImages.resize( imageCount );
-
-		vkGetSwapchainImagesKHR( device, swapchain, &imageCount, fSwapchainImages.data() );
-
-        fFBO = Rtt_NEW( NULL, VulkanFrameBufferObject( fState, imageCount, fSwapchainImages.data() ) );
-/*
-		for ( const VkImage & image : images )
-		{
-			VkImageView view = VulkanTexture::CreateImageView( fState, image, details.fFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
-
-			if (view != VK_NULL_HANDLE)
-			{
-				PerImageData pid;
-				
-				pid.image = image;
-				pid.view = view;
-
-				fPerImageData.push_back( pid );
-			}
-
-			else
-			{
-				CoronaLog( "Failed to create image views!" );
-
-				// TODO: Error
-			}
-		}
-*/
+		return swapchain;
 	}
 
 	else
 	{
 		CoronaLog( "Failed to create swap chain!" );
 
-		// TODO: error
+		return VK_NULL_HANDLE;
+	}
+}
+
+void
+VulkanRenderer::BuildUpSwapchain( VkSwapchainKHR swapchain )
+{
+	fState->SetSwapchain( swapchain );
+
+	VkDevice device = fState->GetDevice();
+	uint32_t imageCount;
+
+	vkGetSwapchainImagesKHR( device, swapchain, &imageCount, NULL );
+	
+	fCommandBuffers.resize( imageCount );
+	fDescriptorPools.resize( imageCount );
+	fSwapchainImages.resize( imageCount );
+
+	VkCommandBufferAllocateInfo allocInfo = {};
+
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandBufferCount = imageCount;
+	allocInfo.commandPool = fState->GetCommandPool();
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+    if (VK_SUCCESS == vkAllocateCommandBuffers( device, &allocInfo, fCommandBuffers.data() ))
+	{
+		vkGetSwapchainImagesKHR( device, swapchain, &imageCount, fSwapchainImages.data() );
+
+		fFBO = Rtt_NEW( NULL, VulkanFrameBufferObject( fState, imageCount, fSwapchainImages.data() ) );
+
+		// TODO: descriptors? etc.
+	}
+
+	else
+	{
+        CoronaLog( "Failed to allocate command buffers!" );
+    }
+}
+
+void
+VulkanRenderer::RecreateSwapchain()
+{
+	vkQueueWaitIdle( fState->GetGraphicsQueue() );
+
+	VkSwapchainKHR newSwapchain = MakeSwapchain();
+
+	TearDownSwapchain();
+
+	if (newSwapchain != VK_NULL_HANDLE )
+	{
+		BuildUpSwapchain( newSwapchain );
 	}
 }
 
 void
 VulkanRenderer::TearDownSwapchain()
 {
-    const VkAllocationCallbacks * allocator = fState->GetAllocator();
-    VkDevice device = fState->GetDevice();
-
     Rtt_DELETE( fFBO );
 
     fFBO = NULL;
-    // ^^ any good doing this? some of this WON'T need rebuilding...
+	
+    const VkAllocationCallbacks * allocator = fState->GetAllocator();
+    VkDevice device = fState->GetDevice();
 
 	vkDestroySwapchainKHR( device, fState->GetSwapchain(), allocator );
+
+	// TODO: lots more stuff...
+
+	vkFreeCommandBuffers( device, fState->GetCommandPool(), fCommandBuffers.size(), fCommandBuffers.data() );
 
     fState->SetSwapchain( VK_NULL_HANDLE );
 }
@@ -443,7 +501,7 @@ VulkanRenderer::ResolvePipeline()
 
 	if (pipeline != VK_NULL_HANDLE && (VK_NULL_HANDLE == fBoundPipeline || pipeline != fBoundPipeline))
 	{
-		vkCmdBindPipeline( fCurrentCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
+		static_cast< VulkanCommandBuffer * >( fFrontCommandBuffer )->AddGraphicsPipeline( pipeline );
 	}
 
 	fBoundPipeline = pipeline;
@@ -526,64 +584,6 @@ VulkanRenderer::PipelineKey::operator == ( const PipelineKey & other ) const
         }
     }
 
-    void createCommandBuffers() {
-        commandBuffers.resize(swapChainFramebuffers.size());
-
-        VkCommandBufferAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool = commandPool;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
-
-        if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate command buffers!");
-        }
-
-        for (size_t i = 0; i < commandBuffers.size(); i++) {
-            VkCommandBufferBeginInfo beginInfo = {};
-            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-
-            if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) {
-                throw std::runtime_error("failed to begin recording command buffer!");
-            }
-
-            VkRenderPassBeginInfo renderPassInfo = {};
-            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            renderPassInfo.renderPass = renderPass;
-            renderPassInfo.framebuffer = swapChainFramebuffers[i];
-            renderPassInfo.renderArea.offset = {0, 0};
-            renderPassInfo.renderArea.extent = swapChainExtent;
-
-            std::array<VkClearValue, 2> clearValues = {};
-            clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
-            clearValues[1].depthStencil = {1.0f, 0};
-
-            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-            renderPassInfo.pClearValues = clearValues.data();
-
-            vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-                vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-                VkBuffer vertexBuffers[] = {vertexBuffer};
-                VkDeviceSize offsets[] = {0};
-                vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-
-                vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-                vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
-
-                vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
-
-            vkCmdEndRenderPass(commandBuffers[i]);
-
-            if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
-                throw std::runtime_error("failed to record command buffer!");
-            }
-        }
-    }
-
     void updateUniformBuffer(uint32_t currentImage) {
         static auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -603,64 +603,11 @@ VulkanRenderer::PipelineKey::operator == ( const PipelineKey & other ) const
     }
 
     void drawFrame() {
-        vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
-
-        uint32_t imageIndex;
-        VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
-
-        if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-            recreateSwapChain();
-            return;
-        } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-            throw std::runtime_error("failed to acquire swap chain image!");
-        }
+		// BeginFrame()
 
         updateUniformBuffer(imageIndex);
 
-        VkSubmitInfo submitInfo = {};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-        VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
-        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-        submitInfo.waitSemaphoreCount = 1;
-        submitInfo.pWaitSemaphores = waitSemaphores;
-        submitInfo.pWaitDstStageMask = waitStages;
-
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
-
-        VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = signalSemaphores;
-
-        vkResetFences(device, 1, &inFlightFences[currentFrame]);
-
-        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
-            throw std::runtime_error("failed to submit draw command buffer!");
-        }
-
-        VkPresentInfoKHR presentInfo = {};
-        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-        presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = signalSemaphores;
-
-        VkSwapchainKHR swapChains[] = {swapChain};
-        presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = swapChains;
-
-        presentInfo.pImageIndices = &imageIndex;
-
-        result = vkQueuePresentKHR(presentQueue, &presentInfo);
-
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
-            framebufferResized = false;
-            recreateSwapChain();
-        } else if (result != VK_SUCCESS) {
-            throw std::runtime_error("failed to present swap chain image!");
-        }
-
-        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+		// Rest
     }
 
     void createColorResources() {
