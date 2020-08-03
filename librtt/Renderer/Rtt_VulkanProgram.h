@@ -61,8 +61,21 @@ class VulkanProgram : public GPUResource
 		// Bind() was virtual in GLProgram but such a method was missing in GPUResource, nor were there derived classes...
 		PipelineStages Bind( Program::Version version );
 
+		struct Location {
+			Location( size_t offset = 0U, size_t range = 0U )
+			:	fOffset( offset ),
+				fRange( range )
+			{
+			}
+
+			bool IsValid() const { return !!fRange; }
+
+			size_t fOffset;
+			size_t fRange;
+		};
+
 		// TODO: cleanup these functions
-		inline uint32_t GetUniformLocation( U32 unit, Program::Version version )
+		inline Location GetUniformLocation( U32 unit, Program::Version version )
 		{
 			Rtt_ASSERT( version <= Program::kNumVersions );
 			return fData[version].fUniformLocations[ unit ];
@@ -91,7 +104,7 @@ class VulkanProgram : public GPUResource
 			VkShaderModule fVertexShader;
 			// TODO? mask counts as specialization info
 			VkShaderModule fFragmentShader;
-			U32 fUniformLocations[Uniform::kNumBuiltInVariables];
+			Location fUniformLocations[Uniform::kNumBuiltInVariables];
 			// TODO? also supply ranges (else assume always in proper form)
 			// TODO? divvy these up between uniforms and push constants
 			U32 fTimestamps[Uniform::kNumBuiltInVariables];
@@ -108,15 +121,13 @@ class VulkanProgram : public GPUResource
 		struct Maps {
 			struct BufferValue {
 				BufferValue( size_t offset, size_t range, bool isUniform )
-				:	fOffset( offset ),
-					fRange( range ),
+				:	fLocation( offset, range ),
 					fStages( 0U ),
 					fIsUniform( isUniform )
 				{
 				}
 
-				size_t fOffset;
-				size_t fRange;
+				Location fLocation;
 				U32 fStages;
 				bool fIsUniform;
 			};
@@ -128,7 +139,7 @@ class VulkanProgram : public GPUResource
 			std::map< std::string, int > varyings;
 
 			U32 CheckForSampler( const std::string & key /* TODO: info... */ );
-			U32 CheckForUniform( const std::string & key );
+			Location CheckForUniform( const std::string & key );
 		};
 
 		void Compile( int kind, const char * sources[], int sourceCount, Maps & maps, VkShaderModule & module );

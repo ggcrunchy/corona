@@ -351,19 +351,19 @@ VulkanProgram::Maps::CheckForSampler( const std::string & key /* TODO: info... *
 	}
 }
 
-U32
+VulkanProgram::Location
 VulkanProgram::Maps::CheckForUniform( const std::string & key )
 {
 	auto iter = buffer_values.find( key );
 
 	if (iter != buffer_values.end() && iter->second.fIsUniform)
 	{
-		return iter->second.fOffset; // TODO: not sure we need second, cf. note in VersionData
+		return iter->second.fLocation;
 	}
 
 	else
 	{
-		return ~0U; // TODO: maybe we want BufferValue with range = 0?
+		return Location{};
 	}
 }
 

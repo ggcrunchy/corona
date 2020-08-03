@@ -15,6 +15,7 @@
 #include <shaderc/shaderc.h>
 #include <algorithm>
 #include <limits>
+#include <tuple>
 #include <utility>
 
 // ----------------------------------------------------------------------------
@@ -353,11 +354,8 @@ VulkanState::StageData( VkDeviceMemory stagingMemory, const void * data, VkDevic
 bool
 VulkanState::PopulateMultisampleDetails( VulkanState & state )
 {
-    VkPhysicalDeviceProperties physicalDeviceProperties;
-
-    vkGetPhysicalDeviceProperties( state.GetPhysicalDevice(), &physicalDeviceProperties );
-
-    VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+	const VkPhysicalDeviceLimits & limits = state.fDeviceDetails.properties.limits;
+    VkSampleCountFlags counts = limits.framebufferColorSampleCounts & limits.framebufferDepthSampleCounts;
 
     if (counts & VK_SAMPLE_COUNT_64_BIT)
 	{
@@ -747,7 +745,7 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 	return formatCount != 0U && presentModeCount != 0U;
 }
 
-static std::pair< VkPhysicalDevice, Queues >
+static std::tuple< VkPhysicalDevice, Queues, VulkanState::DeviceDetails >
 ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 {
 	uint32_t deviceCount = 0U;
@@ -758,7 +756,7 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 	{
 		CoronaLog( "Failed to find GPUs with Vulkan support!" );
 
-		return std::make_pair( VkPhysicalDevice( VK_NULL_HANDLE ), Queues() );
+		return std::make_tuple( VkPhysicalDevice( VK_NULL_HANDLE ), Queues(), VulkanState::DeviceDetails{} );
 	}
 
 	std::vector< VkPhysicalDevice > devices( deviceCount );
@@ -766,6 +764,7 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 	vkEnumeratePhysicalDevices( instance, &deviceCount, devices.data() );
 	
 	VkPhysicalDevice bestDevice = VK_NULL_HANDLE;
+	VulkanState::DeviceDetails bestDetails;
 	uint32_t bestScore = 0U;
 	Queues bestQueues;
 
@@ -778,27 +777,29 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 			continue;
 		}
 
-		VkPhysicalDeviceProperties deviceProperties;
-		VkPhysicalDeviceFeatures deviceFeatures;
-
-	    vkGetPhysicalDeviceProperties( device, &deviceProperties );
-		vkGetPhysicalDeviceFeatures( device, &deviceFeatures );
+		VulkanState::DeviceDetails deviceDetails = {};
+		VkPhysicalDeviceFeatures features;
+		
+		vkGetPhysicalDeviceFeatures( device, &features );
+	    vkGetPhysicalDeviceProperties( device, &deviceDetails.properties );
 		
 		uint32_t score = 0U;
 
 		// Discrete GPUs have a significant performance advantage
-		if (VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU == deviceProperties.deviceType)
+		if (VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU == deviceDetails.properties.deviceType)
 		{
 			score += 1000U;
 		}
 
-		if (deviceFeatures.shaderSampledImageArrayDynamicIndexing)
+		if (features.shaderSampledImageArrayDynamicIndexing)
 		{
 			score += 500U;
+
+			deviceDetails.features.shaderSampledImageArrayDynamicIndexing = true;
 		}
 
 		// Maximum possible size of textures affects graphics quality
-		score += deviceProperties.limits.maxImageDimension2D;
+		score += deviceDetails.properties.limits.maxImageDimension2D;
 
 		// other ideas: ETC2 etc. texture compression
 		// could make the rating adjustable in config.lua?
@@ -806,12 +807,13 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 		if (score > bestScore)
 		{
 			bestDevice = device;
+			bestDetails = deviceDetails;
 			bestScore = score;
 			bestQueues = queues;
 		}
 	}
 
-	return std::make_pair( bestDevice, bestQueues );
+	return std::make_tuple( bestDevice, bestQueues, bestDetails );
 }
 
 static VkDevice
@@ -914,24 +916,26 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 
 			auto physicalDeviceData = ChoosePhysicalDevice( instance, surface );
 
-			if (physicalDeviceData.first != VK_NULL_HANDLE)
+			if (std::get< 0 >( physicalDeviceData ) != VK_NULL_HANDLE)
 			{
-				state.fPhysicalDevice = physicalDeviceData.first;
+				state.fPhysicalDevice = std::get< 0 >( physicalDeviceData );
 
 				// TODO: enable any features and remember this
 
-				auto families = physicalDeviceData.second.GetFamilies();
-				VkDevice device = MakeLogicalDevice( physicalDeviceData.first, families, allocator );
+				const Queues & queues = std::get< 1 >( physicalDeviceData );
+				auto families = queues.GetFamilies();
+				VkDevice device = MakeLogicalDevice( state.fPhysicalDevice, families, allocator );
 
 				if (device != VK_NULL_HANDLE)
 				{
 					state.fDevice = device;
+					state.fDeviceDetails = std::get< 2 >( physicalDeviceData );
 					state.fQueueFamilies = families;
 
-					vkGetDeviceQueue( device, physicalDeviceData.second.fGraphicsFamily, 0U, &state.fGraphicsQueue );
-					vkGetDeviceQueue( device, physicalDeviceData.second.fPresentFamily, 0U, &state.fPresentQueue );
+					vkGetDeviceQueue( device, queues.fGraphicsFamily, 0U, &state.fGraphicsQueue );
+					vkGetDeviceQueue( device, queues.fPresentFamily, 0U, &state.fPresentQueue );
 
-					VkCommandPool commandPool = MakeCommandPool( device, physicalDeviceData.second.fGraphicsFamily, allocator );
+					VkCommandPool commandPool = MakeCommandPool( device, queues.fGraphicsFamily, allocator );
 
 					if (commandPool != VK_NULL_HANDLE)
 					{
