@@ -78,6 +78,7 @@ class VulkanState
 		VkPhysicalDevice GetPhysicalDevice() const { return fPhysicalDevice; }
 		VkQueue GetGraphicsQueue() const { return fGraphicsQueue; }
 		VkQueue GetPresentQueue() const { return fPresentQueue; }
+		VkCommandPool GetCommandPool() const { return fCommandPool; }
 		VkSurfaceKHR GetSurface() const { return fSurface; }
 		VkPipelineCache GetPipelineCache() const { return fPipelineCache; }
 		VkSampleCountFlags GetSampleCountFlags() const { return fSampleCountFlags; }
@@ -144,7 +145,7 @@ class VulkanState
 		VkPhysicalDevice fPhysicalDevice;
 		VkQueue fGraphicsQueue;
 		VkQueue fPresentQueue;
-		VkCommandPool fCurrentCommandPool;
+		VkCommandPool fCommandPool;
 		VkSurfaceKHR fSurface;
 		VkPipelineCache fPipelineCache;
 		VkSampleCountFlags fSampleCountFlags;

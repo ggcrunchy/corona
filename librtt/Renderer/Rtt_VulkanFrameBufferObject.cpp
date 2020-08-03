@@ -198,7 +198,7 @@ RenderPassBuilder::AddAttachment( VkAttachmentDescription description, std::vect
 
 VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanState * state, uint32_t imageCount, VkImage * swapchainImages )
 :	fState( state ),
-	fPerImageData( imageCount ),
+	fFramebufferData( imageCount ),
 	fImage( VK_NULL_HANDLE )
 {
 	if (swapchainImages)
@@ -208,7 +208,7 @@ VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanState * state, uint32_t 
 
 		for (uint32_t i = 0; i < imageCount; ++i)
 		{
-			fPerImageData[i].fViews.push_back( VulkanTexture::CreateImageView( fState, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U ) );
+			fFramebufferData[i].fViews.push_back( VulkanTexture::CreateImageView( fState, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U ) );
 		}
 
 		MakeFramebuffers( details.fExtent.width, details.fExtent.height );
@@ -224,9 +224,9 @@ VulkanFrameBufferObject::Create( CPUResource* resource )
 	VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() ); // n.b. GLFrameBufferObject says this will already exist
 	VkImageView view = vulkanTexture->GetImageView();
 
-	for (auto & perImageData : fPerImageData)
+	for (auto & fbData : fFramebufferData)
 	{
-		perImageData.fViews.push_back( view );
+		fbData.fViews.push_back( view );
 	}
 
 	MakeFramebuffers( texture->GetWidth(), texture->GetHeight() );
@@ -322,19 +322,19 @@ VulkanFrameBufferObject::MakeFramebuffers( uint32_t width, uint32_t height )
 	const VkAllocationCallbacks * allocator = fState->GetAllocator();
 	VkDevice device = fState->GetDevice();
 
-	for (auto & perImageData : fPerImageData)
+	for (auto & fbData : fFramebufferData)
 	{
         VkFramebufferCreateInfo createFramebufferInfo = {};
 
         createFramebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     //    createFramebufferInfo.renderPass = renderPass;
-        createFramebufferInfo.attachmentCount = perImageData.fViews.size();
+        createFramebufferInfo.attachmentCount = fbData.fViews.size();
         createFramebufferInfo.height = height;
         createFramebufferInfo.layers = 1U;
-        createFramebufferInfo.pAttachments = perImageData.fViews.data();
+        createFramebufferInfo.pAttachments = fbData.fViews.data();
         createFramebufferInfo.width = width;
 
-        if (vkCreateFramebuffer( device, &createFramebufferInfo, allocator, &perImageData.fFramebuffer ) != VK_SUCCESS)
+        if (vkCreateFramebuffer( device, &createFramebufferInfo, allocator, &fbData.fFramebuffer ) != VK_SUCCESS)
 		{
             CoronaLog( "Failed to create framebuffer!" );
 

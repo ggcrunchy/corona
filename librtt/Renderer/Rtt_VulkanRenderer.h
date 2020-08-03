@@ -47,6 +47,11 @@ class VulkanFrameBufferObject;
 
 // ----------------------------------------------------------------------------
 
+struct DescriptorPoolList {
+	std::vector< VkDescriptorPool > fPools;
+	uint32_t fIndex = 0U;
+};
+
 class VulkanRenderer : public Renderer
 {
 	public:
@@ -57,13 +62,17 @@ class VulkanRenderer : public Renderer
 		VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state );
 		virtual ~VulkanRenderer();
 
+		virtual void BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY );
+
 	public:
-		void BuildUpSwapchain();
+		VkSwapchainKHR MakeSwapchain();
+
+		void BuildUpSwapchain( VkSwapchainKHR swapchain );
+		void RecreateSwapchain();
 		void TearDownSwapchain();
 
 	public:
 		VulkanState * GetState() const { return fState; }
-		VkCommandBuffer GetCurrentCommandBuffer() const { return fCurrentCommandBuffer; }
 
 	public:
 		void EnableBlend( bool enabled );
@@ -119,10 +128,9 @@ VkViewport fViewport;
 		VulkanFrameBufferObject * fFBO;
 		std::vector< VkClearValue > fClearValues;
 		std::vector< VkImage > fSwapchainImages;
+		std::vector< VkCommandBuffer > fCommandBuffers;
+		std::vector< DescriptorPoolList > fDescriptorPools;
 		std::map< PipelineKey, VkPipeline > fBuiltPipelines;
-
-VkCommandBuffer fCurrentCommandBuffer;
-
 		VkPipeline fFirstPipeline;
 		VkPipeline fBoundPipeline;
 		PipelineCreateInfo fPipelineCreateInfo;

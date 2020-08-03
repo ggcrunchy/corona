@@ -66,8 +66,8 @@ class VulkanFrameBufferObject : public GPUResource
 		virtual void Bind();
 
 	private:
-		struct PerSwapchainImageData {
-			PerSwapchainImageData()
+		struct FramebufferData {
+			FramebufferData()
 			:	fFramebuffer( VK_NULL_HANDLE )
 			{
 			}
@@ -81,7 +81,7 @@ class VulkanFrameBufferObject : public GPUResource
 	private:
 		VulkanState * fState;
 		VkImage fImage;
-		std::vector< PerSwapchainImageData > fPerImageData;
+		std::vector< FramebufferData > fFramebufferData;
 		U32 fIndex;
 };
 

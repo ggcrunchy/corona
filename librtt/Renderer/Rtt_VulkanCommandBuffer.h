@@ -24,6 +24,7 @@ namespace Rtt
 
 class VulkanRenderer;
 class VulkanState;
+struct DescriptorPoolList;
 struct TimeTransform;
 
 // 
@@ -65,6 +66,17 @@ class VulkanCommandBuffer : public CommandBuffer
 		// Execute all buffered commands. A valid OpenGL context must be active.
 		virtual Real Execute( bool measureGPU );
 	
+	public:
+		VkResult WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain );
+		VkResult GetExecuteResult() const { return fExecuteResult; }
+		uint32_t GetImageIndex() const { return fImageIndex; }
+
+		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
+		void PrepareToExecute( VkCommandBuffer commandBuffer, DescriptorPoolList * descriptorPoolList );
+
+	public:
+		void AddGraphicsPipeline( VkPipeline pipeline );
+
 	private:
 		virtual void InitializeFBO();
 		virtual void InitializeCachedParams();
@@ -79,7 +91,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		
 		void ApplyUniforms( GPUResource* resource );
 		void ApplyUniform( GPUResource* resource, U32 index );
-		void WriteUniform( Uniform* uniform );
 
 		UniformUpdate fUniformUpdates[Uniform::kNumBuiltInVariables];
 
@@ -99,6 +110,13 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkFence fInFlight;
 		VkSemaphore fImageAvailableSemaphore;
 		VkSemaphore fRenderFinishedSemaphore;
+
+		// retained for frame
+		DescriptorPoolList * fDescriptorPoolList;
+		VkCommandBuffer fCommandBuffer;
+		VkSwapchainKHR fSwapchain;
+		VkResult fExecuteResult;
+		uint32_t fImageIndex;
 };
 
 // ----------------------------------------------------------------------------

@@ -110,7 +110,7 @@ VulkanState::VulkanState()
     fPhysicalDevice( VK_NULL_HANDLE ),
     fGraphicsQueue( VK_NULL_HANDLE ),
     fPresentQueue( VK_NULL_HANDLE ),
-	fCurrentCommandPool( VK_NULL_HANDLE ),
+	fCommandPool( VK_NULL_HANDLE ),
     fSurface( VK_NULL_HANDLE ),
 	fPipelineCache( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE ),
@@ -154,6 +154,7 @@ VulkanState::~VulkanState()
 {
 	VulkanProgram::CleanUpCompiler( fCompiler, fCompileOptions );
 
+	vkDestroyCommandPool( fDevice, fCommandPool, fAllocator );
     vkDestroySurfaceKHR( fInstance, fSurface, fAllocator );
     vkDestroyDevice( fDevice, fAllocator );
 #ifndef NDEBUG
@@ -270,7 +271,7 @@ VulkanState::BeginSingleTimeCommands()
 
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandBufferCount = 1U;
-    allocInfo.commandPool = fCurrentCommandPool;
+    allocInfo.commandPool = fCommandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
     VkCommandBuffer commandBuffer;
@@ -314,7 +315,7 @@ VulkanState::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
 		vkDestroyFence( fDevice, fence, fAllocator );
 	}
 
-    vkFreeCommandBuffers( fDevice, fCurrentCommandPool, 1U, &commandBuffer );
+    vkFreeCommandBuffers( fDevice, fCommandPool, 1U, &commandBuffer );
 }
 
 void
@@ -349,6 +350,52 @@ VulkanState::StageData( VkDeviceMemory stagingMemory, const void * data, VkDevic
     vkUnmapMemory( fDevice, stagingMemory );
 }
 
+bool
+VulkanState::PopulateMultisampleDetails( VulkanState & state )
+{
+    VkPhysicalDeviceProperties physicalDeviceProperties;
+
+    vkGetPhysicalDeviceProperties( state.GetPhysicalDevice(), &physicalDeviceProperties );
+
+    VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+
+    if (counts & VK_SAMPLE_COUNT_64_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_64_BIT;
+	}
+
+    else if (counts & VK_SAMPLE_COUNT_32_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_32_BIT;
+	}
+
+    else if (counts & VK_SAMPLE_COUNT_16_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_16_BIT;
+	}
+
+    else if (counts & VK_SAMPLE_COUNT_8_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_8_BIT;
+	}
+
+    else if (counts & VK_SAMPLE_COUNT_4_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_4_BIT;
+	}
+
+    else if (counts & VK_SAMPLE_COUNT_2_BIT)
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_2_BIT;
+	}
+
+	else
+	{
+		state.fSampleCountFlags = VK_SAMPLE_COUNT_1_BIT;
+	}
+
+	return true;
+}
 /*
 
 
@@ -614,15 +661,15 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 
 struct Queues {
 	Queues()
-:	fGraphicsQueue( ~0U ),
-	fPresentQueue( ~0U )
+:	fGraphicsFamily( ~0U ),
+	fPresentFamily( ~0U )
 	{
 	}
 
-	uint32_t fGraphicsQueue;
-	uint32_t fPresentQueue;
+	uint32_t fGraphicsFamily;
+	uint32_t fPresentFamily;
 
-	bool isComplete() const { return fGraphicsQueue != ~0U && fPresentQueue != ~0U; }
+	bool isComplete() const { return fGraphicsFamily != ~0U && fPresentFamily != ~0U; }
 
 	std::vector< uint32_t > GetFamilies() const
 	{
@@ -630,11 +677,11 @@ struct Queues {
 
 		if (isComplete())
 		{
-			families.push_back( fGraphicsQueue );
+			families.push_back( fGraphicsFamily );
 
-			if (fGraphicsQueue != fPresentQueue)
+			if (fGraphicsFamily != fPresentFamily)
 			{
-				families.push_back( fPresentQueue );
+				families.push_back( fPresentFamily );
 			}
 		}
 
@@ -645,7 +692,7 @@ struct Queues {
 static bool
 IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues )
 {
-	uint32_t queueFamilyCount = 0U;
+	uint32_t queueFamilyCount;
 
 	vkGetPhysicalDeviceQueueFamilyProperties( device, &queueFamilyCount, NULL );
 
@@ -657,16 +704,16 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 	{
 		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
 		{
-			queues.fGraphicsQueue = i;
+			queues.fGraphicsFamily = i;
 		}
 
-		VkBool32 supported = VK_FALSE;
+		VkBool32 supported;
 
 		vkGetPhysicalDeviceSurfaceSupportKHR( device, i, surface, &supported );
 
 		if (supported)
 		{
-			queues.fPresentQueue = i;
+			queues.fPresentFamily = i;
 		}
 	}
 
@@ -817,51 +864,27 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 	}
 }
 
-bool
-VulkanState::PopulateMultisampleDetails( VulkanState & state )
+static VkCommandPool
+MakeCommandPool( VkDevice device, uint32_t graphicsFamily, const VkAllocationCallbacks * allocator )
 {
-    VkPhysicalDeviceProperties physicalDeviceProperties;
+    VkCommandPoolCreateInfo createPoolInfo = {};
 
-    vkGetPhysicalDeviceProperties( state.GetPhysicalDevice(), &physicalDeviceProperties );
+    createPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    createPoolInfo.queueFamilyIndex = graphicsFamily;
 
-    VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+	VkCommandPool commandPool;
 
-    if (counts & VK_SAMPLE_COUNT_64_BIT)
+    if (VK_SUCCESS == vkCreateCommandPool( device, &createPoolInfo, allocator, &commandPool ))
 	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_64_BIT;
-	}
-
-    else if (counts & VK_SAMPLE_COUNT_32_BIT)
-	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_32_BIT;
-	}
-
-    else if (counts & VK_SAMPLE_COUNT_16_BIT)
-	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_16_BIT;
-	}
-
-    else if (counts & VK_SAMPLE_COUNT_8_BIT)
-	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_8_BIT;
-	}
-
-    else if (counts & VK_SAMPLE_COUNT_4_BIT)
-	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_4_BIT;
-	}
-
-    else if (counts & VK_SAMPLE_COUNT_2_BIT)
-	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_2_BIT;
+		return commandPool;
 	}
 
 	else
 	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_1_BIT;
-	}
+        CoronaLog( "Failed to create graphics command pool!" );
 
-	return true;
+		return VK_NULL_HANDLE;
+    }
 }
 
 bool
@@ -903,19 +926,21 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 				if (device != VK_NULL_HANDLE)
 				{
 					state.fDevice = device;
-
-					VkQueue graphicsQueue, presentQueue;
-
-					vkGetDeviceQueue( device, physicalDeviceData.second.fGraphicsQueue, 0, &graphicsQueue );
-					vkGetDeviceQueue( device, physicalDeviceData.second.fPresentQueue, 0, &presentQueue );
-
-					VulkanProgram::InitializeCompiler( &state.fCompiler, &state.fCompileOptions );
-						
-					state.fGraphicsQueue = graphicsQueue;
-					state.fPresentQueue = presentQueue;
 					state.fQueueFamilies = families;
 
-					return true;
+					vkGetDeviceQueue( device, physicalDeviceData.second.fGraphicsFamily, 0U, &state.fGraphicsQueue );
+					vkGetDeviceQueue( device, physicalDeviceData.second.fPresentFamily, 0U, &state.fPresentQueue );
+
+					VkCommandPool commandPool = MakeCommandPool( device, physicalDeviceData.second.fGraphicsFamily, allocator );
+
+					if (commandPool != VK_NULL_HANDLE)
+					{
+						state.fCommandPool = commandPool;
+
+						VulkanProgram::InitializeCompiler( &state.fCompiler, &state.fCompileOptions );
+
+						return true;
+					}
 				}
 			}
 		}

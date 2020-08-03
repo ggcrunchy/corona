@@ -106,7 +106,10 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fRenderer( renderer ),
 	fInFlight( VK_NULL_HANDLE ),
 	fImageAvailableSemaphore( VK_NULL_HANDLE ),
-	fRenderFinishedSemaphore( VK_NULL_HANDLE )
+	fRenderFinishedSemaphore( VK_NULL_HANDLE ),
+	fDescriptorPoolList( NULL ),
+	fCommandBuffer( VK_NULL_HANDLE ),
+	fSwapchain( VK_NULL_HANDLE )
 
 {
 	for(U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
@@ -114,6 +117,8 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 		fUniformUpdates[i].uniform = NULL;
 		fUniformUpdates[i].timestamp = 0;
 	}
+
+	ClearExecuteResult();
 
 	VulkanState * state = fRenderer.GetState();
 	const VkAllocationCallbacks * vulkanAllocator = state->GetAllocator();
@@ -398,16 +403,19 @@ VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 void
 VulkanCommandBuffer::SetViewport( int x, int y, int width, int height )
 {
-	VkViewport viewport;
+	if (fCommandBuffer != VK_NULL_HANDLE)
+	{
+		VkViewport viewport;
 
-	viewport.x = x;
-	viewport.y = y;
-	viewport.width = width;
-	viewport.height = height;
-	viewport.minDepth = 0.f;
-	viewport.maxDepth = 1.f;
+		viewport.x = x;
+		viewport.y = y;
+		viewport.width = width;
+		viewport.height = height;
+		viewport.minDepth = 0.f;
+		viewport.maxDepth = 1.f;
 
-	vkCmdSetViewport( fRenderer.GetCurrentCommandBuffer(), 0U, 1U, &viewport );
+		vkCmdSetViewport( fCommandBuffer, 0U, 1U, &viewport );
+	}
 }
 
 void 
@@ -462,6 +470,8 @@ VulkanCommandBuffer::Clear( Real r, Real g, Real b, Real a )
 void 
 VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 {
+	if (fCommandBuffer != VK_NULL_HANDLE)
+	{
 	VkPrimitiveTopology topology;
 
 	switch( type )
@@ -494,32 +504,36 @@ VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
 	ApplyUniforms( fProgram->GetGPUResource() );
 */
-	vkCmdDraw( fRenderer.GetCurrentCommandBuffer(), count, 1U, offset, 0U );
+	vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
+	}
 }
 
 void 
 VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 {
-	VkPrimitiveTopology topology;
-
-	switch( type )
+	if (fCommandBuffer != VK_NULL_HANDLE)
 	{
-		case Geometry::kIndexedTriangles:
-			topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		VkPrimitiveTopology topology;
 
-			break;
-		default: Rtt_ASSERT_NOT_REACHED(); break;
-	}
+		switch( type )
+		{
+			case Geometry::kIndexedTriangles:
+				topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+				break;
+			default: Rtt_ASSERT_NOT_REACHED(); break;
+		}
 	
-	fRenderer.SetPrimitiveTopology( topology );
-/*
-	// The first argument, offset, is currently unused. If support for non-
-	// VBO based indexed rendering is added later, an offset may be needed.
+		fRenderer.SetPrimitiveTopology( topology );
+	/*
+		// The first argument, offset, is currently unused. If support for non-
+		// VBO based indexed rendering is added later, an offset may be needed.
 
-	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-	ApplyUniforms( fProgram->GetGPUResource() );
-*/
-	vkCmdDrawIndexed( fRenderer.GetCurrentCommandBuffer(), count, 1U, 0U, 0U, 0U );
+		Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
+		ApplyUniforms( fProgram->GetGPUResource() );
+	*/
+		vkCmdDrawIndexed( fCommandBuffer, count, 1U, 0U, 0U, 0U );
+	}
 }
 
 S32
@@ -661,48 +675,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
 				CHECK_ERROR_AND_BREAK;
 			}
-			case kCommandApplyUniformFromPointerScalar:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Real );
-				glUniform1f( location, value );
-				DEBUG_PRINT( "Set Uniform: value=%f location=%i", value, location );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformFromPointerVec2:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Vec2 );
-				glUniform2fv( location, 1, &value.data[0] );
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f) location=%i", value.data[0], value.data[1], location);
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformFromPointerVec3:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Vec3 );
-				glUniform3fv( location, 1, &value.data[0] );
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location);
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformFromPointerVec4:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Vec4 );
-				glUniform4fv( location, 1, &value.data[0] );
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location);
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformFromPointerMat3:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Mat3 );
-				glUniformMatrix3fv( location, 1, GL_FALSE, &value.data[0] );
-				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 9 );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformFromPointerMat4:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Mat4 );
-				glUniformMatrix4fv( location, 1, GL_FALSE, &value.data[0] );
-				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
-				CHECK_ERROR_AND_BREAK;
-			}
 
 			default:
 				DEBUG_PRINT( "Unknown command(%d)", command );
@@ -725,7 +697,170 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	GL_CHECK_ERROR();
 */
+	if (fCommandBuffer != VK_NULL_HANDLE && fSwapchain != VK_NULL_HANDLE)
+	{
+		VkResult endResult = vkEndCommandBuffer( fCommandBuffer );
+
+		if (VK_SUCCESS == endResult)
+		{
+			VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			VkSubmitInfo submitInfo = {};
+
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.commandBufferCount = 1U;
+			submitInfo.pCommandBuffers = &fCommandBuffer;
+			submitInfo.pSignalSemaphores = &fRenderFinishedSemaphore;
+			submitInfo.pWaitDstStageMask = &waitStage;
+			submitInfo.pWaitSemaphores = &fImageAvailableSemaphore;
+			submitInfo.signalSemaphoreCount = 1U;
+			submitInfo.waitSemaphoreCount = 1U;
+
+			const VulkanState * state = fRenderer.GetState();
+
+			vkResetFences( state->GetDevice(), 1U, &fInFlight );
+
+			VkResult submitResult = vkQueueSubmit( state->GetGraphicsQueue(), 1, &submitInfo, fInFlight );
+
+			if (VK_SUCCESS == submitResult)
+			{
+				VkPresentInfoKHR presentInfo = {};
+
+				presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+				presentInfo.pImageIndices = &fImageIndex;
+				presentInfo.pSwapchains = &fSwapchain;
+				presentInfo.pWaitSemaphores = &fRenderFinishedSemaphore;
+				presentInfo.swapchainCount = 1U;
+				presentInfo.waitSemaphoreCount = 1U;
+
+				VkResult presentResult = vkQueuePresentKHR( state->GetPresentQueue(), &presentInfo );
+
+				if (VK_ERROR_OUT_OF_DATE_KHR == presentResult || VK_SUBOPTIMAL_KHR == presentResult) // || framebufferResized)
+				{
+				//    framebufferResized = false;
+				}
+
+				else if (presentResult != VK_SUCCESS)
+				{
+					CoronaLog( "Failed to present swap chain image!" );
+				}
+
+				fExecuteResult = presentResult;
+			}
+
+			else
+			{
+				CoronaLog( "Failed to submit draw command buffer!" );
+
+				fExecuteResult = submitResult;
+			}
+		}
+
+		else
+		{
+			CoronaLog( "Failed to record command buffer!" );
+
+			fExecuteResult = endResult;
+		}
+	}
+
+	else
+	{
+		fExecuteResult = VK_ERROR_INITIALIZATION_FAILED;
+	}
+
+	fCommandBuffer = VK_NULL_HANDLE;
+	fSwapchain = VK_NULL_HANDLE;
+
 	return fElapsedTimeGPU;
+}
+/*
+    // begin
+
+    VkRenderPassBeginInfo renderPassInfo = {};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass;
+    renderPassInfo.framebuffer = swapChainFramebuffers[i];
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = swapChainExtent;
+
+    std::array<VkClearValue, 2> clearValues = {};
+    clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
+    clearValues[1].depthStencil = {1.0f, 0};
+
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
+
+    vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+        VkBuffer vertexBuffers[] = {vertexBuffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+        vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
+
+        vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+    vkCmdEndRenderPass(commandBuffers[i]);
+
+	// end
+*/
+VkResult VulkanCommandBuffer::WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain )
+{
+	if (fInFlight != VK_NULL_HANDLE)
+	{
+		vkWaitForFences( device, 1U, &fInFlight, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+
+		fSwapchain = swapchain;
+
+		return vkAcquireNextImageKHR( device, swapchain, std::numeric_limits< uint64_t >::max(), fImageAvailableSemaphore, VK_NULL_HANDLE, &fImageIndex );
+	}
+
+	else
+	{
+		return VK_ERROR_INITIALIZATION_FAILED;
+	}
+}
+
+void VulkanCommandBuffer::PrepareToExecute( VkCommandBuffer commandBuffer, DescriptorPoolList * descriptorPoolList )
+{
+	if (commandBuffer != VK_NULL_HANDLE && descriptorPoolList)
+	{
+		VkDevice device = fRenderer.GetState()->GetDevice();
+
+		for (uint32_t i = 0; i < descriptorPoolList->fPools.size() && i <= descriptorPoolList->fIndex; ++i)
+		{
+//			vkResetDescriptorPool( device, descriptorPoolList->fPools[i], 0 );
+		}
+
+		descriptorPoolList->fIndex = 0U;
+		
+		VkCommandBufferBeginInfo beginInfo = {};
+
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+		if (VK_SUCCESS == vkBeginCommandBuffer( commandBuffer, &beginInfo ))
+		{
+			fCommandBuffer = commandBuffer;
+			fDescriptorPoolList = descriptorPoolList;
+		}
+
+		else
+		{
+			CoronaLog( "Failed to begin recording command buffer!" );
+		}
+	}
+}
+
+void VulkanCommandBuffer::AddGraphicsPipeline( VkPipeline pipeline )
+{
+	if (fCommandBuffer != VK_NULL_HANDLE)
+	{
+		vkCmdBindPipeline( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
+	}
 }
 
 void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
@@ -768,8 +903,6 @@ void VulkanCommandBuffer::ApplyUniform( GPUResource* resource, U32 index )
 	glProgram->SetUniformTimestamp( index, fCurrentPrepVersion, update.timestamp );
 
 	GLint location = glProgram->GetUniformLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );*/
-	if( false )//glProgram->GetHandle() && location >= 0 )
-	{
 		// The OpenGL program already exists and actually uses the specified uniform
 		Uniform* uniform = update.uniform;
 		switch( uniform->GetDataType() )
@@ -783,68 +916,7 @@ void VulkanCommandBuffer::ApplyUniform( GPUResource* resource, U32 index )
 			default:				Rtt_ASSERT_NOT_REACHED();						break;*/
 		}
 	//	Write<GLint>( location );
-		WriteUniform( uniform );
-	}
-	else if( false )//!glProgram->GetHandle() )
-	{
-		// The OpenGL program has not yet been created. Assume it uses the uniform
-		Uniform* uniform = update.uniform;
-		switch( uniform->GetDataType() )
-		{/*
-			case Uniform::kScalar:	WRITE_COMMAND( kCommandApplyUniformFromPointerScalar );	break;
-			case Uniform::kVec2:	WRITE_COMMAND( kCommandApplyUniformFromPointerVec2 );	break;
-			case Uniform::kVec3:	WRITE_COMMAND( kCommandApplyUniformFromPointerVec3 );	break;
-			case Uniform::kVec4:	WRITE_COMMAND( kCommandApplyUniformFromPointerVec4 );	break;
-			case Uniform::kMat3:	WRITE_COMMAND( kCommandApplyUniformFromPointerMat3 );	break;
-			case Uniform::kMat4:	WRITE_COMMAND( kCommandApplyUniformFromPointerMat4 );	break;*/
-			default:				Rtt_ASSERT_NOT_REACHED();								break;
-		}
-	//	Write<GLProgram*>( glProgram );
-	//	Write<U32>( index ); 
-		WriteUniform( uniform );
-	}
 }
-
-void VulkanCommandBuffer::WriteUniform( Uniform* uniform )
-{
-	switch( uniform->GetDataType() )
-	{/*
-		case Uniform::kScalar:	Write<Real>(*reinterpret_cast<Real*>(uniform->GetData()));	break;
-		case Uniform::kVec2:	Write<Vec2>(*reinterpret_cast<Vec2*>(uniform->GetData()));	break;
-		case Uniform::kVec3:	Write<Vec3>(*reinterpret_cast<Vec3*>(uniform->GetData()));	break;
-		case Uniform::kVec4:	Write<Vec4>(*reinterpret_cast<Vec4*>(uniform->GetData()));	break;
-		case Uniform::kMat3:	Write<Mat3>(*reinterpret_cast<Mat3*>(uniform->GetData()));	break;
-		case Uniform::kMat4:	Write<Mat4>(*reinterpret_cast<Mat4*>(uniform->GetData()));	break;*/
-		default:				Rtt_ASSERT_NOT_REACHED();									break;
-	}
-}
-
-/*
-
-
-static VkCommandPool
-MakeCommandPool( VkDevice device, uint32_t graphicsFamily )
-{
-    VkCommandPoolCreateInfo createPoolInfo = {};
-
-    createPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    createPoolInfo.queueFamilyIndex = graphicsFamily;
-
-	VkCommandPool commandPool;
-
-    if (VK_SUCCESS == vkCreateCommandPool( device, &createPoolInfo, nullptr, &commandPool ))
-	{
-		return commandPool;
-	}
-
-	else
-	{
-        CoronaLog( "Failed to create graphics command pool!" );
-
-		return VK_NULL_HANDLE;
-    }
-}
-*/
 
 // ----------------------------------------------------------------------------
 
