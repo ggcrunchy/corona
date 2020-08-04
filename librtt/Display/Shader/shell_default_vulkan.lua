@@ -6,6 +6,8 @@ shell.category = "default"
 
 shell.name = "default"
 
+-- n.b. be mindful of  https://stackoverflow.com/questions/38172696/should-i-ever-use-a-vec3-inside-of-a-uniform-buffer-or-shader-storage-buffer-o
+-- in some of this layout, in particular the mask matrices
 shell.vertex =
 [[
 #define attribute
@@ -16,23 +18,65 @@ layout(location = 2) in attribute vec4 a_ColorScale;
 layout(location = 3) in attribute vec4 a_UserData;
 
 layout(binding = 0) uniform UniformBufferObject {
-    float TotalTime;
-    float DeltaTime;
+    // in 2D, these bits are changed only per framebuffer at most
+        // back either with small (96 byte) buffers or a (largely wasteful) dynamic buffer
+        // IF our minimum alignment is > 512, could coalesce these and user data
+            // but only useful if we can dynamically generate shaders or swap out different binary versions...
+    mat4 ViewProjectionMatrix;
     vec4 TexelSize;
     vec2 ContentScale;
-    mat4 ViewProjectionMatrix;
-    mat3 MaskMatrix0;
+    float DeltaTime;
+
+    // in 3D, on the other hand, the matrix would change a lot
+        // leave as is for now: full-fledged solution will want more anyhow, e.g. inverse modelview et al.
+
+    // these can potentially vary per batch:
+    float TotalTime; // might be updated on shader change, if time transform was found
+ // int SamplerIndex; // if hardware support available, incremented if a batch had texture slots replaced
+    mat3 MaskMatrix0; // update these if the batch's transformation(s) changed
     mat3 MaskMatrix1;
     mat3 MaskMatrix2;
+
+    // 256 total, so makes sense as own dynamic buffer:
     mat4 UserData0;
     mat4 UserData1;
     mat4 UserData2;
     mat4 UserData3;
 } ubo;
+// TODO: divvy these up according to frequency of use
+// allow for "SamplerIndex" if our hardware allows dynamic sampler indexing (http://kylehalladay.com/blog/tutorial/vulkan/2018/01/28/Textue-Arrays-Vulkan.html)
+// push constants guarantee at least 128 bytes: could encompass TotalTime + Index + two other values = 4, but mask matrices = + 48 * 3 = 148
+// if we crammed those, though... 36 * 3 = 108, for 112...
+// by the looks of it, three components of each matrix effectively go unused, though
+    // maybe a better packing would be mat2 MaskMatrix?; with accompanying vec2 MaskTranslation?;
+    // each mat2 would be 4 * 4 = 16, followed by 2 * 4 = 8 for each vec2...
+    // the third vec2 could be complemented by TotalTime and Index
+    // thus:
+        // 3 mat2 values = 48
+        // + 3 vec2 values = 72
+        // + 2 float values = 80, a comfortable fit
+        // so push constants like:
+            // mat2 MaskMatrix0; // vec4 #1
+            // mat2 MaskMatrix1; // vec4 #2
+            // mat2 MaskMatrix2; // vec4 #3
+            // vec2 MaskTranslation0; // vec4 #4
+            // vec2 MaskTranslation1;
+            // vec2 MaskTranslation2; // vec4 #5
+            // float TotalTime;
+            // int SamplerIndex;
+        // something like this might let us bind less in the common case:
+            // vec2 MaskTranslation0; // vector #1
+            // float TotalTime;
+            // int SamplerIndex;
+            // mat2 MaskMatrix0; // vector #2
+            // mat2 MaskMatrix1; // vector #3
+            // vec2 MaskTranslation1; // vector #4
+            // vec2 MaskTranslation2;
+            // mat2 MaskMatrix2; // vector #5
 
 #define MAX_FILL_SAMPLERS 2
 
-layout(binding = 1) uniform sampler2D u_FillSamplers[MAX_FILL_SAMPLERS + 3]; // TODO: can we drop the mask count here?
+layout(binding = 1) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3]; // TODO: does this stage need the "+ 3"?
 
 #define CoronaVertexUserData a_UserData
 #define CoronaTexCoord a_TexCoord.xy
@@ -41,8 +85,8 @@ layout(binding = 1) uniform sampler2D u_FillSamplers[MAX_FILL_SAMPLERS + 3]; // 
 #define CoronaDeltaTime ubo.DeltaTime
 #define CoronaTexelSize ubo.TexelSize
 #define CoronaContentScale ubo.ContentScale
-#define u_FillSampler0 u_FillSamplers[0]
-#define u_FillSampler0 u_FillSamplers[1]
+#define u_FillSampler0 u_Samplers[0]
+#define u_FillSampler1 u_Samplers[1]
 
 varying P_POSITION vec2 v_Position;
 varying P_UV vec2 v_TexCoord;
@@ -112,11 +156,11 @@ shell.fragment =
 layout(binding = 1) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3];
 
 layout(binding = 0) uniform UniformBufferObject {
-    float TotalTime;
-    float DeltaTime;
+    mat4 ViewProjectionMatrix;
     vec4 TexelSize;
     vec2 ContentScale;
-    mat4 ViewProjectionMatrix;
+    float DeltaTime;
+    float TotalTime;
     mat3 MaskMatrix0;
     mat3 MaskMatrix1;
     mat3 MaskMatrix2;
