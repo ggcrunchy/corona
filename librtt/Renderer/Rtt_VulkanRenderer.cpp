@@ -30,10 +30,32 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 :   Super( allocator ),
 	fState( state ),
     fFBO( NULL ),
-	fFirstPipeline( VK_NULL_HANDLE )
+	fFirstPipeline( VK_NULL_HANDLE ),
+	fPipelineLayout( VK_NULL_HANDLE )
 {
 	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
 	fBackCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
+
+	VkPipelineLayoutCreateInfo createPipelineLayoutInfo = {};
+	VkPushConstantRange pushConstantRange;
+
+	pushConstantRange.offset = 0U;
+	pushConstantRange.size = sizeof( UniformObjects::PushConstant );
+	pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	createPipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	createPipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+//	createPipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+	createPipelineLayoutInfo.pushConstantRangeCount = 1U;
+	createPipelineLayoutInfo.setLayoutCount = 1U;
+
+	if (VK_SUCCESS == vkCreatePipelineLayout( state->GetDevice(), &createPipelineLayoutInfo, state->GetAllocator(), &fPipelineLayout ))
+	{
+	}
+
+	else
+	{
+	}
 
 	InitializePipelineState();
 }

@@ -110,12 +110,26 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkSemaphore fRenderFinishedSemaphore;
 		VkFence fInFlight;
 
+		// reset at start of frame and after draws:
+		bool fUpdatedUniformBuffer;
+		bool fUpdatedUserData;
+		S32 fLowerPushConstantVector;
+		S32 fUpperPushConstantVector;
+
+		std::vector< U8 > fDynamicUBO;
+		std::vector< U8 > fDynamicUserData;
+
+		uint32_t fUBOIndex;
+		uint32_t fUserDataIndex;
+
 		// non-owned, retained only for frame:
 		DescriptorPoolList * fDescriptorPoolList;
 		VkCommandBuffer fCommandBuffer;
 		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;
 		uint32_t fImageIndex;
+
+		size_t fDynamicBufferAlignment;
 };
 
 // ----------------------------------------------------------------------------
