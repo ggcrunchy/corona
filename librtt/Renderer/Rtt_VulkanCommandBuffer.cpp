@@ -848,19 +848,22 @@ void VulkanCommandBuffer::ApplyUniform( GPUResource* resource, U32 index )
 			// WRITE_COMMAND( kCommandApplyUniformScalar );
 
 			break;
-		case Uniform::kVec2:
+		case Uniform::kVec2: // only use cases are uniform user data; we can put the rows into two vectors
 			// WRITE_COMMAND( kCommandApplyUniformVec2 );
 			
 			break;
-		case Uniform::kVec3: // TODO: see if Cross handles this robustly (a few sources sound the alarm with these types)
-			// WRITE_COMMAND( kCommandApplyUniformVec3 );
-			
+		case Uniform::kVec3: // has difficulties, cf. https://stackoverflow.com/questions/38172696/should-i-ever-use-a-vec3-inside-of-a-uniform-buffer-or-shader-storage-buffer-o
+							 // only use cases are user data
+			// 
 			break;
 		case Uniform::kVec4:
 			// WRITE_COMMAND( kCommandApplyUniformVec4 );
 			
 			break;
-		case Uniform::kMat3: // TODO: ditto here
+		case Uniform::kMat3: // may be user data, in which case we put each row in the first three components of a vector
+							 // otherwise, only used by mask matrices, with three constant components
+							 // thus, mindful of the difficulties mentioned re. kVec3, these are decomposed as mat2 and vec2
+							 // conveniently, this more naturally lends itself to their use as push constants
 			// WRITE_COMMAND( kCommandApplyUniformMat3 );
 			// split into three rows
 			

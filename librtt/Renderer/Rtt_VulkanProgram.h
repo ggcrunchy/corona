@@ -105,6 +105,7 @@ class VulkanProgram : public GPUResource
 			// TODO? mask counts as specialization info
 			VkShaderModule fFragmentShader;
 			Location fUniformLocations[Uniform::kNumBuiltInVariables];
+			Location fMaskTranslationLocations[3]; // these should only ever be present alongside the corresponding MaskMatrix
 			// TODO? also supply ranges (else assume always in proper form)
 			// TODO? divvy these up between uniforms and push constants
 			U32 fTimestamps[Uniform::kNumBuiltInVariables];

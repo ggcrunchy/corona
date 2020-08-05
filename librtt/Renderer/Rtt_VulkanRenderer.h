@@ -86,6 +86,28 @@ class VulkanRenderer : public Renderer
 	public:
 		void SetClearValue( U32 index, const VkClearValue & clearValue );
 
+	public:
+		// cf. shell_default_vulkan:
+
+		struct UniformObjects {
+			typedef float Mat4[16];
+			typedef float Vec4[4];
+
+			struct UniformBuffer {
+				alignas(16) Mat4 ViewProjectionMatrix;
+				alignas(16) Vec4 TexelSize;
+				alignas(16) Vec4 ContentScaleDeltaTime; // xy; z; w unused
+			};
+
+			struct UserData {
+				alignas(16) Mat4 UserData[4];
+			};
+
+			struct PushConstant {
+				alignas(16) Vec4 fVectors[5];
+			};
+		};
+
 	protected:
 		// Create an OpenGL resource appropriate for the given CPUResource.
 		virtual GPUResource* Create( const CPUResource* resource );
@@ -133,6 +155,7 @@ VkViewport fViewport;
 		std::map< PipelineKey, VkPipeline > fBuiltPipelines;
 		VkPipeline fFirstPipeline;
 		VkPipeline fBoundPipeline;
+		VkPipelineLayout fPipelineLayout;
 		PipelineCreateInfo fPipelineCreateInfo;
 		PipelineKey fDefaultKey;
 		PipelineKey fWorkingKey;

@@ -425,6 +425,10 @@ VulkanProgram::Update( Program::Version version, VersionData& data )
 	data.fUniformLocations[Uniform::kUserData2] = maps.CheckForUniform( "UserData2" );
 	data.fUniformLocations[Uniform::kUserData3] = maps.CheckForUniform( "UserData3" );
 
+	data.fMaskTranslationLocations[0] = maps.CheckForUniform( "MaskTranslation0" );
+	data.fMaskTranslationLocations[1] = maps.CheckForUniform( "MaskTranslation1" );
+	data.fMaskTranslationLocations[2] = maps.CheckForUniform( "MaskTranslation2" );
+
 /*
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_FillSampler0" ), Texture::kFill0 );
 	glUniform1i( glGetUniformLocation( data.fProgram, "u_FillSampler1" ), Texture::kFill1 );
@@ -440,14 +444,20 @@ VulkanProgram::Reset( VersionData& data )
 	data.fVertexShader = VK_NULL_HANDLE;
 	data.fFragmentShader = VK_NULL_HANDLE;
 
+	const uint32_t kInactiveLocation = ~0U;
+
 	for( U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i )
 	{
-		const uint32_t kInactiveLocation = ~0U;
 		data.fUniformLocations[ i ] = kInactiveLocation;
 
 		// CommandBuffer also initializes timestamp to zero
 		const U32 kTimestamp = 0;
 		data.fTimestamps[ i ] = kTimestamp;
+	}
+
+	for ( U32 i = 0; i < 3; ++i )
+	{
+		data.fMaskTranslationLocations[ i ] = kInactiveLocation;
 	}
 	
 	data.fHeaderNumLines = 0;
