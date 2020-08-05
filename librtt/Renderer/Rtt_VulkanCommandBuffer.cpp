@@ -842,33 +842,84 @@ void VulkanCommandBuffer::ApplyUniform( GPUResource* resource, U32 index )
 	VulkanProgram::Location location = vulkanProgram->GetUniformLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
 	Uniform* uniform = update.uniform;
 
+	bool isUniformUserData = index >= Uniform::kUserData0;
+	bool isPushConstant = (index >= Uniform::kMaskMatrix0 && index <= Uniform::kMaskMatrix2) || Uniform::kTotalTime == index;
+	S32 low, nrows = 1;
+
 	switch( uniform->GetDataType() )
 	{
 		case Uniform::kScalar:
+			if (isPushConstant)
+			{
+//				low = X - X % 4;
+			}
+
+			else if (isUniformUserData)
+			{
+				// blast to vector 0
+			}
+
+			else
+			{
+			}
 			// WRITE_COMMAND( kCommandApplyUniformScalar );
 
 			break;
-		case Uniform::kVec2: // only use cases are uniform user data; we can put the rows into two vectors
+		case Uniform::kVec2:
+			Rtt_ASSERT( isUniformUserData );
+
+			// blast to vector 0
 			// WRITE_COMMAND( kCommandApplyUniformVec2 );
 			
 			break;
 		case Uniform::kVec3: // has difficulties, cf. https://stackoverflow.com/questions/38172696/should-i-ever-use-a-vec3-inside-of-a-uniform-buffer-or-shader-storage-buffer-o
-							 // only use cases are user data
-			// 
+			// blast to vector 0
+			Rtt_ASSERT( isUniformUserData );
+
 			break;
 		case Uniform::kVec4:
+			if (isUniformUserData)
+			{
+				// blast to vector 0
+			}
+
+			else
+			{
+				Rtt_ASSERT( !isPushConstant );
+			}
 			// WRITE_COMMAND( kCommandApplyUniformVec4 );
 			
 			break;
-		case Uniform::kMat3: // may be user data, in which case we put each row in the first three components of a vector
-							 // otherwise, only used by mask matrices, with three constant components
-							 // thus, mindful of the difficulties mentioned re. kVec3, these are decomposed as mat2 and vec2
-							 // conveniently, this more naturally lends itself to their use as push constants
-			// WRITE_COMMAND( kCommandApplyUniformMat3 );
-			// split into three rows
+		case Uniform::kMat3:
+			if (isUniformUserData)
+			{
+				nrows = 3;
+			}
 			
+			else
+			{
+				Rtt_ASSERT( isPushConstant );
+				
+				// only used by mask matrices, with three constant components
+				// thus, mindful of the difficulties mentioned re. kVec3, these are decomposed as a vec2[2] and vec2
+				// the vec2 array avoids consuming two vectors, cf. https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)
+				// the two elements should be columns, to allow mat2(vec[0], vec[1]) on the shader side
+			}
+			// WRITE_COMMAND( kCommandApplyUniformMat3 );
+
 			break;
 		case Uniform::kMat4:
+			if (isUniformUserData)
+			{
+				nrows = 4;
+			}
+			
+			else
+			{
+				Rtt_ASSERT( !isPushConstant );
+			}
+				
+			// blast away!
 			// WRITE_COMMAND( kCommandApplyUniformMat4 );
 			
 			break;
@@ -877,7 +928,31 @@ void VulkanCommandBuffer::ApplyUniform( GPUResource* resource, U32 index )
 			
 			break;
 	}
-	// dirty bounds: { bin(lower), bin(upper) }
+
+	if (isUniformUserData)
+	{
+		fUpdatedUserData = true;
+	}
+
+	else if (!isPushConstant)
+	{
+		fUpdatedUniformBuffer = true;
+	}
+
+	else
+	{
+		S32 high = low + nrows - 1;
+
+		if (low < fLowerPushConstantVector)
+		{
+			fLowerPushConstantVector = low;
+		}
+
+		if (high > fUpperPushConstantVector)
+		{
+			fUpperPushConstantVector = high;
+		}
+	}
 }
 
 // ----------------------------------------------------------------------------

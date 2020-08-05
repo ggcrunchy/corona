@@ -94,9 +94,7 @@ class VulkanRenderer : public Renderer
 			typedef float Vec4[4];
 
 			struct UniformBuffer {
-				alignas(16) Mat4 ViewProjectionMatrix;
-				alignas(16) Vec4 TexelSize;
-				alignas(16) Vec4 ContentScaleDeltaTime; // xy; z; w unused
+				alignas(16) Vec4 fVectors[6];
 			};
 
 			struct UserData {
