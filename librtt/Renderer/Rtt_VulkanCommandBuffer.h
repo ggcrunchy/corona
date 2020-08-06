@@ -24,7 +24,7 @@ namespace Rtt
 
 class VulkanRenderer;
 class VulkanState;
-struct DescriptorPoolList;
+struct DescriptorLists;
 struct TimeTransform;
 
 // 
@@ -71,7 +71,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkResult GetExecuteResult() const { return fExecuteResult; }
 		uint32_t GetImageIndex() const { return fImageIndex; }
 		
-		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorPoolList * descriptorPoolList );
+		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists );
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
 		void PrepareDraw( VkPrimitiveTopology topology );
 
@@ -116,14 +116,20 @@ class VulkanCommandBuffer : public CommandBuffer
 		uint32_t fUserDataIndex;
 
 		// reset at start of frame and after draws:
-		bool fUpdatedUniformBuffer;
+		std::vector< VkMappedMemoryRange > fUniformBufferRanges;
+		std::vector< VkMappedMemoryRange > fUserDataRanges;
+		bool fUpdatedUniformBuffer; // TODO: maybe we just need to check !f*Ranges.empty()
 		bool fUpdatedUserData;
 		S32 fLowerPushConstantVector;
 		S32 fUpperPushConstantVector;
 
 		// non-owned, retained only for frame:
-		DescriptorPoolList * fDescriptorPoolList;
+		DescriptorLists * fLists;
 		VkCommandBuffer fCommandBuffer;
+/*
+		dynamic uniform buffers - as a list?
+
+*/
 		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;
 		uint32_t fImageIndex;
