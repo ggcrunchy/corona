@@ -18,7 +18,7 @@ layout(location = 2) in attribute vec4 a_ColorScale;
 layout(location = 3) in attribute vec4 a_UserData;
 
 // < 256 bytes:
-layout(binding = 0) uniform UniformBufferObject {
+layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 ViewProjectionMatrix;
     vec4 TexelSize;
     vec2 ContentScale;
@@ -26,7 +26,7 @@ layout(binding = 0) uniform UniformBufferObject {
 } ubo;
 
 // 256 bytes:
-layout(binding = 1) uniform UserDataObject {
+layout(set = 1, binding = 0) uniform UserDataObject {
     mat4 UserData0;
     mat4 UserData1;
     mat4 UserData2;
@@ -35,7 +35,7 @@ layout(binding = 1) uniform UserDataObject {
 
 #define MAX_FILL_SAMPLERS 2
 
-layout(binding = 2) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3]; // TODO: does this stage need the "+ 3"?
+layout(set = 2, binding = 0) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3]; // TODO: does this stage need the "+ 3"?
 
 // these may vary per batch, somewhat independently:
 layout(push_constant) uniform PushConstants {
@@ -82,11 +82,7 @@ varying P_DEFAULT int v_SamplerIndex;
     varying P_UV vec2 v_MaskUV2;
 #endif
 
-#ifdef Rtt_WEBGL_ENV
-%s
-#else
 P_POSITION vec2 VertexKernel( P_POSITION vec2 position );
-#endif
 
 void main()
 {
@@ -128,7 +124,7 @@ shell.fragment =
 [[
 
 // cf. vertex
-layout(binding = 0) uniform UniformBufferObject {
+layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 ViewProjectionMatrix;
     vec4 TexelSize;
     vec2 ContentScale;
@@ -136,7 +132,7 @@ layout(binding = 0) uniform UniformBufferObject {
 } ubo;
 
 // cf. vertex
-layout(binding = 1) uniform UserDataObject {
+layout(set = 1, binding = 1) uniform UserDataObject {
     mat4 UserData0;
     mat4 UserData1;
     mat4 UserData2;
@@ -145,7 +141,7 @@ layout(binding = 1) uniform UserDataObject {
 
 #define MAX_FILL_SAMPLERS 2
 
-layout(binding = 2) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3];
+layout(set = 2, binding = 0) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3];
 
 varying P_POSITION vec2 v_Position;
 varying P_UV vec2 v_TexCoord;
@@ -185,11 +181,7 @@ varying P_DEFAULT int v_SamplerIndex;
 
 layout(location = 0) out P_COLOR vec4 fragColor;
 
-#ifdef Rtt_WEBGL_ENV
-%s
-#else
 P_COLOR vec4 FragmentKernel( P_UV vec2 texCoord );
-#endif
 
 #define texture2D texture
 
