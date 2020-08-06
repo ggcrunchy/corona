@@ -47,9 +47,24 @@ class VulkanFrameBufferObject;
 
 // ----------------------------------------------------------------------------
 
-struct DescriptorPoolList {
+struct DynamicUniformData {
+	DynamicUniformData();
+
+	VkBuffer fBuffer;
+	VkDeviceMemory fMemory;
+	void * fMapped;
+};
+
+struct DescriptorLists {
+	DescriptorLists();
+
+	void Reset();
+
+	std::vector< DynamicUniformData > fDynamicUBOs;
 	std::vector< VkDescriptorPool > fPools;
-	uint32_t fIndex = 0U;
+	VkDescriptorSetLayout fSetLayout;
+	uint32_t fDynamicUBOIndex;
+	uint32_t fPoolIndex;
 };
 
 class VulkanRenderer : public Renderer
@@ -149,23 +164,19 @@ VkViewport fViewport;
 		std::vector< VkClearValue > fClearValues;
 		std::vector< VkImage > fSwapchainImages;
 		std::vector< VkCommandBuffer > fCommandBuffers;
-		std::vector< DescriptorPoolList > fDescriptorPools;
+		std::vector< VkPipelineLayout > fPipelineLayouts;
+		std::vector< DescriptorLists > fDescriptorLists;
 		std::map< PipelineKey, VkPipeline > fBuiltPipelines;
 		VkPipeline fFirstPipeline;
 		VkPipeline fBoundPipeline;
+		VkDescriptorSetLayout fUBOLayout;
+		VkDescriptorSetLayout fUserDataLayout;
+		VkDescriptorSetLayout fTextureLayout;
 		VkPipelineLayout fPipelineLayout;
 		PipelineCreateInfo fPipelineCreateInfo;
 		PipelineKey fDefaultKey;
 		PipelineKey fWorkingKey;
 /*
-    VkRenderPass renderPass;
-    VkDescriptorSetLayout descriptorSetLayout;
-    VkPipelineLayout pipelineLayout;
-    VkPipeline graphicsPipeline;
-
-    VkDescriptorPool descriptorPool;
-
-
     VkImage colorImage;
     VkDeviceMemory colorImageMemory;
     VkImageView colorImageView;
@@ -175,14 +186,6 @@ VkViewport fViewport;
     VkImageView depthImageView;
 */
 };
-
-/*
-struct UniformBufferObject {
-    alignas(16) glm::mat4 model;
-    alignas(16) glm::mat4 view;
-    alignas(16) glm::mat4 proj;
-};
-*/
 
 // ----------------------------------------------------------------------------
 

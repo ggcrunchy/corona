@@ -106,7 +106,7 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fImageAvailableSemaphore( VK_NULL_HANDLE ),
 	fRenderFinishedSemaphore( VK_NULL_HANDLE ),
 	fInFlight( VK_NULL_HANDLE ),
-	fDescriptorPoolList( NULL ),
+	fLists( NULL ),
 	fCommandBuffer( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE )
 
@@ -753,18 +753,16 @@ VkResult VulkanCommandBuffer::WaitAndAcquire( VkDevice device, VkSwapchainKHR sw
 	}
 }
 
-void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, DescriptorPoolList * descriptorPoolList )
+void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists )
 {
-	if (commandBuffer != VK_NULL_HANDLE && descriptorPoolList)
+	if (commandBuffer != VK_NULL_HANDLE && lists)
 	{
 		VkDevice device = fRenderer.GetState()->GetDevice();
 
-		for (uint32_t i = 0; i < descriptorPoolList->fPools.size() && i <= descriptorPoolList->fIndex; ++i)
-		{
-//			vkResetDescriptorPool( device, descriptorPoolList->fPools[i], 0 );
-		}
+		// lists = ..., ubo, user data, textures, ...
 
-		descriptorPoolList->fIndex = 0U;
+		lists[0].Reset();
+		lists[1].Reset();
 		
 		VkCommandBufferBeginInfo beginInfo = {};
 
@@ -773,7 +771,7 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 		if (VK_SUCCESS == vkBeginCommandBuffer( commandBuffer, &beginInfo ))
 		{
 			fCommandBuffer = commandBuffer;
-			fDescriptorPoolList = descriptorPoolList;
+			fLists = lists;
 		}
 
 		else

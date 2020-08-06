@@ -26,11 +26,39 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
+DynamicUniformData::DynamicUniformData()
+:	fBuffer( VK_NULL_HANDLE ),
+	fMemory( VK_NULL_HANDLE ),
+	fMapped( NULL )
+{
+}
+
+DescriptorLists::DescriptorLists()
+:	fSetLayout( VK_NULL_HANDLE ),
+	fDynamicUBOIndex( 0U ),
+	fPoolIndex( 0U )
+{
+}
+
+void
+DescriptorLists::Reset()
+{
+	for (uint32_t i = 0; i < fPools.size() && i <= fPoolIndex; ++i)
+	{
+//		vkResetDescriptorPool( device, descriptorPoolList->fPools[j], 0 );
+	}
+
+	fDynamicUBOIndex = fPoolIndex = 0U;
+}
+
 VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 :   Super( allocator ),
 	fState( state ),
     fFBO( NULL ),
 	fFirstPipeline( VK_NULL_HANDLE ),
+	fUBOLayout( VK_NULL_HANDLE ),
+	fUserDataLayout( VK_NULL_HANDLE ),
+	fTextureLayout( VK_NULL_HANDLE ),
 	fPipelineLayout( VK_NULL_HANDLE )
 {
 	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
@@ -43,11 +71,62 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	pushConstantRange.size = sizeof( UniformObjects::PushConstant );
 	pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+	VkDescriptorSetLayoutCreateInfo createDescriptorSetInfo = {};
+	VkDescriptorSetLayoutBinding binding = {};
+
+	createDescriptorSetInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	createDescriptorSetInfo.bindingCount = 1U;
+//	createDescriptorSetInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT; TODO: this seems right?
+	createDescriptorSetInfo.pBindings = &binding;
+
+	binding.descriptorCount = 1U;
+	binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetInfo, state->GetAllocator(), &fUBOLayout ))
+	{
+	}
+
+	else
+	{
+		CoronaLog( "Failed to create UBO descriptor set layout!" );
+	}
+
+	binding.stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetInfo, state->GetAllocator(), &fUserDataLayout ))
+	{
+	}
+
+	else
+	{
+		CoronaLog( "Failed to create uniform user data descriptor set layout!" );
+	}
+
+	binding.descriptorCount = 5U; // TODO: locks in texture count, maybe later we'll want a higher value?
+	binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	binding.stageFlags &= ~VK_SHADER_STAGE_VERTEX_BIT;
+
+	// ^^ this will be MUCH different if the hardware can support push constant-indexed samplers, e.g. something like
+		// binging 0: 1 VK_DESCRIPTOR_TYPE_SAMPLER descriptor
+		// binding 1: 4096 VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE descriptors
+
+	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetInfo, state->GetAllocator(), &fTextureLayout ))
+	{
+	}
+
+	else
+	{
+		CoronaLog( "Failed to create texture descriptor set layout!" );
+	}
+
+	VkDescriptorSetLayout layouts[] = { fUBOLayout, fUserDataLayout, fTextureLayout };
+
 	createPipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	createPipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-//	createPipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+	createPipelineLayoutInfo.pSetLayouts = layouts;
 	createPipelineLayoutInfo.pushConstantRangeCount = 1U;
-	createPipelineLayoutInfo.setLayoutCount = 1U;
+	createPipelineLayoutInfo.setLayoutCount = 3U;
 
 	if (VK_SUCCESS == vkCreatePipelineLayout( state->GetDevice(), &createPipelineLayoutInfo, state->GetAllocator(), &fPipelineLayout ))
 	{
@@ -55,6 +134,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 	else
 	{
+		CoronaLog( "Failed to create pipeline layout!" );
 	}
 
 	InitializePipelineState();
@@ -88,7 +168,7 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 	{
 		uint32_t index = vulkanCommandBuffer->GetImageIndex();
 
-		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], &fDescriptorPools[index] );
+		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], fDescriptorLists.data() + 3U * index );
 	}
 
 	else
@@ -167,7 +247,7 @@ VulkanRenderer::BuildUpSwapchain( VkSwapchainKHR swapchain )
 	vkGetSwapchainImagesKHR( device, swapchain, &imageCount, NULL );
 	
 	fCommandBuffers.resize( imageCount );
-	fDescriptorPools.resize( imageCount );
+	fDescriptorLists.resize( 2U * imageCount );
 	fSwapchainImages.resize( imageCount );
 
 	VkCommandBufferAllocateInfo allocInfo = {};
