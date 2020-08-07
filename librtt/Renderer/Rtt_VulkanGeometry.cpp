@@ -129,20 +129,32 @@ VulkanGeometry::Destroy()
 	fVertexBufferData = fIndexBufferData = NULL;
 }
 
-VulkanGeometry::VertexDescription 
+VulkanGeometry::Binding 
 VulkanGeometry::Bind()
 {
-	VertexDescription desc;
 	VkVertexInputBindingDescription description;
 
 	description.binding = 0U;
 	description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 	description.stride = sizeof( Geometry::Vertex );
 
-	desc.fDescriptions.push_back( description );
-	desc.fID = 0U; // n.b. for future use
+	Binding binding;
 
-	return desc;
+	if (fVertexBufferData)
+	{
+		binding.fVertexBuffer = fVertexBufferData->GetBuffer();
+	}
+
+	if (fIndexBufferData)
+	{
+		binding.fIndexBuffer = fIndexBufferData->GetBuffer();
+		binding.fIndexType = VK_INDEX_TYPE_UINT16;
+	}
+
+	binding.fDescriptions.push_back( description );
+	binding.fID = 0U; // n.b. for future use
+
+	return binding;
 }
 
 VulkanBufferData *

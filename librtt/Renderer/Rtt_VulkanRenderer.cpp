@@ -33,20 +33,25 @@ DynamicUniformData::DynamicUniformData()
 {
 }
 
-DescriptorLists::DescriptorLists()
+DescriptorLists::DescriptorLists( bool resetPool )
 :	fSetLayout( VK_NULL_HANDLE ),
 	fPool( VK_NULL_HANDLE ),
 	fDynamicAlignment( 0U ),
 	fBufferIndex( 0U ),
-	fOffset( 0U )
+	fOffset( 0U ),
+	fResetPool( resetPool )
 {
 }
 
 void
-DescriptorLists::Reset()
+DescriptorLists::Reset( VkDevice device )
 {
-//	vkResetDescriptorPool( device, fPool, 0 );
-//	^^ probably no longer makes sense...
+	if (fResetPool)
+	{
+		vkResetDescriptorPool( device, fPool, 0 );
+
+		fSets.clear();
+	}
 
 	fBufferIndex = fOffset = 0U;
 }
@@ -64,26 +69,25 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
 	fBackCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
 
-	VkPipelineLayoutCreateInfo createPipelineLayoutInfo = {};
 	VkPushConstantRange pushConstantRange;
 
 	pushConstantRange.offset = 0U;
-	pushConstantRange.size = sizeof( UniformObjects::PushConstant );
+	pushConstantRange.size = sizeof( VulkanPushConstants );
 	pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-	VkDescriptorSetLayoutCreateInfo createDescriptorSetInfo = {};
+	VkDescriptorSetLayoutCreateInfo createDescriptorSetLayoutInfo = {};
 	VkDescriptorSetLayoutBinding bindings[2] = {};
 
-	createDescriptorSetInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	createDescriptorSetInfo.bindingCount = 1U;
-//	createDescriptorSetInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT; TODO: this seems right?
-	createDescriptorSetInfo.pBindings = bindings;
+	createDescriptorSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	createDescriptorSetLayoutInfo.bindingCount = 1U;
+//	createDescriptorSetLayoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT; TODO: this seems right?
+	createDescriptorSetLayoutInfo.pBindings = bindings;
 
 	bindings[0].descriptorCount = 1U;
 	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetInfo, state->GetAllocator(), &fUBOLayout ))
+	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetLayoutInfo, state->GetAllocator(), &fUBOLayout ))
 	{
 	}
 
@@ -94,7 +98,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 	bindings[0].stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetInfo, state->GetAllocator(), &fUserDataLayout ))
+	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetLayoutInfo, state->GetAllocator(), &fUserDataLayout ))
 	{
 	}
 
@@ -113,7 +117,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 		// binging 0: 1 (VK_DESCRIPTOR_TYPE_SAMPLER) descriptor
 		// binding 1: 4096 (VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE) descriptors
 
-	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetInfo, state->GetAllocator(), &fTextureLayout ))
+	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetLayoutInfo, state->GetAllocator(), &fTextureLayout ))
 	{
 	}
 
@@ -121,7 +125,8 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	{
 		CoronaLog( "Failed to create texture descriptor set layout!" );
 	}
-
+	
+	VkPipelineLayoutCreateInfo createPipelineLayoutInfo = {};
 	VkDescriptorSetLayout layouts[] = { fUBOLayout, fUserDataLayout, fTextureLayout };
 
 	createPipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;

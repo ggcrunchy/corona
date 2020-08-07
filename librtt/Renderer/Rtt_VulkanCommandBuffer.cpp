@@ -10,8 +10,7 @@
 #include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanCommandBuffer.h"
 
-/*
-#include "Renderer/Rtt_FrameBufferObject.h"
+#include "Renderer/Rtt_FrameBufferObject.h"/*
 #include "Renderer/Rtt_Geometry_Renderer.h"*/
 #include "Renderer/Rtt_VulkanFrameBufferObject.h"
 #include "Renderer/Rtt_VulkanGeometry.h"
@@ -97,9 +96,9 @@ namespace Rtt
 
 VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRenderer & renderer )
 :	CommandBuffer( allocator ),
-	fCurrentPrepVersion( Program::kMaskCount0 ),/*
+	fCurrentPrepVersion( Program::kMaskCount0 ),
 	fProgram( NULL ),
-	fDefaultFBO( 0 ),*/
+	fDefaultFBO( NULL ),
 	fTimeTransform( NULL ),/*
 	fTimerQueries( new U32[kTimerQueryCount] ),
 	fTimerQueryIndex( 0 ),*/
@@ -111,7 +110,6 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fLists( NULL ),
 	fCommandBuffer( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE )
-
 {
 	for(U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
 	{
@@ -242,12 +240,17 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
 	if( fbo )
 	{
-	//	WRITE_COMMAND( kCommandBindFrameBufferObject );
-	//	Write<GPUResource*>( fbo->GetGPUResource() );
+		VulkanFrameBufferObject * vulkanFBO = static_cast< VulkanFrameBufferObject * >( fbo->GetGPUResource() );
+
+		vulkanFBO->Bind();	// TODO: stuff to plug in to render pass begin...
 	}
 	else
 	{
-	//	WRITE_COMMAND( kCommandUnBindFrameBufferObject );
+/*
+glBindFramebuffer( GL_FRAMEBUFFER, fDefaultFBO );
+DEBUG_PRINT( "Unbind FrameBufferObject: OpenGL name: %i (fDefaultFBO)", fDefaultFBO );
+CHECK_ERROR_AND_BREAK;
+*/
 	}
 }
 
@@ -255,26 +258,61 @@ void
 VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 {
 	VulkanGeometry * vulkanGeometry = static_cast< VulkanGeometry * >( geometry->GetGPUResource() );
-	VulkanGeometry::VertexDescription vertexData = vulkanGeometry->Bind();
+	VulkanGeometry::Binding binding = vulkanGeometry->Bind();
 
-	fRenderer.SetBindingDescriptions( vertexData.fID, vertexData.fDescriptions );
-//	WRITE_COMMAND( kCommandBindGeometry );
-//	Write<GPUResource*>( geometry->GetGPUResource() );
-//        VkBuffer vertexBuffers[] = {vertexBuffer};
-//        VkDeviceSize offsets[] = {0};	
-//                vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+	fRenderer.SetBindingDescriptions( binding.fID, binding.fDescriptions );
 
-//                vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+	VkDeviceSize offset = 0U;
+
+	vkCmdBindVertexBuffers( fCommandBuffer, 0U, 1U, &binding.fVertexBuffer, &offset );
+
+	if (binding.fIndexBuffer != VK_NULL_HANDLE)
+	{
+		vkCmdBindIndexBuffer( fCommandBuffer, binding.fIndexBuffer, 0U, binding.fIndexType );
+	}
 }
 
 void 
 VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 {
-//	WRITE_COMMAND( kCommandBindTexture );
-//	Write<U32>( unit );
-//	Write<GPUResource*>( texture->GetGPUResource() );
-//	vkUpdateDescriptorSets(device, 1, WRITES, 1, 0);
-//                vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
+	VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() );
+	VulkanTexture::Binding binding = vulkanTexture->Bind();
+	VkDescriptorImageInfo imageInfo;
+
+	imageInfo.imageView = binding.view;
+	imageInfo.sampler = binding.sampler;
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkWriteDescriptorSet descriptorWrite = {};
+
+	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite.descriptorCount = 1U;
+	descriptorWrite.pImageInfo = &imageInfo;
+
+	if (true) // TODO: no indexing... this will presumably occur before binding
+	{
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrite.dstArrayElement = unit;
+		//	descriptorWrite.dstSet = 2U;
+		
+		vkUpdateDescriptorSets( fRenderer.GetState()->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
+	}
+
+	else // TODO: do one bind at start of frame, update here?
+	{
+		VkWriteDescriptorSet write2 = descriptorWrite;
+
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+		write2.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+//		write2.dstArrayElement = unit + offset;
+		write2.dstBinding = 1U;
+//		write2.dstSet = set;
+		write2.pImageInfo = &imageInfo; // TODO: is this right?? (also for write 0)
+
+		VkWriteDescriptorSet writes[] = { descriptorWrite, write2 };
+
+		vkUpdateDescriptorSets( fRenderer.GetState()->GetDevice(), 2U, writes, 0U, NULL );
+	}
 }
 
 void 
@@ -284,13 +322,9 @@ VulkanCommandBuffer::BindProgram( Program* program, Program::Version version )
 	VulkanProgram::PipelineStages stageData = vulkanProgram->Bind( version );
 
 	fRenderer.SetShaderStages( stageData.fID, stageData.fStages );
-/*
-	WRITE_COMMAND( kCommandBindProgram );
-	Write<Program::Version>( version );
-	Write<GPUResource*>( program->GetGPUResource() );
-	*/
+
+	fProgram = program;
 	fCurrentPrepVersion = version;
-//	fProgram = program;
 
 	fTimeTransform = program->GetShaderResource()->GetTimeTransform();
 }
@@ -539,17 +573,11 @@ VulkanCommandBuffer::GetCachedParam( CommandBuffer::QueryableParams param )
 Real 
 VulkanCommandBuffer::Execute( bool measureGPU )
 {
-/*
-	DEBUG_PRINT( "--Begin Rendering: GLCommandBuffer --" );
+//	DEBUG_PRINT( "--Begin Rendering: VulkanCommandBuffer --" );
 
-//TODO - make this a property that can be invalidated for specific platforms
-//The Mac platform needs to set the default FBO for resize, sleep, zoom functionality
-#ifdef Rtt_MAC_ENV
 	InitializeFBO();
-	//printf("DEFAULTFBO: %d", fDefaultFBO);
-#endif
-
-#ifdef ENABLE_GPU_TIMER_QUERIES	
+/*
+#ifdef ENABLE_GPU_TIMER_QUERIES
 	if( measureGPU )
 	{
 		GLint available = 0;
@@ -566,74 +594,15 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 		glBeginQuery( GL_TIME_ELAPSED, id);
 		fTimerQueryIndex = ( fTimerQueryIndex + 1 ) % kTimerQueryCount;
 	}
-#endif
 
-	// Reset the offset pointer to the start of the buffer.
-	// This is safe to do here, as preparation work is done
-	// on another CommandBuffer while this one is executing.
-	fOffset = fBuffer;
-
-	//GL_CHECK_ERROR();
-
-	for( U32 i = 0; i < fNumCommands; ++i )
-	{
-		Command command = Read<Command>();
-
-// printf( "GLCommandBuffer::Execute [%d/%d] %d\n", i, fNumCommands, command );
-
-		Rtt_ASSERT( command < kNumCommands );
-		switch( command )
-		{
-			case kCommandBindFrameBufferObject:
-			{
-				GLFrameBufferObject* fbo = Read<GLFrameBufferObject*>();
-				fbo->Bind();
-				DEBUG_PRINT( "Bind FrameBufferObject: OpenGL name: %i, OpenGL Texture name, if any: %d",
-								fbo->GetName(),
-								fbo->GetTextureName() );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandUnBindFrameBufferObject:
-			{
-				glBindFramebuffer( GL_FRAMEBUFFER, fDefaultFBO );
-				DEBUG_PRINT( "Unbind FrameBufferObject: OpenGL name: %i (fDefaultFBO)", fDefaultFBO );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandBindGeometry:
-			{
-				GLGeometry* geometry = Read<GLGeometry*>();
-				geometry->Bind();
-				DEBUG_PRINT( "Bind Geometry %p", geometry );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandBindTexture:
-			{
-				U32 unit = Read<U32>();
-				GLTexture* texture = Read<GLTexture*>();
-				texture->Bind( unit );
-				DEBUG_PRINT( "Bind Texture: texture=%p unit=%i OpenGL name=%d",
-								texture,
-								unit,
-								texture->GetName() );
-				CHECK_ERROR_AND_BREAK;
-			}
-		}
-	}
-
-	fBytesUsed = 0;
-	fNumCommands = 0;
-	
-#ifdef ENABLE_GPU_TIMER_QUERIES
 	if( measureGPU )
 	{
 		glEndQuery( GL_TIME_ELAPSED );
 	}
 #endif
-	
-	DEBUG_PRINT( "--End Rendering: GLCommandBuffer --\n" );
-
-	GL_CHECK_ERROR();
 */
+//	DEBUG_PRINT( "--End Rendering: VulkanCommandBuffer --\n" );
+
 	if (fCommandBuffer != VK_NULL_HANDLE && fSwapchain != VK_NULL_HANDLE)
 	{
 		VkResult endResult = vkEndCommandBuffer( fCommandBuffer );
@@ -763,8 +732,9 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 
 		// lists = ..., ubo, user data, textures, ...
 
-		lists[0].Reset();
-		lists[1].Reset();
+		lists[0].Reset( device );
+		lists[1].Reset( device );
+		lists[2].Reset( device );
 		
 		VkCommandBufferBeginInfo beginInfo = {};
 
@@ -787,21 +757,50 @@ void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
 {
 	fRenderer.SetPrimitiveTopology( topology );
 
-	// Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-/*
-TODO: can we keep all this here?
+	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
+	
+	VulkanPushConstants pushConstants;
+	DrawState drawState = ApplyUniforms( fProgram->GetGPUResource(), pushConstants );
+	VkDevice device = fRenderer.GetState()->GetDevice();
+	uint32_t dynamicOffsets[2], count = 0U;
+	VkDescriptorSet sets[3] = {};
 
-		std::vector< VkMappedMemoryRange > fUniformBufferRanges;
-		std::vector< VkMappedMemoryRange > fUserDataRanges;
-		bool fUpdatedUniformBuffer; // TODO: maybe we just need to check !f*Ranges.empty()
-		bool fUpdatedUserData;
-		S32 fLowerPushConstantVector;
-		S32 fUpperPushConstantVector;
-*/
-	// ApplyUniforms( fProgram->GetGPUResource() );
+	if (!drawState.uniformBufferRanges.empty())
+	{
+		vkFlushMappedMemoryRanges( device, drawState.uniformBufferRanges.size(), drawState.uniformBufferRanges.data() );
 
-//  vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0U, 1U, &descriptorSets[i], 0U, NULL );
-	// ^^ offsets...
+		DescriptorLists & lists = fLists[0];
+//		sets[0] = ;//lists.fBufferData[lists.fBufferIndex]
+		dynamicOffsets[count++] = lists.fOffset;
+
+		lists.fOffset += lists.fDynamicAlignment;
+	}
+
+	if (!drawState.userDataRanges.empty())
+	{
+		vkFlushMappedMemoryRanges( device, drawState.userDataRanges.size(), drawState.userDataRanges.data() );
+		
+		DescriptorLists & lists = fLists[1];
+//		sets[1] = &fLists[1];
+		dynamicOffsets[count] = lists.fOffset;
+
+		lists.fOffset += lists.fDynamicAlignment;
+	}
+
+	// texture set...
+
+	if (count || false)
+	{
+		vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fRenderer.GetPipelineLayout(), 0U, 3U, sets, count, dynamicOffsets );
+	}
+
+	if (drawState.upperPushConstantOffset >= 0)
+	{
+		uint32_t offset = uint32_t( drawState.lowerPushConstantOffset );
+		uint32_t size = uint32_t( drawState.upperPushConstantOffset ) - offset + sizeof( float ) * 4U;
+
+		vkCmdPushConstants( fCommandBuffer, fRenderer.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, offset, size, &pushConstants.fData + offset );
+	}
 }
 
 void VulkanCommandBuffer::AddGraphicsPipeline( VkPipeline pipeline )
@@ -812,11 +811,8 @@ void VulkanCommandBuffer::AddGraphicsPipeline( VkPipeline pipeline )
 	}
 }
 
-void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
+VulkanCommandBuffer::DrawState VulkanCommandBuffer::ApplyUniforms( GPUResource* resource, VulkanPushConstants & pushConstants )
 {
-	VulkanProgram* vulkanProgram = static_cast< VulkanProgram * >( resource );
-	DrawState drawState;
-
 	Real rawTotalTime;
 	bool transformed = false;
 
@@ -828,13 +824,16 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 			transformed = fTimeTransform->Apply( time.uniform, &rawTotalTime, time.timestamp );
 		}
 	}
+	
+	VulkanProgram* vulkanProgram = static_cast< VulkanProgram * >( resource );
+	DrawState drawState;
 
 	for( U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
 	{
 		const UniformUpdate& update = fUniformUpdates[i];
 		if( update.uniform && update.timestamp != vulkanProgram->GetUniformTimestamp( i, fCurrentPrepVersion ) )
 		{		
-			ApplyUniform( *vulkanProgram, i, drawState );
+			ApplyUniform( *vulkanProgram, i, drawState, pushConstants );
 		}
 	}
 
@@ -842,9 +841,11 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 	{
 		fUniformUpdates[Uniform::kTotalTime].uniform->SetValue(rawTotalTime);
 	}
+
+	return drawState;
 }
 
-void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index, DrawState & drawState )
+void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index, DrawState & drawState, VulkanPushConstants & pushConstants )
 {
 	const UniformUpdate& update = fUniformUpdates[index];
 	vulkanProgram.SetUniformTimestamp( index, fCurrentPrepVersion, update.timestamp );
@@ -856,81 +857,106 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 	bool isPushConstant = (index >= Uniform::kMaskMatrix0 && index <= Uniform::kMaskMatrix2) || Uniform::kTotalTime == index;
 	S32 low, nrows = 1;
 
+	size_t offset;
+	float * dst = NULL;
+	VkMappedMemoryRange range = {};
+
+	if (isUniformUserData)
+	{
+		DescriptorLists & lists = fLists[1];
+		DynamicUniformData & data = lists.fBufferData[lists.fBufferIndex];
+
+		range.memory = data.fBuffer;
+
+		void * mapped = static_cast< U8 * >( data.fMapped ) + lists.fOffset;
+
+		dst = reinterpret_cast< VulkanUserDataUBO * >( mapped )->UserData[index - Uniform::kUserData0];
+	}
+
+	else if (!isPushConstant)
+	{
+		DescriptorLists & lists = fLists[0];
+		DynamicUniformData & data = lists.fBufferData[lists.fBufferIndex];
+
+		range.memory = data.fBuffer;
+
+		void * mapped = static_cast< U8 * >( data.fMapped ) + lists.fOffset;
+
+		dst = reinterpret_cast< VulkanUBO * >( mapped )->fData;
+	}
+
 	switch( uniform->GetDataType() )
 	{
 		case Uniform::kScalar:
 			if (isPushConstant)
 			{
-//				low = X - X % 4;
+				dst = pushConstants.fData + location.fOffset;
+				low = location.fOffset - location.fOffset % 4;
 			}
 
-			else if (isUniformUserData)
-			{
-				// blast to vector 0
-			}
-
-			else
-			{
-			}
-			// WRITE_COMMAND( kCommandApplyUniformScalar );
+			uniform->GetValue( dst[0] );
 
 			break;
 		case Uniform::kVec2:
 			Rtt_ASSERT( isUniformUserData );
 
-			// blast to vector 0
-			// WRITE_COMMAND( kCommandApplyUniformVec2 );
+			uniform->GetValue( dst[0], dst[1] );
 			
 			break;
 		case Uniform::kVec3: // has difficulties, cf. https://stackoverflow.com/questions/38172696/should-i-ever-use-a-vec3-inside-of-a-uniform-buffer-or-shader-storage-buffer-o
-			// blast to vector 0
 			Rtt_ASSERT( isUniformUserData );
+
+			uniform->GetValue( dst[0], dst[1], dst[2] );
 
 			break;
 		case Uniform::kVec4:
-			if (isUniformUserData)
-			{
-				// blast to vector 0
-			}
+			Rtt_ASSERT( !isPushConstant );
 
-			else
-			{
-				Rtt_ASSERT( !isPushConstant );
-			}
-			// WRITE_COMMAND( kCommandApplyUniformVec4 );
+			uniform->GetValue( dst[0], dst[1], dst[2], dst[3] );
 			
 			break;
 		case Uniform::kMat3:
 			if (isUniformUserData)
 			{
 				nrows = 3;
+
+				float * src = reinterpret_cast< float * >( uniform->GetData() );
+
+				for (int i = 0; i < 3; ++i)
+				{
+					memcpy( dst, src, 3U * sizeof( float ) );
+
+					src += 3U * sizeof( float );
+					dst += 4U * sizeof( float );
+				}
 			}
 			
 			else
 			{
 				Rtt_ASSERT( isPushConstant );
-				
+
+				VulkanProgram::Location translationLocation = vulkanProgram.GetTranslationLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
+
 				// only used by mask matrices, with three constant components
 				// thus, mindful of the difficulties mentioned re. kVec3, these are decomposed as a vec2[2] and vec2
 				// the vec2 array avoids consuming two vectors, cf. https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)
 				// the two elements should be columns, to allow mat2(vec[0], vec[1]) on the shader side
+				float * src = reinterpret_cast< float * >( uniform->GetData() );
+
+
 			}
 			// WRITE_COMMAND( kCommandApplyUniformMat3 );
 
 			break;
 		case Uniform::kMat4:
+			Rtt_ASSERT( !isPushConstant );
+
 			if (isUniformUserData)
 			{
 				nrows = 4;
 			}
-			
-			else
-			{
-				Rtt_ASSERT( !isPushConstant );
-			}
-				
-			// blast away!
-			// WRITE_COMMAND( kCommandApplyUniformMat4 );
+
+			memcpy( dst, uniform->GetData(), 16U * sizeof( float ) );
 			
 			break;
 		default:
@@ -943,21 +969,21 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 	{
 		S32 high = low + nrows - 1;
 
-		if (low < drawState.lowerPushConstantVector)
+		if (low < drawState.lowerPushConstantOffset)
 		{
-			drawState.lowerPushConstantVector = low;
+			drawState.lowerPushConstantOffset = low;
 		}
 
-		if (high > drawState.upperPushConstantVector)
+		if (high > drawState.upperPushConstantOffset)
 		{
-			drawState.upperPushConstantVector = high;
+			drawState.upperPushConstantOffset = high;
 		}
 	}
 }
 
 VulkanCommandBuffer::DrawState::DrawState()
-:	lowerPushConstantVector( std::numeric_limits< S32 >::max() ),
-	upperPushConstantVector( -1 )
+:	lowerPushConstantOffset( 0 ),
+	upperPushConstantOffset( -1 )
 {
 }
 
