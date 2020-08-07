@@ -60,11 +60,12 @@ struct DescriptorLists {
 
 	void Reset();
 
-	std::vector< DynamicUniformData > fDynamicUBOs;
-	std::vector< VkDescriptorPool > fPools;
+	std::vector< DynamicUniformData > fBufferData; // in normal scenarios, we should only ever use one of these...
 	VkDescriptorSetLayout fSetLayout;
-	uint32_t fDynamicUBOIndex;
-	uint32_t fPoolIndex;
+	VkDescriptorPool fPool;
+	size_t fDynamicAlignment;
+	U32 fBufferIndex; // ...i.e. index 0
+	U32 fOffset;
 };
 
 class VulkanRenderer : public Renderer

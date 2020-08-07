@@ -31,6 +31,8 @@
 #include <string.h>
 #include "Core/Rtt_String.h"
 */
+#include <limits>
+
 #include "CoronaLog.h"
 
 // ----------------------------------------------------------------------------
@@ -786,6 +788,16 @@ void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
 	fRenderer.SetPrimitiveTopology( topology );
 
 	// Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
+/*
+TODO: can we keep all this here?
+
+		std::vector< VkMappedMemoryRange > fUniformBufferRanges;
+		std::vector< VkMappedMemoryRange > fUserDataRanges;
+		bool fUpdatedUniformBuffer; // TODO: maybe we just need to check !f*Ranges.empty()
+		bool fUpdatedUserData;
+		S32 fLowerPushConstantVector;
+		S32 fUpperPushConstantVector;
+*/
 	// ApplyUniforms( fProgram->GetGPUResource() );
 
 //  vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0U, 1U, &descriptorSets[i], 0U, NULL );
@@ -803,6 +815,7 @@ void VulkanCommandBuffer::AddGraphicsPipeline( VkPipeline pipeline )
 void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 {
 	VulkanProgram* vulkanProgram = static_cast< VulkanProgram * >( resource );
+	DrawState drawState;
 
 	Real rawTotalTime;
 	bool transformed = false;
@@ -821,7 +834,7 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 		const UniformUpdate& update = fUniformUpdates[i];
 		if( update.uniform && update.timestamp != vulkanProgram->GetUniformTimestamp( i, fCurrentPrepVersion ) )
 		{		
-			ApplyUniform( resource, i );
+			ApplyUniform( *vulkanProgram, i, drawState );
 		}
 	}
 
@@ -831,13 +844,12 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 	}
 }
 
-void VulkanCommandBuffer::ApplyUniform( GPUResource* resource, U32 index )
+void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index, DrawState & drawState )
 {
 	const UniformUpdate& update = fUniformUpdates[index];
-	VulkanProgram * vulkanProgram = static_cast< VulkanProgram * >( resource );
-	vulkanProgram->SetUniformTimestamp( index, fCurrentPrepVersion, update.timestamp );
+	vulkanProgram.SetUniformTimestamp( index, fCurrentPrepVersion, update.timestamp );
 
-	VulkanProgram::Location location = vulkanProgram->GetUniformLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
+	VulkanProgram::Location location = vulkanProgram.GetUniformLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
 	Uniform* uniform = update.uniform;
 
 	bool isUniformUserData = index >= Uniform::kUserData0;
@@ -927,30 +939,26 @@ void VulkanCommandBuffer::ApplyUniform( GPUResource* resource, U32 index )
 			break;
 	}
 
-	if (isUniformUserData)
-	{
-		fUpdatedUserData = true;
-	}
-
-	else if (!isPushConstant)
-	{
-		fUpdatedUniformBuffer = true;
-	}
-
-	else
+	if (isPushConstant)
 	{
 		S32 high = low + nrows - 1;
 
-		if (low < fLowerPushConstantVector)
+		if (low < drawState.lowerPushConstantVector)
 		{
-			fLowerPushConstantVector = low;
+			drawState.lowerPushConstantVector = low;
 		}
 
-		if (high > fUpperPushConstantVector)
+		if (high > drawState.upperPushConstantVector)
 		{
-			fUpperPushConstantVector = high;
+			drawState.upperPushConstantVector = high;
 		}
 	}
+}
+
+VulkanCommandBuffer::DrawState::DrawState()
+:	lowerPushConstantVector( std::numeric_limits< S32 >::max() ),
+	upperPushConstantVector( -1 )
+{
 }
 
 // ----------------------------------------------------------------------------

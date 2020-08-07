@@ -22,6 +22,7 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
+class VulkanProgram;
 class VulkanRenderer;
 class VulkanState;
 struct DescriptorLists;
@@ -84,6 +85,15 @@ class VulkanCommandBuffer : public CommandBuffer
 		virtual void CacheQueryParam( CommandBuffer::QueryableParams param );
 
 	private:
+		struct DrawState {
+			DrawState();
+
+			std::vector< VkMappedMemoryRange > uniformBufferRanges;
+			std::vector< VkMappedMemoryRange > userDataRanges;
+			S32 lowerPushConstantVector;
+			S32 upperPushConstantVector;
+		};
+
 		struct UniformUpdate
 		{
 			Uniform* uniform;
@@ -91,7 +101,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		};
 		
 		void ApplyUniforms( GPUResource* resource );
-		void ApplyUniform( GPUResource* resource, U32 index );
+		void ApplyUniform( VulkanProgram & vulkanProgram, U32 index, DrawState & drawState );
 
 		UniformUpdate fUniformUpdates[Uniform::kNumBuiltInVariables];
 
@@ -109,19 +119,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkSemaphore fImageAvailableSemaphore;
 		VkSemaphore fRenderFinishedSemaphore;
 		VkFence fInFlight;
-		std::vector< U8 > fDynamicUBO;
-		std::vector< U8 > fDynamicUserData;
-		size_t fDynamicBufferAlignment;
-		uint32_t fUBOIndex;
-		uint32_t fUserDataIndex;
-
-		// reset at start of frame and after draws:
-		std::vector< VkMappedMemoryRange > fUniformBufferRanges;
-		std::vector< VkMappedMemoryRange > fUserDataRanges;
-		bool fUpdatedUniformBuffer; // TODO: maybe we just need to check !f*Ranges.empty()
-		bool fUpdatedUserData;
-		S32 fLowerPushConstantVector;
-		S32 fUpperPushConstantVector;
 
 		// non-owned, retained only for frame:
 		DescriptorLists * fLists;
