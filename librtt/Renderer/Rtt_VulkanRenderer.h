@@ -56,16 +56,32 @@ struct DynamicUniformData {
 };
 
 struct DescriptorLists {
-	DescriptorLists();
+	DescriptorLists( bool resetPool = false );
 
-	void Reset();
+	void Reset( VkDevice device );
 
+	std::vector< VkDescriptorSet > fSets;
 	std::vector< DynamicUniformData > fBufferData; // in normal scenarios, we should only ever use one of these...
 	VkDescriptorSetLayout fSetLayout;
 	VkDescriptorPool fPool;
 	size_t fDynamicAlignment;
 	U32 fBufferIndex; // ...i.e. index 0
 	U32 fOffset;
+	bool fResetPool;
+};
+
+// cf. shell_default_vulkan:
+
+struct VulkanUBO {
+	alignas(16) float fData[6 * 4];
+};
+
+struct VulkanUserDataUBO {
+	alignas(16) float UserData[4][16];
+};
+
+struct VulkanPushConstants {
+	alignas(16) float fData[5 * 4];
 };
 
 class VulkanRenderer : public Renderer
@@ -89,6 +105,10 @@ class VulkanRenderer : public Renderer
 
 	public:
 		VulkanState * GetState() const { return fState; }
+		VkDescriptorSetLayout GetUBOLayout() const { return fUBOLayout; }
+		VkDescriptorSetLayout GetUserDataLayout() const { return fUserDataLayout; }
+		VkDescriptorSetLayout GetTextureLayout() const { return fTextureLayout; }
+		VkPipelineLayout GetPipelineLayout() const { return fPipelineLayout; }
 
 	public:
 		void EnableBlend( bool enabled );
@@ -101,26 +121,6 @@ class VulkanRenderer : public Renderer
 
 	public:
 		void SetClearValue( U32 index, const VkClearValue & clearValue );
-
-	public:
-		// cf. shell_default_vulkan:
-
-		struct UniformObjects {
-			typedef float Mat4[16];
-			typedef float Vec4[4];
-
-			struct UniformBuffer {
-				alignas(16) Vec4 fVectors[6];
-			};
-
-			struct UserData {
-				alignas(16) Mat4 UserData[4];
-			};
-
-			struct PushConstant {
-				alignas(16) Vec4 fVectors[5];
-			};
-		};
 
 	protected:
 		// Create an OpenGL resource appropriate for the given CPUResource.
@@ -165,7 +165,6 @@ VkViewport fViewport;
 		std::vector< VkClearValue > fClearValues;
 		std::vector< VkImage > fSwapchainImages;
 		std::vector< VkCommandBuffer > fCommandBuffers;
-		std::vector< VkPipelineLayout > fPipelineLayouts;
 		std::vector< DescriptorLists > fDescriptorLists;
 		std::map< PipelineKey, VkPipeline > fBuiltPipelines;
 		VkPipeline fFirstPipeline;

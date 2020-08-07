@@ -27,6 +27,7 @@ class VulkanRenderer;
 class VulkanState;
 struct DescriptorLists;
 struct TimeTransform;
+struct VulkanPushConstants;
 
 // 
 class VulkanCommandBuffer : public CommandBuffer
@@ -90,8 +91,8 @@ class VulkanCommandBuffer : public CommandBuffer
 
 			std::vector< VkMappedMemoryRange > uniformBufferRanges;
 			std::vector< VkMappedMemoryRange > userDataRanges;
-			S32 lowerPushConstantVector;
-			S32 upperPushConstantVector;
+			S32 lowerPushConstantOffset;
+			S32 upperPushConstantOffset;
 		};
 
 		struct UniformUpdate
@@ -100,16 +101,16 @@ class VulkanCommandBuffer : public CommandBuffer
 			U32 timestamp;
 		};
 		
-		void ApplyUniforms( GPUResource* resource );
-		void ApplyUniform( VulkanProgram & vulkanProgram, U32 index, DrawState & drawState );
+		DrawState ApplyUniforms( GPUResource* resource, VulkanPushConstants & pushConstants );
+		void ApplyUniform( VulkanProgram & vulkanProgram, U32 index, DrawState & drawState, VulkanPushConstants & pushConstants );
 
 		UniformUpdate fUniformUpdates[Uniform::kNumBuiltInVariables];
 
 		Program::Version fCurrentPrepVersion;
 		
-	private:/*
+	private:
 		Program* fProgram;
-		S32 fDefaultFBO;
+		FrameBufferObject * fDefaultFBO;/*
 		U32* fTimerQueries;
 		U32 fTimerQueryIndex;*/
 		Real fElapsedTimeGPU;

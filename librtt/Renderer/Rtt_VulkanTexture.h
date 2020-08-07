@@ -34,10 +34,16 @@ class VulkanTexture : public GPUResource
 		VulkanTexture( VulkanState * state );
 
 	public:
+		struct Binding {
+			VkImageView view;
+			VkSampler sampler;
+		};
+
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
-		virtual void Bind( U32 unit );
+
+		Binding Bind();
 
 	public:
 		void CopyBufferToImage( VkBuffer buffer, VkImage image, uint32_t width, uint32_t height );

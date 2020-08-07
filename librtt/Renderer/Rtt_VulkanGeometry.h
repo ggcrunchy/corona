@@ -34,12 +34,17 @@ class VulkanGeometry : public GPUResource
 	public:
 		VulkanGeometry( VulkanState * state );
 
-		struct VertexDescription {
-			VertexDescription()
+		struct Binding {
+			Binding()
+			:	fVertexBuffer( VK_NULL_HANDLE ),
+				fIndexBuffer( VK_NULL_HANDLE )
 			{
 			}
 
 			std::vector< VkVertexInputBindingDescription > fDescriptions;
+			VkIndexType fIndexType;
+			VkBuffer fVertexBuffer;
+			VkBuffer fIndexBuffer;
 			U32 fID;
 		};
 
@@ -47,7 +52,7 @@ class VulkanGeometry : public GPUResource
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 
-		VertexDescription Bind();
+		Binding Bind();
 
 	private:
 		VulkanBufferData * CreateBufferOnGPU( VkDeviceSize bufferSize, VkBufferUsageFlags usage );

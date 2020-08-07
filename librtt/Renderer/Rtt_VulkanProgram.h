@@ -81,6 +81,13 @@ class VulkanProgram : public GPUResource
 			return fData[version].fUniformLocations[ unit ];
 		}
 
+		inline Location GetTranslationLocation( U32 unit, Program::Version version )
+		{
+			Rtt_ASSERT( unit >= Uniform::kMaskMatrix0 && unit <= Uniform::kMaskMatrix2 );
+			Rtt_ASSERT( version <= Program::kNumVersions );
+			return fData[version].fMaskTranslationLocations[ unit - Uniform::kMaskMatrix0 ];
+		}
+
 		inline U32 GetUniformTimestamp( U32 unit, Program::Version version )
 		{
 			Rtt_ASSERT( version <= Program::kNumVersions );

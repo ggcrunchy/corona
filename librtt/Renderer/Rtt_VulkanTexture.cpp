@@ -242,12 +242,15 @@ VulkanTexture::Destroy()
     vkFreeMemory( device, fData.fMemory, allocator );
 }
 
-void 
-VulkanTexture::Bind( U32 unit )
+VulkanTexture::Binding 
+VulkanTexture::Bind()
 {
-    // TODO: sampler, view?
-    // something to hook up to descriptor: unit + 1
-    // reset when program changes?
+    Binding binding;
+
+    binding.sampler = fSampler;
+    binding.view = fImageView;
+
+    return binding;
 }
 
 void
