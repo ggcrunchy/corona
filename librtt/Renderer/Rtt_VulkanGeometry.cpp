@@ -152,7 +152,7 @@ VulkanGeometry::Bind()
 	}
 
 	binding.fDescriptions.push_back( description );
-	binding.fID = 0U; // n.b. for future use
+	binding.fInputBindingID = 0U; // n.b. for future use
 
 	return binding;
 }

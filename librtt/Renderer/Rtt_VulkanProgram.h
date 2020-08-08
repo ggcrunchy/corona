@@ -45,21 +45,18 @@ class VulkanProgram : public GPUResource
 	public:
 		VulkanProgram( VulkanState * state );
 
-		struct PipelineStages {
-			PipelineStages( U32 id ) : fID( id )
-			{
-			}
-
+		struct Binding {
+			std::vector< VkVertexInputAttributeDescription > fDescriptions;
 			std::vector< VkPipelineShaderStageCreateInfo > fStages;
-			U32 fID;
+			U32 fInputAttributesID;
+			U32 fShadersID;
 		};
 
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 		
-		// Bind() was virtual in GLProgram but such a method was missing in GPUResource, nor were there derived classes...
-		PipelineStages Bind( Program::Version version );
+		Binding Bind( Program::Version version );
 
 		struct Location {
 			Location( size_t offset = 0U, size_t range = 0U )
@@ -155,8 +152,6 @@ class VulkanProgram : public GPUResource
 
 		static void InitializeCompiler( shaderc_compiler ** compiler, shaderc_compile_options ** options );
 		static void CleanUpCompiler( shaderc_compiler * compiler, shaderc_compile_options * options );
-			
-		static std::vector< VkVertexInputAttributeDescription > AttributeDescriptions();
 
 		VulkanState * fState;
 		VersionData fData[Program::kNumVersions];
