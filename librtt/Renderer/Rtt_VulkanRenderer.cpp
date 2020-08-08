@@ -80,7 +80,6 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 	createDescriptorSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	createDescriptorSetLayoutInfo.bindingCount = 1U;
-//	createDescriptorSetLayoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT; TODO: this seems right?
 	createDescriptorSetLayoutInfo.pBindings = bindings;
 
 	bindings[0].descriptorCount = 1U;
@@ -107,6 +106,8 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 		CoronaLog( "Failed to create uniform user data descriptor set layout!" );
 	}
 
+	// if samplerIndexing...
+		//	createDescriptorSetLayoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT; TODO: this seems right?
 	bindings[0].descriptorCount = 5U; // TODO: locks in texture count, maybe later we'll want a higher value?
 	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[0].stageFlags &= ~VK_SHADER_STAGE_VERTEX_BIT;
@@ -404,7 +405,9 @@ VulkanRenderer::EnableBlend( bool enabled )
 void
 VulkanRenderer::SetAttributeDescriptions( U32 id, const std::vector< VkVertexInputAttributeDescription > & descriptions )
 {
-    // TODO!
+	fPipelineCreateInfo.fVertexAttributeDescriptions = descriptions;
+
+	GetPackedPipeline( fWorkingKey.fContents ).fAttributeDescriptionID = id;
 }
 
 void

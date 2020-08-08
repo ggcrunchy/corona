@@ -99,8 +99,8 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fCurrentPrepVersion( Program::kMaskCount0 ),
 	fProgram( NULL ),
 	fDefaultFBO( NULL ),
-	fTimeTransform( NULL ),/*
-	fTimerQueries( new U32[kTimerQueryCount] ),
+	fTimeTransform( NULL ),
+/*	fTimerQueries( new U32[kTimerQueryCount] ),
 	fTimerQueryIndex( 0 ),*/
 	fElapsedTimeGPU( 0.0f ),
 	fRenderer( renderer ),
@@ -109,6 +109,7 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fInFlight( VK_NULL_HANDLE ),
 	fLists( NULL ),
 	fCommandBuffer( VK_NULL_HANDLE ),
+	fTextures( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE )
 {
 	for(U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
@@ -241,7 +242,19 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 	if( fbo )
 	{
 		VulkanFrameBufferObject * vulkanFBO = static_cast< VulkanFrameBufferObject * >( fbo->GetGPUResource() );
+/*
+VkRenderPassBeginInfo renderPassInfo = {};
 
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.clearValueCount = fClearValues.size();
+    renderPassInfo.framebuffer = swapChainFramebuffers[i];
+    renderPassInfo.pClearValues = fClearValues.data();
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = swapChainExtent;
+    renderPassInfo.renderPass = renderPass;
+
+    vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+*/
 		vulkanFBO->Bind();	// TODO: stuff to plug in to render pass begin...
 	}
 	else
@@ -260,7 +273,7 @@ VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 	VulkanGeometry * vulkanGeometry = static_cast< VulkanGeometry * >( geometry->GetGPUResource() );
 	VulkanGeometry::Binding binding = vulkanGeometry->Bind();
 
-	fRenderer.SetBindingDescriptions( binding.fID, binding.fDescriptions );
+	fRenderer.SetBindingDescriptions( binding.fInputBindingID, binding.fDescriptions );
 
 	VkDeviceSize offset = 0U;
 
@@ -271,7 +284,71 @@ VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 		vkCmdBindIndexBuffer( fCommandBuffer, binding.fIndexBuffer, 0U, binding.fIndexType );
 	}
 }
+/*
+    void createDescriptorPool() {
+        std::array<VkDescriptorPoolSize, 2> poolSizes = {};
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[0].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
 
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = static_cast<uint32_t>(swapChainImages.size());
+
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor pool!");
+        }
+    }
+
+    void createDescriptorSets() {
+        std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
+        allocInfo.pSetLayouts = layouts.data();
+
+        descriptorSets.resize(swapChainImages.size());
+        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate descriptor sets!");
+        }
+
+        for (size_t i = 0; i < swapChainImages.size(); i++) {
+            VkDescriptorBufferInfo bufferInfo = {};
+            bufferInfo.buffer = uniformBuffers[i];
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(UniformBufferObject);
+
+            VkDescriptorImageInfo imageInfo = {};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = textureImageView;
+            imageInfo.sampler = textureSampler;
+
+            std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = descriptorSets[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = descriptorSets[i];
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].dstArrayElement = 0;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[1].descriptorCount = 1;
+            descriptorWrites[1].pImageInfo = &imageInfo;
+
+            vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        }
+    }
+*/
 void 
 VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 {
@@ -289,13 +366,49 @@ VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 	descriptorWrite.descriptorCount = 1U;
 	descriptorWrite.pImageInfo = &imageInfo;
 
-	if (true) // TODO: no indexing... this will presumably occur before binding
+	VulkanState * state = fRenderer.GetState();
+
+	if (!state->GetFeatures().shaderSampledImageArrayDynamicIndexing) // TODO: no indexing... this will presumably occur before binding
 	{
-		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrite.dstArrayElement = unit;
-		//	descriptorWrite.dstSet = 2U;
+		if (VK_NULL_HANDLE == fTextures)
+		{
+			VkDescriptorSetAllocateInfo allocInfo = {};
+			VkDescriptorSetLayout layout = fRenderer.GetTextureLayout();
+
+			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			allocInfo.descriptorPool = fLists[2].fPool; // TODO: this case legitimately could run out of descriptors, see loop below...
+			allocInfo.descriptorSetCount = 1U;
+			allocInfo.pSetLayouts = &layout;
+
+			VkResult result = VK_ERROR_UNKNOWN;
+
+			do {
+				bool isRetry = VK_ERROR_OUT_OF_POOL_MEMORY == result;
+
+				result = vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &fTextures );
+
+				if (VK_ERROR_OUT_OF_POOL_MEMORY == result)
+				{
+					Rtt_ASSERT( !isRetry );
+
+					// TODO: add new pool...
+				}
+			} while (VK_ERROR_OUT_OF_POOL_MEMORY == result);
+
+			if (result != VK_SUCCESS)
+			{
+				CoronaLog( "Failed to allocate texture descriptor set!" );
+			}
+		}
+			
+		if (fTextures != VK_NULL_HANDLE) // TODO? ignore if neither view nor sampler changed?
+		{
+			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptorWrite.dstArrayElement = unit;
+			descriptorWrite.dstSet = fTextures;
 		
-		vkUpdateDescriptorSets( fRenderer.GetState()->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
+			vkUpdateDescriptorSets( state->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
+		}
 	}
 
 	else // TODO: do one bind at start of frame, update here?
@@ -311,7 +424,7 @@ VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 
 		VkWriteDescriptorSet writes[] = { descriptorWrite, write2 };
 
-		vkUpdateDescriptorSets( fRenderer.GetState()->GetDevice(), 2U, writes, 0U, NULL );
+		vkUpdateDescriptorSets( state->GetDevice(), 2U, writes, 0U, NULL );
 	}
 }
 
@@ -319,9 +432,10 @@ void
 VulkanCommandBuffer::BindProgram( Program* program, Program::Version version )
 {
 	VulkanProgram * vulkanProgram = static_cast< VulkanProgram * >( program->GetGPUResource() );
-	VulkanProgram::PipelineStages stageData = vulkanProgram->Bind( version );
+	VulkanProgram::Binding binding = vulkanProgram->Bind( version );
 
-	fRenderer.SetShaderStages( stageData.fID, stageData.fStages );
+	fRenderer.SetAttributeDescriptions( binding.fInputAttributesID, binding.fDescriptions );
+	fRenderer.SetShaderStages( binding.fShadersID, binding.fStages );
 
 	fProgram = program;
 	fCurrentPrepVersion = version;
@@ -432,10 +546,10 @@ VulkanCommandBuffer::SetViewport( int x, int y, int width, int height )
 	{
 		VkViewport viewport;
 
-		viewport.x = x;
-		viewport.y = y;
-		viewport.width = width;
-		viewport.height = height;
+		viewport.x = float( x );
+		viewport.y = float( y );
+		viewport.width = float( width );
+		viewport.height = float( height );
 		viewport.minDepth = 0.f;
 		viewport.maxDepth = 1.f;
 
@@ -682,18 +796,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 /*
     // begin
 
-    VkRenderPassBeginInfo renderPassInfo = {};
-
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.clearValueCount = fClearValues.size();
-    renderPassInfo.framebuffer = swapChainFramebuffers[i];
-    renderPassInfo.pClearValues = fClearValues.data();
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = swapChainExtent;
-    renderPassInfo.renderPass = renderPass;
-
-    vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
 	^^ FBO?
 
 		geometry
@@ -744,6 +846,7 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 		{
 			fCommandBuffer = commandBuffer;
 			fLists = lists;
+			fTextures = VK_NULL_HANDLE;
 		}
 
 		else
@@ -763,7 +866,7 @@ void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
 	DrawState drawState = ApplyUniforms( fProgram->GetGPUResource(), pushConstants );
 	VkDevice device = fRenderer.GetState()->GetDevice();
 	uint32_t dynamicOffsets[2], count = 0U;
-	VkDescriptorSet sets[3] = {};
+	VkDescriptorSet sets[3] = { VK_NULL_HANDLE, VK_NULL_HANDLE, fTextures };
 
 	if (!drawState.uniformBufferRanges.empty())
 	{
@@ -789,9 +892,11 @@ void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
 
 	// texture set...
 
-	if (count || false)
+	if (count || fTextures != VK_NULL_HANDLE)
 	{
 		vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fRenderer.GetPipelineLayout(), 0U, 3U, sets, count, dynamicOffsets );
+
+		fTextures = VK_NULL_HANDLE;
 	}
 
 	if (drawState.upperPushConstantOffset >= 0)
@@ -855,9 +960,8 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 
 	bool isUniformUserData = index >= Uniform::kUserData0;
 	bool isPushConstant = (index >= Uniform::kMaskMatrix0 && index <= Uniform::kMaskMatrix2) || Uniform::kTotalTime == index;
-	S32 low, nrows = 1;
+	S32 low, high;
 
-	size_t offset;
 	float * dst = NULL;
 	VkMappedMemoryRange range = {};
 
@@ -885,49 +989,53 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 		dst = reinterpret_cast< VulkanUBO * >( mapped )->fData;
 	}
 
-	switch( uniform->GetDataType() )
+	Uniform::DataType dataType = uniform->GetDataType();
+
+	switch( dataType )
 	{
 		case Uniform::kScalar:
 			if (isPushConstant)
 			{
 				dst = pushConstants.fData + location.fOffset;
-				low = location.fOffset - location.fOffset % 4;
+				low = high = S32( location.fOffset ) & 0xF0;
 			}
 
-			uniform->GetValue( dst[0] );
-
 			break;
-		case Uniform::kVec2:
-			Rtt_ASSERT( isUniformUserData );
-
-			uniform->GetValue( dst[0], dst[1] );
-			
-			break;
+		case Uniform::kVec2: // fallthrough
 		case Uniform::kVec3: // has difficulties, cf. https://stackoverflow.com/questions/38172696/should-i-ever-use-a-vec3-inside-of-a-uniform-buffer-or-shader-storage-buffer-o
-			Rtt_ASSERT( isUniformUserData );
-
-			uniform->GetValue( dst[0], dst[1], dst[2] );
-
+			Rtt_ASSERT( isUniformUserData ); break;
+		case Uniform::kVec4: // fallthrough
+		case Uniform::kMat4:
+			Rtt_ASSERT( !isPushConstant ); break;
+		default:
 			break;
-		case Uniform::kVec4:
-			Rtt_ASSERT( !isPushConstant );
+	}
 
-			uniform->GetValue( dst[0], dst[1], dst[2], dst[3] );
-			
+	switch( dataType )
+	{
+		case Uniform::kScalar: // fallthrough (the first four increase consecutively)
+		case Uniform::kVec2:
+		case Uniform::kVec3:
+		case Uniform::kVec4:
+		case Uniform::kMat4:
+			{
+				size_t count = dataType != Uniform::kMat4 ? size_t( dataType - Uniform::kScalar ) + 1U : 16U;
+
+				memcpy( dst, uniform->GetData(), count * sizeof( float ) );
+			}
+
 			break;
 		case Uniform::kMat3:
 			if (isUniformUserData)
 			{
-				nrows = 3;
-
 				float * src = reinterpret_cast< float * >( uniform->GetData() );
 
 				for (int i = 0; i < 3; ++i)
 				{
 					memcpy( dst, src, 3U * sizeof( float ) );
 
-					src += 3U * sizeof( float );
-					dst += 4U * sizeof( float );
+					src += 3;
+					dst += 4;
 				}
 			}
 			
@@ -943,21 +1051,37 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 				// the two elements should be columns, to allow mat2(vec[0], vec[1]) on the shader side
 				float * src = reinterpret_cast< float * >( uniform->GetData() );
 
+				dst = pushConstants.fData + location.fOffset;
+				dst[0] = src[0]; // row 1, col 1
+				dst[1] = src[3]; // row 2, col 1
+				dst[2] = src[1]; // row 1, col 2
+				dst[3] = src[4]; // row 2, col 2
 
+				S32 maskTranslationOffset, maskMatrixVectorOffset = S32( location.fOffset ) & 0xF0; // cf. shell_default_vulkan
+
+				switch (maskMatrixVectorOffset)
+				{
+				case 0x10: // mask matrix 0 = vector #2; translation = vector #1, offset #0
+				case 0x40: // mask matrix 2 = vector #5; translation = vector #4, offset #2
+					low = maskMatrixVectorOffset - 0x10;
+					high = maskTranslationOffset;
+					maskTranslationOffset = low + (0x40 == maskMatrixVectorOffset) ? 0x8 : 0x0;
+
+					break;
+				case 0x20: // mask matrix 1 = vector #3; translation = vector #4, offset #0
+					low = maskMatrixVectorOffset;
+					high = low + 0x10;
+					maskTranslationOffset = high;
+
+					break;
+				default:
+					Rtt_ASSERT_NOT_REACHED();
+				}
+
+				dst[maskTranslationOffset + 0] = src[2];
+				dst[maskTranslationOffset + 1] = src[5];
 			}
-			// WRITE_COMMAND( kCommandApplyUniformMat3 );
 
-			break;
-		case Uniform::kMat4:
-			Rtt_ASSERT( !isPushConstant );
-
-			if (isUniformUserData)
-			{
-				nrows = 4;
-			}
-
-			memcpy( dst, uniform->GetData(), 16U * sizeof( float ) );
-			
 			break;
 		default:
 			Rtt_ASSERT_NOT_REACHED();
@@ -967,8 +1091,6 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 
 	if (isPushConstant)
 	{
-		S32 high = low + nrows - 1;
-
 		if (low < drawState.lowerPushConstantOffset)
 		{
 			drawState.lowerPushConstantOffset = low;

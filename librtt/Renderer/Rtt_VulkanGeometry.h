@@ -45,7 +45,7 @@ class VulkanGeometry : public GPUResource
 			VkIndexType fIndexType;
 			VkBuffer fVertexBuffer;
 			VkBuffer fIndexBuffer;
-			U32 fID;
+			U32 fInputBindingID;
 		};
 
 		virtual void Create( CPUResource* resource );

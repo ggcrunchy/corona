@@ -124,6 +124,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		// non-owned, retained only for frame:
 		DescriptorLists * fLists;
 		VkCommandBuffer fCommandBuffer;
+		VkDescriptorSet fTextures;
 /*
 		dynamic uniform buffers - as a list?
 
