@@ -33,22 +33,57 @@ DynamicUniformData::DynamicUniformData()
 {
 }
 
-DescriptorLists::DescriptorLists( bool resetPool )
+DescriptorLists::DescriptorLists( bool resetPools )
 :	fSetLayout( VK_NULL_HANDLE ),
-	fPool( VK_NULL_HANDLE ),
 	fDynamicAlignment( 0U ),
 	fBufferIndex( 0U ),
 	fOffset( 0U ),
-	fResetPool( resetPool )
+	fResetPools( resetPools )
 {
+}
+
+bool
+DescriptorLists::AddPool( VulkanState * state, VkDescriptorType type, U32 descriptorCount, U32 maxSets, VkDescriptorPoolCreateFlags flags )
+{
+	VkDescriptorPoolSize poolSize;
+
+	poolSize.descriptorCount = descriptorCount;
+	poolSize.type = type;
+
+	VkDescriptorPoolCreateInfo poolInfo = {};
+
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.flags = flags;
+	poolInfo.maxSets = maxSets;
+	poolInfo.poolSizeCount = 1U;
+	poolInfo.pPoolSizes = &poolSize;
+
+	VkDescriptorPool pool;
+
+	if (VK_SUCCESS == vkCreateDescriptorPool( state->GetDevice(), &poolInfo, state->GetAllocator(), &pool ))
+	{
+		fPools.push_back( pool );
+
+		return true;
+	}
+
+	else
+	{
+		CoronaLog( "Failed to create descriptor pool!" );
+
+		return false;
+	}
 }
 
 void
 DescriptorLists::Reset( VkDevice device )
 {
-	if (fResetPool)
+	if (fResetPools)
 	{
-		vkResetDescriptorPool( device, fPool, 0 );
+		for (VkDescriptorPool & pool : fPools)
+		{
+			vkResetDescriptorPool( device, pool, 0 );
+		}
 
 		fSets.clear();
 	}
