@@ -56,18 +56,21 @@ struct DynamicUniformData {
 };
 
 struct DescriptorLists {
-	DescriptorLists( bool resetPool = false );
+	enum ListIndex { eUBO, eUserDataUBO, eTexture };
 
+	DescriptorLists( bool resetPools = false );
+
+	bool AddPool( VulkanState * state, VkDescriptorType type, U32 descriptorCount, U32 maxSets, VkDescriptorPoolCreateFlags flags = 0 );
 	void Reset( VkDevice device );
 
 	std::vector< VkDescriptorSet > fSets;
+	std::vector< VkDescriptorPool > fPools;
 	std::vector< DynamicUniformData > fBufferData; // in normal scenarios, we should only ever use one of these...
 	VkDescriptorSetLayout fSetLayout;
-	VkDescriptorPool fPool;
 	size_t fDynamicAlignment;
 	U32 fBufferIndex; // ...i.e. index 0
 	U32 fOffset;
-	bool fResetPool;
+	bool fResetPools;
 };
 
 // cf. shell_default_vulkan:

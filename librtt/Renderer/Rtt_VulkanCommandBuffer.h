@@ -46,6 +46,10 @@ class VulkanCommandBuffer : public CommandBuffer
 
 		virtual void ClearUserUniforms();
 
+		bool PrepareUBOPool( VulkanState * state );
+		bool PrepareUserDataUBOPool( VulkanState * state );
+		bool PrepareTexturesPool( VulkanState * state );
+
 		// Generate the appropriate buffered OpenGL commands to accomplish the
 		// specified state changes.
 		virtual void BindFrameBufferObject( FrameBufferObject* fbo );

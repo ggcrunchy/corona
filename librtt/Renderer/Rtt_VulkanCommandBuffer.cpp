@@ -10,26 +10,14 @@
 #include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanCommandBuffer.h"
 
-#include "Renderer/Rtt_FrameBufferObject.h"/*
-#include "Renderer/Rtt_Geometry_Renderer.h"*/
+#include "Renderer/Rtt_FrameBufferObject.h"
 #include "Renderer/Rtt_VulkanFrameBufferObject.h"
 #include "Renderer/Rtt_VulkanGeometry.h"
 #include "Renderer/Rtt_VulkanProgram.h"
 #include "Renderer/Rtt_VulkanTexture.h"
 #include "Renderer/Rtt_VulkanRenderer.h"
-/*
-#include "Renderer/Rtt_Program.h"/*
-#include "Renderer/Rtt_Texture.h"
-#include "Renderer/Rtt_Uniform.h"*/
-#include "Display/Rtt_ShaderResource.h"/*
-#include "Core/Rtt_Config.h"
-#include "Core/Rtt_Allocator.h"
-#include "Core/Rtt_Assert.h"
-#include "Core/Rtt_Math.h"
-#include <cstdio>
-#include <string.h>
-#include "Core/Rtt_String.h"
-*/
+#include "Display/Rtt_ShaderResource.h"
+
 #include <limits>
 
 #include "CoronaLog.h"
@@ -38,53 +26,13 @@
 
 namespace /*anonymous*/
 {
-/*
-	// To ease reading/writing of arrays
-	struct Vec2 { Rtt::Real data[2]; };
-	struct Vec3 { Rtt::Real data[3]; };
-	struct Vec4 { Rtt::Real data[4]; };
-	struct Mat3 { Rtt::Real data[9]; };
-	struct Mat4 { Rtt::Real data[16]; };
 
 	// NOT USED: const Rtt::Real kNanosecondsToMilliseconds = 1.0f / 1000000.0f;
-	const U32 kTimerQueryCount = 3;
-	*/
-	// The Uniform timestamp counter must be the same for both the
-	// front and back CommandBuffers, though only one CommandBuffer
-	// will ever write the timestamp on any given frame. If it were
-	// ever the case that more than two CommandBuffers were used,
-	// this would need to be made a shared member variable.
+	// const U32 kTimerQueryCount = 3;
+
+	// see GLCommandBuffer.cpp:
 	static U32 gUniformTimestamp = 0;
-	/*
-	// Extract location and data from buffer
-	#define READ_UNIFORM_DATA( Type ) \
-		GLint location = Read<GLint>(); \
-		Type value = Read<Type>();
 
-	// Extract data but query for location
-	#define READ_UNIFORM_DATA_WITH_PROGRAM( Type ) \
-				Rtt::GLProgram* program = Read<Rtt::GLProgram*>(); \
-				U32 index = Read<U32>(); \
-				GLint location = program->GetUniformLocation( index, fCurrentDrawVersion ); \
-				Type value = Read<Type>();
-	
-	#define CHECK_ERROR_AND_BREAK GL_CHECK_ERROR(); break;
-
-	// Used to validate that the appropriate OpenGL commands
-	// are being generated and that their arguments are correct
-	#if ENABLE_DEBUG_PRINT 
-		#define DEBUG_PRINT( ... ) Rtt_LogException( __VA_ARGS__ ); Rtt_LogException("\n");
-		#define DEBUG_PRINT_MATRIX( message, data, count ) \
-			Rtt_LogException( "%s\n", message ); \
-			Rtt_LogException( "[ %.3f", data[0] ); \
-			for( U32 i = 1; i < count; ++i ) \
-				Rtt_LogException( ", %.3f", data[i] ); \
-			Rtt_LogException ("]\n" );
-	#else 
-		#define DEBUG_PRINT( ... )
-		#define DEBUG_PRINT_MATRIX( message, data, count )
-	#endif
-*/
 }
 
 // ----------------------------------------------------------------------------
@@ -100,8 +48,8 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fProgram( NULL ),
 	fDefaultFBO( NULL ),
 	fTimeTransform( NULL ),
-/*	fTimerQueries( new U32[kTimerQueryCount] ),
-	fTimerQueryIndex( 0 ),*/
+//	fTimerQueries( new U32[kTimerQueryCount] ),
+//	fTimerQueryIndex( 0 ),
 	fElapsedTimeGPU( 0.0f ),
 	fRenderer( renderer ),
 	fImageAvailableSemaphore( VK_NULL_HANDLE ),
@@ -236,6 +184,30 @@ VulkanCommandBuffer::ClearUserUniforms()
 	fUniformUpdates[Uniform::kUserData3].uniform = NULL;
 }
 
+bool 
+VulkanCommandBuffer::PrepareUBOPool( VulkanState * state )
+{
+	DescriptorLists & lists = fLists[DescriptorLists::eUBO];
+
+	return !lists.fPools.empty() || lists.AddPool( state, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1U, 1U );
+}
+
+bool 
+VulkanCommandBuffer::PrepareUserDataUBOPool( VulkanState * state )
+{
+	DescriptorLists & lists = fLists[DescriptorLists::eUserDataUBO];
+
+	return !lists.fPools.empty() || lists.AddPool( state, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1U, 1U );
+}
+
+bool 
+VulkanCommandBuffer::PrepareTexturesPool( VulkanState * state )
+{
+	const U32 descriptorCount = 1024U * 3U; // one image + either another or a mask as "average"
+
+	return fLists[DescriptorLists::eTexture].AddPool( state, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorCount, 4096U );
+}
+
 void
 VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
@@ -245,15 +217,15 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 /*
 VkRenderPassBeginInfo renderPassInfo = {};
 
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.clearValueCount = fClearValues.size();
-    renderPassInfo.framebuffer = swapChainFramebuffers[i];
-    renderPassInfo.pClearValues = fClearValues.data();
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = swapChainExtent;
-    renderPassInfo.renderPass = renderPass;
+renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+renderPassInfo.clearValueCount = fClearValues.size();
+renderPassInfo.framebuffer = swapChainFramebuffers[i];
+renderPassInfo.pClearValues = fClearValues.data();
+renderPassInfo.renderArea.offset = {0, 0};
+renderPassInfo.renderArea.extent = swapChainExtent;
+renderPassInfo.renderPass = renderPass;
 
-    vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 */
 		vulkanFBO->Bind();	// TODO: stuff to plug in to render pass begin...
 	}
@@ -284,71 +256,7 @@ VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 		vkCmdBindIndexBuffer( fCommandBuffer, binding.fIndexBuffer, 0U, binding.fIndexType );
 	}
 }
-/*
-    void createDescriptorPool() {
-        std::array<VkDescriptorPoolSize, 2> poolSizes = {};
-        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[0].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
-        poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
 
-        VkDescriptorPoolCreateInfo poolInfo = {};
-        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-        poolInfo.pPoolSizes = poolSizes.data();
-        poolInfo.maxSets = static_cast<uint32_t>(swapChainImages.size());
-
-        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor pool!");
-        }
-    }
-
-    void createDescriptorSets() {
-        std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
-        VkDescriptorSetAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorPool;
-        allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
-        allocInfo.pSetLayouts = layouts.data();
-
-        descriptorSets.resize(swapChainImages.size());
-        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate descriptor sets!");
-        }
-
-        for (size_t i = 0; i < swapChainImages.size(); i++) {
-            VkDescriptorBufferInfo bufferInfo = {};
-            bufferInfo.buffer = uniformBuffers[i];
-            bufferInfo.offset = 0;
-            bufferInfo.range = sizeof(UniformBufferObject);
-
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = textureImageView;
-            imageInfo.sampler = textureSampler;
-
-            std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
-
-            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[0].dstSet = descriptorSets[i];
-            descriptorWrites[0].dstBinding = 0;
-            descriptorWrites[0].dstArrayElement = 0;
-            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            descriptorWrites[0].descriptorCount = 1;
-            descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[1].dstSet = descriptorSets[i];
-            descriptorWrites[1].dstBinding = 1;
-            descriptorWrites[1].dstArrayElement = 0;
-            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            descriptorWrites[1].descriptorCount = 1;
-            descriptorWrites[1].pImageInfo = &imageInfo;
-
-            vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-        }
-    }
-*/
 void 
 VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 {
@@ -372,36 +280,45 @@ VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 	{
 		if (VK_NULL_HANDLE == fTextures)
 		{
-			VkDescriptorSetAllocateInfo allocInfo = {};
-			VkDescriptorSetLayout layout = fRenderer.GetTextureLayout();
+			DescriptorLists & list = fLists[DescriptorLists::eTexture];
 
-			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			allocInfo.descriptorPool = fLists[2].fPool; // TODO: this case legitimately could run out of descriptors, see loop below...
-			allocInfo.descriptorSetCount = 1U;
-			allocInfo.pSetLayouts = &layout;
-
-			VkResult result = VK_ERROR_UNKNOWN;
-
-			do {
-				bool isRetry = VK_ERROR_OUT_OF_POOL_MEMORY == result;
-
-				result = vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &fTextures );
-
-				if (VK_ERROR_OUT_OF_POOL_MEMORY == result)
-				{
-					Rtt_ASSERT( !isRetry );
-
-					// TODO: add new pool...
-				}
-			} while (VK_ERROR_OUT_OF_POOL_MEMORY == result);
-
-			if (result != VK_SUCCESS)
+			if (list.fPools.empty() && !PrepareTexturesPool( state ))
 			{
-				CoronaLog( "Failed to allocate texture descriptor set!" );
+				CoronaLog( "Failed to create initial descriptor texture pool!" );
+			}
+
+			if (!list.fPools.empty())
+			{
+				VkDescriptorSetAllocateInfo allocInfo = {};
+				VkDescriptorSetLayout layout = fRenderer.GetTextureLayout();
+
+				allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+				allocInfo.descriptorSetCount = 1U;
+				allocInfo.pSetLayouts = &layout;
+
+				VkResult result = VK_ERROR_UNKNOWN;
+				bool doRetry = false;
+
+				do {
+					allocInfo.descriptorPool = list.fPools.back();
+					result = vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &fTextures );
+
+					if (VK_ERROR_OUT_OF_POOL_MEMORY == result)
+					{
+						Rtt_ASSERT( !doRetry ); // this should never happen
+
+						doRetry = PrepareTexturesPool( state );
+					}
+				} while (doRetry);
+
+				if (result != VK_SUCCESS)
+				{
+					CoronaLog( "Failed to allocate texture descriptor set!" );
+				}
 			}
 		}
 			
-		if (fTextures != VK_NULL_HANDLE) // TODO? ignore if neither view nor sampler changed?
+		if (fTextures != VK_NULL_HANDLE) // TODO: ignore if neither view nor sampler changed?
 		{
 			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorWrite.dstArrayElement = unit;
@@ -420,7 +337,7 @@ VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 //		write2.dstArrayElement = unit + offset;
 		write2.dstBinding = 1U;
 //		write2.dstSet = set;
-		write2.pImageInfo = &imageInfo; // TODO: is this right?? (also for write 0)
+		// TODO: does these both use imageInfo?
 
 		VkWriteDescriptorSet writes[] = { descriptorWrite, write2 };
 
