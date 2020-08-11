@@ -42,6 +42,7 @@ namespace Rtt
 
 class GPUResource;
 class CPUResource;
+class VulkanBufferData;
 class VulkanState;
 class VulkanFrameBufferObject;
 
@@ -49,17 +50,19 @@ class VulkanFrameBufferObject;
 
 struct DynamicUniformData {
 	DynamicUniformData();
+	~DynamicUniformData();
 
-	VkBuffer fBuffer;
-	VkDeviceMemory fMemory;
+	VulkanBufferData * fData;
 	void * fMapped;
 };
 
 struct DescriptorLists {
 	enum ListIndex { eUBO, eUserDataUBO, eTexture };
 
+	DescriptorLists( VulkanState * state, U32 count, bool isUserDataUBO );
 	DescriptorLists( bool resetPools = false );
 
+	bool AddBuffer( VulkanState * state );
 	bool AddPool( VulkanState * state, VkDescriptorType type, U32 descriptorCount, U32 maxSets, VkDescriptorPoolCreateFlags flags = 0 );
 	void Reset( VkDevice device );
 
@@ -67,9 +70,12 @@ struct DescriptorLists {
 	std::vector< VkDescriptorPool > fPools;
 	std::vector< DynamicUniformData > fBufferData; // in normal scenarios, we should only ever use one of these...
 	VkDescriptorSetLayout fSetLayout;
-	size_t fDynamicAlignment;
+	VkDeviceSize fDynamicAlignment;
 	U32 fBufferIndex; // ...i.e. index 0
+	U32 fBufferSize;
 	U32 fOffset;
+	bool fDirty;
+	bool fIsUserDataUBO;
 	bool fResetPools;
 };
 
