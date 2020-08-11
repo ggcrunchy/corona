@@ -93,8 +93,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		struct DrawState {
 			DrawState();
 
-			std::vector< VkMappedMemoryRange > uniformBufferRanges;
-			std::vector< VkMappedMemoryRange > userDataRanges;
+			std::vector< VkMappedMemoryRange > ranges;
 			S32 lowerPushConstantOffset;
 			S32 upperPushConstantOffset;
 		};
@@ -129,6 +128,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		DescriptorLists * fLists;
 		VkCommandBuffer fCommandBuffer;
 		VkDescriptorSet fTextures;
+		std::vector< VkDescriptorImageInfo > fTextureState;
 /*
 		dynamic uniform buffers - as a list?
 
