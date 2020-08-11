@@ -967,7 +967,6 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 				memcpy( dst, uniform->GetData(), count * sizeof( float ) );
 
 				count = (count + 3U) & ~3U;
-
 				range.size = count * sizeof( float );
 			}
 

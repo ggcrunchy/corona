@@ -350,7 +350,7 @@ class ProjectSettings
 		 * @return
 		 * Returns one of "gl", "vulkanWanted", "vulkanRequired".
 		 */
-		std::string Backend() const;
+		const std::string & Backend() const;
 // /STEVE CHANGE
 	protected:
 		/**
