@@ -755,7 +755,7 @@ bool ProjectSettings::IsWindowTitleShown() const
 }
 
 // STEVE CHANGE
-std::string ProjectSettings::Backend() const
+const std::string & ProjectSettings::Backend() const
 {
 	return fBackend;
 }
