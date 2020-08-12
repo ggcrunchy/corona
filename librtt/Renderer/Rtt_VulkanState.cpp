@@ -507,7 +507,7 @@ FindString( I & i1, I & i2, const char * str, F && getString )
 }
 
 static void
-CollectExtensions(std::vector<const char *> & extensions, std::vector<const char *> & optional, const std::vector<VkExtensionProperties> & extensionProps)
+CollectExtensions( std::vector<const char *> & extensions, std::vector<const char *> & optional, const std::vector<VkExtensionProperties> & extensionProps )
 {
 	auto optionalEnd = std::remove_if( optional.begin(), optional.end(), [&extensions]( const char * name )
 	{
@@ -520,7 +520,7 @@ CollectExtensions(std::vector<const char *> & extensions, std::vector<const char
 
 		if (FindString( optional.begin(), optionalEnd, props.extensionName, StringIdentity ))
 		{
-			extensions.push_back(props.extensionName);
+			extensions.push_back( props.extensionName );
 		}
 	}
 }
@@ -555,7 +555,7 @@ AppInfo()
 	return appInfo;
 }
 
-#ifndef NDEBUG
+#if 0//ndef NDEBUG
 static std::pair< VkInstance, VkDebugUtilsMessengerEXT >
 #else
 static VkInstance
@@ -572,7 +572,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 
 	vkEnumerateInstanceExtensionProperties( NULL, &extensionCount, NULL );
 
-	std::vector< VkExtensionProperties > extensionProps(extensionCount);
+	std::vector< VkExtensionProperties > extensionProps( extensionCount );
 
 	vkEnumerateInstanceExtensionProperties( NULL, &extensionCount, extensionProps.data() );
 
@@ -594,21 +594,28 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 
     vkEnumerateInstanceLayerProperties( &layerCount, NULL );
 	
-	const std::vector< const char* > validationLayers = { "VK_LAYER_KHRONOS_validation" };
+	const std::vector< const char * > layersToTry = { "VK_LAYER_LUNARG_standard_validation", "VK_LAYER_KHRONOS_validation" };
     std::vector< VkLayerProperties > availableLayers( layerCount );
 
     vkEnumerateInstanceLayerProperties( &layerCount, availableLayers.data() );
 
-	for (const char * layerName : validationLayers)
+	std::vector< const char * > validationLayers;
+
+	for (const char * layerName : layersToTry)
 	{
-		if (!FindString( availableLayers.begin(), availableLayers.end(), layerName, []( const VkLayerProperties & props )
+		if (FindString( availableLayers.begin(), availableLayers.end(), layerName, []( const VkLayerProperties & props )
 		{
 			return props.layerName;
 		} ) )
 		{
+			validationLayers.push_back( layerName );
+		}
+
+		else
+		{
 			CoronaLog( "Unable to find layer %s", layerName );
 
-			ok = false;
+		//	ok = false;
 
 			break;
 		}
@@ -624,7 +631,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 	debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 	debugCreateInfo.pfnUserCallback = DebugCallback;
 
-	createInfo.pNext = ( VkDebugUtilsMessengerCreateInfoEXT * ) &debugCreateInfo;
+	createInfo.pNext = /*( VkDebugUtilsMessengerCreateInfoEXT * )*/ &debugCreateInfo;
 #endif
 
 	if (ok && vkCreateInstance( &createInfo, allocator, &instance ) != VK_SUCCESS)
@@ -634,7 +641,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 		ok = false;
 	}
 
-#ifndef NDEBUG
+#if 0 // ndef NDEBUG
 	VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 
 	if (ok)
@@ -698,7 +705,7 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 
 	vkGetPhysicalDeviceQueueFamilyProperties( device, &queueFamilyCount, queueFamilies.data() );
 
-	for (uint32_t i = 0; i < queueFamilyCount; ++i)
+	for (uint32_t i = 0; i < queueFamilyCount && !queues.isComplete(); ++i)
 	{
 		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
 		{
@@ -896,7 +903,7 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 	const VkAllocationCallbacks * allocator = state.GetAllocator();
 	auto instanceData = MakeInstance( &appInfo, surfaceCallback.extension, allocator );
 
-#ifndef NDEBUG
+#if 0//ndef NDEBUG
 	state.SetDebugMessenger( instanceData.second );
 
 	VkInstance instance = instanceData.first;
