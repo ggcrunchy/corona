@@ -555,11 +555,7 @@ AppInfo()
 	return appInfo;
 }
 
-#if 0//ndef NDEBUG
-static std::pair< VkInstance, VkDebugUtilsMessengerEXT >
-#else
 static VkInstance
-#endif
 MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAllocationCallbacks * allocator )
 {
 	VkInstanceCreateInfo createInfo = {};
@@ -631,7 +627,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 	debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 	debugCreateInfo.pfnUserCallback = DebugCallback;
 
-	createInfo.pNext = /*( VkDebugUtilsMessengerCreateInfoEXT * )*/ &debugCreateInfo;
+	createInfo.pNext = &debugCreateInfo;
 #endif
 
 	if (ok && vkCreateInstance( &createInfo, allocator, &instance ) != VK_SUCCESS)
@@ -641,27 +637,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 		ok = false;
 	}
 
-#if 0 // ndef NDEBUG
-	VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
-
-	if (ok)
-	{
-		auto func = ( PFN_vkCreateDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( instance, "vkCreateDebugUtilsMessengerEXT" );
-
-		if (!func || VK_SUCCESS == func( instance, &debugCreateInfo, allocator, &messenger ) != VK_SUCCESS)
-		{
-			CoronaLog( "Failed to create debug messenger!\n" );
-
-			vkDestroyInstance( instance, allocator );
-
-			instance = VK_NULL_HANDLE;
-		}
-	}
-
-	return std::make_pair( instance, messenger );
-#else
 	return instance;
-#endif
 }
 
 struct Queues {
@@ -808,7 +784,7 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 		// Maximum possible size of textures affects graphics quality
 		score += deviceDetails.properties.limits.maxImageDimension2D;
 
-		// other ideas: ETC2 etc. texture compression
+		// other ideas: texture compression
 		// could make the rating adjustable in config.lua?
 
 		if (score > bestScore)
@@ -824,7 +800,7 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 }
 
 static VkDevice
-MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> & families, const VkAllocationCallbacks * allocator )
+MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector< uint32_t > & families, const VulkanState::DeviceDetails & deviceDetails, const const VkAllocationCallbacks * allocator )
 {
 	VkDeviceCreateInfo createDeviceInfo = {};
 
@@ -840,7 +816,7 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 
 		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		queueCreateInfo.pQueuePriorities = queuePriorities;
-		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.queueCount = 1U;
 		queueCreateInfo.queueFamilyIndex = index;
 
 		queueCreateInfos.push_back( queueCreateInfo );
@@ -850,6 +826,8 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector<uint32_t> 
 	createDeviceInfo.queueCreateInfoCount = queueCreateInfos.size();
 
 	VkPhysicalDeviceFeatures deviceFeatures = {};
+
+	deviceFeatures.shaderSampledImageArrayDynamicIndexing = deviceDetails.features.shaderSampledImageArrayDynamicIndexing ? VK_TRUE : VK_FALSE;
 
 	createDeviceInfo.pEnabledFeatures = &deviceFeatures;
 
@@ -901,15 +879,7 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 {
 	VkApplicationInfo appInfo = AppInfo();
 	const VkAllocationCallbacks * allocator = state.GetAllocator();
-	auto instanceData = MakeInstance( &appInfo, surfaceCallback.extension, allocator );
-
-#if 0//ndef NDEBUG
-	state.SetDebugMessenger( instanceData.second );
-
-	VkInstance instance = instanceData.first;
-#else
-	VkInstance instance = instanceData;
-#endif
+	VkInstance instance = MakeInstance( &appInfo, surfaceCallback.extension, allocator );
 
 	if (instance != VK_NULL_HANDLE)
 	{
@@ -927,11 +897,9 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 			{
 				state.fPhysicalDevice = std::get< 0 >( physicalDeviceData );
 
-				// TODO: enable any features and remember this
-
 				const Queues & queues = std::get< 1 >( physicalDeviceData );
-				auto families = queues.GetFamilies();
-				VkDevice device = MakeLogicalDevice( state.fPhysicalDevice, families, allocator );
+				const std::vector< uint32_t > & families = queues.GetFamilies();
+				VkDevice device = MakeLogicalDevice( state.fPhysicalDevice, families, std::get< 2 >( physicalDeviceData ), allocator );
 
 				if (device != VK_NULL_HANDLE)
 				{
@@ -1000,7 +968,7 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint
 
 	VkSurfaceCapabilitiesKHR capabilities;
 
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities);
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR( device, surface, &capabilities );
 
 	uint32_t imageCount = capabilities.minImageCount + 1U;
 

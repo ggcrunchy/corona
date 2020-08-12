@@ -232,6 +232,13 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 		CoronaLog( "Failed to create pipeline layout!" );
 	}
 
+	VkSwapchainKHR swapchain = MakeSwapchain();
+
+	if (swapchain != VK_NULL_HANDLE)
+	{
+		BuildUpSwapchain( swapchain );
+	}
+
 	InitializePipelineState();
 }
 
@@ -289,36 +296,28 @@ VkSwapchainKHR
 VulkanRenderer::MakeSwapchain()
 {
     const VulkanState::SwapchainDetails & details = fState->GetSwapchainDetails();
+    auto queueFamilies = fState->GetQueueFamilies();
 	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
 
 	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapchainCreateInfo.clipped = VK_TRUE;
+	swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	swapchainCreateInfo.imageArrayLayers = 1U;
 	swapchainCreateInfo.imageColorSpace = details.fFormat.colorSpace;
 	swapchainCreateInfo.imageExtent = details.fExtent;
 	swapchainCreateInfo.imageFormat = details.fFormat.format;
-	swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	swapchainCreateInfo.minImageCount = details.fImageCount;
-
-    auto queueFamilies = fState->GetQueueFamilies();
-
-	if (queueFamilies.size() > 1U)
-	{
-		swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-		swapchainCreateInfo.pQueueFamilyIndices = queueFamilies.data();
-		swapchainCreateInfo.queueFamilyIndexCount = 2U;
-	}
-
-	swapchainCreateInfo.clipped = VK_TRUE;
-	swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	swapchainCreateInfo.oldSwapchain = fState->GetSwapchain();
+	swapchainCreateInfo.pQueueFamilyIndices = queueFamilies.data();
 	swapchainCreateInfo.presentMode = details.fPresentMode;
 	swapchainCreateInfo.preTransform = details.fTransformFlagBits; // TODO: relevant to portrait, landscape, etc?
+	swapchainCreateInfo.queueFamilyIndexCount = queueFamilies.size();
 	swapchainCreateInfo.surface = fState->GetSurface();
 
 	VkSwapchainKHR swapchain;
-
-	if (VK_SUCCESS == vkCreateSwapchainKHR( fState->GetDevice(), &swapchainCreateInfo, fState->GetAllocator(), &swapchain ))
+	VkResult rr = vkCreateSwapchainKHR( fState->GetDevice(), &swapchainCreateInfo, fState->GetAllocator(), &swapchain );
+	if (VK_SUCCESS == rr)
 	{
 		return swapchain;
 	}
