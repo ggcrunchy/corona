@@ -556,7 +556,7 @@ AppInfo()
 }
 
 static VkInstance
-MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAllocationCallbacks * allocator )
+MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAllocationCallbacks * allocator, VkDebugUtilsMessengerEXT * debugMessenger )
 {
 	VkInstanceCreateInfo createInfo = {};
 
@@ -630,15 +630,27 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 	createInfo.pNext = &debugCreateInfo;
 #endif
 
-	_putenv( "DISABLE_VULKAN_OBS_CAPTURE" );
-
 	if (ok && vkCreateInstance( &createInfo, allocator, &instance ) != VK_SUCCESS)
 	{
 		CoronaLog( "Failed to create instance!\n" );
 
 		ok = false;
 	}
+#ifndef NDEBUG
+	if (ok && debugMessenger)
+	{
+		auto func = ( PFN_vkCreateDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( instance, "vkCreateDebugUtilsMessengerEXT" );
 
+		if (!func || func( instance, &debugCreateInfo, allocator, debugMessenger ) != VK_SUCCESS)
+		{
+			CoronaLog( "Failed to create debug messenger!\n" );
+
+			vkDestroyInstance( instance, allocator );
+
+			instance = VK_NULL_HANDLE;
+		}
+	}
+#endif
 	return instance;
 }
 
@@ -707,11 +719,11 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 
 	uint32_t extensionCount;
 
-    vkEnumerateDeviceExtensionProperties( device, NULL, &extensionCount, NULL );
+    VkResult dep1=vkEnumerateDeviceExtensionProperties( device, NULL, &extensionCount, NULL );
 
     std::vector< VkExtensionProperties > availableExtensions( extensionCount );
 
-    vkEnumerateDeviceExtensionProperties( device, NULL, &extensionCount, availableExtensions.data() );
+    VkResult dep2=vkEnumerateDeviceExtensionProperties( device, NULL, &extensionCount, availableExtensions.data() );
 
 	std::vector< const char * > extensions, required = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
@@ -724,8 +736,8 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 
 	uint32_t formatCount, presentModeCount;
 
-	vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, NULL );
-	vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, NULL );
+	VkResult sf=vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, NULL );
+	VkResult pm=vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, NULL );
 
 	return formatCount != 0U && presentModeCount != 0U;
 }
@@ -881,7 +893,9 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 {
 	VkApplicationInfo appInfo = AppInfo();
 	const VkAllocationCallbacks * allocator = state.GetAllocator();
-	VkInstance instance = MakeInstance( &appInfo, surfaceCallback.extension, allocator );
+
+	VkDebugUtilsMessengerEXT messenger;
+	VkInstance instance = MakeInstance( &appInfo, surfaceCallback.extension, allocator, &messenger );
 
 	if (instance != VK_NULL_HANDLE)
 	{
@@ -892,6 +906,9 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 		if (surface != VK_NULL_HANDLE)
 		{
 			state.fSurface = surface;
+		#ifndef NDEBUG
+			state.fDebugMessenger = messenger;
+		#endif
 
 			auto physicalDeviceData = ChoosePhysicalDevice( instance, surface );
 
@@ -937,14 +954,14 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint
 	VkSurfaceKHR surface = state.GetSurface();
 	uint32_t formatCount, presentModeCount;
 
-	vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, NULL );
-	vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, NULL );
+	VkResult sf1=vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, NULL );
+	VkResult pm1=vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, NULL );
 
 	std::vector< VkSurfaceFormatKHR > formats( formatCount );
 	std::vector< VkPresentModeKHR > presentModes( presentModeCount );
 
-	vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, formats.data() );
-	vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, presentModes.data() );
+	VkResult sf2=vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, formats.data() );
+	VkResult pm2=vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, presentModes.data() );
 
 	VkSurfaceFormatKHR format = formats.front();
 
@@ -970,7 +987,7 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint
 
 	VkSurfaceCapabilitiesKHR capabilities;
 
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR( device, surface, &capabilities );
+	VkResult sc=vkGetPhysicalDeviceSurfaceCapabilitiesKHR( device, surface, &capabilities );
 
 	uint32_t imageCount = capabilities.minImageCount + 1U;
 

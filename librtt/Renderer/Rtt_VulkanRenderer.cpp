@@ -296,7 +296,7 @@ VkSwapchainKHR
 VulkanRenderer::MakeSwapchain()
 {
     const VulkanState::SwapchainDetails & details = fState->GetSwapchainDetails();
-    auto queueFamilies = fState->GetQueueFamilies();
+    auto & queueFamilies = fState->GetQueueFamilies();
 	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
 
 	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -306,14 +306,19 @@ VulkanRenderer::MakeSwapchain()
 	swapchainCreateInfo.imageColorSpace = details.fFormat.colorSpace;
 	swapchainCreateInfo.imageExtent = details.fExtent;
 	swapchainCreateInfo.imageFormat = details.fFormat.format;
+	swapchainCreateInfo.imageSharingMode = 1U == queueFamilies.size() ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
 	swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	swapchainCreateInfo.minImageCount = details.fImageCount;
 	swapchainCreateInfo.oldSwapchain = fState->GetSwapchain();
-	swapchainCreateInfo.pQueueFamilyIndices = queueFamilies.data();
 	swapchainCreateInfo.presentMode = details.fPresentMode;
 	swapchainCreateInfo.preTransform = details.fTransformFlagBits; // TODO: relevant to portrait, landscape, etc?
-	swapchainCreateInfo.queueFamilyIndexCount = queueFamilies.size();
 	swapchainCreateInfo.surface = fState->GetSurface();
+
+	if (VK_SHARING_MODE_CONCURRENT == swapchainCreateInfo.imageSharingMode)
+	{
+		swapchainCreateInfo.pQueueFamilyIndices = queueFamilies.data();
+		swapchainCreateInfo.queueFamilyIndexCount = queueFamilies.size();
+	}
 
 	VkSwapchainKHR swapchain;
 	VkResult rr = vkCreateSwapchainKHR( fState->GetDevice(), &swapchainCreateInfo, fState->GetAllocator(), &swapchain );

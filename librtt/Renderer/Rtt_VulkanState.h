@@ -97,10 +97,6 @@ class VulkanState
 		shaderc_compiler * GetCompiler() const { return fCompiler; }
 		shaderc_compile_options * GetCompileOptions() const { return fCompileOptions; }
 
-	#ifndef NDEBUG
-		void SetDebugMessenger( VkDebugUtilsMessengerEXT messenger ) { fDebugMessenger = messenger; }
-	#endif
-
 	public:
 		struct RenderPassData {
 			U32 fID;
