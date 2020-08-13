@@ -630,6 +630,8 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 	createInfo.pNext = &debugCreateInfo;
 #endif
 
+	_putenv( "DISABLE_VULKAN_OBS_CAPTURE" );
+
 	if (ok && vkCreateInstance( &createInfo, allocator, &instance ) != VK_SUCCESS)
 	{
 		CoronaLog( "Failed to create instance!\n" );
@@ -703,7 +705,7 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 		return false;
 	}
 
-	uint32_t extensionCount = 0U;
+	uint32_t extensionCount;
 
     vkEnumerateDeviceExtensionProperties( device, NULL, &extensionCount, NULL );
 
@@ -720,7 +722,7 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 		return false;
 	}
 
-	uint32_t formatCount = 0U, presentModeCount = 0U;
+	uint32_t formatCount, presentModeCount;
 
 	vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, NULL );
 	vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, NULL );
@@ -731,7 +733,7 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 static std::tuple< VkPhysicalDevice, Queues, VulkanState::DeviceDetails >
 ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 {
-	uint32_t deviceCount = 0U;
+	uint32_t deviceCount;
 
 	vkEnumeratePhysicalDevices( instance, &deviceCount, NULL );
 
@@ -800,7 +802,7 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 }
 
 static VkDevice
-MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector< uint32_t > & families, const VulkanState::DeviceDetails & deviceDetails, const const VkAllocationCallbacks * allocator )
+MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector< uint32_t > & families, const VulkanState::DeviceDetails & deviceDetails, const VkAllocationCallbacks * allocator )
 {
 	VkDeviceCreateInfo createDeviceInfo = {};
 
