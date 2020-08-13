@@ -171,6 +171,8 @@ void RenderSurfaceControl::OnRaisedDestroyingEvent()
 
 #pragma region Private Methods
 // STEVE CHANGE
+static HMODULE GetLibraryModuleHandle();
+
 static VkSurfaceKHR
 MakeSurface( VkInstance instance, void * data, const VkAllocationCallbacks * allocator )
 {
@@ -178,7 +180,7 @@ MakeSurface( VkInstance instance, void * data, const VkAllocationCallbacks * all
 
 	createSurfaceInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 	createSurfaceInfo.hwnd = (HWND)data;
-	createSurfaceInfo.hinstance = GetModuleHandle(nullptr);
+	createSurfaceInfo.hinstance = GetLibraryModuleHandle();
 
 	VkSurfaceKHR surface;
 
