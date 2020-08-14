@@ -262,8 +262,13 @@ int CSimulatorView::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	bounds.left = 0;
 	bounds.bottom = lpCreateStruct->cy;
 	bounds.right = lpCreateStruct->cx;
-	mCoronaContainerControl.Create(nullptr, WS_CHILD | WS_VISIBLE, bounds, this);
-	mCoronaContainerControl.GetCoronaControl().ShowWindow(SW_HIDE);
+	// STEVE CHANGE
+	for (int i = 0; i < kBackendsCount; ++i)
+	{
+		mCoronaContainerControl[i].Create(nullptr, WS_CHILD | WS_VISIBLE, bounds, this);
+		mCoronaContainerControl[i].GetCoronaControl().ShowWindow(SW_HIDE);
+	}
+	// /STEVE CHANGE
 
 	// Start the timer that implements the file modification detection feature
 	SetTimer(TIMER_ID_CHECK_APP, 500, NULL);
@@ -308,11 +313,16 @@ int CSimulatorView::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 void CSimulatorView::OnSetFocus(CWnd* pOldWnd)
 {
-	CWnd& coronaControl = mCoronaContainerControl.GetCoronaControl();
-	if (coronaControl.IsWindowVisible())
+	// STEVE CHANGE
+	for (int i = 0; i < kBackendsCount; ++i)
 	{
-		coronaControl.SetFocus();
+		CWnd& coronaControl = mCoronaContainerControl[i].GetCoronaControl();
+		if (coronaControl.IsWindowVisible())
+		{
+			coronaControl.SetFocus();
+		}
 	}
+	// /STEVE CHANGE
 }
 
 bool CSimulatorView::HasApplicationChanged()
@@ -651,9 +661,14 @@ void CSimulatorView::OnViewNavigateBack()
 
 	// Send "back" key down/up messages to the Corona control.
 	// Corona will automatically terminate the runtime if the Lua key listener does not handle them.
-	auto windowPointer = &mCoronaContainerControl.GetCoronaControl();
-	windowPointer->PostMessage(WM_KEYDOWN, VK_BROWSER_BACK, 0L);
-	windowPointer->PostMessage(WM_KEYUP, VK_BROWSER_BACK, 0x40000000L);
+	// STEVE CHANGE
+	for (int i = 0; i < kBackendsCount; ++i)
+	{
+		auto windowPointer = &mCoronaContainerControl[i].GetCoronaControl();
+		windowPointer->PostMessage(WM_KEYDOWN, VK_BROWSER_BACK, 0L);
+		windowPointer->PostMessage(WM_KEYUP, VK_BROWSER_BACK, 0x40000000L);
+	}
+	// /STEVE CHANGE
 	GetWinProperties()->GetAnalytics()->Log("back", nullptr);
 }
 
@@ -1811,20 +1826,30 @@ void CSimulatorView::SuspendResumeSimulationWithOverlay(bool showOverlay, bool s
 	{
 		if (showOverlay)
 		{
-			mCoronaContainerControl.SetWindowTextW(L"Suspended");
-			mCoronaContainerControl.GetCoronaControl().ShowWindow(SW_HIDE);
+			// STEVE CHANGE
+			for (int i = 0; i < kBackendsCount; ++i)
+			{
+				mCoronaContainerControl[i].SetWindowTextW(L"Suspended");
+				mCoronaContainerControl[i].GetCoronaControl().ShowWindow(SW_HIDE);
+			}
+			// /STEVE CHANGE
 		}
 		EnableWindow(FALSE);
 	}
 	else
 	{
 		EnableWindow(TRUE);
-		if (mCoronaContainerControl.GetCoronaControl().IsWindowVisible() == FALSE)
+		// STEVE CHANGE
+		for (int i = 0; i < kBackendsCount; ++i)
 		{
-			mCoronaContainerControl.SetWindowTextW(L"");
-			mCoronaContainerControl.GetCoronaControl().ShowWindow(SW_SHOW);
-			mCoronaContainerControl.GetCoronaControl().SetFocus();
+			if (mCoronaContainerControl[i].GetCoronaControl().IsWindowVisible() == FALSE)
+			{
+				mCoronaContainerControl[i].SetWindowTextW(L"");
+				mCoronaContainerControl[i].GetCoronaControl().ShowWindow(SW_SHOW);
+				mCoronaContainerControl[i].GetCoronaControl().SetFocus();
+			}
 		}
+		// /STEVE CHANGE
 	}
 }
 
@@ -1842,8 +1867,13 @@ void CSimulatorView::StopSimulation()
 	mRuntimeEnvironmentPointer = nullptr;
 
 	// Hide the Corona control and show its black container without any text.
-	mCoronaContainerControl.SetWindowTextW(L"");
-	mCoronaContainerControl.GetCoronaControl().ShowWindow(SW_HIDE);
+	// STEVE CHANGE
+	for (int i = 0; i < kBackendsCount; ++i)
+	{
+		mCoronaContainerControl[i].SetWindowTextW(L"");
+		mCoronaContainerControl[i].GetCoronaControl().ShowWindow(SW_HIDE);
+	}
+	// /STEVE CHANGE
 
 	// Clear the simulator screen.
 	UpdateSimulatorSkin();
@@ -2060,7 +2090,12 @@ void CSimulatorView::UpdateSimulatorSkin()
 		// Not showing a skin. Use the same bounds as the window's client area.
 		coronaBounds.CopyRect(&clientBounds);
 	}
-	mCoronaContainerControl.MoveWindow(coronaBounds, FALSE);
+	// STEVE CHANGE
+	for (int i = 0; i < kBackendsCount; ++i)
+	{
+		mCoronaContainerControl[i].MoveWindow(coronaBounds, FALSE);
+	}
+	// /STEVE CHANGE
 
     // Set size, position, and visibility of view window
 	this->MoveWindow(clientBounds, TRUE);
@@ -2277,14 +2312,24 @@ void CSimulatorView::RunCoronaProject(CString& projectPath)
 	if (projectPath.GetLength() > 0)
 	{
 		// Show the Corona control before creating the runtime. The Corona runtime will render to this control.
-		mCoronaContainerControl.GetCoronaControl().ShowWindow(SW_SHOW);
-		mCoronaContainerControl.GetCoronaControl().SetFocus();
+		// STEVE CHANGE
+		for (int i = 0; i < kBackendsCount; ++i)
+		{
+			mCoronaContainerControl[i].GetCoronaControl().ShowWindow(SW_SHOW);
+			mCoronaContainerControl[i].GetCoronaControl().SetFocus();
+		}
+		// /STEVE CHANGE
 
 		// Set up the Corona runtime launch settings.
 		Interop::SimulatorRuntimeEnvironment::CreationSettings settings;
 		settings.ResourceDirectoryPath = projectPath;
 		settings.MainWindowHandle = nullptr;			// <- Do not let the runtime take control of the main window.
-		settings.RenderSurfaceHandle = mCoronaContainerControl.GetCoronaControl().GetSafeHwnd();
+		// STEVE CHANGE
+		for (int i = 0; i < kBackendsCount; ++i)
+		{
+			settings.RenderSurfaceHandle.push_back( mCoronaContainerControl[i].GetCoronaControl().GetSafeHwnd() );
+		}
+		// /STEVE CHANGE
 		settings.LoadedEventHandlerPointer = &mRuntimeLoadedEventHandler;
 		if (mIsShowingInternalScreen)
 		{
@@ -2326,8 +2371,13 @@ void CSimulatorView::RunCoronaProject(CString& projectPath)
 	if (!mRuntimeEnvironmentPointer)
 	{
 		UpdateSimulatorSkin();
-		mCoronaContainerControl.SetWindowTextW(L"");
-		mCoronaContainerControl.GetCoronaControl().ShowWindow(SW_HIDE);
+		// STEVE CHANGE
+		for (int i = 0; i < kBackendsCount; ++i)
+		{
+			mCoronaContainerControl[i].SetWindowTextW(L"");
+			mCoronaContainerControl[i].GetCoronaControl().ShowWindow(SW_HIDE);
+		}
+		// /STEVE CHANGE
 	}
 
 	// If we're monitoring a project directory, close that handle (we'll open a new one when we need to)
@@ -2459,7 +2509,7 @@ bool CSimulatorView::InitSkin( Rtt::TargetDevice::Skin skinId )
 bool CSimulatorView::ValidateOpenGL()
 {
 	// Verify that the control we want to render to meets Corona's minimum requirements.
-	HWND windowHandle = mCoronaContainerControl.GetCoronaControl().GetSafeHwnd();
+	HWND windowHandle = mCoronaContainerControl[kBackendGL].GetCoronaControl().GetSafeHwnd(); // <- STEVE CHANGE
 	auto result = Interop::RuntimeEnvironment::ValidateRenderSurface(windowHandle);
 
 	// Fetch the renderer's version string.
@@ -2487,7 +2537,7 @@ bool CSimulatorView::ValidateOpenGL()
 		if (messageDlg.DoModal() != ID_MSG_BUTTON2)
 		{
 			// User has chosen not to continue. Fail the validation test.
-			mCoronaContainerControl.ShowWindow(SW_HIDE);
+			mCoronaContainerControl[kBackendGL].ShowWindow(SW_HIDE); // <- STEVE CHANGE
 			return false;
 		}
 	}
@@ -2512,7 +2562,7 @@ bool CSimulatorView::ValidateOpenGL()
 		if (messageDlg.DoModal() != ID_MSG_BUTTON2)
 		{
 			// User has chosen not to continue. Fail the validation test.
-			mCoronaContainerControl.ShowWindow(SW_HIDE);
+			mCoronaContainerControl[kBackendGL].ShowWindow(SW_HIDE); // <- STEVE CHANGE
 			return false;
 		}
 		else
@@ -2525,9 +2575,9 @@ bool CSimulatorView::ValidateOpenGL()
 
 	// The system successfully meets Corona's minimum graphics requirements
 	// ...or there is a graphics issue and the user has chosen to continue at his/her own risk.
-	if (!mCoronaContainerControl.IsWindowVisible())
+	if (!mCoronaContainerControl[kBackendGL].IsWindowVisible()) // <- STEVE CHANGE
 	{
-		mCoronaContainerControl.ShowWindow(SW_SHOW);
+		mCoronaContainerControl[kBackendGL].ShowWindow(SW_SHOW); // <- STEVE CHANGE
 	}
 	return true;
 }

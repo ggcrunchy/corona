@@ -34,6 +34,7 @@ RenderSurfaceControl::RenderSurfaceControl(HWND windowHandle, const Params & par
 	fPaintDeviceContextHandle(nullptr),
 	fRenderingContextHandle(nullptr),
 // STEVE CHANGE
+	fFailed(false),
 	fVulkanState(nullptr)
 // /STEVE CHANGE
 {
@@ -227,6 +228,8 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 	if (params.IsVulkanWanted() && !CreateVulkanState())
 	{
 		DestroyContext();
+
+		fFailed = true;
 
 		if (params.IsVulkanRequired())
 		{
