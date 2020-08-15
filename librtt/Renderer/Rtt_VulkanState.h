@@ -103,9 +103,8 @@ class VulkanState
 			VkRenderPass fPass;
 		};
 
-		bool FindRenderPassData( const RenderPassKey & key ) const;
 		bool AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass );
-
+		const RenderPassData * FindRenderPassData( const RenderPassKey & key ) const;
 	public:
 		VulkanBufferData CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties );
 		bool FindMemoryType( uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t & type );

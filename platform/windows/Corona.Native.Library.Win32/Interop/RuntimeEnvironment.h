@@ -28,7 +28,6 @@
 #include "ScopedOleInitializer.h"
 #include "WinString.h"
 #include <list>
-#include <vector> // <- STEVE CHANGE
 #include <Windows.h>
 extern "C"
 {
@@ -213,7 +212,7 @@ class RuntimeEnvironment
 			///  <para>Handle to a window/control's client area to render OpenGL content to.</para>
 			///  <para>Can be null, which prevents Corona from rendering anything.</para>
 			/// </summary>
-			std::vector<HWND> RenderSurfaceHandle; // <- STEVE CHANGE
+			HWND RenderSurfaceHandle;
 
 			/// <summary>Launch options to be used such as kConnectToDebugger, kLaunchDeviceShell, etc.</summary>
 			Rtt::Runtime::LaunchOptions LaunchOptions;
@@ -249,7 +248,7 @@ class RuntimeEnvironment
 				SkinResourceDirectoryPath(nullptr),
 				UserSkinsDirectoryPath(nullptr),
 				MainWindowHandle(nullptr),
-			//	RenderSurfaceHandle(nullptr), <- STEVE CHANGE
+				RenderSurfaceHandle(nullptr),
 				LaunchOptions(Rtt::Runtime::kDefaultLaunchOption),
 				LaunchArgumentsPointer(nullptr),
 				LoadedEventHandlerPointer(nullptr)

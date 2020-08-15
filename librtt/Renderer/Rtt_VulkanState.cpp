@@ -172,18 +172,20 @@ VulkanState::~VulkanState()
 }
 
 bool
-VulkanState::FindRenderPassData( const RenderPassKey & key ) const
-{
-	return fRenderPasses.end() != fRenderPasses.find( key );
-}
-
-bool
 VulkanState::AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass )
 {
 	RenderPassData data = { fRenderPasses.size(), renderPass };
 	auto result = fRenderPasses.insert( std::make_pair( key, data ) );
 
 	return result.second;
+}
+
+const VulkanState::RenderPassData *
+VulkanState::FindRenderPassData( const RenderPassKey & key ) const
+{
+	auto iter = fRenderPasses.find( key );
+
+	return fRenderPasses.end() != iter ? &iter->second : NULL;
 }
 
 VulkanBufferData
@@ -572,8 +574,6 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 
 	vkEnumerateInstanceExtensionProperties( NULL, &extensionCount, extensionProps.data() );
 
-	VkInstance instance = VK_NULL_HANDLE;
-
 #ifndef NDEBUG
 	extensions.push_back( VK_EXT_DEBUG_UTILS_EXTENSION_NAME );
 #endif
@@ -629,6 +629,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 
 	createInfo.pNext = &debugCreateInfo;
 #endif
+	VkInstance instance = VK_NULL_HANDLE;
 
 	if (ok && vkCreateInstance( &createInfo, allocator, &instance ) != VK_SUCCESS)
 	{
@@ -717,13 +718,13 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 		return false;
 	}
 
-	uint32_t extensionCount;
+	uint32_t extensionCount = 0U;
 
-    VkResult dep1=vkEnumerateDeviceExtensionProperties( device, NULL, &extensionCount, NULL );
+    vkEnumerateDeviceExtensionProperties( device, NULL, &extensionCount, NULL );
 
     std::vector< VkExtensionProperties > availableExtensions( extensionCount );
 
-    VkResult dep2=vkEnumerateDeviceExtensionProperties( device, NULL, &extensionCount, availableExtensions.data() );
+    vkEnumerateDeviceExtensionProperties( device, NULL, &extensionCount, availableExtensions.data() );
 
 	std::vector< const char * > extensions, required = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
@@ -734,10 +735,10 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 		return false;
 	}
 
-	uint32_t formatCount, presentModeCount;
+	uint32_t formatCount = 0U, presentModeCount = 0U;
 
-	VkResult sf=vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, NULL );
-	VkResult pm=vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, NULL );
+	vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, NULL );
+	vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, NULL );
 
 	return formatCount != 0U && presentModeCount != 0U;
 }
@@ -745,7 +746,7 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 static std::tuple< VkPhysicalDevice, Queues, VulkanState::DeviceDetails >
 ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 {
-	uint32_t deviceCount;
+	uint32_t deviceCount = 0U;
 
 	vkEnumeratePhysicalDevices( instance, &deviceCount, NULL );
 
@@ -873,7 +874,7 @@ MakeCommandPool( VkDevice device, uint32_t graphicsFamily, const VkAllocationCal
     createPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     createPoolInfo.queueFamilyIndex = graphicsFamily;
 
-	VkCommandPool commandPool;
+	VkCommandPool commandPool = VK_NULL_HANDLE;
 
     if (VK_SUCCESS == vkCreateCommandPool( device, &createPoolInfo, allocator, &commandPool ))
 	{
@@ -893,22 +894,21 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 {
 	VkApplicationInfo appInfo = AppInfo();
 	const VkAllocationCallbacks * allocator = state.GetAllocator();
-
-	VkDebugUtilsMessengerEXT messenger;
+	VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 	VkInstance instance = MakeInstance( &appInfo, surfaceCallback.extension, allocator, &messenger );
 
 	if (instance != VK_NULL_HANDLE)
 	{
 		state.fInstance = instance;
+	#ifndef NDEBUG
+		state.fDebugMessenger = messenger;
+	#endif
 
 		VkSurfaceKHR surface = surfaceCallback.make( instance, surfaceCallback.data, allocator );
 
 		if (surface != VK_NULL_HANDLE)
 		{
 			state.fSurface = surface;
-		#ifndef NDEBUG
-			state.fDebugMessenger = messenger;
-		#endif
 
 			auto physicalDeviceData = ChoosePhysicalDevice( instance, surface );
 
@@ -952,16 +952,16 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint
 {
 	VkPhysicalDevice device = state.GetPhysicalDevice();
 	VkSurfaceKHR surface = state.GetSurface();
-	uint32_t formatCount, presentModeCount;
+	uint32_t formatCount = 0U, presentModeCount = 0U;
 
-	VkResult sf1=vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, NULL );
-	VkResult pm1=vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, NULL );
+	vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, NULL );
+	vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, NULL );
 
 	std::vector< VkSurfaceFormatKHR > formats( formatCount );
 	std::vector< VkPresentModeKHR > presentModes( presentModeCount );
 
-	VkResult sf2=vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, formats.data() );
-	VkResult pm2=vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, presentModes.data() );
+	vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, formats.data() );
+	vkGetPhysicalDeviceSurfacePresentModesKHR( device, surface, &presentModeCount, presentModes.data() );
 
 	VkSurfaceFormatKHR format = formats.front();
 
@@ -987,7 +987,7 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint
 
 	VkSurfaceCapabilitiesKHR capabilities;
 
-	VkResult sc=vkGetPhysicalDeviceSurfaceCapabilitiesKHR( device, surface, &capabilities );
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR( device, surface, &capabilities );
 
 	uint32_t imageCount = capabilities.minImageCount + 1U;
 

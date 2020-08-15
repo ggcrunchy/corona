@@ -37,11 +37,11 @@ class RenderPassBuilder {
 		void AddDepthStencilAttachment( VkFormat format, const AttachmentOptions & options = AttachmentOptions() );
 		void AddSubpassDependency( const VkSubpassDependency & dependency );
 
-		VkRenderPass BuildForSingleSubpass( VkDevice device, const VkAllocationCallbacks * allocator ) const;
-		void SingleSubpassKey( RenderPassKey & key ) const;
+		VkRenderPass Build( VkDevice device, const VkAllocationCallbacks * allocator ) const;
+		void GetKey( RenderPassKey & key ) const;
 
 	private:
-		void AddAttachment( VkAttachmentDescription description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, bool isFinalLayout = true );
+		void AddAttachment( VkAttachmentDescription & description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, VkImageLayout finalLayout = VK_IMAGE_LAYOUT_UNDEFINED );
 
 		std::vector< VkSubpassDependency > fDependencies;
 		std::vector< VkAttachmentDescription > fDescriptions;
@@ -60,10 +60,17 @@ class VulkanFrameBufferObject : public GPUResource
 		VulkanFrameBufferObject( VulkanState * state, uint32_t imageCount, VkImage * swapchainImages = NULL );
 
 	public:
+		struct Binding {
+			VkFramebuffer fFramebuffer;
+			VkRenderPass fRenderPass;
+			std::vector< VkClearValue > fClearValues;
+		};
+
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
-		virtual void Bind();
+
+		Binding Bind( uint32_t index );
 
 	private:
 		struct FramebufferData {
@@ -76,11 +83,12 @@ class VulkanFrameBufferObject : public GPUResource
 			VkFramebuffer fFramebuffer;
 		};
 
-		void MakeFramebuffers( uint32_t width, uint32_t height );
+		void MakeFramebuffers( uint32_t width, uint32_t height, const RenderPassBuilder & builder );
 
 	private:
 		VulkanState * fState;
 		VkImage fImage;
+		VkRenderPass fRenderPass;
 		std::vector< FramebufferData > fFramebufferData;
 		U32 fIndex;
 };

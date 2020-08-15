@@ -185,7 +185,6 @@ class RenderSurfaceControl : public Control
 		void RequestRender();
 
 		// STEVE CHANGE
-		bool CreationFailed() const { return fFailed; }
 		bool IsUsingVulkanBackend() const { return !!fVulkanState; }
 		void * GetBackendState() const { return IsUsingVulkanBackend() ? fVulkanState : nullptr; }
 		// /STEVE CHANGE
@@ -295,9 +294,6 @@ class RenderSurfaceControl : public Control
 		// STEVE CHANGE
 		/// <summary>Various Vulkan-related state, if chosen as the backend.</summary>
 		void * fVulkanState;
-
-		/// <summary>Creation failed, e.g. because backend could not be instantiated.</summary>
-		bool fFailed;
 		// /STEVE CHANGE
 
 		#pragma endregion

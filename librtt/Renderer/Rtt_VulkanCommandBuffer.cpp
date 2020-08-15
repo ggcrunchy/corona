@@ -127,9 +127,6 @@ VulkanCommandBuffer::Initialize()
 	InitializeFBO();
 	InitializeCachedParams();
 	CacheQueryParam( kMaxTextureSize );
-	
-	GetMaxTextureSize();
-
 }
 void
 VulkanCommandBuffer::InitializeFBO()
@@ -142,6 +139,7 @@ VulkanCommandBuffer::InitializeFBO()
 	fDefaultFBO = curFBO;
 	Rtt_STATIC_ASSERT( sizeof( curFBO ) == sizeof( fDefaultFBO ) );
 	*/
+	// TODO: probably a no-op?
 }
 
 void 
@@ -213,21 +211,19 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
 	if( fbo )
 	{
+		const VulkanState::SwapchainDetails & details = fRenderer.GetState()->GetSwapchainDetails();
 		VulkanFrameBufferObject * vulkanFBO = static_cast< VulkanFrameBufferObject * >( fbo->GetGPUResource() );
-/*
-VkRenderPassBeginInfo renderPassInfo = {};
+		VulkanFrameBufferObject::Binding binding = vulkanFBO->Bind( fImageIndex );
+		VkRenderPassBeginInfo renderPassInfo = {};
 
-renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-renderPassInfo.clearValueCount = fClearValues.size();
-renderPassInfo.framebuffer = swapChainFramebuffers[i];
-renderPassInfo.pClearValues = fClearValues.data();
-renderPassInfo.renderArea.offset = {0, 0};
-renderPassInfo.renderArea.extent = swapChainExtent;
-renderPassInfo.renderPass = renderPass;
+		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassInfo.clearValueCount = binding.fClearValues.size();
+		renderPassInfo.framebuffer = binding.fFramebuffer;
+		renderPassInfo.pClearValues = binding.fClearValues.data();
+		renderPassInfo.renderArea.extent = details.fExtent;
+		renderPassInfo.renderPass = binding.fRenderPass;
 
-vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-*/
-		vulkanFBO->Bind();	// TODO: stuff to plug in to render pass begin...
+		vkCmdBeginRenderPass( fCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE );
 	}
 	else
 	{
@@ -807,7 +803,7 @@ void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
 			sets[listIndex] = lists.fSets[lists.fBufferIndex];
 			dynamicOffsets[count++] = lists.fOffset;
 
-			lists.fOffset += lists.fDynamicAlignment;
+			lists.fOffset += U32( lists.fDynamicAlignment );
 		}
 	}
 

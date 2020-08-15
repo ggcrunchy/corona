@@ -97,21 +97,18 @@ RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment::CreationSetting
 {
 	// Do not continue if the given render surface handle (if provided) is already being used by another runtime.
 	// STEVE CHANGE
-	for (size_t i = 0; i < settings.RenderSurfaceHandle.size(); ++i)
+	if (settings.IsRuntimeCreationEnabled && settings.RenderSurfaceHandle)
 	{
-		if (settings.IsRuntimeCreationEnabled && settings.RenderSurfaceHandle[i])
+		auto componentCollection = UI::UIComponent::FetchExistingBy(settings.RenderSurfaceHandle);
+		for (int index = componentCollection.GetCount() - 1; index >= 0; index--)
 		{
-			auto componentCollection = UI::UIComponent::FetchExistingBy(settings.RenderSurfaceHandle[i]);
-			for (int index = componentCollection.GetCount() - 1; index >= 0; index--)
+			auto componentPointer = componentCollection.GetByIndex(index);
+			if (componentPointer)
 			{
-				auto componentPointer = componentCollection.GetByIndex(index);
-				if (componentPointer)
+				if (dynamic_cast<UI::RenderSurfaceControl*>(componentPointer) != nullptr)
 				{
-					if (dynamic_cast<UI::RenderSurfaceControl*>(componentPointer) != nullptr)
-					{
-						throw std::runtime_error(
-									"There is another Corona runtime already referencing the given window handle.");
-					}
+					throw std::runtime_error(
+								"There is another Corona runtime already referencing the given window handle.");
 				}
 			}
 		}
@@ -285,27 +282,15 @@ RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment::CreationSetting
 
 	// If given a control to render to, wrap it with our own render surface object.
 	// This allows us to receive all Windows messages delivered to this control and tightly control rendering.
-	// STEVE CHANGE
-	bool hasSurfaceHandles = true;
-
-	for (size_t i = 0; i < settings.RenderSurfaceHandle.size(); ++i)
-	{
-		hasSurfaceHandles = hasSurfaceHandles && settings.RenderSurfaceHandle[i];
-	}
-
-	if (hasSurfaceHandles)//settings.RenderSurfaceHandle)
-	// /STEVE CHANGE
+	if (settings.RenderSurfaceHandle)
 	{
 		// Set up the control to clip its child controls, if not done already.
 		// This prevents the rendered content from being painted on top of all of the child controls.
 		// STEVE CHANGE
-		for (size_t i = 0; i < settings.RenderSurfaceHandle.size(); ++i)
+		auto windowStyles = ::GetWindowLongW(settings.RenderSurfaceHandle, GWL_STYLE);
+		if ((windowStyles & WS_CLIPCHILDREN) == 0)
 		{
-			auto windowStyles = ::GetWindowLongW(settings.RenderSurfaceHandle[i], GWL_STYLE);
-			if ((windowStyles & WS_CLIPCHILDREN) == 0)
-			{
-				::SetWindowLongW(settings.RenderSurfaceHandle[i], GWL_STYLE, windowStyles | WS_CLIPCHILDREN);
-			}
+			::SetWindowLongW(settings.RenderSurfaceHandle, GWL_STYLE, windowStyles | WS_CLIPCHILDREN);
 		}
 		// /STEVE CHANGE
 
@@ -320,19 +305,7 @@ RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment::CreationSetting
 			params.SetVulkanWanted(requireVulkan);
 		}
 
-		for (int i = params.IsVulkanWanted() ? 1 : 0; i >= 0; --i)
-		{
-			fRenderSurfacePointer = new Interop::UI::RenderSurfaceControl(settings.RenderSurfaceHandle[i], params);
-
-			if (!fRenderSurfacePointer->CreationFailed())
-			{
-				delete fRenderSurfacePointer;
-
-				break;
-			}
-
-			
-		}
+		fRenderSurfacePointer = new Interop::UI::RenderSurfaceControl(settings.RenderSurfaceHandle, params);
 		// /STEVE CHANGE
 		fRenderSurfacePointer->SetRenderFrameHandler(&fRenderFrameEventHandler);
 		fRenderSurfacePointer->GetDestroyingEventHandlers().Add(&fDestroyingSurfaceEventHandler);

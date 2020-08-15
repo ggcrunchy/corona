@@ -72,10 +72,9 @@ RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions 
 	if (options.isResolve)
 	{
 		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		colorAttachment.samples = options.samples;
 
-		AddAttachment( colorAttachment, fResolveReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, false );
+		AddAttachment( colorAttachment, fResolveReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR );
 	}
 
 	else
@@ -100,7 +99,7 @@ RenderPassBuilder::AddSubpassDependency( const VkSubpassDependency & dependency 
 }
 
 VkRenderPass
-RenderPassBuilder::BuildForSingleSubpass( VkDevice device, const VkAllocationCallbacks * allocator ) const
+RenderPassBuilder::Build( VkDevice device, const VkAllocationCallbacks * allocator ) const
 {
 	VkSubpassDescription subpass = {};
 
@@ -120,7 +119,7 @@ RenderPassBuilder::BuildForSingleSubpass( VkDevice device, const VkAllocationCal
     createRenderPassInfo.pSubpasses = &subpass;
     createRenderPassInfo.subpassCount = 1U;
 
-	VkRenderPass renderPass;
+	VkRenderPass renderPass = VK_NULL_HANDLE;
 
     if (VK_SUCCESS == vkCreateRenderPass( device, &createRenderPassInfo, allocator, &renderPass ))
 	{
@@ -136,7 +135,7 @@ RenderPassBuilder::BuildForSingleSubpass( VkDevice device, const VkAllocationCal
 }
 
 void
-RenderPassBuilder::SingleSubpassKey( RenderPassKey & key ) const
+RenderPassBuilder::GetKey( RenderPassKey & key ) const
 {
 	U8 descriptionCount = U8( fDescriptions.size() ), dependencyCount = U8( fDependencies.size() );
 
@@ -179,7 +178,7 @@ RenderPassBuilder::SingleSubpassKey( RenderPassKey & key ) const
 }
 
 void
-RenderPassBuilder::AddAttachment( VkAttachmentDescription description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, bool isFinalLayout )
+RenderPassBuilder::AddAttachment( VkAttachmentDescription & description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, VkImageLayout finalLayout )
 {
 	VkAttachmentReference attachmentRef = {};
 
@@ -188,10 +187,7 @@ RenderPassBuilder::AddAttachment( VkAttachmentDescription description, std::vect
 
 	references.push_back( attachmentRef );
 
-	if (isFinalLayout)
-	{
-		description.finalLayout = layout;
-	}
+	description.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED == finalLayout ? layout : finalLayout;
 
 	fDescriptions.push_back( description );
 }
@@ -199,7 +195,8 @@ RenderPassBuilder::AddAttachment( VkAttachmentDescription description, std::vect
 VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanState * state, uint32_t imageCount, VkImage * swapchainImages )
 :	fState( state ),
 	fFramebufferData( imageCount ),
-	fImage( VK_NULL_HANDLE )
+	fImage( VK_NULL_HANDLE ),
+	fRenderPass( VK_NULL_HANDLE )
 {
 	if (swapchainImages)
 	{
@@ -211,7 +208,18 @@ VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanState * state, uint32_t 
 			fFramebufferData[i].fViews.push_back( VulkanTexture::CreateImageView( fState, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U ) );
 		}
 
-		MakeFramebuffers( details.fExtent.width, details.fExtent.height );
+		RenderPassBuilder builder;
+
+		builder.AddColorAttachment( format );
+
+		RenderPassBuilder::AttachmentOptions options;
+
+		options.isResolve = true;
+		options.samples = (VkSampleCountFlagBits)fState->GetSampleCountFlags();
+
+		builder.AddColorAttachment( format, options );
+
+		MakeFramebuffers( details.fExtent.width, details.fExtent.height, builder );
 	}
 }
 
@@ -229,7 +237,9 @@ VulkanFrameBufferObject::Create( CPUResource* resource )
 		fbData.fViews.push_back( view );
 	}
 
-	MakeFramebuffers( texture->GetWidth(), texture->GetHeight() );
+	RenderPassBuilder builder; // TODO!
+
+	MakeFramebuffers( texture->GetWidth(), texture->GetHeight(), builder );
 	Update( resource );
 
 	/*
@@ -309,25 +319,47 @@ VulkanFrameBufferObject::Destroy()
 */
 }
 
-void 
-VulkanFrameBufferObject::Bind()
-{/*
-	glBindFramebuffer( GL_FRAMEBUFFER, GetName() );
-	GL_CHECK_ERROR();*/
+VulkanFrameBufferObject::Binding 
+VulkanFrameBufferObject::Bind( uint32_t index )
+{
+	Binding binding;
+
+	binding.fFramebuffer = fFramebufferData[index].fFramebuffer;
+	binding.fRenderPass = fRenderPass;
+	// TODO: clear values
+
+	return binding;
 }
 
 void
-VulkanFrameBufferObject::MakeFramebuffers( uint32_t width, uint32_t height )
+VulkanFrameBufferObject::MakeFramebuffers( uint32_t width, uint32_t height, const RenderPassBuilder & builder )
 {
+	RenderPassKey key;
+
+	builder.GetKey( key );
+	
+	const VulkanState::RenderPassData * data = fState->FindRenderPassData( key );
 	const VkAllocationCallbacks * allocator = fState->GetAllocator();
 	VkDevice device = fState->GetDevice();
+
+	if (data)
+	{
+		fRenderPass = data->fPass;
+	}
+
+	else
+	{
+		fRenderPass = builder.Build( device, allocator );
+
+		fState->AddRenderPass( key, fRenderPass );
+	}
 
 	for (auto & fbData : fFramebufferData)
 	{
         VkFramebufferCreateInfo createFramebufferInfo = {};
 
         createFramebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    //    createFramebufferInfo.renderPass = renderPass;
+        createFramebufferInfo.renderPass = fRenderPass;
         createFramebufferInfo.attachmentCount = fbData.fViews.size();
         createFramebufferInfo.height = height;
         createFramebufferInfo.layers = 1U;
