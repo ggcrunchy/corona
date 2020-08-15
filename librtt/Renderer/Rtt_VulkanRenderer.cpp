@@ -57,7 +57,7 @@ DescriptorLists::DescriptorLists( VulkanState * state, U32 count, bool isUserDat
 
 	if (alignment > 0U)
 	{
-		fDynamicAlignment = (fDynamicAlignment + alignment - 1) & ~alignment;
+		fDynamicAlignment = (fDynamicAlignment + alignment - 1) & ~(alignment - 1);
 	}
 
 	fBufferSize = U32( count * fDynamicAlignment );
@@ -109,7 +109,7 @@ DescriptorLists::AddPool( VulkanState * state, VkDescriptorType type, U32 descri
 	poolInfo.poolSizeCount = 1U;
 	poolInfo.pPoolSizes = &poolSize;
 
-	VkDescriptorPool pool;
+	VkDescriptorPool pool = VK_NULL_HANDLE;
 
 	if (VK_SUCCESS == vkCreateDescriptorPool( state->GetDevice(), &poolInfo, state->GetAllocator(), &pool ))
 	{
@@ -320,9 +320,9 @@ VulkanRenderer::MakeSwapchain()
 		swapchainCreateInfo.queueFamilyIndexCount = queueFamilies.size();
 	}
 
-	VkSwapchainKHR swapchain;
-	VkResult rr = vkCreateSwapchainKHR( fState->GetDevice(), &swapchainCreateInfo, fState->GetAllocator(), &swapchain );
-	if (VK_SUCCESS == rr)
+	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+
+	if (VK_SUCCESS == vkCreateSwapchainKHR( fState->GetDevice(), &swapchainCreateInfo, fState->GetAllocator(), &swapchain ))
 	{
 		return swapchain;
 	}

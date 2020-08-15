@@ -172,8 +172,7 @@ class CSimulatorView : public CView
 		void OnRuntimeLoaded(Interop::RuntimeEnvironment& sender, const Interop::EventArgs& arguments);
 		void RemoveUnauthorizedMenuItemsFrom(CMenu* menuPointer);
 
-		enum { kBackendGL = 0, kBackendVulkan = 1, kBackendsCount = 2 }; // <- STEVE CHANGE
-		CCoronaControlContainer mCoronaContainerControl[kBackendsCount]; // <- STEVE CHANGE
+		CCoronaControlContainer mCoronaContainerControl;
 		Interop::SimulatorRuntimeEnvironment* mRuntimeEnvironmentPointer;
 		Interop::SimulatorRuntimeEnvironment::LoadedEvent::MethodHandler<CSimulatorView> mRuntimeLoadedEventHandler;
 		Rtt::WinSimulatorServices mSimulatorServices;
