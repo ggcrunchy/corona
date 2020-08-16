@@ -16,6 +16,7 @@
 #include "Renderer/Rtt_VulkanProgram.h"
 #include "Renderer/Rtt_VulkanTexture.h"
 #include "Renderer/Rtt_CPUResource.h"
+#include "Renderer/Rtt_FrameBufferObject.h"
 #include "Core/Rtt_Assert.h"
 #include "CoronaLog.h"
 
@@ -271,6 +272,7 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 		uint32_t index = vulkanCommandBuffer->GetImageIndex();
 
 		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], fDescriptorLists.data() + 3U * index );
+		vulkanCommandBuffer->SubmitFBO( fFBO );
 	}
 
 	else
@@ -484,6 +486,7 @@ struct PackedPipeline {
 	U64 fBlendConstant3 : 4;
 	U64 fBlendConstant4 : 4;
 	U64 fLayoutID : 4;
+	U64 fRenderPassID : 4;
 	U64 fShaderID : 16;
 	U64 fAttributeDescriptionID : 3;
 	U64 fBindingDescriptionID : 3;
@@ -568,6 +571,14 @@ VulkanRenderer::SetPrimitiveTopology( VkPrimitiveTopology topology, bool resolve
 }
 
 void
+VulkanRenderer::SetRenderPass( U32 id, VkRenderPass renderPass )
+{
+	fPipelineCreateInfo.fRenderPass = renderPass;
+
+	GetPackedPipeline( fWorkingKey.fContents ).fRenderPassID = id;
+}
+
+void
 VulkanRenderer::SetShaderStages( U32 id, const std::vector< VkPipelineShaderStageCreateInfo > & stages )
 {
 	fPipelineCreateInfo.fShaderStages = stages;
@@ -578,12 +589,30 @@ VulkanRenderer::SetShaderStages( U32 id, const std::vector< VkPipelineShaderStag
 void
 VulkanRenderer::SetClearValue( U32 index, const VkClearValue & clearValue )
 {
-    if (index >= fClearValues.size())
-    {
-        fClearValues.resize( index + 1U, VkClearValue{} );
-    }
+	FrameBufferObject * fbo = GetFrameBufferObject();
 
-    fClearValues[index] = clearValue;
+	if (fbo)
+	{
+		VulkanFrameBufferObject * vulkanFBO = static_cast< VulkanFrameBufferObject * >( fbo->GetGPUResource() );
+/*
+		if (!vulkanFBO->GetCommitted())
+		{
+			std::vector< VkClearValue > & clearValues = vulkanFBO->GetClearValues();
+
+			if (index >= clearValues.size())
+			{
+				clearValues.resize( index + 1U, VkClearValue{} );
+			}
+
+			clearValues[index] = clearValue;
+		}
+
+		else // TODO: already bound, issue command instead...
+		{
+//			vkCmdClearColorImage, etc.
+		}
+*/
+	}
 }
 
 GPUResource* 
@@ -679,7 +708,7 @@ VulkanRenderer::ResolvePipeline()
         pipelineCreateInfo.pStages = fPipelineCreateInfo.fShaderStages.data();
         pipelineCreateInfo.pVertexInputState = &vertexInputInfo;
 		pipelineCreateInfo.pViewportState = &viewportInfo;
-//      pipelineCreateInfo.renderPass = fState->FindRenderPassData( key );
+		pipelineCreateInfo.renderPass = fPipelineCreateInfo.fRenderPass;
         pipelineCreateInfo.stageCount = fPipelineCreateInfo.fShaderStages.size();
 
 		const VkAllocationCallbacks * allocator = fState->GetAllocator();
@@ -756,6 +785,8 @@ VulkanRenderer::PipelineCreateInfo::PipelineCreateInfo()
 	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlending.attachmentCount = 1U;
 	fColorBlend = colorBlending;
+
+	fRenderPass = VK_NULL_HANDLE;
 }
 
 const size_t kByteCountRoundedUp = (sizeof( PackedPipeline ) + 7U) & ~7U;

@@ -118,7 +118,9 @@ namespace Rtt
 
 VulkanTexture::VulkanTexture( VulkanState * state )
 :	fState( state ),
-    fData()
+    fData(),
+    fImageView( VK_NULL_HANDLE ),
+    fSampler( VK_NULL_HANDLE )
 {
 }
 
@@ -169,10 +171,13 @@ VulkanTexture::Create( CPUResource* resource )
         samplerInfo.addressModeU = convertWrapToken( texture->GetWrapX() );
         samplerInfo.addressModeV = convertWrapToken( texture->GetWrapY() );
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-/*
-        samplerInfo.anisotropyEnable = VK_TRUE;
-        samplerInfo.maxAnisotropy = 16;
-*/
+
+        if (fState->GetFeatures().samplerAnisotropy)
+        {
+            samplerInfo.anisotropyEnable = VK_TRUE;
+            samplerInfo.maxAnisotropy = 16;
+        }
+
         samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 /*
         samplerInfo.unnormalizedCoordinates = VK_FALSE;

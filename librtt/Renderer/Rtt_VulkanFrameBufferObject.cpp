@@ -196,7 +196,7 @@ VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanState * state, uint32_t 
 :	fState( state ),
 	fFramebufferData( imageCount ),
 	fImage( VK_NULL_HANDLE ),
-	fRenderPass( VK_NULL_HANDLE )
+	fRenderPassData( NULL )
 {
 	if (swapchainImages)
 	{
@@ -325,8 +325,8 @@ VulkanFrameBufferObject::Bind( uint32_t index )
 	Binding binding;
 
 	binding.fFramebuffer = fFramebufferData[index].fFramebuffer;
-	binding.fRenderPass = fRenderPass;
-	// TODO: clear values
+	binding.fRenderPassData = *fRenderPassData;
+	binding.fClearValues = fClearValues;
 
 	return binding;
 }
@@ -337,21 +337,16 @@ VulkanFrameBufferObject::MakeFramebuffers( uint32_t width, uint32_t height, cons
 	RenderPassKey key;
 
 	builder.GetKey( key );
-	
-	const VulkanState::RenderPassData * data = fState->FindRenderPassData( key );
 	const VkAllocationCallbacks * allocator = fState->GetAllocator();
 	VkDevice device = fState->GetDevice();
+	
+	fRenderPassData = fState->FindRenderPassData( key );
 
-	if (data)
+	if (!fRenderPassData)
 	{
-		fRenderPass = data->fPass;
-	}
+		VkRenderPass renderPass = builder.Build( device, allocator );
 
-	else
-	{
-		fRenderPass = builder.Build( device, allocator );
-
-		fState->AddRenderPass( key, fRenderPass );
+		fRenderPassData = fState->AddRenderPass( key, renderPass );
 	}
 
 	for (auto & fbData : fFramebufferData)
@@ -359,7 +354,7 @@ VulkanFrameBufferObject::MakeFramebuffers( uint32_t width, uint32_t height, cons
         VkFramebufferCreateInfo createFramebufferInfo = {};
 
         createFramebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        createFramebufferInfo.renderPass = fRenderPass;
+        createFramebufferInfo.renderPass = fRenderPassData->fPass;
         createFramebufferInfo.attachmentCount = fbData.fViews.size();
         createFramebufferInfo.height = height;
         createFramebufferInfo.layers = 1U;

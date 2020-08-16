@@ -40,6 +40,11 @@ class RenderPassKey {
 		std::vector< U8 > fContents;
 };
 
+struct RenderPassData {
+	U32 fID;
+	VkRenderPass fPass;
+};
+
 class VulkanBufferData {
 public:
 	VulkanBufferData( VkDevice device, VkAllocationCallbacks * allocator );
@@ -73,6 +78,7 @@ class VulkanState
 
 	public:
 		struct Features {
+			bool samplerAnisotropy;
 			bool shaderSampledImageArrayDynamicIndexing;
 		};
 
@@ -98,12 +104,7 @@ class VulkanState
 		shaderc_compile_options * GetCompileOptions() const { return fCompileOptions; }
 
 	public:
-		struct RenderPassData {
-			U32 fID;
-			VkRenderPass fPass;
-		};
-
-		bool AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass );
+		const RenderPassData * AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass );
 		const RenderPassData * FindRenderPassData( const RenderPassKey & key ) const;
 	public:
 		VulkanBufferData CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties );

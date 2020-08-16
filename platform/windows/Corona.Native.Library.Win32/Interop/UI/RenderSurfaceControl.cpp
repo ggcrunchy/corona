@@ -592,10 +592,20 @@ void RenderSurfaceControl::OnPaint()
 	}
 
 	// Render to the control.
-	if (fMainDeviceContextHandle && fRenderingContextHandle)
+// STEVE CHANGE
+	bool canDraw = (fMainDeviceContextHandle && fRenderingContextHandle) || fVulkanState;
+	if (canDraw)//fMainDeviceContextHandle && fRenderingContextHandle)
+// /STEVE CHANGE
 	{
 		// Select this control's OpenGL context.
+		// STEVE CHANGE
+		if (!fVulkanState)
+		{
+		// /STEVE CHANGE
 		SelectRenderingContext();
+		// STEVE CHANGE
+		}
+		// /STEVE CHANGE
 
 		// If the owner of this surface has provided a RenderFrameHandler, then use it to draw the next frame.
 		// Otherwise, draw a black screen until a handler has been given to this surface.
@@ -610,7 +620,7 @@ void RenderSurfaceControl::OnPaint()
 			}
 			catch (std::exception ex) { }
 		}
-		if (false == didDraw)
+		if (false == didDraw && !fVulkanState) // <- STEVE CHANGE
 		{
 			::glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 			::glClear(GL_COLOR_BUFFER_BIT);

@@ -43,7 +43,7 @@ class Program : public CPUResource
 			kOpenGL_2_1 = 1,
 			kOpenGL_ES_2 = kDefault,
 		// STEVE CHANGE
-			kVulkanGLSL
+			kVulkanGLSL = 2
 		// /STEVE CHANGE
 		}
 		Language;
