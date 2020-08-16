@@ -22,6 +22,7 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
+class VulkanFrameBufferObject;
 class VulkanProgram;
 class VulkanRenderer;
 class VulkanState;
@@ -81,6 +82,9 @@ class VulkanCommandBuffer : public CommandBuffer
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
 		void PrepareDraw( VkPrimitiveTopology topology );
 
+		void SubmitFBO( VulkanFrameBufferObject * fbo );
+		void CommitFBO();
+
 	public:
 		void AddGraphicsPipeline( VkPipeline pipeline );
 
@@ -116,6 +120,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		FrameBufferObject * fDefaultFBO;/*
 		U32* fTimerQueries;
 		U32 fTimerQueryIndex;*/
+		VulkanFrameBufferObject * fFBO;
 		Real fElapsedTimeGPU;
 		TimeTransform* fTimeTransform;
 		S32 fCachedQuery[kNumQueryableParams];
@@ -136,6 +141,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;
 		uint32_t fImageIndex;
+		bool fCommitted;
 };
 
 // ----------------------------------------------------------------------------

@@ -411,7 +411,7 @@ LuaProxy::__proxyindex( lua_State *L )
 		// const char* key = ! lua_isnumber( L, 2 ) ? lua_tostring( L, 2 ) : NULL;
 		const char* key = LUA_TSTRING == lua_type( L, 2 ) ? lua_tostring( L, 2 ) : NULL;
 
-		Rtt_LUA_ASSERT( L, lua_isnumber( L, 2 ) || key, "__proxyindex was passed a NULL key" );
+	//	Rtt_LUA_ASSERT( L, lua_isnumber( L, 2 ) || key, "__proxyindex was passed a NULL key" ); <- STEVE CHANGE
 		if ( lua_isnil( L, 2 ) )
 		{
 			luaL_error( L, "ERROR: nil key supplied for property lookup." );
@@ -529,9 +529,16 @@ LuaProxy::__proxynewindex( lua_State *L )
 	else
 	{
 		const char* key = lua_tostring( L, 2 );
+// STEVE CHANGE
+bool nullKey = !key && lua_isnoneornil( L, 2 );
 
+if (nullKey)
+{
+// /STEVE ChANGE
 		Rtt_LUA_ASSERT( L, key, "__proxynewindex was passed a NULL key" );
-
+// STEVE CHANGE
+}
+// /STEVE ChANGE
 		const LuaProxyVTable& delegate = proxy->Delegate();
 		const LuaProxyVTable* pDelegate = & delegate;
 
@@ -539,15 +546,23 @@ LuaProxy::__proxynewindex( lua_State *L )
 			const LuaProxyVTableTracer tracer( delegate, proxy );
 			pDelegate = & tracer;
 		#endif
-
+// STEVE CHANGE
+if (nullKey)
+{
+// /STEVE ChANGE
 		// Warn whenever the key corresponds to a proxy property (ValueForKey != 0 )
 		// and the newValue is none; ignore otherwise. Some properties can be set to 'nil'.
 		Rtt_WARN_SIM(
 			pDelegate->ValueForKey( L, * object, key ) == 0 || ! lua_isnone( L, 3 ),
 			( "WARNING: Attempting to set property(%s) but no value was provided\n", key ) );
-
+// STEVE CHANGE
+}
+// /STEVE CHANGE
 		bool didSetValue = false;
-
+// STEVE ChANGE
+if (key)
+{
+// /STEVE ChANGE
 #ifdef Rtt_PHYSICS
 		// Call extensions delegate if it exists. This should be add-on behavior,
 		// not modify original behavior.  Therefore, it should return false for all
@@ -565,7 +580,9 @@ LuaProxy::__proxynewindex( lua_State *L )
 		{
 			didSetValue = pDelegate->SetValueForKey( L, *object, key, 3 );
 		}
-
+// STEVE CHANGE
+}
+// /STEVE CHANGE
 		if ( ! didSetValue )
 		{
 			// TODO: Check whether key is available, i.e. not used

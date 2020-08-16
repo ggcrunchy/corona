@@ -47,6 +47,7 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fCurrentPrepVersion( Program::kMaskCount0 ),
 	fProgram( NULL ),
 	fDefaultFBO( NULL ),
+	fFBO( NULL ),
 	fTimeTransform( NULL ),
 //	fTimerQueries( new U32[kTimerQueryCount] ),
 //	fTimerQueryIndex( 0 ),
@@ -58,7 +59,8 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fLists( NULL ),
 	fCommandBuffer( VK_NULL_HANDLE ),
 	fTextures( VK_NULL_HANDLE ),
-	fSwapchain( VK_NULL_HANDLE )
+	fSwapchain( VK_NULL_HANDLE ),
+	fCommitted( false )
 {
 	for(U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
 	{
@@ -211,19 +213,9 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
 	if( fbo )
 	{
-		const VulkanState::SwapchainDetails & details = fRenderer.GetState()->GetSwapchainDetails();
 		VulkanFrameBufferObject * vulkanFBO = static_cast< VulkanFrameBufferObject * >( fbo->GetGPUResource() );
-		VulkanFrameBufferObject::Binding binding = vulkanFBO->Bind( fImageIndex );
-		VkRenderPassBeginInfo renderPassInfo = {};
 
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.clearValueCount = binding.fClearValues.size();
-		renderPassInfo.framebuffer = binding.fFramebuffer;
-		renderPassInfo.pClearValues = binding.fClearValues.data();
-		renderPassInfo.renderArea.extent = details.fExtent;
-		renderPassInfo.renderPass = binding.fRenderPass;
-
-		vkCmdBeginRenderPass( fCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE );
+		SubmitFBO( vulkanFBO );
 	}
 	else
 	{
@@ -640,6 +632,14 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	if (fCommandBuffer != VK_NULL_HANDLE && fSwapchain != VK_NULL_HANDLE)
 	{
+		if (fFBO && fCommitted)
+		{
+			vkCmdEndRenderPass( fCommandBuffer );
+		}
+
+		fFBO = NULL;
+		fCommitted = false;
+
 		VkResult endResult = vkEndCommandBuffer( fCommandBuffer );
 
 		if (VK_SUCCESS == endResult)
@@ -781,6 +781,8 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 
 void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
 {
+	CommitFBO();
+
 	fRenderer.SetPrimitiveTopology( topology );
 
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
@@ -833,6 +835,36 @@ void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
 		U32 size = U32( drawState.upperPushConstantOffset ) - offset + sizeof( float ) * 4U;
 
 		vkCmdPushConstants( fCommandBuffer, fRenderer.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, offset, size, &pushConstants.fData + offset );
+	}
+}
+
+void VulkanCommandBuffer::SubmitFBO( VulkanFrameBufferObject * fbo )
+{
+	fFBO = fbo;
+	fCommitted = false;
+}
+
+void VulkanCommandBuffer::CommitFBO()
+{
+	if (fFBO && !fCommitted)
+	{
+		const VulkanState::SwapchainDetails & details = fRenderer.GetState()->GetSwapchainDetails();
+		VulkanFrameBufferObject::Binding binding = fFBO->Bind( fImageIndex );
+
+		fRenderer.SetRenderPass( binding.fRenderPassData.fID, binding.fRenderPassData.fPass );
+
+		VkRenderPassBeginInfo renderPassInfo = {};
+
+		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassInfo.clearValueCount = binding.fClearValues.size();
+		renderPassInfo.framebuffer = binding.fFramebuffer;
+		renderPassInfo.pClearValues = binding.fClearValues.data();
+		renderPassInfo.renderArea.extent = details.fExtent;
+		renderPassInfo.renderPass = binding.fRenderPassData.fPass;
+
+		vkCmdBeginRenderPass( fCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE );
+
+		fCommitted = true;
 	}
 }
 

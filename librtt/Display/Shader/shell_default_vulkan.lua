@@ -164,6 +164,8 @@ varying P_DEFAULT int v_SamplerIndex;
 
 // TODO: allow for sampler index too...
 
+#define u_FillSampler0 u_Samplers[0] // used by default kernel
+
 #define CoronaSampler0 u_Samplers[0]
 #define CoronaSampler1 u_Samplers[1]
 

@@ -126,6 +126,7 @@ class VulkanRenderer : public Renderer
 		void SetBlendEquations( VkBlendOp color, VkBlendOp alpha );
 		void SetBlendFactors( VkBlendFactor srcColor, VkBlendFactor srcAlpha, VkBlendFactor dstColor, VkBlendFactor dstAlpha );
 		void SetPrimitiveTopology( VkPrimitiveTopology topology, bool resolvePipeline = true );
+		void SetRenderPass( U32 id, VkRenderPass renderPass );
 		void SetShaderStages( U32 id, const std::vector< VkPipelineShaderStageCreateInfo > & stages );
 
 	public:
@@ -158,6 +159,7 @@ VkViewport fViewport;
 			VkPipelineMultisampleStateCreateInfo fMultisample;
 			VkPipelineDepthStencilStateCreateInfo fDepthStencil;
 			VkPipelineColorBlendStateCreateInfo fColorBlend;
+			VkRenderPass fRenderPass;
 		};
 
 		struct PipelineKey {
@@ -171,7 +173,6 @@ VkViewport fViewport;
 
 		VulkanState * fState;
 		VulkanFrameBufferObject * fFBO;
-		std::vector< VkClearValue > fClearValues;
 		std::vector< VkImage > fSwapchainImages;
 		std::vector< VkCommandBuffer > fCommandBuffers;
 		std::vector< DescriptorLists > fDescriptorLists;

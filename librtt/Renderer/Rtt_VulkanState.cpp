@@ -171,16 +171,16 @@ VulkanState::~VulkanState()
 	// allocator?
 }
 
-bool
+const RenderPassData *
 VulkanState::AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass )
 {
 	RenderPassData data = { fRenderPasses.size(), renderPass };
 	auto result = fRenderPasses.insert( std::make_pair( key, data ) );
 
-	return result.second;
+	return result.second ? &result.first->second : NULL;
 }
 
-const VulkanState::RenderPassData *
+const RenderPassData *
 VulkanState::FindRenderPassData( const RenderPassKey & key ) const
 {
 	auto iter = fRenderPasses.find( key );
@@ -796,6 +796,13 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 			deviceDetails.features.shaderSampledImageArrayDynamicIndexing = true;
 		}
 
+		if (features.samplerAnisotropy)
+		{
+			score += 500U;
+
+			deviceDetails.features.samplerAnisotropy = true;
+		}
+
 		// Maximum possible size of textures affects graphics quality
 		score += deviceDetails.properties.limits.maxImageDimension2D;
 
@@ -842,6 +849,7 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector< uint32_t 
 
 	VkPhysicalDeviceFeatures deviceFeatures = {};
 
+	deviceFeatures.samplerAnisotropy = deviceDetails.features.samplerAnisotropy ? VK_TRUE : VK_FALSE;
 	deviceFeatures.shaderSampledImageArrayDynamicIndexing = deviceDetails.features.shaderSampledImageArrayDynamicIndexing ? VK_TRUE : VK_FALSE;
 
 	createDeviceInfo.pEnabledFeatures = &deviceFeatures;

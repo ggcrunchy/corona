@@ -22,6 +22,7 @@ namespace Rtt
 
 class VulkanState;
 class RenderPassKey;
+struct RenderPassData;
 
 // ----------------------------------------------------------------------------
 
@@ -62,7 +63,7 @@ class VulkanFrameBufferObject : public GPUResource
 	public:
 		struct Binding {
 			VkFramebuffer fFramebuffer;
-			VkRenderPass fRenderPass;
+			RenderPassData fRenderPassData;
 			std::vector< VkClearValue > fClearValues;
 		};
 
@@ -88,9 +89,9 @@ class VulkanFrameBufferObject : public GPUResource
 	private:
 		VulkanState * fState;
 		VkImage fImage;
-		VkRenderPass fRenderPass;
+		const RenderPassData * fRenderPassData;
 		std::vector< FramebufferData > fFramebufferData;
-		U32 fIndex;
+		std::vector< VkClearValue > fClearValues;
 };
 
 // ----------------------------------------------------------------------------
