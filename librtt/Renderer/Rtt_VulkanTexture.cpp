@@ -128,15 +128,16 @@ void
 VulkanTexture::Create( CPUResource* resource )
 {
 	Rtt_ASSERT( CPUResource::kTexture == resource->GetType() || CPUResource::kVideoTexture == resource->GetType() );
-	Texture* texture = static_cast<Texture*>( resource );
+	Texture* texture = static_cast< Texture* >( resource );
 
     VkComponentMapping mapping = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
     VkFormat format = getFormatTokens( texture->GetFormat(), mapping );
     
     VkDeviceSize imageSize = texture->GetSizeInBytes();
-    U32 mipLevels = static_cast<uint32_t>( std::floor( std::log2( std::max( texture->GetWidth(), texture->GetHeight() ) ) ) ) + 1U;
+    U32 mipLevels = /* static_cast< uint32_t >( std::floor( std::log2( std::max( texture->GetWidth(), texture->GetHeight() ) ) ) ) + */ 1U;
     VulkanBufferData stagingData = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
-    bool ok = stagingData.IsValid(); // ^^ TODO: also non-buffered approach
+    bool ok = stagingData.IsValid();    // ^^ TODO: also non-buffered approach? (suggestions that we should recycle a buffer)
+                                        // is it okay to let this go away or should it be backed for a while still?
 
     if (ok)
     {
@@ -175,7 +176,7 @@ VulkanTexture::Create( CPUResource* resource )
         if (fState->GetFeatures().samplerAnisotropy)
         {
             samplerInfo.anisotropyEnable = VK_TRUE;
-            samplerInfo.maxAnisotropy = 16;
+            samplerInfo.maxAnisotropy = 16.f;
         }
 
         samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
@@ -185,14 +186,14 @@ VulkanTexture::Create( CPUResource* resource )
         samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 */
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.maxLod = 1U;
+        samplerInfo.maxLod = 1.f;
 
-        VkSampler sampler;
+        VkSampler sampler = VK_NULL_HANDLE;
 
         if (VK_SUCCESS == vkCreateSampler( fState->GetDevice(), &samplerInfo, fState->GetAllocator(), &sampler ))
         {
-            fSampler = sampler;
             fImageView = CreateImageView( fState, fData.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels, &mapping );
+            fSampler = sampler;
         }
         
         else
@@ -496,7 +497,7 @@ VulkanTexture::CreateImageView( VulkanState * state, VkImage image, VkFormat for
 	createImageViewInfo.subresourceRange.levelCount = mipLevels;
 	createImageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 
-	VkImageView view;
+	VkImageView view = VK_NULL_HANDLE;
 
 	if (VK_SUCCESS == vkCreateImageView( state->GetDevice(), &createImageViewInfo, state->GetAllocator(), &view ))
 	{

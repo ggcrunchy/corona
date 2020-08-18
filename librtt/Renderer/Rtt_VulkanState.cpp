@@ -215,7 +215,7 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 
 		if (FindMemoryType( memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex ))
 		{
-			VkDeviceMemory bufferMemory;
+			VkDeviceMemory bufferMemory = VK_NULL_HANDLE;
 
 			if (VK_SUCCESS == vkAllocateMemory( fDevice, &allocInfo, fAllocator, &bufferMemory ))
 			{
