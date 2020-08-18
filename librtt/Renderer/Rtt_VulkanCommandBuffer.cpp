@@ -26,13 +26,89 @@
 
 namespace /*anonymous*/
 {
+	enum Command
+	{
+		kCommandBindFrameBufferObject,
+		kCommandUnBindFrameBufferObject,
+		kCommandBindGeometry,
+		kCommandBindTexture,
+		kCommandBindProgram,
+		kCommandApplyUniformScalar,
+		kCommandApplyUniformVec2,
+		kCommandApplyUniformVec3,
+		kCommandApplyUniformVec4,
+		kCommandApplyUniformMat3,
+		kCommandApplyUniformMat4,
+		kCommandApplyUniformFromPointerScalar,
+		kCommandApplyUniformFromPointerVec2,
+		kCommandApplyUniformFromPointerVec3,
+		kCommandApplyUniformFromPointerVec4,
+		kCommandApplyUniformFromPointerMat3,
+		kCommandApplyUniformFromPointerMat4,
+		kCommandEnableBlend,
+		kCommandDisableBlend,
+		kCommandSetBlendFunction,
+		kCommandSetBlendEquation,
+		kCommandSetViewport,
+		kCommandEnableScissor,
+		kCommandDisableScissor,
+		kCommandSetScissorRegion,
+		kCommandEnableMultisample,
+		kCommandDisableMultisample,
+		kCommandClear,
+		kCommandDraw,
+		kCommandDrawIndexed,
+		kNumCommands
+	};
+
+	// To ease reading/writing of arrays
+	struct Vec2 { Rtt::Real data[2]; };
+	struct Vec3 { Rtt::Real data[3]; };
+	struct Vec4 { Rtt::Real data[4]; };
+	struct Mat3 { Rtt::Real data[9]; };
+	struct Mat4 { Rtt::Real data[16]; };
 
 	// NOT USED: const Rtt::Real kNanosecondsToMilliseconds = 1.0f / 1000000.0f;
-	// const U32 kTimerQueryCount = 3;
-
-	// see GLCommandBuffer.cpp:
+	const U32 kTimerQueryCount = 3;
+	
+	// The Uniform timestamp counter must be the same for both the
+	// front and back CommandBuffers, though only one CommandBuffer
+	// will ever write the timestamp on any given frame. If it were
+	// ever the case that more than two CommandBuffers were used,
+	// this would need to be made a shared member variable.
 	static U32 gUniformTimestamp = 0;
 
+	// Extract location and data from buffer
+	#define READ_UNIFORM_DATA( Type ) \
+		VulkanProgram::Location location = Read<VulkanProgram::Location>(); \
+		Type value = Read<Type>();
+
+	// Extract data but query for location
+	#define READ_UNIFORM_DATA_WITH_PROGRAM( Type ) \
+				Rtt::VulkanProgram* program = Read<Rtt::VulkanProgram*>(); \
+				U32 index = Read<U32>(); \
+				VulkanProgram::Location location = program->GetUniformLocation( index, fCurrentDrawVersion ); \
+				Type value = Read<Type>();
+	
+	#define CHECK_ERROR_AND_BREAK /* something... */ break;
+
+	// Ensure command count is incremented
+	#define WRITE_COMMAND( command ) Write<Command>( command ); ++fNumCommands;
+	
+	// Used to validate that the appropriate OpenGL commands
+	// are being generated and that their arguments are correct
+	#if ENABLE_DEBUG_PRINT 
+		#define DEBUG_PRINT( ... ) Rtt_LogException( __VA_ARGS__ ); Rtt_LogException("\n");
+		#define DEBUG_PRINT_MATRIX( message, data, count ) \
+			Rtt_LogException( "%s\n", message ); \
+			Rtt_LogException( "[ %.3f", data[0] ); \
+			for( U32 i = 1; i < count; ++i ) \
+				Rtt_LogException( ", %.3f", data[i] ); \
+			Rtt_LogException ("]\n" );
+	#else 
+		#define DEBUG_PRINT( ... )
+		#define DEBUG_PRINT_MATRIX( message, data, count )
+	#endif
 }
 
 // ----------------------------------------------------------------------------
@@ -45,6 +121,7 @@ namespace Rtt
 VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRenderer & renderer )
 :	CommandBuffer( allocator ),
 	fCurrentPrepVersion( Program::kMaskCount0 ),
+	fCurrentDrawVersion( Program::kMaskCount0 ),
 	fProgram( NULL ),
 	fDefaultFBO( NULL ),
 	fFBO( NULL ),
@@ -211,27 +288,29 @@ VulkanCommandBuffer::PrepareTexturesPool( VulkanState * state )
 void
 VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
-	if (true) return;
 	if( fbo )
 	{
-		VulkanFrameBufferObject * vulkanFBO = static_cast< VulkanFrameBufferObject * >( fbo->GetGPUResource() );
-
-		SubmitFBO( vulkanFBO );
+		WRITE_COMMAND( kCommandBindFrameBufferObject );
+		Write<GPUResource*>( fbo->GetGPUResource() );
 	}
 	else
 	{
+		WRITE_COMMAND( kCommandUnBindFrameBufferObject );
+	}
 /*
+***** SubmitFBO( vulkanFBO )
 glBindFramebuffer( GL_FRAMEBUFFER, fDefaultFBO );
 DEBUG_PRINT( "Unbind FrameBufferObject: OpenGL name: %i (fDefaultFBO)", fDefaultFBO );
 CHECK_ERROR_AND_BREAK;
 */
-	}
 }
 
 void 
 VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 {
-	if (true) return;
+	WRITE_COMMAND( kCommandBindGeometry );
+	Write<GPUResource*>( geometry->GetGPUResource() );
+/*
 	VulkanGeometry * vulkanGeometry = static_cast< VulkanGeometry * >( geometry->GetGPUResource() );
 	VulkanGeometry::Binding binding = vulkanGeometry->Bind();
 
@@ -245,12 +324,16 @@ VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 	{
 		vkCmdBindIndexBuffer( fCommandBuffer, binding.fIndexBuffer, 0U, binding.fIndexType );
 	}
+*/
 }
 
 void 
 VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 {
-	if (true) return;
+	WRITE_COMMAND( kCommandBindTexture );
+	Write<U32>( unit );
+	Write<GPUResource*>( texture->GetGPUResource() );
+/*
 	VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() );
 	VulkanTexture::Binding binding = vulkanTexture->Bind();
 	VkDescriptorImageInfo imageInfo;
@@ -342,12 +425,21 @@ VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 
 		vkUpdateDescriptorSets( state->GetDevice(), 2U, writes, 0U, NULL );
 	}
+	*/
 }
 
 void 
 VulkanCommandBuffer::BindProgram( Program* program, Program::Version version )
 {
-	if (true) return;
+	WRITE_COMMAND( kCommandBindProgram );
+	Write<Program::Version>( version );
+	Write<GPUResource*>( program->GetGPUResource() );
+
+	fCurrentPrepVersion = version;
+	fProgram = program;
+
+	fTimeTransform = program->GetShaderResource()->GetTimeTransform();
+/*
 	VulkanProgram * vulkanProgram = static_cast< VulkanProgram * >( program->GetGPUResource() );
 	VulkanProgram::Binding binding = vulkanProgram->Bind( version );
 
@@ -358,6 +450,7 @@ VulkanCommandBuffer::BindProgram( Program* program, Program::Version version )
 	fCurrentPrepVersion = version;
 
 	fTimeTransform = program->GetShaderResource()->GetTimeTransform();
+*/
 }
 
 void
@@ -373,7 +466,8 @@ VulkanCommandBuffer::BindUniform( Uniform* uniform, U32 unit )
 void
 VulkanCommandBuffer::SetBlendEnabled( bool enabled )
 {
-	fRenderer.EnableBlend( enabled );
+	WRITE_COMMAND( enabled ? kCommandEnableBlend : kCommandDisableBlend );
+//	fRenderer.EnableBlend( enabled );
 }
 
 static VkBlendFactor
@@ -427,6 +521,19 @@ VulkanFactorForBlendParam( BlendMode::Param param )
 void
 VulkanCommandBuffer::SetBlendFunction( const BlendMode& mode )
 {
+/*	WRITE_COMMAND( kCommandSetBlendFunction );
+
+	GLenum srcColor = GLenumForBlendParam( mode.fSrcColor );
+	GLenum dstColor = GLenumForBlendParam( mode.fDstColor );
+
+	GLenum srcAlpha = GLenumForBlendParam( mode.fSrcAlpha );
+	GLenum dstAlpha = GLenumForBlendParam( mode.fDstAlpha );
+
+	Write<GLenum>( srcColor );
+	Write<GLenum>( dstColor );
+	Write<GLenum>( srcAlpha );
+	Write<GLenum>( dstAlpha );
+*/
 	VkBlendFactor srcColor = VulkanFactorForBlendParam( mode.fSrcColor );
 	VkBlendFactor dstColor = VulkanFactorForBlendParam( mode.fDstColor );
 
@@ -439,6 +546,24 @@ VulkanCommandBuffer::SetBlendFunction( const BlendMode& mode )
 void 
 VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 {
+/*	WRITE_COMMAND( kCommandSetBlendEquation );
+
+	GLenum equation = GL_FUNC_ADD;
+
+	switch( mode )
+	{
+		case RenderTypes::kSubtractEquation:
+			equation = GL_FUNC_SUBTRACT;
+			break;
+		case RenderTypes::kReverseSubtractEquation:
+			equation = GL_FUNC_REVERSE_SUBTRACT;
+			break;
+		default:
+			break;
+	}
+
+	Write<GLenum>( equation );
+*/
 	VkBlendOp equation = VK_BLEND_OP_ADD;
 
 	switch( mode )
@@ -459,6 +584,13 @@ VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 void
 VulkanCommandBuffer::SetViewport( int x, int y, int width, int height )
 {
+/*
+	WRITE_COMMAND( kCommandSetViewport );
+	Write<GLint>(x);
+	Write<GLint>(y);
+	Write<GLsizei>(width);
+	Write<GLsizei>(height);
+*/
 	if (fCommandBuffer != VK_NULL_HANDLE)
 	{
 		VkViewport viewport;
@@ -477,19 +609,25 @@ VulkanCommandBuffer::SetViewport( int x, int y, int width, int height )
 void 
 VulkanCommandBuffer::SetScissorEnabled( bool enabled )
 {
+//	WRITE_COMMAND( enabled ? kCommandEnableScissor : kCommandDisableScissor );
 	// No-op: always want scissor, possibly fullscreen
 }
 
 void 
 VulkanCommandBuffer::SetScissorRegion( int x, int y, int width, int height )
 {
+	/*
+	WRITE_COMMAND( kCommandSetScissorRegion );
+	Write<GLint>(x);
+	Write<GLint>(y);
+	Write<GLsizei>(width);
+	Write<GLsizei>(height);*/
 	// TODO? seems to be dead code
 }
 
 void
 VulkanCommandBuffer::SetMultisampleEnabled( bool enabled )
 {
-// TODO: some flag to ignore these settings...
 //	WRITE_COMMAND( enabled ? kCommandEnableMultisample : kCommandDisableMultisample );
 //	fMultisampleStateCreateInfo.rasterizationSamples
 /*
@@ -511,6 +649,12 @@ VulkanCommandBuffer::SetMultisampleEnabled( bool enabled )
 void 
 VulkanCommandBuffer::Clear( Real r, Real g, Real b, Real a )
 {
+	/*
+	WRITE_COMMAND( kCommandClear );
+	Write<GLfloat>(r);
+	Write<GLfloat>(g);
+	Write<GLfloat>(b);
+	Write<GLfloat>(a);*/
 	VkClearValue clearValue;
 
 	// TODO: allow this to accommodate float targets?
@@ -526,7 +670,24 @@ VulkanCommandBuffer::Clear( Real r, Real g, Real b, Real a )
 void 
 VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 {
-if (true) return;
+	/*
+	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
+	ApplyUniforms( fProgram->GetGPUResource() );
+	
+	WRITE_COMMAND( kCommandDraw );
+	switch( type )
+	{
+		case Geometry::kTriangleStrip:	Write<GLenum>(GL_TRIANGLE_STRIP);	break;
+		case Geometry::kTriangleFan:	Write<GLenum>(GL_TRIANGLE_FAN);		break;
+		case Geometry::kTriangles:		Write<GLenum>(GL_TRIANGLES);		break;
+		case Geometry::kLines:			Write<GLenum>(GL_LINES);			break;
+		case Geometry::kLineLoop:		Write<GLenum>(GL_LINE_LOOP);		break;
+		default: Rtt_ASSERT_NOT_REACHED(); break;
+	}
+	Write<GLint>(offset);
+	Write<GLsizei>(count);
+	*/
+	if (true) return;
 	if (fCommandBuffer != VK_NULL_HANDLE)
 	{
 		VkPrimitiveTopology topology;
@@ -565,6 +726,20 @@ if (true) return;
 void 
 VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 {
+	/*	// The first argument, offset, is currently unused. If support for non-
+	// VBO based indexed rendering is added later, an offset may be needed.
+
+	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
+	ApplyUniforms( fProgram->GetGPUResource() );
+	
+	WRITE_COMMAND( kCommandDrawIndexed );
+	switch( type )
+	{
+		case Geometry::kIndexedTriangles:	Write<GLenum>(GL_TRIANGLES);	break;
+		default: Rtt_ASSERT_NOT_REACHED(); break;
+	}
+	Write<GLsizei>(count);
+	*/
 if (true) return;
 	if (fCommandBuffer != VK_NULL_HANDLE)
 	{
@@ -606,13 +781,13 @@ VulkanCommandBuffer::GetCachedParam( CommandBuffer::QueryableParams param )
 Real 
 VulkanCommandBuffer::Execute( bool measureGPU )
 {
-//	DEBUG_PRINT( "--Begin Rendering: VulkanCommandBuffer --" );
+	DEBUG_PRINT( "--Begin Rendering: VulkanCommandBuffer --" );
 
 	InitializeFBO();
-/*
+
 #ifdef ENABLE_GPU_TIMER_QUERIES
 	if( measureGPU )
-	{
+	{/*
 		GLint available = 0;
 		GLint id = fTimerQueries[fTimerQueryIndex];
 		while( !available )
@@ -626,15 +801,281 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 		glBeginQuery( GL_TIME_ELAPSED, id);
 		fTimerQueryIndex = ( fTimerQueryIndex + 1 ) % kTimerQueryCount;
-	}
+	*/}
 
 	if( measureGPU )
 	{
-		glEndQuery( GL_TIME_ELAPSED );
+	//	glEndQuery( GL_TIME_ELAPSED );
 	}
 #endif
-*/
-//	DEBUG_PRINT( "--End Rendering: VulkanCommandBuffer --\n" );
+	// Reset the offset pointer to the start of the buffer.
+	// This is safe to do here, as preparation work is done
+	// on another CommandBuffer while this one is executing.
+	fOffset = fBuffer;
+
+	//GL_CHECK_ERROR();
+
+	for( U32 i = 0; i < fNumCommands; ++i )
+	{
+		Command command = Read<Command>();
+
+// printf( "GLCommandBuffer::Execute [%d/%d] %d\n", i, fNumCommands, command );
+
+		Rtt_ASSERT( command < kNumCommands );
+		switch( command )
+		{
+			case kCommandBindFrameBufferObject:
+			{
+				VulkanFrameBufferObject* fbo = Read<VulkanFrameBufferObject*>();
+//				fbo->Bind();
+/*
+				DEBUG_PRINT( "Bind FrameBufferObject: OpenGL name: %i, OpenGL Texture name, if any: %d",
+								fbo->GetName(),
+								fbo->GetTextureName() );*/
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandUnBindFrameBufferObject:
+			{
+			//	glBindFramebuffer( GL_FRAMEBUFFER, fDefaultFBO );
+				DEBUG_PRINT( "Unbind FrameBufferObject: OpenGL name: %i (fDefaultFBO)", fDefaultFBO );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandBindGeometry:
+			{
+				VulkanGeometry* geometry = Read<VulkanGeometry*>();
+//				geometry->Bind();
+				DEBUG_PRINT( "Bind Geometry %p", geometry );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandBindTexture:
+			{
+				U32 unit = Read<U32>();
+				VulkanTexture* texture = Read<VulkanTexture*>();
+//				texture->Bind( unit );
+/*
+				DEBUG_PRINT( "Bind Texture: texture=%p unit=%i OpenGL name=%d",
+								texture,
+								unit,
+								texture->GetName() );*/
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandBindProgram:
+			{
+			//	fCurrentDrawVersion = Read<Program::Version>();
+				VulkanProgram* program = Read<VulkanProgram*>();
+//				program->Bind( fCurrentDrawVersion );
+//				DEBUG_PRINT( "Bind Program: program=%p version=%i", program, fCurrentDrawVersion );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformScalar:
+			{
+				READ_UNIFORM_DATA( Real );
+//				glUniform1f( location, value );
+//				DEBUG_PRINT( "Set Uniform: value=%f location=%i", value, location );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformVec2:
+			{
+				READ_UNIFORM_DATA( Vec2 );
+//				glUniform2fv( location, 1, &value.data[0] );
+//				DEBUG_PRINT( "Set Uniform: value=(%f, %f) location=%i", value.data[0], value.data[1], location);
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformVec3:
+			{
+				READ_UNIFORM_DATA( Vec3 );
+//				glUniform3fv( location, 1, &value.data[0] );
+//				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location);
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformVec4:
+			{
+				READ_UNIFORM_DATA( Vec4 );
+//				glUniform4fv( location, 1, &value.data[0] );
+//				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location);
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformMat3:
+			{
+				READ_UNIFORM_DATA( Mat3 );
+//				glUniformMatrix3fv( location, 1, GL_FALSE, &value.data[0] );
+//				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 9 );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformMat4:
+			{
+				READ_UNIFORM_DATA( Mat4 );
+//				glUniformMatrix4fv( location, 1, GL_FALSE, &value.data[0] );
+//				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformFromPointerScalar:
+			{
+				READ_UNIFORM_DATA_WITH_PROGRAM( Real );
+//				glUniform1f( location, value );
+//				DEBUG_PRINT( "Set Uniform: value=%f location=%i", value, location );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformFromPointerVec2:
+			{
+				READ_UNIFORM_DATA_WITH_PROGRAM( Vec2 );
+//				glUniform2fv( location, 1, &value.data[0] );
+//				DEBUG_PRINT( "Set Uniform: value=(%f, %f) location=%i", value.data[0], value.data[1], location);
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformFromPointerVec3:
+			{
+				READ_UNIFORM_DATA_WITH_PROGRAM( Vec3 );
+//				glUniform3fv( location, 1, &value.data[0] );
+//				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location);
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformFromPointerVec4:
+			{
+				READ_UNIFORM_DATA_WITH_PROGRAM( Vec4 );
+//				glUniform4fv( location, 1, &value.data[0] );
+//				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location);
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformFromPointerMat3:
+			{
+				READ_UNIFORM_DATA_WITH_PROGRAM( Mat3 );
+//				glUniformMatrix3fv( location, 1, GL_FALSE, &value.data[0] );
+//				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 9 );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyUniformFromPointerMat4:
+			{
+				READ_UNIFORM_DATA_WITH_PROGRAM( Mat4 );
+//				glUniformMatrix4fv( location, 1, GL_FALSE, &value.data[0] );
+				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandEnableBlend:
+			{
+//				glEnable( GL_BLEND );
+				DEBUG_PRINT( "Enable blend" );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandDisableBlend:
+			{
+//				glDisable( GL_BLEND );
+				DEBUG_PRINT( "Disable blend" );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandSetBlendFunction:
+			{/*
+				GLenum srcColor = Read<GLenum>();
+				GLenum dstColor = Read<GLenum>();
+
+				GLenum srcAlpha = Read<GLenum>();
+				GLenum dstAlpha = Read<GLenum>();
+
+				glBlendFuncSeparate( srcColor, dstColor, srcAlpha, dstAlpha );
+				DEBUG_PRINT(
+					"Set blend function: srcColor=%i, dstColor=%i, srcAlpha=%i, dstAlpha=%i",
+					srcColor, dstColor, srcAlpha, dstAlpha );*/
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandSetBlendEquation:
+			{/*
+				GLenum mode = Read<GLenum>();
+				glBlendEquation( mode );
+				DEBUG_PRINT( "Set blend equation: mode=%i", mode );*/
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandSetViewport:
+			{/*
+				GLint x = Read<GLint>();
+				GLint y = Read<GLint>();
+				GLsizei width = Read<GLsizei>();
+				GLsizei height = Read<GLsizei>();
+				glViewport( x, y, width, height );
+				DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );*/
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandEnableScissor:
+			{
+//				glEnable( GL_SCISSOR_TEST );
+				DEBUG_PRINT( "Enable scissor test" );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandDisableScissor:
+			{
+//				glDisable( GL_SCISSOR_TEST );
+				DEBUG_PRINT( "Disable scissor test" );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandSetScissorRegion:
+			{/*
+				GLint x = Read<GLint>();
+				GLint y = Read<GLint>();
+				GLsizei width = Read<GLsizei>();
+				GLsizei height = Read<GLsizei>();
+				glScissor( x, y, width, height );
+				DEBUG_PRINT( "Set scissor window x=%i, y=%i, width=%i, height=%i", x, y, width, height );*/
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandEnableMultisample:
+			{
+//				Rtt_glEnableMultisample();
+				DEBUG_PRINT( "Enable multisample test" );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandDisableMultisample:
+			{
+//				Rtt_glDisableMultisample();
+				DEBUG_PRINT( "Disable multisample test" );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandClear:
+			{/*
+				GLfloat r = Read<GLfloat>();
+				GLfloat g = Read<GLfloat>();
+				GLfloat b = Read<GLfloat>();
+				GLfloat a = Read<GLfloat>();
+				glClearColor( r, g, b, a );
+				glClear( GL_COLOR_BUFFER_BIT );
+				DEBUG_PRINT( "Clear: r=%f, g=%f, b=%f, a=%f", r, g, b, a );*/
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandDraw:
+			{/*
+				GLenum mode = Read<GLenum>();
+				GLint offset = Read<GLint>();
+				GLsizei count = Read<GLsizei>();
+				glDrawArrays( mode, offset, count );
+				DEBUG_PRINT( "Draw: mode=%i, offset=%i, count=%i", mode, offset, count );*/
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandDrawIndexed:
+			{/*
+				GLenum mode = Read<GLenum>();
+				GLsizei count = Read<GLsizei>();
+				glDrawElements( mode, count, GL_UNSIGNED_SHORT, NULL );
+				DEBUG_PRINT( "Draw indexed: mode=%i, count=%i", mode, count );*/
+				CHECK_ERROR_AND_BREAK;
+			}
+			default:
+				DEBUG_PRINT( "Unknown command(%d)", command );
+				Rtt_ASSERT_NOT_REACHED();
+				break;
+		}
+	}
+
+	fBytesUsed = 0;
+	fNumCommands = 0;
+	
+#ifdef ENABLE_GPU_TIMER_QUERIES
+	if( measureGPU )
+	{
+	//	glEndQuery( GL_TIME_ELAPSED );
+	}
+#endif
+	
+	DEBUG_PRINT( "--End Rendering: VulkanCommandBuffer --\n" );
+
+//	VULKAN_CHECK_ERROR();
 
 	if (fCommandBuffer != VK_NULL_HANDLE && fSwapchain != VK_NULL_HANDLE)
 	{
@@ -884,6 +1325,39 @@ void VulkanCommandBuffer::AddGraphicsPipeline( VkPipeline pipeline )
 	}
 }
 
+template <typename T>
+T 
+VulkanCommandBuffer::Read()
+{
+	Rtt_ASSERT( fOffset < fBuffer + fBytesAllocated );
+	T result = reinterpret_cast<T*>( fOffset )[0];
+	fOffset += sizeof( T );
+	return result;
+}
+
+template <typename T>
+void 
+VulkanCommandBuffer::Write( T value )
+{
+	U32 size = sizeof(T);
+	U32 bytesNeeded = fBytesUsed + size;
+	if( bytesNeeded > fBytesAllocated )
+	{
+		U32 doubleSize = fBytesUsed ? 2 * fBytesUsed : 4;
+		U32 newSize = Max( bytesNeeded, doubleSize );
+		U8* newBuffer = new U8[newSize];
+
+		memcpy( newBuffer, fBuffer, fBytesUsed );
+		delete [] fBuffer;
+
+		fBuffer = newBuffer;
+		fBytesAllocated = newSize;
+	}
+
+	memcpy( fBuffer + fBytesUsed, &value, size );
+	fBytesUsed += size;
+}
+
 VulkanCommandBuffer::DrawState VulkanCommandBuffer::ApplyUniforms( GPUResource* resource, VulkanPushConstants & pushConstants )
 {
 	Real rawTotalTime;
@@ -1107,5 +1581,12 @@ VulkanCommandBuffer::DrawState::DrawState()
 // ----------------------------------------------------------------------------
 
 } // namespace Rtt
+
+#undef READ_UNIFORM_DATA
+#undef READ_UNIFORM_DATA_WITH_PROGRAM
+#undef CHECK_ERROR_AND_BREAK
+#undef WRITE_COMMAND
+#undef DEBUG_PRINT
+#undef DEBUG_PRINT_MATRIX
 
 // ----------------------------------------------------------------------------
