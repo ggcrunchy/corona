@@ -294,6 +294,15 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 	vulkanCommandBuffer->ClearExecuteResult();
 }
 
+void
+VulkanRenderer::EndFrame()
+{
+	Super::EndFrame();
+
+	// TODO: this always precedes Swap(), so hook up resources for Create() / Update()
+	// yank them in Execute()
+}
+
 VkSwapchainKHR
 VulkanRenderer::MakeSwapchain()
 {

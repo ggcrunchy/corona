@@ -15,10 +15,6 @@
 #include <map>
 #include <vector>
 
-#ifdef free
-#undef free
-#endif
-
 // ----------------------------------------------------------------------------
 
 struct shaderc_compiler;

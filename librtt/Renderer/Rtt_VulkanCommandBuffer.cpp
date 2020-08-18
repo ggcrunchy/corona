@@ -211,6 +211,7 @@ VulkanCommandBuffer::PrepareTexturesPool( VulkanState * state )
 void
 VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
+	if (true) return;
 	if( fbo )
 	{
 		VulkanFrameBufferObject * vulkanFBO = static_cast< VulkanFrameBufferObject * >( fbo->GetGPUResource() );
@@ -230,6 +231,7 @@ CHECK_ERROR_AND_BREAK;
 void 
 VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 {
+	if (true) return;
 	VulkanGeometry * vulkanGeometry = static_cast< VulkanGeometry * >( geometry->GetGPUResource() );
 	VulkanGeometry::Binding binding = vulkanGeometry->Bind();
 
@@ -248,6 +250,7 @@ VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 void 
 VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 {
+	if (true) return;
 	VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() );
 	VulkanTexture::Binding binding = vulkanTexture->Bind();
 	VkDescriptorImageInfo imageInfo;
@@ -344,6 +347,7 @@ VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 void 
 VulkanCommandBuffer::BindProgram( Program* program, Program::Version version )
 {
+	if (true) return;
 	VulkanProgram * vulkanProgram = static_cast< VulkanProgram * >( program->GetGPUResource() );
 	VulkanProgram::Binding binding = vulkanProgram->Bind( version );
 
@@ -522,6 +526,7 @@ VulkanCommandBuffer::Clear( Real r, Real g, Real b, Real a )
 void 
 VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 {
+if (true) return;
 	if (fCommandBuffer != VK_NULL_HANDLE)
 	{
 		VkPrimitiveTopology topology;
@@ -560,6 +565,7 @@ VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 void 
 VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 {
+if (true) return;
 	if (fCommandBuffer != VK_NULL_HANDLE)
 	{
 		VkPrimitiveTopology topology;
@@ -781,6 +787,7 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 
 void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
 {
+if (true) return;
 	CommitFBO();
 
 	fRenderer.SetPrimitiveTopology( topology );
@@ -846,6 +853,7 @@ void VulkanCommandBuffer::SubmitFBO( VulkanFrameBufferObject * fbo )
 
 void VulkanCommandBuffer::CommitFBO()
 {
+if (true) return;
 	if (fFBO && !fCommitted)
 	{
 		const VulkanState::SwapchainDetails & details = fRenderer.GetState()->GetSwapchainDetails();
@@ -912,6 +920,7 @@ VulkanCommandBuffer::DrawState VulkanCommandBuffer::ApplyUniforms( GPUResource* 
 
 void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index, DrawState & drawState, VulkanPushConstants & pushConstants )
 {
+if (true) return;
 	const UniformUpdate& update = fUniformUpdates[index];
 	vulkanProgram.SetUniformTimestamp( index, fCurrentPrepVersion, update.timestamp );
 

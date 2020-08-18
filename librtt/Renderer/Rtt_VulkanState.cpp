@@ -200,7 +200,7 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 
 	VulkanBufferData bufferData( fDevice, fAllocator );
 
-	VkBuffer buffer;
+	VkBuffer buffer = VK_NULL_HANDLE;
 
     if (VK_SUCCESS == vkCreateBuffer( fDevice, &createBufferInfo, fAllocator, &buffer ))
 	{
@@ -277,7 +277,7 @@ VulkanState::BeginSingleTimeCommands()
     allocInfo.commandPool = fCommandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
-    VkCommandBuffer commandBuffer;
+    VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
 
     vkAllocateCommandBuffers( fDevice, &allocInfo, &commandBuffer );
 
@@ -300,7 +300,7 @@ VulkanState::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
 
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 
-	VkFence fence;
+	VkFence fence = VK_NULL_HANDLE;
 	
 	if (VK_SUCCESS == vkCreateFence( fDevice, &fenceCreateInfo, fAllocator, &fence ))
 	{
@@ -337,7 +337,7 @@ VulkanState::CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize si
 void *
 VulkanState::MapData( VkDeviceMemory memory, VkDeviceSize count, VkDeviceSize offset )
 {
-	void * mapping;
+	void * mapping = NULL;
 
 	vkMapMemory( fDevice, memory, offset, count, 0, &mapping );
 
@@ -662,9 +662,6 @@ struct Queues {
 	{
 	}
 
-	uint32_t fGraphicsFamily;
-	uint32_t fPresentFamily;
-
 	bool isComplete() const { return fGraphicsFamily != ~0U && fPresentFamily != ~0U; }
 
 	std::vector< uint32_t > GetFamilies() const
@@ -683,12 +680,15 @@ struct Queues {
 
 		return families;
 	}
+
+	uint32_t fGraphicsFamily;
+	uint32_t fPresentFamily;
 };
 
 static bool
 IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues )
 {
-	uint32_t queueFamilyCount;
+	uint32_t queueFamilyCount = 0U;
 
 	vkGetPhysicalDeviceQueueFamilyProperties( device, &queueFamilyCount, NULL );
 
