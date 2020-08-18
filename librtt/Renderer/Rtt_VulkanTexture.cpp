@@ -427,8 +427,8 @@ VulkanTexture::CreateImage( VulkanState * state, uint32_t width, uint32_t height
 
     const VkAllocationCallbacks * allocator = state->GetAllocator();
     VkDevice device = state->GetDevice();
+    VkImage image = VK_NULL_HANDLE;
     ImageData imageData;
-    VkImage image;
 
     if (VK_SUCCESS == vkCreateImage( device, &createImageInfo, allocator, &image ))
     {
@@ -492,8 +492,6 @@ VulkanTexture::CreateImageView( VulkanState * state, VkImage image, VkFormat for
 	createImageViewInfo.format = format;
 	createImageViewInfo.image = image;
 	createImageViewInfo.subresourceRange.aspectMask = flags;
-	createImageViewInfo.subresourceRange.baseArrayLayer = 0U;
-	createImageViewInfo.subresourceRange.baseMipLevel = 0U;
 	createImageViewInfo.subresourceRange.layerCount = 1U;
 	createImageViewInfo.subresourceRange.levelCount = mipLevels;
 	createImageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;

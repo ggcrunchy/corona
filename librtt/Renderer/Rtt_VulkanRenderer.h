@@ -104,6 +104,7 @@ class VulkanRenderer : public Renderer
 		virtual ~VulkanRenderer();
 
 		virtual void BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY );
+		virtual void EndFrame();
 
 	public:
 		VkSwapchainKHR MakeSwapchain();
