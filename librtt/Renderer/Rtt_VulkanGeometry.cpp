@@ -9,6 +9,7 @@
 
 #include "Core/Rtt_Build.h"
 
+#include "Renderer/Rtt_VulkanRenderer.h"
 #include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanGeometry.h"
 
@@ -129,32 +130,32 @@ VulkanGeometry::Destroy()
 	fVertexBufferData = fIndexBufferData = NULL;
 }
 
-VulkanGeometry::Binding 
-VulkanGeometry::Bind()
+void 
+VulkanGeometry::Bind( VulkanRenderer & renderer, VkCommandBuffer commandBuffer )
 {
+	U32 bindingID = 0U; // n.b. for future use?
+
 	VkVertexInputBindingDescription description;
 
 	description.binding = 0U;
 	description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 	description.stride = sizeof( Geometry::Vertex );
 
-	Binding binding;
+	std::vector< VkVertexInputBindingDescription > inputBindingDescriptions;
 
-	if (fVertexBufferData)
+	inputBindingDescriptions.push_back( description );
+
+	renderer.SetBindingDescriptions( bindingID, inputBindingDescriptions );
+
+	VkBuffer vertexBuffer = fVertexBufferData->GetBuffer();
+	VkDeviceSize offset = 0U;
+
+	vkCmdBindVertexBuffers( commandBuffer, 0U, 1U, &vertexBuffer, &offset );
+
+	if (fIndexBufferData != VK_NULL_HANDLE)
 	{
-		binding.fVertexBuffer = fVertexBufferData->GetBuffer();
+		vkCmdBindIndexBuffer( commandBuffer, fIndexBufferData->GetBuffer(), 0U, VK_INDEX_TYPE_UINT16 );
 	}
-
-	if (fIndexBufferData)
-	{
-		binding.fIndexBuffer = fIndexBufferData->GetBuffer();
-		binding.fIndexType = VK_INDEX_TYPE_UINT16;
-	}
-
-	binding.fDescriptions.push_back( description );
-	binding.fInputBindingID = 0U; // n.b. for future use
-
-	return binding;
 }
 
 VulkanBufferData *

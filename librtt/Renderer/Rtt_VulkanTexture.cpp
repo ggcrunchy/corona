@@ -255,7 +255,99 @@ VulkanTexture::Bind()
 
     binding.sampler = fSampler;
     binding.view = fImageView;
+/*
+	VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() );
+	VulkanTexture::Binding binding = vulkanTexture->Bind();
+	VkDescriptorImageInfo imageInfo;
 
+	imageInfo.imageView = binding.view;
+	imageInfo.sampler = binding.sampler;
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkWriteDescriptorSet descriptorWrite = {};
+
+	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite.descriptorCount = 1U;
+	descriptorWrite.pImageInfo = &imageInfo;
+
+	VulkanState * state = fRenderer.GetState();
+	DescriptorLists & list = fLists[DescriptorLists::eTexture];
+
+	if (!state->GetFeatures().shaderSampledImageArrayDynamicIndexing) // TODO: no indexing... this will presumably occur before binding
+	{
+		bool isNew = memcmp( &imageInfo, &fTextureState[unit], sizeof( VkDescriptorImageInfo ) ) != 0;
+		bool becameDirty = isNew && !list.fDirty;
+
+		if (becameDirty)
+		{
+			fTextures = VK_NULL_HANDLE;
+
+			if (list.fPools.empty() && !PrepareTexturesPool( state ))
+			{
+				CoronaLog( "Failed to create initial descriptor texture pool!" );
+			}
+
+			if (!list.fPools.empty())
+			{
+				VkDescriptorSetAllocateInfo allocInfo = {};
+				VkDescriptorSetLayout layout = fRenderer.GetTextureLayout();
+
+				allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+				allocInfo.descriptorSetCount = 1U;
+				allocInfo.pSetLayouts = &layout;
+				
+				VkResult result = VK_ERROR_UNKNOWN;
+				bool doRetry = false;
+
+				do {
+					allocInfo.descriptorPool = list.fPools.back();
+					result = vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &fTextures );
+
+					if (VK_ERROR_OUT_OF_POOL_MEMORY == result)
+					{
+						Rtt_ASSERT( !doRetry ); // this should never happen
+
+						doRetry = PrepareTexturesPool( state );
+					}
+				} while (doRetry);
+
+				if (result != VK_SUCCESS)
+				{
+					CoronaLog( "Failed to allocate texture descriptor set!" );
+				}
+			}
+		}
+
+		if (isNew && fTextures != VK_NULL_HANDLE)
+		{
+			list.fDirty = true;
+
+			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptorWrite.dstArrayElement = unit;
+			descriptorWrite.dstSet = fTextures;
+		
+			fTextureState[unit] = imageInfo;
+
+			vkUpdateDescriptorSets( state->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
+		}
+	}
+
+	else // TODO: do one bind at start of frame, update here?
+	{
+		VkWriteDescriptorSet write2 = descriptorWrite;
+
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+		write2.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+//		write2.dstArrayElement = unit + offset;
+		write2.dstBinding = 1U;
+//		write2.dstSet = set;
+		// TODO: does these both use imageInfo?
+
+		VkWriteDescriptorSet writes[] = { descriptorWrite, write2 };
+
+		vkUpdateDescriptorSets( state->GetDevice(), 2U, writes, 0U, NULL );
+	}
+*/
     return binding;
 }
 
