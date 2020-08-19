@@ -721,7 +721,7 @@ VulkanRenderer::ResolvePipeline()
         pipelineCreateInfo.stageCount = fPipelineCreateInfo.fShaderStages.size();
 
 		const VkAllocationCallbacks * allocator = fState->GetAllocator();
-
+// TODO: can we use another queue to actually build this while still recording commands?
         if (VK_SUCCESS == vkCreateGraphicsPipelines( fState->GetDevice(), fState->GetPipelineCache(), 1U, &pipelineCreateInfo, allocator, &pipeline ))
 		{
 			if (VK_NULL_HANDLE == fFirstPipeline)

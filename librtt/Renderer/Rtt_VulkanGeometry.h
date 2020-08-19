@@ -21,6 +21,7 @@ namespace Rtt
 {
 
 class VulkanBufferData;
+class VulkanRenderer;
 class VulkanState;
 
 // ----------------------------------------------------------------------------
@@ -52,7 +53,7 @@ class VulkanGeometry : public GPUResource
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 
-		Binding Bind();
+		void Bind( VulkanRenderer & renderer, VkCommandBuffer commandBuffer );
 
 	private:
 		VulkanBufferData * CreateBufferOnGPU( VkDeviceSize bufferSize, VkBufferUsageFlags usage );

@@ -32,6 +32,7 @@ struct shaderc_compile_options;
 namespace Rtt
 {
 
+class VulkanRenderer;
 class VulkanState;
 
 // ----------------------------------------------------------------------------
@@ -45,18 +46,11 @@ class VulkanProgram : public GPUResource
 	public:
 		VulkanProgram( VulkanState * state );
 
-		struct Binding {
-			std::vector< VkVertexInputAttributeDescription > fDescriptions;
-			std::vector< VkPipelineShaderStageCreateInfo > fStages;
-			U32 fInputAttributesID;
-			U32 fShadersID;
-		};
-
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 		
-		Binding Bind( Program::Version version );
+		void Bind( VulkanRenderer & renderer, Program::Version version );
 
 		struct Location {
 			Location( size_t offset = 0U, size_t range = 0U )

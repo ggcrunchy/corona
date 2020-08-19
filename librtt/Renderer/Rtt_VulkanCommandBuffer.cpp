@@ -297,12 +297,6 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 	{
 		WRITE_COMMAND( kCommandUnBindFrameBufferObject );
 	}
-/*
-***** SubmitFBO( vulkanFBO )
-glBindFramebuffer( GL_FRAMEBUFFER, fDefaultFBO );
-DEBUG_PRINT( "Unbind FrameBufferObject: OpenGL name: %i (fDefaultFBO)", fDefaultFBO );
-CHECK_ERROR_AND_BREAK;
-*/
 }
 
 void 
@@ -310,21 +304,6 @@ VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 {
 	WRITE_COMMAND( kCommandBindGeometry );
 	Write<GPUResource*>( geometry->GetGPUResource() );
-/*
-	VulkanGeometry * vulkanGeometry = static_cast< VulkanGeometry * >( geometry->GetGPUResource() );
-	VulkanGeometry::Binding binding = vulkanGeometry->Bind();
-
-	fRenderer.SetBindingDescriptions( binding.fInputBindingID, binding.fDescriptions );
-
-	VkDeviceSize offset = 0U;
-
-	vkCmdBindVertexBuffers( fCommandBuffer, 0U, 1U, &binding.fVertexBuffer, &offset );
-
-	if (binding.fIndexBuffer != VK_NULL_HANDLE)
-	{
-		vkCmdBindIndexBuffer( fCommandBuffer, binding.fIndexBuffer, 0U, binding.fIndexType );
-	}
-*/
 }
 
 void 
@@ -333,99 +312,6 @@ VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 	WRITE_COMMAND( kCommandBindTexture );
 	Write<U32>( unit );
 	Write<GPUResource*>( texture->GetGPUResource() );
-/*
-	VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() );
-	VulkanTexture::Binding binding = vulkanTexture->Bind();
-	VkDescriptorImageInfo imageInfo;
-
-	imageInfo.imageView = binding.view;
-	imageInfo.sampler = binding.sampler;
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	VkWriteDescriptorSet descriptorWrite = {};
-
-	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.descriptorCount = 1U;
-	descriptorWrite.pImageInfo = &imageInfo;
-
-	VulkanState * state = fRenderer.GetState();
-	DescriptorLists & list = fLists[DescriptorLists::eTexture];
-
-	if (!state->GetFeatures().shaderSampledImageArrayDynamicIndexing) // TODO: no indexing... this will presumably occur before binding
-	{
-		bool isNew = memcmp( &imageInfo, &fTextureState[unit], sizeof( VkDescriptorImageInfo ) ) != 0;
-		bool becameDirty = isNew && !list.fDirty;
-
-		if (becameDirty)
-		{
-			fTextures = VK_NULL_HANDLE;
-
-			if (list.fPools.empty() && !PrepareTexturesPool( state ))
-			{
-				CoronaLog( "Failed to create initial descriptor texture pool!" );
-			}
-
-			if (!list.fPools.empty())
-			{
-				VkDescriptorSetAllocateInfo allocInfo = {};
-				VkDescriptorSetLayout layout = fRenderer.GetTextureLayout();
-
-				allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-				allocInfo.descriptorSetCount = 1U;
-				allocInfo.pSetLayouts = &layout;
-				
-				VkResult result = VK_ERROR_UNKNOWN;
-				bool doRetry = false;
-
-				do {
-					allocInfo.descriptorPool = list.fPools.back();
-					result = vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &fTextures );
-
-					if (VK_ERROR_OUT_OF_POOL_MEMORY == result)
-					{
-						Rtt_ASSERT( !doRetry ); // this should never happen
-
-						doRetry = PrepareTexturesPool( state );
-					}
-				} while (doRetry);
-
-				if (result != VK_SUCCESS)
-				{
-					CoronaLog( "Failed to allocate texture descriptor set!" );
-				}
-			}
-		}
-
-		if (isNew && fTextures != VK_NULL_HANDLE)
-		{
-			list.fDirty = true;
-
-			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			descriptorWrite.dstArrayElement = unit;
-			descriptorWrite.dstSet = fTextures;
-		
-			fTextureState[unit] = imageInfo;
-
-			vkUpdateDescriptorSets( state->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
-		}
-	}
-
-	else // TODO: do one bind at start of frame, update here?
-	{
-		VkWriteDescriptorSet write2 = descriptorWrite;
-
-		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-		write2.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-//		write2.dstArrayElement = unit + offset;
-		write2.dstBinding = 1U;
-//		write2.dstSet = set;
-		// TODO: does these both use imageInfo?
-
-		VkWriteDescriptorSet writes[] = { descriptorWrite, write2 };
-
-		vkUpdateDescriptorSets( state->GetDevice(), 2U, writes, 0U, NULL );
-	}
-	*/
 }
 
 void 
@@ -439,18 +325,6 @@ VulkanCommandBuffer::BindProgram( Program* program, Program::Version version )
 	fProgram = program;
 
 	fTimeTransform = program->GetShaderResource()->GetTimeTransform();
-/*
-	VulkanProgram * vulkanProgram = static_cast< VulkanProgram * >( program->GetGPUResource() );
-	VulkanProgram::Binding binding = vulkanProgram->Bind( version );
-
-	fRenderer.SetAttributeDescriptions( binding.fInputAttributesID, binding.fDescriptions );
-	fRenderer.SetShaderStages( binding.fShadersID, binding.fStages );
-
-	fProgram = program;
-	fCurrentPrepVersion = version;
-
-	fTimeTransform = program->GetShaderResource()->GetTimeTransform();
-*/
 }
 
 void
@@ -467,7 +341,6 @@ void
 VulkanCommandBuffer::SetBlendEnabled( bool enabled )
 {
 	WRITE_COMMAND( enabled ? kCommandEnableBlend : kCommandDisableBlend );
-//	fRenderer.EnableBlend( enabled );
 }
 
 static VkBlendFactor
@@ -521,49 +394,25 @@ VulkanFactorForBlendParam( BlendMode::Param param )
 void
 VulkanCommandBuffer::SetBlendFunction( const BlendMode& mode )
 {
-/*	WRITE_COMMAND( kCommandSetBlendFunction );
+	WRITE_COMMAND( kCommandSetBlendFunction );
 
-	GLenum srcColor = GLenumForBlendParam( mode.fSrcColor );
-	GLenum dstColor = GLenumForBlendParam( mode.fDstColor );
-
-	GLenum srcAlpha = GLenumForBlendParam( mode.fSrcAlpha );
-	GLenum dstAlpha = GLenumForBlendParam( mode.fDstAlpha );
-
-	Write<GLenum>( srcColor );
-	Write<GLenum>( dstColor );
-	Write<GLenum>( srcAlpha );
-	Write<GLenum>( dstAlpha );
-*/
 	VkBlendFactor srcColor = VulkanFactorForBlendParam( mode.fSrcColor );
 	VkBlendFactor dstColor = VulkanFactorForBlendParam( mode.fDstColor );
 
 	VkBlendFactor srcAlpha = VulkanFactorForBlendParam( mode.fSrcAlpha );
 	VkBlendFactor dstAlpha = VulkanFactorForBlendParam( mode.fDstAlpha );
 
-	fRenderer.SetBlendFactors( srcColor, srcAlpha, dstColor, dstAlpha );
+	Write<VkBlendFactor>( srcColor );
+	Write<VkBlendFactor>( dstColor );
+	Write<VkBlendFactor>( srcAlpha );
+	Write<VkBlendFactor>( dstAlpha );
 }
 
 void 
 VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 {
-/*	WRITE_COMMAND( kCommandSetBlendEquation );
+	WRITE_COMMAND( kCommandSetBlendEquation );
 
-	GLenum equation = GL_FUNC_ADD;
-
-	switch( mode )
-	{
-		case RenderTypes::kSubtractEquation:
-			equation = GL_FUNC_SUBTRACT;
-			break;
-		case RenderTypes::kReverseSubtractEquation:
-			equation = GL_FUNC_REVERSE_SUBTRACT;
-			break;
-		default:
-			break;
-	}
-
-	Write<GLenum>( equation );
-*/
 	VkBlendOp equation = VK_BLEND_OP_ADD;
 
 	switch( mode )
@@ -577,47 +426,31 @@ VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 		default:
 			break;
 	}
-
-	fRenderer.SetBlendEquations( equation, equation );
+	
+	Write<VkBlendOp>( equation );
 }
 
 void
 VulkanCommandBuffer::SetViewport( int x, int y, int width, int height )
 {
-/*
 	WRITE_COMMAND( kCommandSetViewport );
-	Write<GLint>(x);
-	Write<GLint>(y);
-	Write<GLsizei>(width);
-	Write<GLsizei>(height);
-*/
-	if (fCommandBuffer != VK_NULL_HANDLE)
-	{
-		VkViewport viewport;
-
-		viewport.x = float( x );
-		viewport.y = float( y );
-		viewport.width = float( width );
-		viewport.height = float( height );
-		viewport.minDepth = 0.f;
-		viewport.maxDepth = 1.f;
-
-		vkCmdSetViewport( fCommandBuffer, 0U, 1U, &viewport );
-	}
+	Write<int>(x);
+	Write<int>(y);
+	Write<int>(width);
+	Write<int>(height);
 }
 
 void 
 VulkanCommandBuffer::SetScissorEnabled( bool enabled )
 {
-//	WRITE_COMMAND( enabled ? kCommandEnableScissor : kCommandDisableScissor );
+	WRITE_COMMAND( enabled ? kCommandEnableScissor : kCommandDisableScissor );
 	// No-op: always want scissor, possibly fullscreen
 }
 
 void 
 VulkanCommandBuffer::SetScissorRegion( int x, int y, int width, int height )
 {
-	/*
-	WRITE_COMMAND( kCommandSetScissorRegion );
+	WRITE_COMMAND( kCommandSetScissorRegion );/*
 	Write<GLint>(x);
 	Write<GLint>(y);
 	Write<GLsizei>(width);
@@ -628,7 +461,7 @@ VulkanCommandBuffer::SetScissorRegion( int x, int y, int width, int height )
 void
 VulkanCommandBuffer::SetMultisampleEnabled( bool enabled )
 {
-//	WRITE_COMMAND( enabled ? kCommandEnableMultisample : kCommandDisableMultisample );
+	WRITE_COMMAND( enabled ? kCommandEnableMultisample : kCommandDisableMultisample );
 //	fMultisampleStateCreateInfo.rasterizationSamples
 /*
 			case kCommandEnableMultisample:
@@ -649,118 +482,49 @@ VulkanCommandBuffer::SetMultisampleEnabled( bool enabled )
 void 
 VulkanCommandBuffer::Clear( Real r, Real g, Real b, Real a )
 {
-	/*
 	WRITE_COMMAND( kCommandClear );
-	Write<GLfloat>(r);
-	Write<GLfloat>(g);
-	Write<GLfloat>(b);
-	Write<GLfloat>(a);*/
-	VkClearValue clearValue;
-
-	// TODO: allow this to accommodate float targets?
-
-	clearValue.color.uint32[0] = uint32_t( 255. * r );
-	clearValue.color.uint32[1] = uint32_t( 255. * g );
-	clearValue.color.uint32[2] = uint32_t( 255. * b );
-	clearValue.color.uint32[3] = uint32_t( 255. * a );
-
-	fRenderer.SetClearValue( 0U, clearValue );
+	Write<Real>(r);
+	Write<Real>(g);
+	Write<Real>(b);
+	Write<Real>(a);
 }
 
 void 
 VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 {
-	/*
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-	ApplyUniforms( fProgram->GetGPUResource() );
+//	ApplyUniforms( fProgram->GetGPUResource() );
 	
 	WRITE_COMMAND( kCommandDraw );
 	switch( type )
 	{
-		case Geometry::kTriangleStrip:	Write<GLenum>(GL_TRIANGLE_STRIP);	break;
-		case Geometry::kTriangleFan:	Write<GLenum>(GL_TRIANGLE_FAN);		break;
-		case Geometry::kTriangles:		Write<GLenum>(GL_TRIANGLES);		break;
-		case Geometry::kLines:			Write<GLenum>(GL_LINES);			break;
-		case Geometry::kLineLoop:		Write<GLenum>(GL_LINE_LOOP);		break;
+		case Geometry::kTriangleStrip:	Write<VkPrimitiveTopology>(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);	break;
+		case Geometry::kTriangleFan:	Write<VkPrimitiveTopology>(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN);		break;
+		case Geometry::kTriangles:		Write<VkPrimitiveTopology>(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);		break;
+		case Geometry::kLines:			Write<VkPrimitiveTopology>(VK_PRIMITIVE_TOPOLOGY_LINE_LIST);			break;
+		case Geometry::kLineLoop:		Write<VkPrimitiveTopology>(VK_PRIMITIVE_TOPOLOGY_LINE_STRIP);		break;
 		default: Rtt_ASSERT_NOT_REACHED(); break;
 	}
-	Write<GLint>(offset);
-	Write<GLsizei>(count);
-	*/
-	if (true) return;
-	if (fCommandBuffer != VK_NULL_HANDLE)
-	{
-		VkPrimitiveTopology topology;
-
-		switch( type )
-		{
-			case Geometry::kTriangleStrip:
-				topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-			
-				break;
-			case Geometry::kTriangleFan:
-				topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
-			
-				break;
-			case Geometry::kTriangles:
-				topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-			
-				break;
-			case Geometry::kLines:
-				topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-
-				break;
-			case Geometry::kLineLoop:
-				topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-			
-				break;
-			default: Rtt_ASSERT_NOT_REACHED(); break;
-		}
-
-		PrepareDraw( topology );
-
-		vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
-	}
+	Write<U32>(offset);
+	Write<U32>(count);
 }
 
 void 
 VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 {
-	/*	// The first argument, offset, is currently unused. If support for non-
+	// The first argument, offset, is currently unused. If support for non-
 	// VBO based indexed rendering is added later, an offset may be needed.
 
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-	ApplyUniforms( fProgram->GetGPUResource() );
+//	ApplyUniforms( fProgram->GetGPUResource() );
 	
 	WRITE_COMMAND( kCommandDrawIndexed );
 	switch( type )
 	{
-		case Geometry::kIndexedTriangles:	Write<GLenum>(GL_TRIANGLES);	break;
+		case Geometry::kIndexedTriangles:	Write<VkPrimitiveTopology>(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);	break;
 		default: Rtt_ASSERT_NOT_REACHED(); break;
 	}
-	Write<GLsizei>(count);
-	*/
-if (true) return;
-	if (fCommandBuffer != VK_NULL_HANDLE)
-	{
-		VkPrimitiveTopology topology;
-
-		switch( type )
-		{
-			case Geometry::kIndexedTriangles:
-				topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-
-				break;
-			default: Rtt_ASSERT_NOT_REACHED(); break;
-		}
-
-		PrepareDraw( topology );
-
-		// The first argument, offset, is currently unused. If support for non-
-		// VBO based indexed rendering is added later, an offset may be needed.
-
-		vkCmdDrawIndexed( fCommandBuffer, count, 1U, 0U, 0U, 0U );
-	}
+	Write<U32>(count);
 }
 
 S32
@@ -832,20 +596,28 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				DEBUG_PRINT( "Bind FrameBufferObject: OpenGL name: %i, OpenGL Texture name, if any: %d",
 								fbo->GetName(),
 								fbo->GetTextureName() );*/
+
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandUnBindFrameBufferObject:
 			{
 			//	glBindFramebuffer( GL_FRAMEBUFFER, fDefaultFBO );
-				DEBUG_PRINT( "Unbind FrameBufferObject: OpenGL name: %i (fDefaultFBO)", fDefaultFBO );
+				DEBUG_PRINT( "Unbind FrameBufferObject: Vulkan name: %p (fDefaultFBO)", fDefaultFBO );
 				CHECK_ERROR_AND_BREAK;
+/*
+***** SubmitFBO( vulkanFBO )
+glBindFramebuffer( GL_FRAMEBUFFER, fDefaultFBO );
+DEBUG_PRINT( "Unbind FrameBufferObject: OpenGL name: %i (fDefaultFBO)", fDefaultFBO );
+CHECK_ERROR_AND_BREAK;
+*/
 			}
 			case kCommandBindGeometry:
 			{
 				VulkanGeometry* geometry = Read<VulkanGeometry*>();
-//				geometry->Bind();
+				geometry->Bind( fRenderer, fCommandBuffer );
 				DEBUG_PRINT( "Bind Geometry %p", geometry );
 				CHECK_ERROR_AND_BREAK;
+
 			}
 			case kCommandBindTexture:
 			{
@@ -861,10 +633,10 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			}
 			case kCommandBindProgram:
 			{
-			//	fCurrentDrawVersion = Read<Program::Version>();
+				fCurrentDrawVersion = Read<Program::Version>();
 				VulkanProgram* program = Read<VulkanProgram*>();
-//				program->Bind( fCurrentDrawVersion );
-//				DEBUG_PRINT( "Bind Program: program=%p version=%i", program, fCurrentDrawVersion );
+				program->Bind( fRenderer, fCurrentDrawVersion );
+				DEBUG_PRINT( "Bind Program: program=%p version=%i", program, fCurrentDrawVersion );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformScalar:
@@ -953,61 +725,72 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			}
 			case kCommandEnableBlend:
 			{
-//				glEnable( GL_BLEND );
+				fRenderer.EnableBlend( true );
 				DEBUG_PRINT( "Enable blend" );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandDisableBlend:
 			{
-//				glDisable( GL_BLEND );
+				fRenderer.EnableBlend( false );
 				DEBUG_PRINT( "Disable blend" );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandSetBlendFunction:
-			{/*
-				GLenum srcColor = Read<GLenum>();
-				GLenum dstColor = Read<GLenum>();
+			{
+				VkBlendFactor srcColor = Read<VkBlendFactor>();
+				VkBlendFactor dstColor = Read<VkBlendFactor>();
 
-				GLenum srcAlpha = Read<GLenum>();
-				GLenum dstAlpha = Read<GLenum>();
+				VkBlendFactor srcAlpha = Read<VkBlendFactor>();
+				VkBlendFactor dstAlpha = Read<VkBlendFactor>();
 
-				glBlendFuncSeparate( srcColor, dstColor, srcAlpha, dstAlpha );
+				fRenderer.SetBlendFactors( srcColor, srcAlpha, dstColor, dstAlpha );
 				DEBUG_PRINT(
 					"Set blend function: srcColor=%i, dstColor=%i, srcAlpha=%i, dstAlpha=%i",
-					srcColor, dstColor, srcAlpha, dstAlpha );*/
+					srcColor, dstColor, srcAlpha, dstAlpha );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandSetBlendEquation:
-			{/*
-				GLenum mode = Read<GLenum>();
-				glBlendEquation( mode );
-				DEBUG_PRINT( "Set blend equation: mode=%i", mode );*/
+			{
+				VkBlendOp equation = Read<VkBlendOp>();
+				fRenderer.SetBlendEquations( equation, equation );
+				DEBUG_PRINT( "Set blend equation: equation=%i", equation );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandSetViewport:
-			{/*
-				GLint x = Read<GLint>();
-				GLint y = Read<GLint>();
-				GLsizei width = Read<GLsizei>();
-				GLsizei height = Read<GLsizei>();
-				glViewport( x, y, width, height );
-				DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );*/
+			{
+				int x = Read<int>();
+				int y = Read<int>();
+				int width = Read<int>();
+				int height = Read<int>();
+				
+				VkViewport viewport;
+
+				viewport.x = float( x );
+				viewport.y = float( y );
+				viewport.width = float( width );
+				viewport.height = float( height );
+				viewport.minDepth = 0.f;
+				viewport.maxDepth = 1.f;
+				vkCmdSetViewport( fCommandBuffer, 0U, 1U, &viewport );
+				DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandEnableScissor:
 			{
-//				glEnable( GL_SCISSOR_TEST );
+				// TODO?
 				DEBUG_PRINT( "Enable scissor test" );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandDisableScissor:
 			{
-//				glDisable( GL_SCISSOR_TEST );
+				// TODO?
 				DEBUG_PRINT( "Disable scissor test" );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandSetScissorRegion:
-			{/*
+			{
+				// TODO?
+				/*
 				GLint x = Read<GLint>();
 				GLint y = Read<GLint>();
 				GLsizei width = Read<GLsizei>();
@@ -1018,42 +801,62 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			}
 			case kCommandEnableMultisample:
 			{
+				// TODO
 //				Rtt_glEnableMultisample();
 				DEBUG_PRINT( "Enable multisample test" );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandDisableMultisample:
 			{
+				// TODO
 //				Rtt_glDisableMultisample();
 				DEBUG_PRINT( "Disable multisample test" );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandClear:
-			{/*
-				GLfloat r = Read<GLfloat>();
-				GLfloat g = Read<GLfloat>();
-				GLfloat b = Read<GLfloat>();
-				GLfloat a = Read<GLfloat>();
-				glClearColor( r, g, b, a );
-				glClear( GL_COLOR_BUFFER_BIT );
-				DEBUG_PRINT( "Clear: r=%f, g=%f, b=%f, a=%f", r, g, b, a );*/
+			{
+				Real r = Read<Real>();
+				Real g = Read<Real>();
+				Real b = Read<Real>();
+				Real a = Read<Real>();
+
+				VkClearValue clearValue;
+
+				// TODO: allow this to accommodate float targets?
+
+				clearValue.color.uint32[0] = uint32_t( 255. * r );
+				clearValue.color.uint32[1] = uint32_t( 255. * g );
+				clearValue.color.uint32[2] = uint32_t( 255. * b );
+				clearValue.color.uint32[3] = uint32_t( 255. * a );
+
+				fRenderer.SetClearValue( 0U, clearValue ); // TODO: or assign to FBO...
+				DEBUG_PRINT( "Clear: r=%f, g=%f, b=%f, a=%f", r, g, b, a );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandDraw:
-			{/*
-				GLenum mode = Read<GLenum>();
-				GLint offset = Read<GLint>();
-				GLsizei count = Read<GLsizei>();
-				glDrawArrays( mode, offset, count );
-				DEBUG_PRINT( "Draw: mode=%i, offset=%i, count=%i", mode, offset, count );*/
+			{
+				VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
+				U32 offset = Read<U32>();
+				U32 count = Read<U32>();
+
+				PrepareDraw( mode );
+				vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
+
+				DEBUG_PRINT( "Draw: mode=%i, offset=%u, count=%u", mode, offset, count );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandDrawIndexed:
-			{/*
-				GLenum mode = Read<GLenum>();
-				GLsizei count = Read<GLsizei>();
-				glDrawElements( mode, count, GL_UNSIGNED_SHORT, NULL );
-				DEBUG_PRINT( "Draw indexed: mode=%i, count=%i", mode, count );*/
+			{
+				VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
+				U32 count = Read<U32>();
+
+				PrepareDraw( mode );
+
+				// The first argument, offset, is currently unused. If support for non-
+				// VBO based indexed rendering is added later, an offset may be needed.
+
+				vkCmdDrawIndexed( fCommandBuffer, count, 1U, 0U, 0U, 0U );
+				DEBUG_PRINT( "Draw indexed: mode=%i, count=%u", mode, count );
 				CHECK_ERROR_AND_BREAK;
 			}
 			default:

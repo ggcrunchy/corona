@@ -7,6 +7,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include "Renderer/Rtt_VulkanRenderer.h"
 #include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanProgram.h"
 
@@ -140,8 +141,8 @@ VulkanProgram::Destroy()
 	}
 }
 
-VulkanProgram::Binding
-VulkanProgram::Bind( Program::Version version )
+void
+VulkanProgram::Bind( VulkanRenderer & renderer, Program::Version version )
 {
 	VersionData& data = fData[version];
 	
@@ -152,7 +153,7 @@ VulkanProgram::Bind( Program::Version version )
 		}
 	#endif
 
-	Binding binding;
+	std::vector< VkVertexInputAttributeDescription > inputAttributeDescriptions;
 
 	VkVertexInputAttributeDescription description = {};
 
@@ -160,24 +161,30 @@ VulkanProgram::Bind( Program::Version version )
 	description.format = VK_FORMAT_R32G32B32_SFLOAT;
 	description.offset = offsetof( Geometry::Vertex, x );
 
-	binding.fDescriptions.push_back( description );
+	inputAttributeDescriptions.push_back( description );
 
 	description.location = Geometry::kVertexTexCoordAttribute;
 	description.offset = offsetof( Geometry::Vertex, u );
 
-	binding.fDescriptions.push_back( description );
+	inputAttributeDescriptions.push_back( description );
 
 	description.location = Geometry::kVertexColorScaleAttribute;
 	description.format = VK_FORMAT_R8G8B8A8_UNORM;
 	description.offset = offsetof( Geometry::Vertex, rs );
 
-	binding.fDescriptions.push_back( description );
+	inputAttributeDescriptions.push_back( description );
 
 	description.location = Geometry::kVertexUserDataAttribute;
 	description.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	description.offset = offsetof( Geometry::Vertex, ux );
 
-	binding.fDescriptions.push_back( description );
+	inputAttributeDescriptions.push_back( description );
+	
+	U32 inputAttributesID = 0U; // TODO: for future use
+
+	renderer.SetAttributeDescriptions( inputAttributesID, inputAttributeDescriptions );
+
+	std::vector< VkPipelineShaderStageCreateInfo > stages;
 
 	VkPipelineShaderStageCreateInfo shaderStageInfo = {};
 
@@ -187,17 +194,14 @@ VulkanProgram::Bind( Program::Version version )
 	shaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
 	shaderStageInfo.module = data.fVertexShader;
 
-	binding.fStages.push_back( shaderStageInfo );
+	stages.push_back( shaderStageInfo );
 
 	shaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	shaderStageInfo.module = data.fFragmentShader;
 
-	binding.fStages.push_back( shaderStageInfo );
+	stages.push_back( shaderStageInfo );
 
-	binding.fInputAttributesID = 0U; // TODO: for future use
-	binding.fShadersID = data.fShadersID;
-
-	return binding;
+	renderer.SetShaderStages( data.fShadersID, stages );
 }
 
 U32 VulkanProgram::sID;
