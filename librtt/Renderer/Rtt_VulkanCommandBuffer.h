@@ -28,7 +28,22 @@ class VulkanRenderer;
 class VulkanState;
 struct DescriptorLists;
 struct TimeTransform;
-struct VulkanPushConstants;
+
+// cf. shell_default_vulkan:
+
+struct VulkanUBO {
+	alignas(16) float fData[6 * 4];
+};
+
+struct VulkanUserDataUBO {
+	alignas(16) float UserData[4][16];
+};
+
+struct VulkanPushConstants {
+	enum { kVectorCount = 5 };
+
+	alignas(16) float fData[kVectorCount * 4];
+};
 
 // 
 class VulkanCommandBuffer : public CommandBuffer
@@ -88,6 +103,9 @@ class VulkanCommandBuffer : public CommandBuffer
 	public:
 		void AddGraphicsPipeline( VkPipeline pipeline );
 
+	public:
+		VkDescriptorSet AddTexture( U32 unit, const VkDescriptorImageInfo & imageInfo );
+
 	private:
 		virtual void InitializeFBO();
 		virtual void InitializeCachedParams();
@@ -105,11 +123,27 @@ class VulkanCommandBuffer : public CommandBuffer
 		void Write(T);
 
 		struct DrawState {
-			DrawState();
-
 			std::vector< VkMappedMemoryRange > ranges;
-			S32 lowerPushConstantOffset;
-			S32 upperPushConstantOffset;
+		};
+
+		struct PushConstantState : public VulkanPushConstants {
+			PushConstantState()
+			{
+				Reset();
+			}
+
+			void Reset();
+			void ClaimOffsets( U32 offset1, U32 offset2 );
+
+			static U32 VectorOffset( U32 offset );
+
+			float * GetData( U32 offset );
+			bool IsValid() const { return lowerOffset < kVectorCount * 4; }
+			U32 Offset() const { return lowerOffset; }
+			U32 Range() const { return IsValid() ? upperOffset - lowerOffset + 4U : 0U; }
+
+			U32 lowerOffset;
+			U32 upperOffset;
 		};
 
 		struct UniformUpdate
@@ -118,8 +152,9 @@ class VulkanCommandBuffer : public CommandBuffer
 			U32 timestamp;
 		};
 		
-		DrawState ApplyUniforms( GPUResource* resource, VulkanPushConstants & pushConstants );
-		void ApplyUniform( VulkanProgram & vulkanProgram, U32 index, DrawState & drawState, VulkanPushConstants & pushConstants );
+		DrawState ApplyUniforms( GPUResource* resource );
+		void ApplyPushConstant( Uniform * uniform, size_t offset, size_t translationOffset );
+		void ApplyUniform( VulkanProgram & vulkanProgram, U32 index, DrawState & drawState );
 
 		UniformUpdate fUniformUpdates[Uniform::kNumBuiltInVariables];
 
@@ -149,6 +184,8 @@ class VulkanCommandBuffer : public CommandBuffer
 		dynamic uniform buffers - as a list?
 
 */
+		PushConstantState fPushConstants;
+
 		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;
 		uint32_t fImageIndex;

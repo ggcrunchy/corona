@@ -20,7 +20,9 @@ namespace Rtt
 {
 
 class VulkanBufferData;
+class VulkanCommandBuffer;
 class VulkanState;
+struct DescriptorLists;
 
 // ----------------------------------------------------------------------------
 
@@ -34,16 +36,11 @@ class VulkanTexture : public GPUResource
 		VulkanTexture( VulkanState * state );
 
 	public:
-		struct Binding {
-			VkImageView view;
-			VkSampler sampler;
-		};
-
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 
-		Binding Bind();
+		void Bind( VulkanCommandBuffer & commandBuffer, U32 unit );
 
 	public:
 		void CopyBufferToImage( VkBuffer buffer, VkImage image, uint32_t width, uint32_t height );
