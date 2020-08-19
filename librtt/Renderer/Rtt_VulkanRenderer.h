@@ -79,20 +79,6 @@ struct DescriptorLists {
 	bool fResetPools;
 };
 
-// cf. shell_default_vulkan:
-
-struct VulkanUBO {
-	alignas(16) float fData[6 * 4];
-};
-
-struct VulkanUserDataUBO {
-	alignas(16) float UserData[4][16];
-};
-
-struct VulkanPushConstants {
-	alignas(16) float fData[5 * 4];
-};
-
 class VulkanRenderer : public Renderer
 {
 	public:

@@ -9,6 +9,7 @@
 
 #include "Core/Rtt_Config.h"
 
+#include "Renderer/Rtt_VulkanCommandBuffer.h"
 #include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanTexture.h"
 #include "Renderer/Rtt_Texture.h"
@@ -248,20 +249,13 @@ VulkanTexture::Destroy()
     vkFreeMemory( device, fData.fMemory, allocator );
 }
 
-VulkanTexture::Binding 
-VulkanTexture::Bind()
+void
+VulkanTexture::Bind( VulkanCommandBuffer & commandBuffer, U32 unit )
 {
-    Binding binding;
-
-    binding.sampler = fSampler;
-    binding.view = fImageView;
-/*
-	VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() );
-	VulkanTexture::Binding binding = vulkanTexture->Bind();
 	VkDescriptorImageInfo imageInfo;
 
-	imageInfo.imageView = binding.view;
-	imageInfo.sampler = binding.sampler;
+	imageInfo.imageView = fImageView;
+	imageInfo.sampler = fSampler;
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	VkWriteDescriptorSet descriptorWrite = {};
@@ -270,65 +264,17 @@ VulkanTexture::Bind()
 	descriptorWrite.descriptorCount = 1U;
 	descriptorWrite.pImageInfo = &imageInfo;
 
-	VulkanState * state = fRenderer.GetState();
-	DescriptorLists & list = fLists[DescriptorLists::eTexture];
-
-	if (!state->GetFeatures().shaderSampledImageArrayDynamicIndexing) // TODO: no indexing... this will presumably occur before binding
+	if (!fState->GetFeatures().shaderSampledImageArrayDynamicIndexing) // TODO: no indexing... this will presumably occur before binding
 	{
-		bool isNew = memcmp( &imageInfo, &fTextureState[unit], sizeof( VkDescriptorImageInfo ) ) != 0;
-		bool becameDirty = isNew && !list.fDirty;
+		VkDescriptorSet set = commandBuffer.AddTexture( unit, imageInfo );
 
-		if (becameDirty)
+		if (set != VK_NULL_HANDLE)
 		{
-			fTextures = VK_NULL_HANDLE;
-
-			if (list.fPools.empty() && !PrepareTexturesPool( state ))
-			{
-				CoronaLog( "Failed to create initial descriptor texture pool!" );
-			}
-
-			if (!list.fPools.empty())
-			{
-				VkDescriptorSetAllocateInfo allocInfo = {};
-				VkDescriptorSetLayout layout = fRenderer.GetTextureLayout();
-
-				allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-				allocInfo.descriptorSetCount = 1U;
-				allocInfo.pSetLayouts = &layout;
-				
-				VkResult result = VK_ERROR_UNKNOWN;
-				bool doRetry = false;
-
-				do {
-					allocInfo.descriptorPool = list.fPools.back();
-					result = vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &fTextures );
-
-					if (VK_ERROR_OUT_OF_POOL_MEMORY == result)
-					{
-						Rtt_ASSERT( !doRetry ); // this should never happen
-
-						doRetry = PrepareTexturesPool( state );
-					}
-				} while (doRetry);
-
-				if (result != VK_SUCCESS)
-				{
-					CoronaLog( "Failed to allocate texture descriptor set!" );
-				}
-			}
-		}
-
-		if (isNew && fTextures != VK_NULL_HANDLE)
-		{
-			list.fDirty = true;
-
 			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorWrite.dstArrayElement = unit;
-			descriptorWrite.dstSet = fTextures;
-		
-			fTextureState[unit] = imageInfo;
+			descriptorWrite.dstSet = set;
 
-			vkUpdateDescriptorSets( state->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
+			vkUpdateDescriptorSets( fState->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
 		}
 	}
 
@@ -345,10 +291,8 @@ VulkanTexture::Bind()
 
 		VkWriteDescriptorSet writes[] = { descriptorWrite, write2 };
 
-		vkUpdateDescriptorSets( state->GetDevice(), 2U, writes, 0U, NULL );
+		vkUpdateDescriptorSets( fState->GetDevice(), 2U, writes, 0U, NULL );
 	}
-*/
-    return binding;
 }
 
 void
