@@ -61,17 +61,14 @@ class VulkanFrameBufferObject : public GPUResource
 		VulkanFrameBufferObject( VulkanState * state, uint32_t imageCount, VkImage * swapchainImages = NULL );
 
 	public:
-		struct Binding {
-			VkFramebuffer fFramebuffer;
-			RenderPassData fRenderPassData;
-			std::vector< VkClearValue > fClearValues;
-		};
-
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 
-		Binding Bind( uint32_t index );
+		void Bind( uint32_t index, VkRenderPassBeginInfo & passBeginInfo, U32 & id );
+
+	public:
+		std::vector< VkClearValue > & GetClearValues() { return fClearValues; }
 
 	private:
 		struct FramebufferData {
@@ -89,6 +86,7 @@ class VulkanFrameBufferObject : public GPUResource
 	private:
 		VulkanState * fState;
 		VkImage fImage;
+		VkExtent2D fExtent;
 		const RenderPassData * fRenderPassData;
 		std::vector< FramebufferData > fFramebufferData;
 		std::vector< VkClearValue > fClearValues;

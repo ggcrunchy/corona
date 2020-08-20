@@ -272,7 +272,6 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 		uint32_t index = vulkanCommandBuffer->GetImageIndex();
 
 		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], fDescriptorLists.data() + 3U * index );
-		vulkanCommandBuffer->SubmitFBO( fFBO );
 	}
 
 	else
@@ -593,35 +592,6 @@ VulkanRenderer::SetShaderStages( U32 id, const std::vector< VkPipelineShaderStag
 	fPipelineCreateInfo.fShaderStages = stages;
 
 	GetPackedPipeline( fWorkingKey.fContents ).fShaderID = id;
-}
-
-void
-VulkanRenderer::SetClearValue( U32 index, const VkClearValue & clearValue )
-{
-	FrameBufferObject * fbo = GetFrameBufferObject();
-
-	if (fbo)
-	{
-		VulkanFrameBufferObject * vulkanFBO = static_cast< VulkanFrameBufferObject * >( fbo->GetGPUResource() );
-/*
-		if (!vulkanFBO->GetCommitted())
-		{
-			std::vector< VkClearValue > & clearValues = vulkanFBO->GetClearValues();
-
-			if (index >= clearValues.size())
-			{
-				clearValues.resize( index + 1U, VkClearValue{} );
-			}
-
-			clearValues[index] = clearValue;
-		}
-
-		else // TODO: already bound, issue command instead...
-		{
-//			vkCmdClearColorImage, etc.
-		}
-*/
-	}
 }
 
 GPUResource* 

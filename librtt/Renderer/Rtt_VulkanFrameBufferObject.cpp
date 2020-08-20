@@ -208,6 +208,8 @@ VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanState * state, uint32_t 
 			fFramebufferData[i].fViews.push_back( VulkanTexture::CreateImageView( fState, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U ) );
 		}
 
+		fExtent = details.fExtent;
+
 		RenderPassBuilder builder;
 
 		builder.AddColorAttachment( format );
@@ -236,6 +238,9 @@ VulkanFrameBufferObject::Create( CPUResource* resource )
 	{
 		fbData.fViews.push_back( view );
 	}
+
+	fExtent.width = texture->GetWidth();
+	fExtent.height = texture->GetHeight();
 
 	RenderPassBuilder builder; // TODO!
 
@@ -319,16 +324,13 @@ VulkanFrameBufferObject::Destroy()
 */
 }
 
-VulkanFrameBufferObject::Binding 
-VulkanFrameBufferObject::Bind( uint32_t index )
+void
+VulkanFrameBufferObject::Bind( uint32_t index, VkRenderPassBeginInfo & passBeginInfo, U32 & id )
 {
-	Binding binding;
-
-	binding.fFramebuffer = fFramebufferData[index].fFramebuffer;
-	binding.fRenderPassData = *fRenderPassData;
-	binding.fClearValues = fClearValues;
-
-	return binding;
+	passBeginInfo.framebuffer = fFramebufferData[index].fFramebuffer;
+	passBeginInfo.renderArea.extent = fExtent;
+	passBeginInfo.renderPass = fRenderPassData->fPass;
+	id = fRenderPassData->fID;
 }
 
 void

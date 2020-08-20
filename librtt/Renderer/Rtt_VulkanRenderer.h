@@ -116,9 +116,6 @@ class VulkanRenderer : public Renderer
 		void SetRenderPass( U32 id, VkRenderPass renderPass );
 		void SetShaderStages( U32 id, const std::vector< VkPipelineShaderStageCreateInfo > & stages );
 
-	public:
-		void SetClearValue( U32 index, const VkClearValue & clearValue );
-
 	protected:
 		// Create an OpenGL resource appropriate for the given CPUResource.
 		virtual GPUResource* Create( const CPUResource* resource );

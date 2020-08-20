@@ -18,6 +18,7 @@
 #include "Renderer/Rtt_VulkanRenderer.h"
 #include "Display/Rtt_ShaderResource.h"
 
+#include <cinttypes> // https://stackoverflow.com/questions/8132399/how-to-printf-uint64-t-fails-with-spurious-trailing-in-format#comment9979590_8132440
 #include <limits>
 
 #include "CoronaLog.h"
@@ -130,10 +131,10 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fRenderFinishedSemaphore( VK_NULL_HANDLE ),
 	fInFlight( VK_NULL_HANDLE ),
 	fLists( NULL ),
+	fPushConstants( NULL ),
 	fCommandBuffer( VK_NULL_HANDLE ),
 	fTextures( VK_NULL_HANDLE ),
-	fSwapchain( VK_NULL_HANDLE ),
-	fCommitted( false )
+	fSwapchain( VK_NULL_HANDLE )
 {
 	for(U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
 	{
@@ -160,6 +161,8 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fImageAvailableSemaphore );
 	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fRenderFinishedSemaphore );
 
+	fPushConstants = Rtt_NEW( NULL, PushConstantState() );
+
 	if ( VK_NULL_HANDLE == fInFlight || VK_NULL_HANDLE == fImageAvailableSemaphore || VK_NULL_HANDLE == fRenderFinishedSemaphore)
 	{
 		CoronaLog( "Failed to create some synchronziation objects!" );
@@ -171,6 +174,10 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 		fImageAvailableSemaphore = VK_NULL_HANDLE;
 		fRenderFinishedSemaphore = VK_NULL_HANDLE;
 		fInFlight = VK_NULL_HANDLE;
+
+		Rtt_DELETE( fPushConstants );
+
+		fPushConstants = NULL;
 	}
 }
 
@@ -184,6 +191,7 @@ VulkanCommandBuffer::~VulkanCommandBuffer()
 	vkDestroySemaphore( device, fImageAvailableSemaphore, allocator );
 	vkDestroySemaphore( device, fRenderFinishedSemaphore, allocator );
 //	delete [] fTimerQueries;
+	Rtt_DELETE( fPushConstants );
 }
 
 void
@@ -479,7 +487,7 @@ void
 VulkanCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 {
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-//	ApplyUniforms( fProgram->GetGPUResource() );
+	ApplyUniforms( fProgram->GetGPUResource() );
 	
 	WRITE_COMMAND( kCommandDraw );
 	switch( type )
@@ -502,7 +510,7 @@ VulkanCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 	// VBO based indexed rendering is added later, an offset may be needed.
 
 	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-//	ApplyUniforms( fProgram->GetGPUResource() );
+	ApplyUniforms( fProgram->GetGPUResource() );
 	
 	WRITE_COMMAND( kCommandDrawIndexed );
 	switch( type )
@@ -564,6 +572,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	fOffset = fBuffer;
 
 	//GL_CHECK_ERROR();
+	VkRenderPassBeginInfo renderPassBeginInfo = {}, * pendingPass = NULL;
+
+	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+
+	// TODO: initialize FBO... (or come up with better way to do set up swapchain one...)
 
 	for( U32 i = 0; i < fNumCommands; ++i )
 	{
@@ -577,7 +590,14 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			case kCommandBindFrameBufferObject:
 			{
 				VulkanFrameBufferObject* fbo = Read<VulkanFrameBufferObject*>();
-//				fbo->Bind();
+
+				U32 id;
+
+				fFBO = fbo;
+				pendingPass = &renderPassBeginInfo;
+
+				fbo->Bind( fImageIndex, *pendingPass, id );
+				fRenderer.SetRenderPass( id, pendingPass->renderPass );
 /*
 				DEBUG_PRINT( "Bind FrameBufferObject: Vulkan ID: %i, Vulkan Texture ID, if any: %d",
 								fbo->GetName(),
@@ -606,12 +626,10 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				VulkanTexture* texture = Read<VulkanTexture*>();
 				texture->Bind( *this, unit );
 
-				DEBUG_PRINT( "Bind Texture: texture=%p unit=%i Vulkan ID=(%x%x)",
+				DEBUG_PRINT( "Bind Texture: texture=%p unit=%i Vulkan ID=%" PRIx64,
 								texture,
 								unit,
-								(texture->GetImage() >> 32) & 0xFFFFFFFF,
-								texture->GetImage() & 0xFFFFFFFF );
-				// ^^ ID is 64 bit...
+								texture->GetImage() );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandBindProgram:
@@ -625,8 +643,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			case kCommandApplyPushConstantScalar:
 			{
 				U32 offset = Read<U32>();
-				fPushConstants.ClaimOffsets(offset, offset);
-				*fPushConstants.GetData(offset) = Read<Real>();
+				fPushConstants->ClaimOffsets(offset, offset);
+				*fPushConstants->GetData(offset) = Read<Real>();
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyPushConstantMaskTransform:
@@ -635,9 +653,9 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				Vec4 maskMatrix = Read<Vec4>();
 				U32 translationOffset = Read<U32>();
 				Vec2 maskTranslation = Read<Vec2>();
-				fPushConstants.ClaimOffsets(maskOffset, translationOffset);
-				memcpy(fPushConstants.GetData(maskOffset), &maskMatrix, sizeof( Vec4 ));
-				memcpy(fPushConstants.GetData(translationOffset), &maskTranslation, sizeof( Vec2 ));
+				fPushConstants->ClaimOffsets(maskOffset, translationOffset);
+				memcpy(fPushConstants->GetData(maskOffset), &maskMatrix, sizeof( Vec4 ));
+				memcpy(fPushConstants->GetData(translationOffset), &maskTranslation, sizeof( Vec2 ));
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformScalar:
@@ -745,7 +763,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				viewport.height = float( height );
 				viewport.minDepth = 0.f;
 				viewport.maxDepth = 1.f;
-				vkCmdSetViewport( fCommandBuffer, 0U, 1U, &viewport );
+				vkCmdSetViewport( fCommandBuffer, 0U, 1U, &viewport ); // TODO: given usage, might just follow lead of kCommandClear...
 				DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );
 				CHECK_ERROR_AND_BREAK;
 			}
@@ -792,16 +810,25 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				Real b = Read<Real>();
 				Real a = Read<Real>();
 
-				VkClearValue clearValue;
+				VkClearValue value;
 
 				// TODO: allow this to accommodate float targets?
 
-				clearValue.color.uint32[0] = uint32_t( 255. * r );
-				clearValue.color.uint32[1] = uint32_t( 255. * g );
-				clearValue.color.uint32[2] = uint32_t( 255. * b );
-				clearValue.color.uint32[3] = uint32_t( 255. * a );
+				value.color.uint32[0] = uint32_t( 255. * r );
+				value.color.uint32[1] = uint32_t( 255. * g );
+				value.color.uint32[2] = uint32_t( 255. * b );
+				value.color.uint32[3] = uint32_t( 255. * a );
 
-				fRenderer.SetClearValue( 0U, clearValue ); // TODO: or assign to FBO...
+				std::vector< VkClearValue > & clearValues = fFBO->GetClearValues();
+				U32 index = 0U; // n.b. for future use
+
+				if (index >= clearValues.size())
+				{
+					clearValues.resize( index + 1U, VkClearValue{} );
+				}
+
+				clearValues[index] = value;
+
 				DEBUG_PRINT( "Clear: r=%f, g=%f, b=%f, a=%f", r, g, b, a );
 				CHECK_ERROR_AND_BREAK;
 			}
@@ -811,8 +838,10 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				U32 offset = Read<U32>();
 				U32 count = Read<U32>();
 
-				PrepareDraw( mode );
+				PrepareDraw( mode, pendingPass );
 				vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
+
+				pendingPass = NULL;
 
 				DEBUG_PRINT( "Draw: mode=%i, offset=%u, count=%u", mode, offset, count );
 				CHECK_ERROR_AND_BREAK;
@@ -822,12 +851,15 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
 				U32 count = Read<U32>();
 
-				PrepareDraw( mode );
+				PrepareDraw( mode, pendingPass );
 
 				// The first argument, offset, is currently unused. If support for non-
 				// VBO based indexed rendering is added later, an offset may be needed.
 
 				vkCmdDrawIndexed( fCommandBuffer, count, 1U, 0U, 0U, 0U );
+
+				pendingPass = NULL;
+
 				DEBUG_PRINT( "Draw indexed: mode=%i, count=%u", mode, count );
 				CHECK_ERROR_AND_BREAK;
 			}
@@ -854,13 +886,14 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	if (fCommandBuffer != VK_NULL_HANDLE && fSwapchain != VK_NULL_HANDLE)
 	{
-		if (fFBO && fCommitted)
+		if (fFBO)
 		{
+			Rtt_ASSERT( !pendingPass );
+
 			vkCmdEndRenderPass( fCommandBuffer );
 		}
 
 		fFBO = NULL;
-		fCommitted = false;
 
 		VkResult endResult = vkEndCommandBuffer( fCommandBuffer );
 
@@ -1001,10 +1034,9 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 	}
 }
 
-void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
+void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPassBeginInfo * renderPassBeginInfo )
 {
-if (true) return;
-	CommitFBO();
+	CommitFBO( renderPassBeginInfo );
 
 	fRenderer.SetPrimitiveTopology( topology );
 
@@ -1054,44 +1086,26 @@ if (true) return;
 		fLists[i].fDirty = false;
 	}
 
-	if (fPushConstants.IsValid())
+	if (fPushConstants->IsValid())
 	{
-		U32 offset = fPushConstants.Offset(), size = fPushConstants.Range() * sizeof( float );
+		U32 offset = fPushConstants->Offset(), size = fPushConstants->Range() * sizeof( float );
 
-		vkCmdPushConstants( fCommandBuffer, fRenderer.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, offset * sizeof( float ), size, fPushConstants.GetData( offset ) );
+		vkCmdPushConstants( fCommandBuffer, fRenderer.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, offset * sizeof( float ), size, fPushConstants->GetData( offset ) );
 
-		fPushConstants.Reset();
+		fPushConstants->Reset();
 	}
 }
 
-void VulkanCommandBuffer::SubmitFBO( VulkanFrameBufferObject * fbo )
+void VulkanCommandBuffer::CommitFBO( VkRenderPassBeginInfo * renderPassBeginInfo )
 {
-	fFBO = fbo;
-	fCommitted = false;
-}
-
-void VulkanCommandBuffer::CommitFBO()
-{
-if (true) return;
-	if (fFBO && !fCommitted)
+	if (fFBO && renderPassBeginInfo)
 	{
-		const VulkanState::SwapchainDetails & details = fRenderer.GetState()->GetSwapchainDetails();
-		VulkanFrameBufferObject::Binding binding = fFBO->Bind( fImageIndex );
+		const std::vector< VkClearValue > & clearValues = fFBO->GetClearValues();
 
-		fRenderer.SetRenderPass( binding.fRenderPassData.fID, binding.fRenderPassData.fPass );
+		renderPassBeginInfo->clearValueCount = clearValues.size();
+		renderPassBeginInfo->pClearValues = clearValues.data();
 
-		VkRenderPassBeginInfo renderPassInfo = {};
-
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.clearValueCount = binding.fClearValues.size();
-		renderPassInfo.framebuffer = binding.fFramebuffer;
-		renderPassInfo.pClearValues = binding.fClearValues.data();
-		renderPassInfo.renderArea.extent = details.fExtent;
-		renderPassInfo.renderPass = binding.fRenderPassData.fPass;
-
-		vkCmdBeginRenderPass( fCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE );
-
-		fCommitted = true;
+		vkCmdBeginRenderPass( fCommandBuffer, renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
 	}
 }
 
