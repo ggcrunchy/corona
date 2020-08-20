@@ -94,10 +94,9 @@ class VulkanCommandBuffer : public CommandBuffer
 		
 		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists );
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
-		void PrepareDraw( VkPrimitiveTopology topology );
+		void PrepareDraw( VkPrimitiveTopology topology, VkRenderPassBeginInfo * renderPassBeginInfo );
 
-		void SubmitFBO( VulkanFrameBufferObject * fbo );
-		void CommitFBO();
+		void CommitFBO( VkRenderPassBeginInfo * renderPassBeginInfo );
 
 	public:
 		void AddGraphicsPipeline( VkPipeline pipeline );
@@ -188,12 +187,11 @@ class VulkanCommandBuffer : public CommandBuffer
 
 */
 		std::vector< VkMappedMemoryRange > fMappedMemoryRanges;
-		PushConstantState fPushConstants;
+		PushConstantState * fPushConstants;
 
 		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;
 		uint32_t fImageIndex;
-		bool fCommitted;
 };
 
 // ----------------------------------------------------------------------------
