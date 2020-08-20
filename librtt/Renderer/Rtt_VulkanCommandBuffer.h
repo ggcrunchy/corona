@@ -62,8 +62,7 @@ class VulkanCommandBuffer : public CommandBuffer
 
 		virtual void ClearUserUniforms();
 
-		bool PrepareUBOPool( VulkanState * state );
-		bool PrepareUserDataUBOPool( VulkanState * state );
+		bool PreparePool( VulkanState * state, DescriptorLists & lists );
 		bool PrepareTexturesPool( VulkanState * state );
 
 		// Generate the appropriate buffered OpenGL commands to accomplish the
@@ -122,10 +121,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		template <typename T>
 		void Write(T);
 
-		struct DrawState {
-			std::vector< VkMappedMemoryRange > ranges;
-		};
-
 		struct PushConstantState : public VulkanPushConstants {
 			PushConstantState()
 			{
@@ -146,15 +141,23 @@ class VulkanCommandBuffer : public CommandBuffer
 			U32 upperOffset;
 		};
 
+		struct UniformsToWrite {
+			VkDeviceMemory memory;
+			U32 offset;
+			U8 * data;
+		};
+
 		struct UniformUpdate
 		{
 			Uniform* uniform;
 			U32 timestamp;
 		};
 		
-		DrawState ApplyUniforms( GPUResource* resource );
+		void ApplyUniforms( GPUResource* resource );
 		void ApplyPushConstant( Uniform * uniform, size_t offset, size_t translationOffset );
-		void ApplyUniform( VulkanProgram & vulkanProgram, U32 index, DrawState & drawState );
+		void ApplyUniform( VulkanProgram & vulkanProgram, U32 index );
+		void ReadUniform( const UniformsToWrite & utw, const void * value, size_t offset, size_t size );
+		UniformsToWrite PointToUniform( U32 index, size_t offset );
 
 		UniformUpdate fUniformUpdates[Uniform::kNumBuiltInVariables];
 
@@ -184,6 +187,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		dynamic uniform buffers - as a list?
 
 */
+		std::vector< VkMappedMemoryRange > fMappedMemoryRanges;
 		PushConstantState fPushConstants;
 
 		VkSwapchainKHR fSwapchain;
