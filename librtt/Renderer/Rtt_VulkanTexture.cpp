@@ -131,6 +131,11 @@ VulkanTexture::Create( CPUResource* resource )
 	Rtt_ASSERT( CPUResource::kTexture == resource->GetType() || CPUResource::kVideoTexture == resource->GetType() );
 	Texture* texture = static_cast< Texture* >( resource );
 
+    if (Texture::kNumFilters == texture->GetFilter()) // dummy swapchain texture?
+    {
+        return;
+    }
+
     VkComponentMapping mapping = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
     VkFormat format = getFormatTokens( texture->GetFormat(), mapping );
     

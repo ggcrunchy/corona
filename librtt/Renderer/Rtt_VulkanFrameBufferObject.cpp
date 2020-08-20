@@ -7,6 +7,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include "Renderer/Rtt_VulkanRenderer.h"
 #include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanFrameBufferObject.h"
 #include "Renderer/Rtt_VulkanTexture.h"
@@ -192,37 +193,33 @@ RenderPassBuilder::AddAttachment( VkAttachmentDescription & description, std::ve
 	fDescriptions.push_back( description );
 }
 
-VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanState * state, uint32_t imageCount, VkImage * swapchainImages )
-:	fState( state ),
-	fFramebufferData( imageCount ),
+TextureSwapchain::TextureSwapchain( Rtt_Allocator * allocator, VulkanState * state )
+:	Super( allocator ),
+	fState( state )
+{
+}
+
+TextureSwapchain::~TextureSwapchain()
+{
+}
+
+U32
+TextureSwapchain::GetWidth() const
+{
+	return fState->GetSwapchainDetails().fExtent.width;
+}
+
+U32
+TextureSwapchain::GetHeight() const
+{
+	return fState->GetSwapchainDetails().fExtent.height;
+}
+
+VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanRenderer & renderer )
+:	fRenderer( renderer ),
 	fImage( VK_NULL_HANDLE ),
 	fRenderPassData( NULL )
 {
-	if (swapchainImages)
-	{
-		const VulkanState::SwapchainDetails & details = fState->GetSwapchainDetails();
-		VkFormat format = details.fFormat.format;
-
-		for (uint32_t i = 0; i < imageCount; ++i)
-		{
-			fFramebufferData[i].fViews.push_back( VulkanTexture::CreateImageView( fState, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U ) );
-		}
-
-		fExtent = details.fExtent;
-
-		RenderPassBuilder builder;
-
-		builder.AddColorAttachment( format );
-
-		RenderPassBuilder::AttachmentOptions options;
-
-		options.isResolve = true;
-		options.samples = (VkSampleCountFlagBits)fState->GetSampleCountFlags();
-
-		builder.AddColorAttachment( format, options );
-
-		MakeFramebuffers( details.fExtent.width, details.fExtent.height, builder );
-	}
 }
 
 void 
@@ -230,21 +227,6 @@ VulkanFrameBufferObject::Create( CPUResource* resource )
 {
 	Rtt_ASSERT( CPUResource::kFrameBufferObject == resource->GetType() );
 
-	Texture * texture = static_cast< FrameBufferObject * >( resource )->GetTexture();
-	VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() ); // n.b. GLFrameBufferObject says this will already exist
-	VkImageView view = vulkanTexture->GetImageView();
-
-	for (auto & fbData : fFramebufferData)
-	{
-		fbData.fViews.push_back( view );
-	}
-
-	fExtent.width = texture->GetWidth();
-	fExtent.height = texture->GetHeight();
-
-	RenderPassBuilder builder; // TODO!
-
-	MakeFramebuffers( texture->GetWidth(), texture->GetHeight(), builder );
 	Update( resource );
 
 	/*
@@ -263,6 +245,87 @@ VulkanFrameBufferObject::Create( CPUResource* resource )
 void 
 VulkanFrameBufferObject::Update( CPUResource* resource )
 {
+	Rtt_ASSERT( CPUResource::kFrameBufferObject == resource->GetType() );
+	Texture * texture = static_cast< FrameBufferObject * >( resource )->GetTexture();
+
+	fExtent.width = texture->GetWidth();
+	fExtent.height = texture->GetHeight();
+
+	CleanUpImageData();
+
+	VulkanState * state = fRenderer.GetState();
+	const std::vector< VkImage > & swapchainImages = fRenderer.GetSwapchainImages();
+	
+	RenderPassBuilder builder;
+
+	if (Texture::kNumFilters == texture->GetFilter()) // swapchain
+	{
+		const VulkanState::SwapchainDetails & details = state->GetSwapchainDetails();
+		VkFormat format = details.fFormat.format;
+
+		for (size_t i = 0; i < swapchainImages.size(); ++i)
+		{
+			fImageData[i].fViews.push_back( VulkanTexture::CreateImageView( state, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U ) );
+		}
+
+		builder.AddColorAttachment( format );
+
+		RenderPassBuilder::AttachmentOptions options;
+
+		options.isResolve = true;
+		options.samples = (VkSampleCountFlagBits)state->GetSampleCountFlags();
+
+		builder.AddColorAttachment( format, options );
+	}
+
+	else
+	{
+		VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() ); // n.b. GLFrameBufferObject says this will already exist
+		VkImageView view = vulkanTexture->GetImageView();
+
+		for (size_t i = 0; i < swapchainImages.size(); ++i)
+		{
+			fImageData[i].fViews.push_back( view );
+		}
+
+		// TODO: settings...
+	}
+
+	RenderPassKey key;
+
+	builder.GetKey( key );
+
+	fRenderPassData = state->FindRenderPassData( key );
+
+	VkDevice device = state->GetDevice();
+	const VkAllocationCallbacks * allocator = state->GetAllocator();
+
+	if (!fRenderPassData)
+	{
+		VkRenderPass renderPass = builder.Build( device, allocator );
+
+		fRenderPassData = state->AddRenderPass( key, renderPass );
+	}
+
+	for (auto & imageData : fImageData)
+	{
+        VkFramebufferCreateInfo createFramebufferInfo = {};
+
+        createFramebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        createFramebufferInfo.renderPass = fRenderPassData->fPass;
+        createFramebufferInfo.attachmentCount = imageData.fViews.size();
+        createFramebufferInfo.height = fExtent.width;
+        createFramebufferInfo.layers = 1U;
+        createFramebufferInfo.pAttachments = imageData.fViews.data();
+        createFramebufferInfo.width = fExtent.height;
+
+        if (vkCreateFramebuffer( device, &createFramebufferInfo, allocator, &imageData.fFramebuffer ) != VK_SUCCESS)
+		{
+            CoronaLog( "Failed to create framebuffer!" );
+
+			// TODO?
+        }
+	}
 /*
 	// Query the bound FBO so that it can be restored. It may (or
 	// may not) be worth passing this value in to avoid the query.
@@ -312,64 +375,55 @@ VulkanFrameBufferObject::Destroy()
 	DEBUG_PRINT( "%s : OpenGL name: %d\n",
 					__FUNCTION__,
 					name );*/
-/*
-	for (PerImageData & data : fPerImageData)
-	{
-		vkDestroyImageView( device, data.view, allocator );
-        // TODO: frame buffer
 
-        data.image = VK_NULL_HANDLE;
-        data.view = VK_NULL_HANDLE;
-	}
-*/
+	CleanUpImageData();
+
+	VulkanState * state = fRenderer.GetState();
+
+	vkDestroyImage( state->GetDevice(), fImage, state->GetAllocator() );
+
+	fImage = VK_NULL_HANDLE;
 }
 
 void
 VulkanFrameBufferObject::Bind( uint32_t index, VkRenderPassBeginInfo & passBeginInfo, U32 & id )
 {
-	passBeginInfo.framebuffer = fFramebufferData[index].fFramebuffer;
+	passBeginInfo.framebuffer = fImageData[index].fFramebuffer;
 	passBeginInfo.renderArea.extent = fExtent;
 	passBeginInfo.renderPass = fRenderPassData->fPass;
 	id = fRenderPassData->fID;
 }
 
 void
-VulkanFrameBufferObject::MakeFramebuffers( uint32_t width, uint32_t height, const RenderPassBuilder & builder )
+VulkanFrameBufferObject::CleanUpImageData()
 {
-	RenderPassKey key;
+	VulkanState * state = fRenderer.GetState();
+	VkDevice device = state->GetDevice();
+	const VkAllocationCallbacks * allocator = state->GetAllocator();
+	const std::vector< VkImage > & swapchainImages = fRenderer.GetSwapchainImages();
 
-	builder.GetKey( key );
-	const VkAllocationCallbacks * allocator = fState->GetAllocator();
-	VkDevice device = fState->GetDevice();
-	
-	fRenderPassData = fState->FindRenderPassData( key );
-
-	if (!fRenderPassData)
+	if (VK_NULL_HANDLE == fImage) // swapchain
 	{
-		VkRenderPass renderPass = builder.Build( device, allocator );
-
-		fRenderPassData = fState->AddRenderPass( key, renderPass );
-	}
-
-	for (auto & fbData : fFramebufferData)
-	{
-        VkFramebufferCreateInfo createFramebufferInfo = {};
-
-        createFramebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        createFramebufferInfo.renderPass = fRenderPassData->fPass;
-        createFramebufferInfo.attachmentCount = fbData.fViews.size();
-        createFramebufferInfo.height = height;
-        createFramebufferInfo.layers = 1U;
-        createFramebufferInfo.pAttachments = fbData.fViews.data();
-        createFramebufferInfo.width = width;
-
-        if (vkCreateFramebuffer( device, &createFramebufferInfo, allocator, &fbData.fFramebuffer ) != VK_SUCCESS)
+		for (auto & imageData : fImageData)
 		{
-            CoronaLog( "Failed to create framebuffer!" );
-
-			// TODO?
-        }
+			for (VkImageView view : imageData.fViews)
+			{
+				vkDestroyImageView( device, view, allocator );
+			}
+		}
 	}
+
+	else
+	{
+		// TODO (might be the same)
+	}
+
+	for (auto & imageData : fImageData)
+	{
+		vkDestroyFramebuffer( device, imageData.fFramebuffer, allocator );
+	}
+
+	fImageData.clear();
 }
 /*
 GLuint

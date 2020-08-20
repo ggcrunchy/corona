@@ -147,7 +147,8 @@ DescriptorLists::Reset( VkDevice device )
 VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 :   Super( allocator ),
 	fState( state ),
-    fFBO( NULL ),
+    fSwapchainTexture( NULL ),
+	fPrimaryFBO( NULL ),
 	fFirstPipeline( VK_NULL_HANDLE ),
 	fUBOLayout( VK_NULL_HANDLE ),
 	fUserDataLayout( VK_NULL_HANDLE ),
@@ -233,6 +234,9 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 		CoronaLog( "Failed to create pipeline layout!" );
 	}
 
+	fSwapchainTexture = Rtt_NEW( allocator, TextureSwapchain( allocator, state ) );
+	fPrimaryFBO = Rtt_NEW( allocator, FrameBufferObject( allocator, fSwapchainTexture ) );
+
 	VkSwapchainKHR swapchain = MakeSwapchain();
 
 	if (swapchain != VK_NULL_HANDLE)
@@ -249,6 +253,8 @@ VulkanRenderer::~VulkanRenderer()
 
 	TearDownSwapchain();
 
+	Rtt_DELETE( fPrimaryFBO );
+	Rtt_DELETE( fSwapchainTexture );
 	Rtt_DELETE( fState );
 }
 
@@ -270,6 +276,8 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 	if (canContinue)
 	{
 		uint32_t index = vulkanCommandBuffer->GetImageIndex();
+
+		SetFrameBufferObject( fPrimaryFBO );
 
 		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], fDescriptorLists.data() + 3U * index );
 	}
@@ -383,8 +391,6 @@ VulkanRenderer::BuildUpSwapchain( VkSwapchainKHR swapchain )
 	{
 		vkGetSwapchainImagesKHR( device, swapchain, &imageCount, fSwapchainImages.data() );
 
-		fFBO = Rtt_NEW( NULL, VulkanFrameBufferObject( fState, imageCount, fSwapchainImages.data() ) );
-
 		// TODO: descriptors? etc.
 	}
 
@@ -412,10 +418,8 @@ VulkanRenderer::RecreateSwapchain()
 void
 VulkanRenderer::TearDownSwapchain()
 {
-    Rtt_DELETE( fFBO );
+	// TODO: tell frame buffers they're invalid, e.g. iterate list
 
-    fFBO = NULL;
-	
     const VkAllocationCallbacks * allocator = fState->GetAllocator();
     VkDevice device = fState->GetDevice();
 
@@ -599,7 +603,7 @@ VulkanRenderer::Create( const CPUResource* resource )
 {
 	switch( resource->GetType() )
 	{
-		case CPUResource::kFrameBufferObject: return new VulkanFrameBufferObject( fState, fSwapchainImages.size() );
+		case CPUResource::kFrameBufferObject: return new VulkanFrameBufferObject( *this );
 		case CPUResource::kGeometry: return new VulkanGeometry( fState );
 		case CPUResource::kProgram: return new VulkanProgram( fState );
 		case CPUResource::kTexture: return new VulkanTexture( fState );

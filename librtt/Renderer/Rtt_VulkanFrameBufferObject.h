@@ -11,6 +11,7 @@
 #define _Rtt_VulkanFrameBufferObject_H__
 
 #include "Renderer/Rtt_GPUResource.h"
+#include "Renderer/Rtt_Texture.h"
 
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -20,7 +21,7 @@
 namespace Rtt
 {
 
-class VulkanState;
+class VulkanRenderer;
 class RenderPassKey;
 struct RenderPassData;
 
@@ -51,6 +52,26 @@ class RenderPassBuilder {
 		std::vector< VkAttachmentReference > fResolveReferences;
 };
 
+class TextureSwapchain : public Texture
+{
+	public:
+		typedef Texture Super;
+		typedef TextureSwapchain Self;
+
+	public:
+		TextureSwapchain( Rtt_Allocator * allocator, VulkanState * state );
+		virtual ~TextureSwapchain();
+
+	public:
+		virtual U32 GetWidth() const;
+		virtual U32 GetHeight() const;
+		virtual Format GetFormat() const { return kNumFormats; }
+		virtual Filter GetFilter() const { return kNumFilters; }
+
+	private:
+		VulkanState * fState;
+};
+
 class VulkanFrameBufferObject : public GPUResource
 {
 	public:
@@ -58,7 +79,7 @@ class VulkanFrameBufferObject : public GPUResource
 		typedef VulkanFrameBufferObject Self;
 
 	public:
-		VulkanFrameBufferObject( VulkanState * state, uint32_t imageCount, VkImage * swapchainImages = NULL );
+		VulkanFrameBufferObject( VulkanRenderer & renderer );
 
 	public:
 		virtual void Create( CPUResource* resource );
@@ -71,8 +92,8 @@ class VulkanFrameBufferObject : public GPUResource
 		std::vector< VkClearValue > & GetClearValues() { return fClearValues; }
 
 	private:
-		struct FramebufferData {
-			FramebufferData()
+		struct ImageData {
+			ImageData()
 			:	fFramebuffer( VK_NULL_HANDLE )
 			{
 			}
@@ -81,15 +102,15 @@ class VulkanFrameBufferObject : public GPUResource
 			VkFramebuffer fFramebuffer;
 		};
 
-		void MakeFramebuffers( uint32_t width, uint32_t height, const RenderPassBuilder & builder );
+		void CleanUpImageData();
 
 	private:
-		VulkanState * fState;
-		VkImage fImage;
+		VulkanRenderer & fRenderer;
 		VkExtent2D fExtent;
-		const RenderPassData * fRenderPassData;
-		std::vector< FramebufferData > fFramebufferData;
+		VkImage fImage;
 		std::vector< VkClearValue > fClearValues;
+		std::vector< ImageData > fImageData;
+		const RenderPassData * fRenderPassData;
 };
 
 // ----------------------------------------------------------------------------

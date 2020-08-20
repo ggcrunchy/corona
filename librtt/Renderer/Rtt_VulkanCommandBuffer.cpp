@@ -607,7 +607,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			}
 			case kCommandUnBindFrameBufferObject:
 			{
-/****** SubmitFBO( vulkanFBO ) */
 			//	glBindFramebuffer( GL_FRAMEBUFFER, fDefaultFBO );
 				DEBUG_PRINT( "Unbind FrameBufferObject: Vulkan name: %p (fDefaultFBO)", fDefaultFBO );
 				CHECK_ERROR_AND_BREAK;

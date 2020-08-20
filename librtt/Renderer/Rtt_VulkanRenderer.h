@@ -42,9 +42,10 @@ namespace Rtt
 
 class GPUResource;
 class CPUResource;
+class FrameBufferObject;
+class Texture;
 class VulkanBufferData;
 class VulkanState;
-class VulkanFrameBufferObject;
 
 // ----------------------------------------------------------------------------
 
@@ -106,6 +107,8 @@ class VulkanRenderer : public Renderer
 		VkDescriptorSetLayout GetTextureLayout() const { return fTextureLayout; }
 		VkPipelineLayout GetPipelineLayout() const { return fPipelineLayout; }
 
+		const std::vector< VkImage > & GetSwapchainImages() const { return fSwapchainImages; }
+
 	public:
 		void EnableBlend( bool enabled );
 		void SetAttributeDescriptions( U32 id, const std::vector< VkVertexInputAttributeDescription > & descriptions );
@@ -156,7 +159,8 @@ VkViewport fViewport;
 		};
 
 		VulkanState * fState;
-		VulkanFrameBufferObject * fFBO;
+		Texture * fSwapchainTexture;
+		FrameBufferObject * fPrimaryFBO;
 		std::vector< VkImage > fSwapchainImages;
 		std::vector< VkCommandBuffer > fCommandBuffers;
 		std::vector< DescriptorLists > fDescriptorLists;
