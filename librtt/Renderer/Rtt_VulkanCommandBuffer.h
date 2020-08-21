@@ -94,9 +94,9 @@ class VulkanCommandBuffer : public CommandBuffer
 		
 		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists );
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
-		void PrepareDraw( VkPrimitiveTopology topology, VkRenderPassBeginInfo * renderPassBeginInfo );
+		void PrepareDraw( VkPrimitiveTopology topology, VkRenderPassBeginInfo *& renderPassBeginInfo );
 
-		void CommitFBO( VkRenderPassBeginInfo * renderPassBeginInfo );
+		void CommitFBO( VkRenderPassBeginInfo *& renderPassBeginInfo );
 
 	public:
 		void AddGraphicsPipeline( VkPipeline pipeline );

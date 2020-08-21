@@ -79,13 +79,13 @@ DescriptorLists::DescriptorLists( bool resetPools )
 bool
 DescriptorLists::AddBuffer( VulkanState * state )
 {
-	VulkanBufferData bufferData = state->CreateBuffer( fBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ); 
-
-	if (bufferData.IsValid())
+	VulkanBufferData bufferData( state->GetDevice(), state->GetAllocator() );
+	
+	if (state->CreateBuffer( fBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, bufferData ))
 	{
 		DynamicUniformData uniformData;
 		
-		uniformData.fMapped = state->MapData( bufferData.GetMemory(), VK_WHOLE_SIZE );
+		uniformData.fMapped = state->MapData( bufferData.GetMemory() );
 		uniformData.fData = bufferData.Extract( NULL );
 
 		return true;

@@ -74,13 +74,17 @@ VulkanBufferData::GetMemory() const
 VulkanBufferData *
 VulkanBufferData::Extract( Rtt_Allocator * allocator )
 {
+	if (VK_NULL_HANDLE == fBuffer)
+	{
+		return NULL;
+	}
+
 	VulkanBufferData * bufferData = Rtt_NEW( allocator, VulkanBufferData( fDevice, fAllocator ) );
 	
 	bufferData->fBuffer = fBuffer;
 	bufferData->fMemory = fMemory;
 
-	fBuffer = VK_NULL_HANDLE;
-	fMemory = VK_NULL_HANDLE;
+	Disown();
 
 	return bufferData;
 }
@@ -91,14 +95,14 @@ VulkanBufferData::Clear()
     vkDestroyBuffer( fDevice, fBuffer, fAllocator );
     vkFreeMemory( fDevice, fMemory, fAllocator );
 
-	fBuffer = VK_NULL_HANDLE;
-	fMemory = VK_NULL_HANDLE;
+	Disown();
 }
 
-bool
-VulkanBufferData::IsValid() const
+void
+VulkanBufferData::Disown()
 {
-	return fBuffer != VK_NULL_HANDLE && fMemory != VK_NULL_HANDLE;
+	fBuffer = VK_NULL_HANDLE;
+	fMemory = VK_NULL_HANDLE;
 }
 
 VulkanState::VulkanState()
@@ -188,8 +192,8 @@ VulkanState::FindRenderPassData( const RenderPassKey & key ) const
 	return fRenderPasses.end() != iter ? &iter->second : NULL;
 }
 
-VulkanBufferData
-VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties )
+bool
+VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VulkanBufferData & bufferData )
 {
     VkBufferCreateInfo createBufferInfo = {};
 
@@ -197,8 +201,6 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
     createBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     createBufferInfo.size = size;
     createBufferInfo.usage = usage;
-
-	VulkanBufferData bufferData( fDevice, fAllocator );
 
 	VkBuffer buffer = VK_NULL_HANDLE;
 
@@ -223,6 +225,8 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 
 				bufferData.fBuffer = buffer;
 				bufferData.fMemory = bufferMemory;
+
+				return true;
 			}
 
 			else
@@ -231,10 +235,7 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 			}
 		}
 
-		if (!bufferData.IsValid())
-		{
-			vkDestroyBuffer( fDevice, buffer, fAllocator );
-		}
+		vkDestroyBuffer( fDevice, buffer, fAllocator );
 	}
 
 	else
@@ -242,7 +243,7 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
         CoronaLog( "Failed to create buffer!" );
     }
 
-	return bufferData;
+	return false;
 }
 
 bool
