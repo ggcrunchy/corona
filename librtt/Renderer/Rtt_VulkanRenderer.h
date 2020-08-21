@@ -60,8 +60,8 @@ struct DynamicUniformData {
 struct DescriptorLists {
 	enum ListIndex { eUBO, eUserDataUBO, eTexture };
 
-	DescriptorLists( VulkanState * state, U32 count, bool isUserDataUBO );
-	DescriptorLists( bool resetPools = false );
+	DescriptorLists( VulkanState * state, VkDescriptorSetLayout setLayout, U32 count, bool isUserDataUBO );
+	DescriptorLists( VkDescriptorSetLayout setLayout, bool resetPools = false );
 
 	bool AddBuffer( VulkanState * state );
 	bool AddPool( VulkanState * state, VkDescriptorType type, U32 descriptorCount, U32 maxSets, VkDescriptorPoolCreateFlags flags = 0 );
@@ -137,10 +137,6 @@ class VulkanRenderer : public Renderer
 			std::vector< VkPipelineShaderStageCreateInfo > fShaderStages;
 			std::vector< VkVertexInputAttributeDescription > fVertexAttributeDescriptions;
 			std::vector< VkVertexInputBindingDescription > fVertexBindingDescriptions;
-VkRect2D fScissorRect;
-VkViewport fViewport;
-// ^^ TODO: do we need these, or just do immediate bind commands?
-
 			VkPipelineInputAssemblyStateCreateInfo fInputAssembly;
 			VkPipelineRasterizationStateCreateInfo fRasterization;
 			VkPipelineMultisampleStateCreateInfo fMultisample;

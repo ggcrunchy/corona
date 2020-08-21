@@ -43,8 +43,8 @@ DynamicUniformData::~DynamicUniformData()
 	Rtt_DELETE( fData );
 }
 
-DescriptorLists::DescriptorLists( VulkanState * state, U32 count, bool isUserDataUBO )
-:	fSetLayout( VK_NULL_HANDLE ),
+DescriptorLists::DescriptorLists( VulkanState * state, VkDescriptorSetLayout setLayout, U32 count, bool isUserDataUBO )
+:	fSetLayout( setLayout ),
 	fDynamicAlignment( 0U ),
 	fBufferIndex( 0U ),
 	fOffset( 0U ),
@@ -64,8 +64,8 @@ DescriptorLists::DescriptorLists( VulkanState * state, U32 count, bool isUserDat
 	fBufferSize = U32( count * fDynamicAlignment );
 }
 
-DescriptorLists::DescriptorLists( bool resetPools )
-:	fSetLayout( VK_NULL_HANDLE ),
+DescriptorLists::DescriptorLists( VkDescriptorSetLayout setLayout, bool resetPools )
+:	fSetLayout( setLayout ),
 	fDynamicAlignment( 0U ),
 	fBufferIndex( 0U ),
 	fBufferSize( 0U ),
@@ -83,7 +83,9 @@ DescriptorLists::AddBuffer( VulkanState * state )
 	
 	if (state->CreateBuffer( fBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, bufferData ))
 	{
-		DynamicUniformData uniformData;
+		fBufferData.push_back( DynamicUniformData{} );
+
+		DynamicUniformData & uniformData = fBufferData.back();
 		
 		uniformData.fMapped = state->MapData( bufferData.GetMemory() );
 		uniformData.fData = bufferData.Extract( NULL );
@@ -375,9 +377,9 @@ VulkanRenderer::BuildUpSwapchain( VkSwapchainKHR swapchain )
 		static_assert( DescriptorLists::eUBO < DescriptorLists::eUserDataUBO, "UBOs in unexpected order" );
 		static_assert( DescriptorLists::eUserDataUBO < DescriptorLists::eTexture, "UBO / textures in unexpected order" );
 
-		fDescriptorLists.push_back( DescriptorLists( state, 4096U, false ) );
-		fDescriptorLists.push_back( DescriptorLists( state, 1024U, true ) );
-		fDescriptorLists.push_back( DescriptorLists() );
+		fDescriptorLists.push_back( DescriptorLists( state, fUBOLayout, 4096U, false ) );
+		fDescriptorLists.push_back( DescriptorLists( state, fUserDataLayout, 1024U, true ) );
+		fDescriptorLists.push_back( DescriptorLists( fTextureLayout ) );
 	}
 
 	VkCommandBufferAllocateInfo allocInfo = {};
