@@ -91,6 +91,12 @@ class VulkanProgram : public GPUResource
 			fData[version].fTimestamps[ unit ] = timestamp;
 		}
 
+		inline bool IsValid( Program::Version version )
+		{
+			Rtt_ASSERT( version <= Program::kNumVersions );
+			return fData[version].IsValid();
+		}
+
 	private:
 		// To make custom shader code work seamlessly with masking, multiple
 		// versions of each Program are automatically compiled and linked, 
@@ -141,6 +147,7 @@ class VulkanProgram : public GPUResource
 			Location CheckForUniform( const std::string & key );
 		};
 
+		void ReplaceVaryings( bool isVertexSource, std::string & code, Maps & maps );
 		void Compile( int kind, const char * sources[], int sourceCount, Maps & maps, VkShaderModule & module );
 		Maps UpdateShaderSource( Program* program, Program::Version version, VersionData& data );
 

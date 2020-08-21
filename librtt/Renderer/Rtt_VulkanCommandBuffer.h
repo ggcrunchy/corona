@@ -31,18 +31,18 @@ struct TimeTransform;
 
 // cf. shell_default_vulkan:
 
-struct VulkanUBO {
-	alignas(16) float fData[6 * 4];
+struct alignas(16) VulkanUBO {
+	float fData[6 * 4];
 };
 
-struct VulkanUserDataUBO {
-	alignas(16) float UserData[4][16];
+struct alignas(16) VulkanUserDataUBO {
+	float UserData[4][16];
 };
 
-struct VulkanPushConstants {
+struct alignas(16) VulkanPushConstants {
 	enum { kVectorCount = 5 };
 
-	alignas(16) float fData[kVectorCount * 4];
+	float fData[kVectorCount * 4];
 };
 
 // 
@@ -155,6 +155,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		void ApplyUniforms( GPUResource* resource );
 		void ApplyPushConstant( Uniform * uniform, size_t offset, size_t translationOffset );
 		void ApplyUniform( VulkanProgram & vulkanProgram, U32 index );
+		void WriteUniform( Uniform* uniform );
 		void ReadUniform( const UniformsToWrite & utw, const void * value, size_t offset, size_t size );
 		UniformsToWrite PointToUniform( U32 index, size_t offset );
 
@@ -182,6 +183,14 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkCommandBuffer fCommandBuffer;
 		VkDescriptorSet fTextures;
 		std::vector< VkDescriptorImageInfo > fTextureState;
+		VkViewport fViewport;
+
+		struct GraphNode {
+			U32 fOffset;
+			U32 fJump;
+		};
+
+		std::vector< GraphNode > fGraphStack;
 /*
 		dynamic uniform buffers - as a list?
 

@@ -271,7 +271,7 @@ VulkanTexture::Bind( VulkanCommandBuffer & commandBuffer, U32 unit )
 	descriptorWrite.descriptorCount = 1U;
 	descriptorWrite.pImageInfo = &imageInfo;
 
-	if (!fState->GetFeatures().shaderSampledImageArrayDynamicIndexing) // TODO: no indexing... this will presumably occur before binding
+	if (true) // !fState->GetFeatures().shaderSampledImageArrayDynamicIndexing) // TODO: no indexing... this will presumably occur before binding
 	{
 		VkDescriptorSet set = commandBuffer.AddTexture( unit, imageInfo );
 

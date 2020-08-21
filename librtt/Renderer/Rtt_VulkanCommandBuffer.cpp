@@ -20,8 +20,32 @@
 
 #include <cinttypes> // https://stackoverflow.com/questions/8132399/how-to-printf-uint64-t-fails-with-spurious-trailing-in-format#comment9979590_8132440
 #include <limits>
+#include <malloc.h>
 
 #include "CoronaLog.h"
+
+// From Vulkan example on dynamic uniform buffers, by Sascha Willems:
+void* alignedAlloc(size_t size, size_t alignment)
+{
+	void *data = nullptr;
+#if defined(_MSC_VER) || defined(__MINGW32__)
+	data = _aligned_malloc(size, alignment);
+#else
+	int res = posix_memalign(&data, alignment, size);
+	if (res != 0)
+		data = nullptr;
+#endif
+	return data;
+}
+
+void alignedFree(void* data)
+{
+#if	defined(_MSC_VER) || defined(__MINGW32__)
+	_aligned_free(data);
+#else
+	free(data);
+#endif
+}
 
 // ----------------------------------------------------------------------------
 
@@ -42,6 +66,14 @@ namespace /*anonymous*/
 		kCommandApplyUniformVec4,
 		kCommandApplyUniformMat3,
 		kCommandApplyUniformMat4,
+		kCommandApplyPushConstantFromPointerScalar,
+		kCommandApplyPushConstantFromPointerMaskTransform,
+		kCommandApplyUniformFromPointerScalar,
+		kCommandApplyUniformFromPointerVec2,
+		kCommandApplyUniformFromPointerVec3,
+		kCommandApplyUniformFromPointerVec4,
+		kCommandApplyUniformFromPointerMat3,
+		kCommandApplyUniformFromPointerMat4,
 		kCommandEnableBlend,
 		kCommandDisableBlend,
 		kCommandSetBlendFunction,
@@ -161,7 +193,7 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fImageAvailableSemaphore );
 	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fRenderFinishedSemaphore );
 
-	fPushConstants = Rtt_NEW( NULL, PushConstantState() );
+	fPushConstants = (PushConstantState *)alignedAlloc( sizeof( PushConstantState ), 16U );
 
 	if ( VK_NULL_HANDLE == fInFlight || VK_NULL_HANDLE == fImageAvailableSemaphore || VK_NULL_HANDLE == fRenderFinishedSemaphore)
 	{
@@ -175,7 +207,7 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 		fRenderFinishedSemaphore = VK_NULL_HANDLE;
 		fInFlight = VK_NULL_HANDLE;
 
-		Rtt_DELETE( fPushConstants );
+		alignedFree( fPushConstants );
 
 		fPushConstants = NULL;
 	}
@@ -286,10 +318,15 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 	{
 		WRITE_COMMAND( kCommandBindFrameBufferObject );
 		Write<GPUResource*>( fbo->GetGPUResource() );
+		// TODO: record this position on a stack...
+		// redirect if necessary...
+			// 
 	}
 	else
 	{
 		WRITE_COMMAND( kCommandUnBindFrameBufferObject );
+		// TODO: assuming this always happens before a new bind (probably not true, but for reasoning purposes)
+			// leave pointer (or space, rather) to next instruction
 	}
 }
 
@@ -660,8 +697,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			case kCommandApplyUniformScalar:
 			{
 				READ_UNIFORM_DATA( Real );
-				U32 index = Read<U32>();
-				size_t offset = Read<size_t>();
+				U32 index = Read<U32>(), offset=0U;
 				UniformsToWrite utw = PointToUniform( index, offset );
 				ReadUniform( utw, &value, offset, sizeof( Real ) );
 				CHECK_ERROR_AND_BREAK;
@@ -669,8 +705,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			case kCommandApplyUniformVec2:
 			{
 				READ_UNIFORM_DATA( Vec2 );
-				U32 index = Read<U32>();
-				size_t offset = Read<size_t>();
+				U32 index = Read<U32>(), offset=0U;
 				UniformsToWrite utw = PointToUniform( index, offset );
 				ReadUniform( utw, &value, offset, sizeof( Vec2 ) );
 				CHECK_ERROR_AND_BREAK;
@@ -678,8 +713,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			case kCommandApplyUniformVec3:
 			{
 				READ_UNIFORM_DATA( Vec3 );
-				U32 index = Read<U32>();
-				size_t offset = Read<size_t>();
+				U32 index = Read<U32>(), offset=0U;
 				UniformsToWrite utw = PointToUniform( index, offset );
 				ReadUniform( utw, &value, offset, sizeof( Vec3 ) );
 				CHECK_ERROR_AND_BREAK;
@@ -687,8 +721,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			case kCommandApplyUniformVec4:
 			{
 				READ_UNIFORM_DATA( Vec4 );
-				U32 index = Read<U32>();
-				size_t offset = Read<size_t>();
+				U32 index = Read<U32>(), offset=0U;
 				UniformsToWrite utw = PointToUniform( index, offset );
 				ReadUniform( utw, &value, offset, sizeof( Vec4 ) );
 				CHECK_ERROR_AND_BREAK;
@@ -696,8 +729,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			case kCommandApplyUniformMat3:
 			{
 				READ_UNIFORM_DATA( Mat3 );
-				U32 index = Read<U32>();
-				size_t offset = Read<size_t>();
+				U32 index = Read<U32>(), offset=0U;
 				UniformsToWrite utw = PointToUniform( index, offset );
 				for (int i = 0; i < 3; ++i)
 				{
@@ -712,6 +744,38 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				size_t offset = Read<size_t>();
 				UniformsToWrite utw = PointToUniform( index, offset );
 				ReadUniform( utw, &value, offset, sizeof( Mat4 ) );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandApplyPushConstantFromPointerScalar:
+			{
+				CHECK_ERROR_AND_BREAK;
+			}
+			kCommandApplyPushConstantFromPointerMaskTransform:
+			{
+				CHECK_ERROR_AND_BREAK;
+			}
+			kCommandApplyUniformFromPointerScalar:
+			{
+				CHECK_ERROR_AND_BREAK;
+			}
+			kCommandApplyUniformFromPointerVec2:
+			{
+				CHECK_ERROR_AND_BREAK;
+			}
+			kCommandApplyUniformFromPointerVec3:
+			{
+				CHECK_ERROR_AND_BREAK;
+			}
+			kCommandApplyUniformFromPointerVec4:
+			{
+				CHECK_ERROR_AND_BREAK;
+			}
+			kCommandApplyUniformFromPointerMat3:
+			{
+				CHECK_ERROR_AND_BREAK;
+			}
+			kCommandApplyUniformFromPointerMat4:
+			{
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandEnableBlend:
@@ -753,16 +817,13 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				int y = Read<int>();
 				int width = Read<int>();
 				int height = Read<int>();
-				
-				VkViewport viewport;
 
-				viewport.x = float( x );
-				viewport.y = float( y );
-				viewport.width = float( width );
-				viewport.height = float( height );
-				viewport.minDepth = 0.f;
-				viewport.maxDepth = 1.f;
-				vkCmdSetViewport( fCommandBuffer, 0U, 1U, &viewport ); // TODO: given usage, might just follow lead of kCommandClear...
+				fViewport.x = float( x );
+				fViewport.y = float( y );
+				fViewport.width = float( width );
+				fViewport.height = float( height );
+				fViewport.minDepth = 0.f;
+				fViewport.maxDepth = 1.f;
 				DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );
 				CHECK_ERROR_AND_BREAK;
 			}
@@ -933,6 +994,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					CoronaLog( "Failed to present swap chain image!" );
 				}
 
+				else
+				{
+					CoronaLog("WOO");
+				}
+
 				fExecuteResult = presentResult;
 			}
 
@@ -1097,7 +1163,9 @@ void VulkanCommandBuffer::CommitFBO( VkRenderPassBeginInfo *& renderPassBeginInf
 
 		renderPassBeginInfo->clearValueCount = clearValues.size();
 		renderPassBeginInfo->pClearValues = clearValues.data();
-
+		
+		vkCmdSetScissor( fCommandBuffer, 0U, 1U, &renderPassBeginInfo->renderArea );
+		vkCmdSetViewport( fCommandBuffer, 0U, 1U, &fViewport );
 		vkCmdBeginRenderPass( fCommandBuffer, renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
 
 		renderPassBeginInfo = NULL;
@@ -1301,70 +1369,130 @@ void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, s
 	}
 }
 
+void VulkanCommandBuffer::WriteUniform( Uniform* uniform )
+{
+	switch( uniform->GetDataType() )
+	{
+		case Uniform::kScalar:	Write<Real>(*reinterpret_cast<Real*>(uniform->GetData()));	break;
+		case Uniform::kVec2:	Write<Vec2>(*reinterpret_cast<Vec2*>(uniform->GetData()));	break;
+		case Uniform::kVec3:	Write<Vec3>(*reinterpret_cast<Vec3*>(uniform->GetData()));	break;
+		case Uniform::kVec4:	Write<Vec4>(*reinterpret_cast<Vec4*>(uniform->GetData()));	break;
+		case Uniform::kMat3:	Write<Mat3>(*reinterpret_cast<Mat3*>(uniform->GetData()));	break;
+		case Uniform::kMat4:	Write<Mat4>(*reinterpret_cast<Mat4*>(uniform->GetData()));	break;
+		default:				Rtt_ASSERT_NOT_REACHED();									break;
+	}
+}
+
 void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index )
 {
 	const UniformUpdate& update = fUniformUpdates[index];
 	vulkanProgram.SetUniformTimestamp( index, fCurrentPrepVersion, update.timestamp );
 
+	bool isValid = vulkanProgram.IsValid( fCurrentPrepVersion );
 	VulkanProgram::Location location = vulkanProgram.GetUniformLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
 	Uniform* uniform = update.uniform;
 
-	if (index >= Uniform::kMaskMatrix0 && index <= Uniform::kMaskMatrix2)
+	if (isValid && location.IsValid())
 	{
-		VulkanProgram::Location translationLocation = vulkanProgram.GetTranslationLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
-
-		ApplyPushConstant( uniform, location.fOffset, translationLocation.fOffset );
-	}
-
-	else if (Uniform::kTotalTime == index) // TODO: other push constants
-	{
-		ApplyPushConstant( uniform, location.fOffset, 0U );
-	}
-
-	else
-	{
-		Uniform::DataType dataType = uniform->GetDataType();
-
-		switch( dataType )
+		if (index >= Uniform::kMaskMatrix0 && index <= Uniform::kMaskMatrix2)
 		{
-			case Uniform::kScalar:
-				WRITE_COMMAND(kCommandApplyUniformScalar);
-				Write<Real>(*reinterpret_cast<Real *>( uniform->GetData() ) );
+			VulkanProgram::Location translationLocation = vulkanProgram.GetTranslationLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
 
-				break;
-			case Uniform::kVec2:
-				WRITE_COMMAND(kCommandApplyUniformVec2);
-				Write<Vec2>(*reinterpret_cast<Vec2 *>( uniform->GetData() ) );
-
-				break;
-			case Uniform::kVec3:
-				WRITE_COMMAND(kCommandApplyUniformVec3);
-				Write<Vec3>(*reinterpret_cast<Vec3 *>( uniform->GetData() ) );
-
-				break;
-			case Uniform::kVec4:
-				WRITE_COMMAND(kCommandApplyUniformVec4);
-				Write<Vec4>(*reinterpret_cast<Vec4 *>( uniform->GetData() ) );
-
-				break;
-			case Uniform::kMat3:
-				WRITE_COMMAND(kCommandApplyUniformMat3);
-				Write<Mat3>(*reinterpret_cast<Mat3 *>( uniform->GetData() ) );
-
-				break;
-			case Uniform::kMat4:
-				WRITE_COMMAND(kCommandApplyUniformMat4);
-				Write<Mat4>(*reinterpret_cast<Mat4 *>( uniform->GetData() ) );
-
-				break;
-			default:
-				Rtt_ASSERT_NOT_REACHED();
-			
-				break;
+			ApplyPushConstant( uniform, location.fOffset, translationLocation.fOffset );
 		}
 
-		Write<U32>(index);
-		Write<U32>(location.fOffset);
+		else if (Uniform::kTotalTime == index) // TODO: other push constants
+		{
+			ApplyPushConstant( uniform, location.fOffset, 0U );
+		}
+
+		else
+		{
+			Uniform::DataType dataType = uniform->GetDataType();
+
+			switch( dataType )
+			{
+				case Uniform::kScalar:
+					WRITE_COMMAND(kCommandApplyUniformScalar); break;
+				case Uniform::kVec2:
+					WRITE_COMMAND(kCommandApplyUniformVec2); break;
+				case Uniform::kVec3:
+					WRITE_COMMAND(kCommandApplyUniformVec3); break;
+				case Uniform::kVec4:
+					WRITE_COMMAND(kCommandApplyUniformVec4); break;
+				case Uniform::kMat3:
+					WRITE_COMMAND(kCommandApplyUniformMat3); break;
+				case Uniform::kMat4:
+					WRITE_COMMAND(kCommandApplyUniformMat4); break;
+				default:
+					Rtt_ASSERT_NOT_REACHED();
+			}
+			
+			Write<U32>(location.fOffset);
+			WriteUniform( uniform );
+		}
+	}
+
+	else if (!isValid)
+	{
+		Uniform* uniform = update.uniform;
+
+		if (index >= Uniform::kMaskMatrix0 && index <= Uniform::kMaskMatrix2)
+		{
+			VulkanProgram::Location translationLocation = vulkanProgram.GetTranslationLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
+
+			ApplyPushConstant( uniform, location.fOffset, translationLocation.fOffset );
+		}
+
+		else if (Uniform::kTotalTime == index) // TODO: other push constants
+		{
+			ApplyPushConstant( uniform, location.fOffset, 0U );
+		}
+
+		else
+		{
+			Uniform::DataType dataType = uniform->GetDataType();
+
+			switch( dataType )
+			{
+				case Uniform::kScalar:
+					WRITE_COMMAND(kCommandApplyUniformScalar);
+					Write<Real>(*reinterpret_cast<Real *>( uniform->GetData() ) );
+
+					break;
+				case Uniform::kVec2:
+					WRITE_COMMAND(kCommandApplyUniformVec2);
+					Write<Vec2>(*reinterpret_cast<Vec2 *>( uniform->GetData() ) );
+
+					break;
+				case Uniform::kVec3:
+					WRITE_COMMAND(kCommandApplyUniformVec3);
+					Write<Vec3>(*reinterpret_cast<Vec3 *>( uniform->GetData() ) );
+
+					break;
+				case Uniform::kVec4:
+					WRITE_COMMAND(kCommandApplyUniformVec4);
+					Write<Vec4>(*reinterpret_cast<Vec4 *>( uniform->GetData() ) );
+
+					break;
+				case Uniform::kMat3:
+					WRITE_COMMAND(kCommandApplyUniformMat3);
+					Write<Mat3>(*reinterpret_cast<Mat3 *>( uniform->GetData() ) );
+
+					break;
+				case Uniform::kMat4:
+					WRITE_COMMAND(kCommandApplyUniformMat4);
+					Write<Mat4>(*reinterpret_cast<Mat4 *>( uniform->GetData() ) );
+
+					break;
+				default:
+					Rtt_ASSERT_NOT_REACHED();
+			
+					break;
+			}
+
+			Write<U32>(index);
+		}
 	}
 }
 
@@ -1391,10 +1519,26 @@ VulkanCommandBuffer::UniformsToWrite VulkanCommandBuffer::PointToUniform( U32 in
 	int uboIndex = isUniformUserData ? DescriptorLists::eUserDataUBO : DescriptorLists::eUBO;
 	DescriptorLists & lists = fLists[uboIndex];
 	
-	bool ok = PreparePool( fRenderer.GetState(), lists );
+	bool ok = PreparePool( fRenderer.GetState(), lists ), noSet = lists.fSets.empty();
 
-	if (ok && (lists.fSets.empty() || lists.fOffset == lists.fBufferSize))
+	if (ok && (noSet || lists.fOffset == lists.fBufferSize))
 	{
+		if (noSet)
+		{
+			VkDescriptorSetAllocateInfo allocInfo = {};
+
+			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			allocInfo.descriptorPool = lists.fPools.back();
+			allocInfo.descriptorSetCount = 1U;
+			allocInfo.pSetLayouts = &lists.fSetLayout;
+			
+			VkDescriptorSet set = VK_NULL_HANDLE;
+
+			vkAllocateDescriptorSets( fRenderer.GetState()->GetDevice(), &allocInfo, &set );
+
+			lists.fSets.push_back( set );
+		}
+
 		ok = lists.AddBuffer( fRenderer.GetState() );
 
 		if (ok)

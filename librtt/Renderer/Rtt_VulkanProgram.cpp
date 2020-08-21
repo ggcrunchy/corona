@@ -231,6 +231,39 @@ CountLines( const char **segments, int numSegments )
 }
 
 void
+VulkanProgram::ReplaceVaryings( bool isVertexSource, std::string & code, Maps & maps )
+{
+	size_t offset = 0U, varyingLocation = 0U;
+
+	while (true)
+	{
+		size_t pos = code.find( "varying ", offset );
+
+		if (std::string::npos == pos)
+		{
+			return;
+		}
+
+		char precision[256], type[256], name[256];
+
+		sscanf( code.c_str() + pos, "varying %s %s %s", precision, type, name );
+
+		char buf[256];
+
+		sprintf( buf, "layout(location = %u) %s ", isVertexSource ? varyingLocation : maps.varyings[name], isVertexSource ? "out" : "in" );
+
+		code.replace( pos, sizeof( "varying" ), buf );
+
+		if (isVertexSource)
+		{
+			maps.varyings[name] = varyingLocation++;
+		}
+
+		offset = pos + 1U;
+	}
+}
+
+void
 VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps & maps, VkShaderModule & module )
 {
 	std::string code;
@@ -242,6 +275,9 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 	
 	shaderc_shader_kind kind = shaderc_shader_kind( ikind );
 	const char * what = shaderc_vertex_shader == kind ? "vertex shader" : "fragment shader";
+
+	ReplaceVaryings( 'v' == what[0], code, maps );
+
 	shaderc_compilation_result_t result = shaderc_compile_into_spv( fState->GetCompiler(), code.data(), code.size(), shaderc_vertex_shader, what, "main", fState->GetCompileOptions() );
 	shaderc_compilation_status status = shaderc_result_get_compilation_status( result );
 
@@ -331,7 +367,7 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 	const char *program_header_source = program->GetHeaderSource();
 	const char *header = ( program_header_source ? program_header_source : "" );
 
-	const char* shader_source[5];
+	const char* shader_source[4];
 	memset( shader_source, 0, sizeof( shader_source ) );
 	shader_source[0] = header;
 	shader_source[1] = "#define FRAGMENT_SHADER_SUPPORTS_HIGHP 1\n"; // TODO? this seems a safe assumption on Vulkan...
