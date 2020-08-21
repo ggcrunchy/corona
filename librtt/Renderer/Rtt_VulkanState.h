@@ -52,7 +52,7 @@ public:
 	VulkanBufferData * Extract( Rtt_Allocator * allocator );
 
 	void Clear();
-	bool IsValid() const;
+	void Disown();
 
 private:
 	VkAllocationCallbacks * fAllocator;
@@ -103,14 +103,14 @@ class VulkanState
 		const RenderPassData * AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass );
 		const RenderPassData * FindRenderPassData( const RenderPassKey & key ) const;
 	public:
-		VulkanBufferData CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties );
+		bool CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VulkanBufferData & bufferData );
 		bool FindMemoryType( uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t & type );
 	
 	public:
 	    VkCommandBuffer BeginSingleTimeCommands();
 		void EndSingleTimeCommands( VkCommandBuffer commandBuffer );
 		void CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size );
-		void * MapData( VkDeviceMemory memory, VkDeviceSize count, VkDeviceSize offset = 0U );
+		void * MapData( VkDeviceMemory memory, VkDeviceSize count = VK_WHOLE_SIZE, VkDeviceSize offset = 0U );
 		void StageData( VkDeviceMemory stagingMemory, const void * data, VkDeviceSize count, VkDeviceSize offset = 0U );
 
 	public:

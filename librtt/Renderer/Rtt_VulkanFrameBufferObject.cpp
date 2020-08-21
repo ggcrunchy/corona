@@ -260,6 +260,8 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 	if (Texture::kNumFilters == texture->GetFilter()) // swapchain
 	{
+		fImageData.resize( swapchainImages.size() );
+
 		const VulkanState::SwapchainDetails & details = state->GetSwapchainDetails();
 		VkFormat format = details.fFormat.format;
 

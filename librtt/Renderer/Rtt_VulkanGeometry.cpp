@@ -47,10 +47,11 @@ VulkanGeometry::Create( CPUResource* resource )
 {
 	Rtt_ASSERT( CPUResource::kGeometry == resource->GetType() );
 	Geometry* geometry = static_cast< Geometry * >( resource );
-	VkDeviceSize verticesSize = fVertexCount * sizeof( Geometry::Vertex );
 	
 	fVertexCount = geometry->GetVerticesAllocated();
 	fIndexCount = geometry->GetIndicesAllocated();
+
+	VkDeviceSize verticesSize = fVertexCount * sizeof( Geometry::Vertex );
 
 	if ( geometry->GetStoredOnGPU() )
 	{
@@ -69,11 +70,14 @@ VulkanGeometry::Create( CPUResource* resource )
 			TransferToGPU( fIndexBufferData->GetBuffer(), indices, indicesSize );
 		}
 	}
+
 	else
 	{
-        VulkanBufferData bufferData = fState->CreateBuffer( verticesSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+        VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
 
-		fMappedVertices = fState->MapData( bufferData.GetMemory(), verticesSize );
+		fState->CreateBuffer( verticesSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
+
+		fMappedVertices = fState->MapData( bufferData.GetMemory() );
 		fVertexBufferData = bufferData.Extract( NULL );
 
 		Update( resource );
@@ -103,6 +107,7 @@ VulkanGeometry::Update( CPUResource* resource )
 		{
 			TransferToGPU( fVertexBufferData->GetBuffer(), vertexData, fVertexCount * sizeof( Geometry::Vertex ) );
 		}
+
 		else
 		{
 			CoronaLog( "Unable to update GPU geometry. Data is NULL" );
@@ -161,7 +166,9 @@ VulkanGeometry::Bind( VulkanRenderer & renderer, VkCommandBuffer commandBuffer )
 VulkanBufferData *
 VulkanGeometry::CreateBufferOnGPU( VkDeviceSize bufferSize, VkBufferUsageFlags usage )
 {
-    VulkanBufferData bufferData = fState->CreateBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
+    
+	fState->CreateBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferData );
 
 	return bufferData.Extract( NULL );
 }
@@ -169,13 +176,15 @@ VulkanGeometry::CreateBufferOnGPU( VkDeviceSize bufferSize, VkBufferUsageFlags u
 bool
 VulkanGeometry::TransferToGPU( VkBuffer bufferOnGPU, const void * data, VkDeviceSize bufferSize )
 {
-    VulkanBufferData stagingBuffer = fState->CreateBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
-	bool ableToTransfer = stagingBuffer.IsValid();
+    VulkanBufferData stagingData( fState->GetDevice(), fState->GetAllocator() );
+    bool ableToTransfer = fState->CreateBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingData );
 
 	if (ableToTransfer)
 	{
-		fState->StageData( stagingBuffer.GetMemory(), data, bufferSize );
-		fState->CopyBuffer( stagingBuffer.GetBuffer(), bufferOnGPU, bufferSize );
+		fState->StageData( stagingData.GetMemory(), data, bufferSize );
+		fState->CopyBuffer( stagingData.GetBuffer(), bufferOnGPU, bufferSize );
+
+		// TODO: lifetime issue...
 	}
 
 	return ableToTransfer;

@@ -141,8 +141,10 @@ VulkanTexture::Create( CPUResource* resource )
     
     VkDeviceSize imageSize = texture->GetSizeInBytes();
     U32 mipLevels = /* static_cast< uint32_t >( std::floor( std::log2( std::max( texture->GetWidth(), texture->GetHeight() ) ) ) ) + */ 1U;
-    VulkanBufferData stagingData = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
-    bool ok = stagingData.IsValid();    // ^^ TODO: also non-buffered approach? (suggestions that we should recycle a buffer)
+    
+	VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
+    bool ok = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
+                                        // ^^ TODO: also non-buffered approach? (suggestions that we should recycle a buffer)
                                         // is it okay to let this go away or should it be backed for a while still?
 
     if (ok)
@@ -161,7 +163,7 @@ VulkanTexture::Create( CPUResource* resource )
 
         if (ok)
         {
-            ok = Load( texture, format, stagingData, mipLevels );
+            ok = Load( texture, format, bufferData, mipLevels );
         }
     }
     
@@ -334,37 +336,34 @@ PrepareBarrier( VkImage image, VkImageAspectFlags aspectFlags, uint32_t mipLevel
 bool
 VulkanTexture::Load( Texture * texture, VkFormat format, const VulkanBufferData & bufferData, U32 mipLevels )
 {
-    if (bufferData.IsValid())
-    {
-        fState->StageData( bufferData.GetMemory(), texture->GetData(), texture->GetSizeInBytes() );
+    fState->StageData( bufferData.GetMemory(), texture->GetData(), texture->GetSizeInBytes() );
         
-        if (TransitionImageLayout( fData.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels ))
-        {
-            CopyBufferToImage( bufferData.GetBuffer(), fData.fImage, texture->GetWidth(), texture->GetHeight() );
+    if (TransitionImageLayout( fData.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels ))
+    {
+        CopyBufferToImage( bufferData.GetBuffer(), fData.fImage, texture->GetWidth(), texture->GetHeight() );
 
-            VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
-            VkImageMemoryBarrier barrier = PrepareBarrier( fData.fImage, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
+        VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
+        VkImageMemoryBarrier barrier = PrepareBarrier( fData.fImage, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
-            // generateMipmaps(textureImage, format, texWidth, texHeight, mipLevels);
+        // generateMipmaps(textureImage, format, texWidth, texHeight, mipLevels);
              
-            barrier.subresourceRange.baseMipLevel = mipLevels - 1U;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // todo: if we forgo a staging buffer, is this GENERAL or something?
-            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.subresourceRange.baseMipLevel = mipLevels - 1U;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // todo: if we forgo a staging buffer, is this GENERAL or something?
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-            vkCmdPipelineBarrier(
-                commandBuffer,
-                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-                0U, NULL,
-                0U, NULL,
-                1U, &barrier
-            );
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+            0U, NULL,
+            0U, NULL,
+            1U, &barrier
+        );
 
-            fState->EndSingleTimeCommands( commandBuffer );
+        fState->EndSingleTimeCommands( commandBuffer );
 
-            return true;
-        }
+        return true;
     }
 
     return false;

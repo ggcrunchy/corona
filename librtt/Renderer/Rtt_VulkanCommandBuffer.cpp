@@ -840,8 +840,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				PrepareDraw( mode, pendingPass );
 				vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
 
-				pendingPass = NULL;
-
 				DEBUG_PRINT( "Draw: mode=%i, offset=%u, count=%u", mode, offset, count );
 				CHECK_ERROR_AND_BREAK;
 			}
@@ -856,8 +854,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				// VBO based indexed rendering is added later, an offset may be needed.
 
 				vkCmdDrawIndexed( fCommandBuffer, count, 1U, 0U, 0U, 0U );
-
-				pendingPass = NULL;
 
 				DEBUG_PRINT( "Draw indexed: mode=%i, count=%u", mode, count );
 				CHECK_ERROR_AND_BREAK;
@@ -885,10 +881,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	if (fCommandBuffer != VK_NULL_HANDLE && fSwapchain != VK_NULL_HANDLE)
 	{
-		if (fFBO)
+		if (fFBO && !pendingPass ) // will still be pending if FBO uncommitted, i.e. nothing was drawn
 		{
-			Rtt_ASSERT( !pendingPass );
-
 			vkCmdEndRenderPass( fCommandBuffer );
 		}
 
@@ -1033,7 +1027,7 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 	}
 }
 
-void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPassBeginInfo * renderPassBeginInfo )
+void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPassBeginInfo *& renderPassBeginInfo )
 {
 	CommitFBO( renderPassBeginInfo );
 
@@ -1095,7 +1089,7 @@ void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPas
 	}
 }
 
-void VulkanCommandBuffer::CommitFBO( VkRenderPassBeginInfo * renderPassBeginInfo )
+void VulkanCommandBuffer::CommitFBO( VkRenderPassBeginInfo *& renderPassBeginInfo )
 {
 	if (fFBO && renderPassBeginInfo)
 	{
@@ -1105,6 +1099,8 @@ void VulkanCommandBuffer::CommitFBO( VkRenderPassBeginInfo * renderPassBeginInfo
 		renderPassBeginInfo->pClearValues = clearValues.data();
 
 		vkCmdBeginRenderPass( fCommandBuffer, renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
+
+		renderPassBeginInfo = NULL;
 	}
 }
 
