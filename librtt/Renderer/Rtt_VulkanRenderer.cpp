@@ -46,9 +46,6 @@ DynamicUniformData::~DynamicUniformData()
 DescriptorLists::DescriptorLists( VulkanState * state, VkDescriptorSetLayout setLayout, U32 count, bool isUserDataUBO )
 :	fSetLayout( setLayout ),
 	fDynamicAlignment( 0U ),
-	fBufferIndex( 0U ),
-	fOffset( 0U ),
-	fDirty( false ),
 	fIsUserDataUBO( isUserDataUBO ),
 	fResetPools( false )
 {
@@ -62,18 +59,18 @@ DescriptorLists::DescriptorLists( VulkanState * state, VkDescriptorSetLayout set
 	}
 
 	fBufferSize = U32( count * fDynamicAlignment );
+
+	Reset( VK_NULL_HANDLE );
 }
 
 DescriptorLists::DescriptorLists( VkDescriptorSetLayout setLayout, bool resetPools )
 :	fSetLayout( setLayout ),
 	fDynamicAlignment( 0U ),
-	fBufferIndex( 0U ),
 	fBufferSize( 0U ),
-	fOffset( 0U ),
-	fDirty( false ),
 	fIsUserDataUBO( false ),
 	fResetPools( resetPools )
 {
+	Reset( VK_NULL_HANDLE );
 }
 
 bool
@@ -142,7 +139,8 @@ DescriptorLists::Reset( VkDevice device )
 		fSets.clear();
 	}
 
-	fBufferIndex = fOffset = 0U;
+	fBufferIndex = ~0U;
+	fOffset = 0U;
 	fDirty = false;
 }
 

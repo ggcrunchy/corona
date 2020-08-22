@@ -614,13 +614,16 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 
 	// TODO: initialize FBO... (or come up with better way to do set up swapchain one...)
+	if (VK_NULL_HANDLE == fNumCommands)
+	{
+		fNumCommands = 0U;
+	}
 
 	for( U32 i = 0; i < fNumCommands; ++i )
 	{
 		Command command = Read<Command>();
 
 // printf( "GLCommandBuffer::Execute [%d/%d] %d\n", i, fNumCommands, command );
-
 		Rtt_ASSERT( command < kNumCommands );
 		switch( command )
 		{
@@ -1514,47 +1517,69 @@ void VulkanCommandBuffer::ReadUniform( const UniformsToWrite & utw, const void *
 
 VulkanCommandBuffer::UniformsToWrite VulkanCommandBuffer::PointToUniform( U32 index, size_t offset )
 {
-	UniformsToWrite uniformsToWrite = {};
 	bool isUniformUserData = index >= Uniform::kUserData0;
 	int uboIndex = isUniformUserData ? DescriptorLists::eUserDataUBO : DescriptorLists::eUBO;
 	DescriptorLists & lists = fLists[uboIndex];
-	
-	bool ok = PreparePool( fRenderer.GetState(), lists ), noSet = lists.fSets.empty();
+	bool ok = PreparePool( fRenderer.GetState(), lists ), newSet = false;
 
-	if (ok && (noSet || lists.fOffset == lists.fBufferSize))
+	if (ok && (~0U == lists.fBufferIndex || lists.fOffset == lists.fBufferSize)) // nothing allocated yet or current buffer full?
 	{
-		if (noSet)
-		{
-			VkDescriptorSetAllocateInfo allocInfo = {};
-
-			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			allocInfo.descriptorPool = lists.fPools.back();
-			allocInfo.descriptorSetCount = 1U;
-			allocInfo.pSetLayouts = &lists.fSetLayout;
-			
-			VkDescriptorSet set = VK_NULL_HANDLE;
-
-			vkAllocateDescriptorSets( fRenderer.GetState()->GetDevice(), &allocInfo, &set );
-
-			lists.fSets.push_back( set );
-		}
-
 		ok = lists.AddBuffer( fRenderer.GetState() );
 
 		if (ok)
 		{
+			++lists.fBufferIndex; // n.b. overflows to 0 first time
+
 			lists.fOffset = 0U;
+
+			newSet = lists.fBufferIndex == lists.fSets.size();
+		}
+	}
+	
+	UniformsToWrite uniformsToWrite = {};
+	DynamicUniformData * dud = ok ? &lists.fBufferData[lists.fBufferIndex] : NULL;
+
+	if (newSet)
+	{
+		VkDescriptorSetAllocateInfo allocInfo = {};
+
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.descriptorPool = lists.fPools.back();
+		allocInfo.descriptorSetCount = 1U;
+		allocInfo.pSetLayouts = &lists.fSetLayout;
+			
+		VkDescriptorSet set = VK_NULL_HANDLE;
+
+		vkAllocateDescriptorSets( fRenderer.GetState()->GetDevice(), &allocInfo, &set );
+
+		ok = set != VK_NULL_HANDLE;
+
+		if (ok)
+		{
+			VkWriteDescriptorSet descriptorWrite = {};
+			VkDescriptorBufferInfo bufferInfo = {};
+
+			bufferInfo.buffer = dud->fData->GetBuffer();
+			bufferInfo.range = lists.fBufferSize;
+
+			descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrite.descriptorCount = 1U;
+			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptorWrite.dstSet = set;
+			descriptorWrite.pBufferInfo = &bufferInfo;
+
+			vkUpdateDescriptorSets( fRenderer.GetState()->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
+				
+			lists.fSets.push_back( set );
 		}
 	}
 
 	if (ok)
 	{
-		DynamicUniformData & data = lists.fBufferData[lists.fBufferIndex];
-
-		uniformsToWrite.memory = data.fData->GetMemory();
+		uniformsToWrite.memory = dud->fData->GetMemory();
 		uniformsToWrite.offset = lists.fOffset;
 		
-		void * mapped = static_cast< U8 * >( data.fMapped ) + lists.fOffset;
+		void * mapped = static_cast< U8 * >( dud->fMapped ) + lists.fOffset;
 		float * dst;
 
 		if (isUniformUserData)
@@ -1567,7 +1592,7 @@ VulkanCommandBuffer::UniformsToWrite VulkanCommandBuffer::PointToUniform( U32 in
 			dst = reinterpret_cast< VulkanUBO * >( mapped )->fData;
 		}
 
-		uniformsToWrite.data = reinterpret_cast< U8 *>( dst ) + offset;
+		uniformsToWrite.data = reinterpret_cast< U8 * >( dst ) + offset;
 	}
 
 	return uniformsToWrite;
