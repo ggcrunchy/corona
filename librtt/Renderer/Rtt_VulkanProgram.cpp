@@ -305,10 +305,16 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 				// TODO: ensure no clashes when found in both
 			}
 		}
+		
+		spirv_cross::Resource buffer = resources.push_constant_buffers.front();
 
-		for (auto & push_constant : resources.push_constant_buffers)
+		for (auto & br : comp.get_active_buffer_ranges( buffer.id ))
 		{
+				std::string name = comp.get_member_name( buffer.base_type_id, br.index );
+				Maps::BufferValue value( br.offset, br.range, true );
+				auto iter = maps.buffer_values.insert( std::make_pair( name, value ) );
 			// TODO: verify this...
+
 /*
 			for (auto & range : comp.get_???( push_constant.id ))
 			{
@@ -323,6 +329,12 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 		for (auto & sampler : resources.sampled_images)
 		{
 			const spirv_cross::SPIRType & type = comp.get_type_from_variable( sampler.id );
+			U32 count = 0U;
+
+			if (!type.array.empty())
+			{
+				count = type.array.front();
+			}
 
 			maps.samplers[sampler.name] = type.image;
 			// TODO: ditto (although far less likely in vertex shader)
