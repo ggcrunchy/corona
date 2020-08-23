@@ -370,6 +370,7 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 	if (canContinue)
 	{
 		result = vulkanCommandBuffer->WaitAndAcquire( fState->GetDevice(), fState->GetSwapchain() );
+	CoronaLog( "ACQUIRE: %i", result );
 		canContinue = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
 	}
 
@@ -380,6 +381,7 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 		SetFrameBufferObject( fPrimaryFBO );
 
 		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], fDescriptorLists.data() + 3U * index );
+		CoronaLog("OK");
 	}
 
 	else
@@ -390,6 +392,7 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 			// TODO: should we then try again?
 			// or can we just do that straight out?
 				// if an acquire fails, then what????
+			CoronaLog( "Out of date" );
 		}
 	
 		else

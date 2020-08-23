@@ -86,7 +86,7 @@ class VulkanFrameBufferObject : public GPUResource
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 
-		void Bind( uint32_t index, VkRenderPassBeginInfo & passBeginInfo, U32 & id );
+		void Bind( VulkanRenderer & renderer, uint32_t index, VkRenderPassBeginInfo & passBeginInfo );
 
 	public:
 		std::vector< VkClearValue > & GetClearValues() { return fClearValues; }
@@ -107,8 +107,10 @@ class VulkanFrameBufferObject : public GPUResource
 	private:
 		VulkanRenderer & fRenderer;
 		VkExtent2D fExtent;
-		VkImage fImage;
 		std::vector< VkClearValue > fClearValues;
+		std::vector< VkDeviceMemory > fMemory;
+		std::vector< VkImage > fImages;
+		std::vector< VkImageView > fImageViews;
 		std::vector< ImageData > fImageData;
 		const RenderPassData * fRenderPassData;
 };

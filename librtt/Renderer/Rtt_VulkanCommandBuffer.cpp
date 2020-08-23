@@ -123,7 +123,7 @@ namespace /*anonymous*/
 
 	// Ensure command count is incremented
 	#define WRITE_COMMAND( command ) Write<Command>( command ); ++fNumCommands;
-	
+#define ENABLE_DEBUG_PRINT 1
 	// Used to validate that the appropriate OpenGL commands
 	// are being generated and that their arguments are correct
 	#if ENABLE_DEBUG_PRINT 
@@ -619,15 +619,15 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 
 	// TODO: initialize FBO... (or come up with better way to do set up swapchain one...)
-	if (VK_NULL_HANDLE == fNumCommands)
+	if (VK_NULL_HANDLE == fCommandBuffer)
 	{
 		fNumCommands = 0U;
 	}
-
+	CoronaLog("RENDERER, %u", fNumCommands);
 	for( U32 i = 0; i < fNumCommands; ++i )
 	{
 		Command command = Read<Command>();
-
+CoronaLog( "%u, %i", i, command );
 // printf( "GLCommandBuffer::Execute [%d/%d] %d\n", i, fNumCommands, command );
 		Rtt_ASSERT( command < kNumCommands );
 		switch( command )
@@ -636,13 +636,10 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			{
 				VulkanFrameBufferObject* fbo = Read<VulkanFrameBufferObject*>();
 
-				U32 id;
-
 				fFBO = fbo;
 				pendingPass = &renderPassBeginInfo;
 
-				fbo->Bind( fImageIndex, *pendingPass, id );
-				fRenderer.SetRenderPass( id, pendingPass->renderPass );
+				fbo->Bind( fRenderer, fImageIndex, *pendingPass );
 /*
 				DEBUG_PRINT( "Bind FrameBufferObject: Vulkan ID: %i, Vulkan Texture ID, if any: %d",
 								fbo->GetName(),
@@ -960,8 +957,10 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				U32 offset = Read<U32>();
 				U32 count = Read<U32>();
 
-				PrepareDraw( mode, pendingPass );
-				vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
+				if (PrepareDraw( mode, pendingPass ))
+				{
+					vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
+				}
 
 				DEBUG_PRINT( "Draw: mode=%i, offset=%u, count=%u", mode, offset, count );
 				CHECK_ERROR_AND_BREAK;
@@ -971,12 +970,14 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
 				U32 count = Read<U32>();
 
-				PrepareDraw( mode, pendingPass );
+				if (PrepareDraw( mode, pendingPass ))
+				{
 
-				// The first argument, offset, is currently unused. If support for non-
-				// VBO based indexed rendering is added later, an offset may be needed.
+					// The first argument, offset, is currently unused. If support for non-
+					// VBO based indexed rendering is added later, an offset may be needed.
 
-				vkCmdDrawIndexed( fCommandBuffer, count, 1U, 0U, 0U, 0U );
+					vkCmdDrawIndexed( fCommandBuffer, count, 1U, 0U, 0U, 0U );
+				}
 
 				DEBUG_PRINT( "Draw indexed: mode=%i, count=%u", mode, count );
 				CHECK_ERROR_AND_BREAK;
@@ -1001,20 +1002,23 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	DEBUG_PRINT( "--End Rendering: VulkanCommandBuffer --\n" );
 
 //	VULKAN_CHECK_ERROR();
-
+	const VulkanState * state = fRenderer.GetState();
+	CoronaLog( "ERR: %s", fCommandBuffer ? "YES" : "NO" );
+	VkResult endResult = VK_SUCCESS, submitResult = VK_SUCCESS;
+	bool okok=false;
 	if (fCommandBuffer != VK_NULL_HANDLE && fSwapchain != VK_NULL_HANDLE)
-	{
+	{okok=true;
 		if (fFBO && !pendingPass ) // will still be pending if FBO uncommitted, i.e. nothing was drawn
 		{
 			vkCmdEndRenderPass( fCommandBuffer );
 		}
 
 		fFBO = NULL;
-
-		VkResult endResult = vkEndCommandBuffer( fCommandBuffer );
+		CoronaLog("ENDING");
+		endResult = vkEndCommandBuffer( fCommandBuffer );
 
 		if (VK_SUCCESS == endResult)
-		{
+		{CoronaLog("ENDED");
 			VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 			VkSubmitInfo submitInfo = {};
 
@@ -1027,14 +1031,14 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			submitInfo.signalSemaphoreCount = 1U;
 			submitInfo.waitSemaphoreCount = 1U;
 
-			const VulkanState * state = fRenderer.GetState();
-
 			vkResetFences( state->GetDevice(), 1U, &fInFlight );
 
-			VkResult submitResult = vkQueueSubmit( state->GetGraphicsQueue(), 1, &submitInfo, fInFlight );
-
-			if (VK_SUCCESS == submitResult)
-			{
+			submitResult = vkQueueSubmit( state->GetGraphicsQueue(), 1, &submitInfo, fInFlight );
+			CoronaLog( "SUBMIT %i", submitResult );
+		}
+	}
+			if (true)//VK_SUCCESS == submitResult)
+			{CoronaLog("PRESENTING");
 				VkPresentInfoKHR presentInfo = {};
 
 				presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1048,6 +1052,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 				if (VK_ERROR_OUT_OF_DATE_KHR == presentResult || VK_SUBOPTIMAL_KHR == presentResult) // || framebufferResized)
 				{
+					CoronaLog("MUTTER: %i", presentResult);
 				//    framebufferResized = false;
 				}
 
@@ -1070,17 +1075,17 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 				fExecuteResult = submitResult;
 			}
-		}
+	//	}
 
-		else
+		if (endResult != VK_SUCCESS)//else
 		{
 			CoronaLog( "Failed to record command buffer!" );
 
 			fExecuteResult = endResult;
 		}
-	}
+//	}
 
-	else
+	if (!okok)//else
 	{
 		fExecuteResult = VK_ERROR_INITIALIZATION_FAILED;
 	}
@@ -1155,79 +1160,86 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 	}
 }
 
-void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPassBeginInfo *& renderPassBeginInfo )
+bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPassBeginInfo *& renderPassBeginInfo )
 {
-	CommitFBO( renderPassBeginInfo );
+	bool canDraw = fCommandBuffer != VK_NULL_HANDLE;
 
-	fRenderer.SetPrimitiveTopology( topology );
-
-	Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-	
-	ApplyUniforms( fProgram->GetGPUResource() );
-
-	VkDevice device = fRenderer.GetState()->GetDevice();
-	VkDescriptorSet sets[3] = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE };
-	int uboLists[] = { DescriptorLists::kUniforms, DescriptorLists::kUserData };
-	uint32_t dynamicOffsets[2], count = 0U;
-
-	std::vector< VkMappedMemoryRange > memoryRanges;
-
-	for (int i = 0; i < 2; ++i)
+	if (canDraw)
 	{
-		int listIndex = uboLists[i];
+		CommitFBO( renderPassBeginInfo );
 
-		if (fLists[listIndex].fDirty)
+		fRenderer.SetPrimitiveTopology( topology );
+
+		Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
+
+		ApplyUniforms( fProgram->GetGPUResource() );
+
+		VkDevice device = fRenderer.GetState()->GetDevice();
+		VkDescriptorSet sets[3] = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE };
+		int uboLists[] = { DescriptorLists::kUniforms, DescriptorLists::kUserData };
+		uint32_t dynamicOffsets[2], count = 0U;
+
+		std::vector< VkMappedMemoryRange > memoryRanges;
+
+		for (int i = 0; i < 2; ++i)
 		{
-			DescriptorLists & lists = fLists[listIndex];
+			int listIndex = uboLists[i];
 
-			sets[listIndex] = lists.fSets[lists.fBufferIndex];
-			dynamicOffsets[count++] = lists.fOffset;
+			if (fLists[listIndex].fDirty)
+			{
+				DescriptorLists & lists = fLists[listIndex];
 
-			DynamicUniformData & uniforms = lists.fDynamicUniforms[lists.fBufferIndex];
+				sets[listIndex] = lists.fSets[lists.fBufferIndex];
+				dynamicOffsets[count++] = lists.fOffset;
 
-			memcpy( static_cast< U8 * >( uniforms.fMapped ) + lists.fOffset, lists.fWorkspace, lists.fRawSize );
+				DynamicUniformData & uniforms = lists.fDynamicUniforms[lists.fBufferIndex];
+
+				memcpy( static_cast< U8 * >( uniforms.fMapped ) + lists.fOffset, lists.fWorkspace, lists.fRawSize );
 			
-			VkMappedMemoryRange range;
+				VkMappedMemoryRange range;
 
-			range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-			range.memory = uniforms.fBufferData->GetMemory();
-			range.offset = lists.fOffset;
-			range.size = lists.fRawSize;
+				range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+				range.memory = uniforms.fBufferData->GetMemory();
+				range.offset = lists.fOffset;
+				range.size = lists.fRawSize;
 
-			memoryRanges.push_back( range );
+				memoryRanges.push_back( range );
 
-			lists.fOffset += U32( lists.fDynamicAlignment );
+				lists.fOffset += U32( lists.fDynamicAlignment );
+			}
 		}
-	}
 
-	if (fLists[DescriptorLists::kTexture].fDirty)
-	{
-		sets[DescriptorLists::kTexture] = fTextures;
-	}
-
-	if (count || fLists[DescriptorLists::kTexture].fDirty)
-	{
-		if (count)
+		if (fLists[DescriptorLists::kTexture].fDirty)
 		{
-			vkFlushMappedMemoryRanges( device, memoryRanges.size(), memoryRanges.data() );
+			sets[DescriptorLists::kTexture] = fTextures;
 		}
 
-		vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fRenderer.GetPipelineLayout(), 0U, 3U, sets, count, dynamicOffsets );
+		if (count || fLists[DescriptorLists::kTexture].fDirty)
+		{
+			if (count)
+			{
+				vkFlushMappedMemoryRanges( device, memoryRanges.size(), memoryRanges.data() );
+			}
+
+			vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fRenderer.GetPipelineLayout(), 0U, 3U, sets, count, dynamicOffsets );
+		}
+
+		for (int i = 0; i < 3; ++i)
+		{
+			fLists[i].fDirty = false;
+		}
+
+		if (fPushConstants->IsValid())
+		{
+			U32 offset = fPushConstants->Offset(), size = fPushConstants->Range() * sizeof( float );
+
+			vkCmdPushConstants( fCommandBuffer, fRenderer.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, offset * sizeof( float ), size, fPushConstants->GetData( offset ) );
+
+			fPushConstants->Reset();
+		}
 	}
 
-	for (int i = 0; i < 3; ++i)
-	{
-		fLists[i].fDirty = false;
-	}
-
-	if (fPushConstants->IsValid())
-	{
-		U32 offset = fPushConstants->Offset(), size = fPushConstants->Range() * sizeof( float );
-
-		vkCmdPushConstants( fCommandBuffer, fRenderer.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, offset * sizeof( float ), size, fPushConstants->GetData( offset ) );
-
-		fPushConstants->Reset();
-	}
+	return canDraw;
 }
 
 void VulkanCommandBuffer::CommitFBO( VkRenderPassBeginInfo *& renderPassBeginInfo )
