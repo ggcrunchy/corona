@@ -137,10 +137,21 @@ class VulkanProgram : public GPUResource
 				bool fIsUniform;
 			};
 
-			typedef spirv_cross::SPIRType::ImageType SamplersValueType;
+			struct SamplerValue {
+				SamplerValue( const spirv_cross::SPIRType::ImageType & details, std::vector< U32 > & counts )
+				:	fDetails( details ),
+					fStages( 0U )
+				{
+					fCounts.swap( counts );
+				}
+
+				spirv_cross::SPIRType::ImageType fDetails;
+				std::vector< U32 > fCounts;
+				U32 fStages;
+			};
 
 			std::map< std::string, BufferValue > buffer_values;
-			std::map< std::string, SamplersValueType > samplers;
+			std::map< std::string, SamplerValue > samplers;
 			std::map< std::string, int > varyings;
 
 			U32 CheckForSampler( const std::string & key /* TODO: info... */ );

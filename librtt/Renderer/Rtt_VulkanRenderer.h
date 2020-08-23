@@ -53,30 +53,40 @@ struct DynamicUniformData {
 	DynamicUniformData();
 	~DynamicUniformData();
 
-	VulkanBufferData * fData;
+	VulkanBufferData * fBufferData;
 	void * fMapped;
 };
 
 struct DescriptorLists {
-	enum ListIndex { eUBO, eUserDataUBO, eTexture };
+	enum ListIndex { kUniforms, kUserData, kTexture };
 
-	DescriptorLists( VulkanState * state, VkDescriptorSetLayout setLayout, U32 count, bool isUserDataUBO );
+	DescriptorLists( VulkanState * state, VkDescriptorSetLayout setLayout, U32 count, size_t size );
 	DescriptorLists( VkDescriptorSetLayout setLayout, bool resetPools = false );
 
+	bool NoBuffers() const { return ~0U == fBufferIndex; }
+	bool IsBufferFull() const { return fOffset == fBufferSize; }
 	bool AddBuffer( VulkanState * state );
 	bool AddPool( VulkanState * state, VkDescriptorType type, U32 descriptorCount, U32 maxSets, VkDescriptorPoolCreateFlags flags = 0 );
-	void Reset( VkDevice device );
+	bool EnsureAvailability( VulkanState * state );
+	bool PreparePool( VulkanState * state );
+	void Reset( VkDevice device, void * workspace = NULL );
+
+	static bool IsMaskPushConstant( int index );
+	static bool IsPushConstant( int index );
+	static bool IsUserData( int index );
 
 	std::vector< VkDescriptorSet > fSets;
 	std::vector< VkDescriptorPool > fPools;
-	std::vector< DynamicUniformData > fBufferData; // in normal scenarios, we should only ever use one of these...
+	std::vector< DynamicUniformData > fDynamicUniforms; // in normal scenarios, we should only ever use one of these...
 	VkDescriptorSetLayout fSetLayout;
 	VkDeviceSize fDynamicAlignment;
 	U32 fBufferIndex; // ...i.e. index 0
 	U32 fBufferSize;
 	U32 fOffset;
+	U32 fUpdateCount;
+	U8 * fWorkspace;
+	size_t fRawSize;
 	bool fDirty;
-	bool fIsUserDataUBO;
 	bool fResetPools;
 };
 
@@ -102,7 +112,7 @@ class VulkanRenderer : public Renderer
 
 	public:
 		VulkanState * GetState() const { return fState; }
-		VkDescriptorSetLayout GetUBOLayout() const { return fUBOLayout; }
+		VkDescriptorSetLayout GetUniformsLayout() const { return fUniformsLayout; }
 		VkDescriptorSetLayout GetUserDataLayout() const { return fUserDataLayout; }
 		VkDescriptorSetLayout GetTextureLayout() const { return fTextureLayout; }
 		VkPipelineLayout GetPipelineLayout() const { return fPipelineLayout; }
@@ -163,7 +173,7 @@ class VulkanRenderer : public Renderer
 		std::map< PipelineKey, VkPipeline > fBuiltPipelines;
 		VkPipeline fFirstPipeline;
 		VkPipeline fBoundPipeline;
-		VkDescriptorSetLayout fUBOLayout;
+		VkDescriptorSetLayout fUniformsLayout;
 		VkDescriptorSetLayout fUserDataLayout;
 		VkDescriptorSetLayout fTextureLayout;
 		VkPipelineLayout fPipelineLayout;

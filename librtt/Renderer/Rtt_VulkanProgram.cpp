@@ -298,8 +298,7 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 			for (auto & br : comp.get_active_buffer_ranges( uniform.id ))
 			{
 				std::string name = comp.get_member_name( uniform.base_type_id, br.index );
-				Maps::BufferValue value( br.offset, br.range, true );
-				auto iter = maps.buffer_values.insert( std::make_pair( name, value ) );
+				auto iter = maps.buffer_values.insert( std::make_pair( name, Maps::BufferValue( br.offset, br.range, true ) ) );
 
 				iter.first->second.fStages |= 1U << kind;
 				// TODO: ensure no clashes when found in both
@@ -310,34 +309,24 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 
 		for (auto & br : comp.get_active_buffer_ranges( buffer.id ))
 		{
-				std::string name = comp.get_member_name( buffer.base_type_id, br.index );
-				Maps::BufferValue value( br.offset, br.range, true );
-				auto iter = maps.buffer_values.insert( std::make_pair( name, value ) );
-			// TODO: verify this...
+			std::string name = comp.get_member_name( buffer.base_type_id, br.index );
 
-/*
-			for (auto & range : comp.get_???( push_constant.id ))
-			{
-				std::string name = comp.get_member_name( push_constant.base_type_id, range.index );
-
-				maps.push_constants[name] = std::make_pair( range.offset, range.range );
-				// TODO: compare, if found in both?
-			}
-*/
+			maps.buffer_values.insert( std::make_pair( name, Maps::BufferValue( br.offset, br.range, false ) ) );
 		}
 
 		for (auto & sampler : resources.sampled_images)
 		{
 			const spirv_cross::SPIRType & type = comp.get_type_from_variable( sampler.id );
-			U32 count = 0U;
+			std::vector< U32 > counts;
 
-			if (!type.array.empty())
+			for (uint32_t i = 0; i < type.array.size(); ++i)
 			{
-				count = type.array.front();
+				counts.push_back( type.array[i] );
 			}
 
-			maps.samplers[sampler.name] = type.image;
-			// TODO: ditto (although far less likely in vertex shader)
+			auto iter = maps.samplers.insert( std::make_pair( sampler.name, Maps::SamplerValue( type.image, counts ) ) );
+
+			iter.first->second.fStages |= 1U << kind;
 		}
 
 		VkShaderModule shaderModule;

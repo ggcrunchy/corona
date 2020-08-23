@@ -28,7 +28,7 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 DynamicUniformData::DynamicUniformData()
-:	fData( NULL ),
+:	fBufferData( NULL ),
 	fMapped( NULL )
 {
 }
@@ -40,18 +40,19 @@ DynamicUniformData::~DynamicUniformData()
 //		vkUnmapMemory( device, fData->mMemory );
 	}
 
-	Rtt_DELETE( fData );
+	Rtt_DELETE( fBufferData );
 }
 
-DescriptorLists::DescriptorLists( VulkanState * state, VkDescriptorSetLayout setLayout, U32 count, bool isUserDataUBO )
+DescriptorLists::DescriptorLists( VulkanState * state, VkDescriptorSetLayout setLayout, U32 count, size_t size )
 :	fSetLayout( setLayout ),
 	fDynamicAlignment( 0U ),
-	fIsUserDataUBO( isUserDataUBO ),
+	fWorkspace( NULL ),
+	fRawSize( size ),
 	fResetPools( false )
 {
 	VkDeviceSize alignment = state->GetProperties().limits.minUniformBufferOffsetAlignment;
 
-	fDynamicAlignment = isUserDataUBO ? sizeof( VulkanUserDataUBO ) : sizeof( VulkanUBO );
+	fDynamicAlignment = fRawSize;
 
 	if (alignment > 0U)
 	{
@@ -67,7 +68,8 @@ DescriptorLists::DescriptorLists( VkDescriptorSetLayout setLayout, bool resetPoo
 :	fSetLayout( setLayout ),
 	fDynamicAlignment( 0U ),
 	fBufferSize( 0U ),
-	fIsUserDataUBO( false ),
+	fWorkspace( NULL ),
+	fRawSize( 0U ),
 	fResetPools( resetPools )
 {
 	Reset( VK_NULL_HANDLE );
@@ -80,12 +82,12 @@ DescriptorLists::AddBuffer( VulkanState * state )
 	
 	if (state->CreateBuffer( fBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, bufferData ))
 	{
-		fBufferData.push_back( DynamicUniformData{} );
+		fDynamicUniforms.push_back( DynamicUniformData{} );
 
-		DynamicUniformData & uniformData = fBufferData.back();
+		DynamicUniformData & uniformData = fDynamicUniforms.back();
 		
 		uniformData.fMapped = state->MapData( bufferData.GetMemory() );
-		uniformData.fData = bufferData.Extract( NULL );
+		uniformData.fBufferData = bufferData.Extract( NULL );
 
 		return true;
 	}
@@ -126,8 +128,84 @@ DescriptorLists::AddPool( VulkanState * state, VkDescriptorType type, U32 descri
 	}
 }
 
+bool
+DescriptorLists::EnsureAvailability( VulkanState * state )
+{
+	if (0U == fUpdateCount)
+	{
+		return true;
+	}
+/*
+	TODO:
+
+	U32 total = fUpdateCount * fDynamicAlignment;
+
+	we want to allocate enough new sets to accommodate this total, or fail
+	doling them out should go into a separate function
+*/
+
+	bool ok = PreparePool( state ), newSet = false;
+
+	if ( ok && ( NoBuffers() || IsBufferFull() ) )
+	{
+		ok = AddBuffer( state );
+
+		if (ok)
+		{
+			++fBufferIndex; // n.b. overflows to 0 first time
+
+			fOffset = 0U;
+
+			newSet = fBufferIndex == fSets.size();
+		}
+	}
+	
+	if (newSet)
+	{
+		VkDescriptorSetAllocateInfo allocInfo = {};
+
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.descriptorPool = fPools.back();
+		allocInfo.descriptorSetCount = 1U;
+		allocInfo.pSetLayouts = &fSetLayout;
+			
+		VkDescriptorSet set = VK_NULL_HANDLE;
+
+		vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &set );
+
+		ok = set != VK_NULL_HANDLE;
+
+		if (ok)
+		{
+			VkWriteDescriptorSet descriptorWrite = {};
+			VkDescriptorBufferInfo bufferInfo = {};
+
+			bufferInfo.buffer = fDynamicUniforms[fBufferIndex].fBufferData->GetBuffer();
+			bufferInfo.range = fBufferSize;
+
+			descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrite.descriptorCount = 1U;
+			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+			descriptorWrite.dstSet = set;
+			descriptorWrite.pBufferInfo = &bufferInfo;
+
+			vkUpdateDescriptorSets( state->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
+				
+			fSets.push_back( set );
+		}
+	}
+
+	return ok;
+}
+
+bool 
+DescriptorLists::PreparePool( VulkanState * state )
+{
+	return !fPools.empty() || AddPool( state, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1U, 1U );
+}
+
 void
-DescriptorLists::Reset( VkDevice device )
+DescriptorLists::Reset( VkDevice device, void * workspace )
 {
 	if (fResetPools)
 	{
@@ -139,9 +217,29 @@ DescriptorLists::Reset( VkDevice device )
 		fSets.clear();
 	}
 
+	fWorkspace = static_cast< U8 * >( workspace );
 	fBufferIndex = ~0U;
 	fOffset = 0U;
+	fUpdateCount = 0U;
 	fDirty = false;
+}
+
+bool
+DescriptorLists::IsMaskPushConstant( int index )
+{
+	return index >= Uniform::kMaskMatrix0 && index <= Uniform::kMaskMatrix2;
+}
+
+bool
+DescriptorLists::IsPushConstant( int index )
+{
+	return Uniform::kTotalTime == index || IsMaskPushConstant( index ); // TODO: others, e.g. SamplerIndex?
+}
+
+bool
+DescriptorLists::IsUserData( int index )
+{
+	return index >= Uniform::kUserData0;
 }
 
 VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
@@ -150,7 +248,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
     fSwapchainTexture( NULL ),
 	fPrimaryFBO( NULL ),
 	fFirstPipeline( VK_NULL_HANDLE ),
-	fUBOLayout( VK_NULL_HANDLE ),
+	fUniformsLayout( VK_NULL_HANDLE ),
 	fUserDataLayout( VK_NULL_HANDLE ),
 	fTextureLayout( VK_NULL_HANDLE ),
 	fPipelineLayout( VK_NULL_HANDLE )
@@ -175,7 +273,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetLayoutInfo, state->GetAllocator(), &fUBOLayout ))
+	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetLayoutInfo, state->GetAllocator(), &fUniformsLayout ))
 	{
 	}
 
@@ -217,7 +315,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	}
 	
 	VkPipelineLayoutCreateInfo createPipelineLayoutInfo = {};
-	VkDescriptorSetLayout layouts[] = { fUBOLayout, fUserDataLayout, fTextureLayout };
+	VkDescriptorSetLayout layouts[] = { fUniformsLayout, fUserDataLayout, fTextureLayout };
 
 	createPipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	createPipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
@@ -372,11 +470,11 @@ VulkanRenderer::BuildUpSwapchain( VkSwapchainKHR swapchain )
 
 	for (uint32_t i = 0; i < imageCount; ++i)
 	{
-		static_assert( DescriptorLists::eUBO < DescriptorLists::eUserDataUBO, "UBOs in unexpected order" );
-		static_assert( DescriptorLists::eUserDataUBO < DescriptorLists::eTexture, "UBO / textures in unexpected order" );
+		static_assert( DescriptorLists::kUniforms < DescriptorLists::kUserData, "UBOs in unexpected order" );
+		static_assert( DescriptorLists::kUserData < DescriptorLists::kTexture, "UBO / textures in unexpected order" );
 
-		fDescriptorLists.push_back( DescriptorLists( state, fUBOLayout, 4096U, false ) );
-		fDescriptorLists.push_back( DescriptorLists( state, fUserDataLayout, 1024U, true ) );
+		fDescriptorLists.push_back( DescriptorLists( state, fUniformsLayout, 4096U, sizeof( VulkanUniforms ) ) );
+		fDescriptorLists.push_back( DescriptorLists( state, fUserDataLayout, 1024U, sizeof( VulkanUserData ) ) );
 		fDescriptorLists.push_back( DescriptorLists( fTextureLayout ) );
 	}
 
