@@ -136,12 +136,14 @@ DescriptorLists::EnsureAvailability( VulkanState * state )
 		return true;
 	}
 /*
-	TODO:
+	TODO (probably once working properly?)
 
 	U32 total = fUpdateCount * fDynamicAlignment;
 
 	we want to allocate enough new sets to accommodate this total, or fail
 	doling them out should go into a separate function
+
+	alternatively could replace with larger buffer if possible, but of course could suddenly fail...
 */
 
 	bool ok = PreparePool( state ), newSet = false;
