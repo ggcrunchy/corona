@@ -140,9 +140,9 @@ class VulkanCommandBuffer : public CommandBuffer
 			Uniform* uniform;
 			U32 timestamp;
 		};
-		
+
 		void ApplyUniforms( GPUResource* resource );
-		void ApplyPushConstant( Uniform * uniform, size_t offset, size_t translationOffset );
+		void ApplyPushConstant( Uniform * uniform, size_t offset, size_t translationOffset, VulkanProgram * program = NULL, U32 index = ~0U );
 		void ApplyUniform( VulkanProgram & vulkanProgram, U32 index );
 		void WriteUniform( Uniform* uniform );
 		U8 * PointToUniform( U32 index, size_t offset );
