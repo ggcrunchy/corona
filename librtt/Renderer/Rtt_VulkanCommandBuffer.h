@@ -31,18 +31,16 @@ struct TimeTransform;
 
 // cf. shell_default_vulkan:
 
-struct alignas(16) VulkanUBO {
+struct alignas(16) VulkanUniforms {
 	float fData[6 * 4];
 };
 
-struct alignas(16) VulkanUserDataUBO {
+struct alignas(16) VulkanUserData {
 	float UserData[4][16];
 };
 
 struct alignas(16) VulkanPushConstants {
-	enum { kVectorCount = 5 };
-
-	float fData[kVectorCount * 4];
+	float fData[5 * 4];
 };
 
 // 
@@ -62,7 +60,6 @@ class VulkanCommandBuffer : public CommandBuffer
 
 		virtual void ClearUserUniforms();
 
-		bool PreparePool( VulkanState * state, DescriptorLists & lists );
 		bool PrepareTexturesPool( VulkanState * state );
 
 		// Generate the appropriate buffered OpenGL commands to accomplish the
@@ -127,23 +124,15 @@ class VulkanCommandBuffer : public CommandBuffer
 			}
 
 			void Reset();
-			void ClaimOffsets( U32 offset1, U32 offset2 );
-
-			static U32 VectorOffset( U32 offset );
+			void Write( U32 offset, const void * src, size_t size );
 
 			float * GetData( U32 offset );
-			bool IsValid() const { return lowerOffset < kVectorCount * 4; }
+			bool IsValid() const { return lowerOffset <= upperOffset; }
 			U32 Offset() const { return lowerOffset; }
-			U32 Range() const { return IsValid() ? upperOffset - lowerOffset + 4U : 0U; }
+			U32 Range() const { return IsValid() ? upperOffset - lowerOffset + 4U * sizeof( float ) : 0U; }
 
 			U32 lowerOffset;
 			U32 upperOffset;
-		};
-
-		struct UniformsToWrite {
-			VkDeviceMemory memory;
-			U32 offset;
-			U8 * data;
 		};
 
 		struct UniformUpdate
@@ -156,8 +145,9 @@ class VulkanCommandBuffer : public CommandBuffer
 		void ApplyPushConstant( Uniform * uniform, size_t offset, size_t translationOffset );
 		void ApplyUniform( VulkanProgram & vulkanProgram, U32 index );
 		void WriteUniform( Uniform* uniform );
-		void ReadUniform( const UniformsToWrite & utw, const void * value, size_t offset, size_t size );
-		UniformsToWrite PointToUniform( U32 index, size_t offset );
+		U8 * PointToUniform( U32 index, size_t offset );
+
+		DescriptorLists & ListsForIndex( U32 index );
 
 		UniformUpdate fUniformUpdates[Uniform::kNumBuiltInVariables];
 
@@ -179,6 +169,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkFence fInFlight;
 
 		// non-owned, retained only for frame:
+		// (some of this could go on the stack)
 		DescriptorLists * fLists;
 		VkCommandBuffer fCommandBuffer;
 		VkDescriptorSet fTextures;
@@ -195,7 +186,8 @@ class VulkanCommandBuffer : public CommandBuffer
 		dynamic uniform buffers - as a list?
 
 */
-		std::vector< VkMappedMemoryRange > fMappedMemoryRanges;
+		VulkanUniforms * fUniforms;
+		VulkanUserData * fUserData;
 		PushConstantState * fPushConstants;
 
 		VkSwapchainKHR fSwapchain;

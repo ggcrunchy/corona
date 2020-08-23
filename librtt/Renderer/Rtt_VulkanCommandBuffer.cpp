@@ -163,6 +163,8 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fRenderFinishedSemaphore( VK_NULL_HANDLE ),
 	fInFlight( VK_NULL_HANDLE ),
 	fLists( NULL ),
+	fUniforms( NULL ),
+	fUserData( NULL ),
 	fPushConstants( NULL ),
 	fCommandBuffer( VK_NULL_HANDLE ),
 	fTextures( VK_NULL_HANDLE ),
@@ -193,6 +195,8 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fImageAvailableSemaphore );
 	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fRenderFinishedSemaphore );
 
+	fUniforms = (VulkanUniforms *)alignedAlloc( sizeof( VulkanUniforms ), 16U );
+	fUserData = (VulkanUserData *)alignedAlloc( sizeof( VulkanUserData ), 16U );
 	fPushConstants = (PushConstantState *)alignedAlloc( sizeof( PushConstantState ), 16U );
 
 	if ( VK_NULL_HANDLE == fInFlight || VK_NULL_HANDLE == fImageAvailableSemaphore || VK_NULL_HANDLE == fRenderFinishedSemaphore)
@@ -207,8 +211,12 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 		fRenderFinishedSemaphore = VK_NULL_HANDLE;
 		fInFlight = VK_NULL_HANDLE;
 
+		alignedFree( fUniforms );
+		alignedFree( fUserData );
 		alignedFree( fPushConstants );
 
+		fUniforms = NULL;
+		fUserData = NULL;
 		fPushConstants = NULL;
 	}
 }
@@ -223,7 +231,9 @@ VulkanCommandBuffer::~VulkanCommandBuffer()
 	vkDestroySemaphore( device, fImageAvailableSemaphore, allocator );
 	vkDestroySemaphore( device, fRenderFinishedSemaphore, allocator );
 //	delete [] fTimerQueries;
-	Rtt_DELETE( fPushConstants );
+	alignedFree( fUniforms );
+	alignedFree( fUserData );
+	alignedFree( fPushConstants );
 }
 
 void
@@ -298,17 +308,12 @@ VulkanCommandBuffer::ClearUserUniforms()
 }
 
 bool 
-VulkanCommandBuffer::PreparePool( VulkanState * state, DescriptorLists & lists )
-{
-	return !lists.fPools.empty() || lists.AddPool( state, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1U, 1U );
-}
-
-bool 
 VulkanCommandBuffer::PrepareTexturesPool( VulkanState * state )
 {
-	const U32 descriptorCount = 1024U * 5U; // TODO: is this how to allocate this? (maybe arrays are just too complex / wasteful for the common case)
+	const U32 arrayCount = 1024U; // TODO: is this how to allocate this? (maybe arrays are just too complex / wasteful for the common case)
+	const U32 descriptorCount = arrayCount * 5U; // 2 + 3 masks (TODO: but could be more flexible? e.g. already reflected in VulkanProgram)
 
-	return fLists[DescriptorLists::eTexture].AddPool( state, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorCount, 1024U );
+	return fLists[DescriptorLists::kTexture].AddPool( state, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorCount, arrayCount );
 }
 
 void
@@ -682,8 +687,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			case kCommandApplyPushConstantScalar:
 			{
 				U32 offset = Read<U32>();
-				fPushConstants->ClaimOffsets(offset, offset);
-				*fPushConstants->GetData(offset) = Read<Real>();
+				Real value = Read<Real>();
+				fPushConstants->Write( offset, &value, sizeof( Real ) );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyPushConstantMaskTransform:
@@ -692,51 +697,52 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				Vec4 maskMatrix = Read<Vec4>();
 				U32 translationOffset = Read<U32>();
 				Vec2 maskTranslation = Read<Vec2>();
-				fPushConstants->ClaimOffsets(maskOffset, translationOffset);
-				memcpy(fPushConstants->GetData(maskOffset), &maskMatrix, sizeof( Vec4 ));
-				memcpy(fPushConstants->GetData(translationOffset), &maskTranslation, sizeof( Vec2 ));
+				fPushConstants->Write( maskOffset, &maskMatrix, sizeof( Vec4 ));
+				fPushConstants->Write( translationOffset, &maskTranslation, sizeof( Vec2 ) );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformScalar:
 			{
 				READ_UNIFORM_DATA( Real );
-				U32 index = Read<U32>(), offset=0U;
-				UniformsToWrite utw = PointToUniform( index, offset );
-				ReadUniform( utw, &value, offset, sizeof( Real ) );
+				U32 index = Read<U32>();
+				U8 * data = PointToUniform( index, location.fOffset );
+				memcpy( data, &value, sizeof( Real ) );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformVec2:
 			{
 				READ_UNIFORM_DATA( Vec2 );
-				U32 index = Read<U32>(), offset=0U;
-				UniformsToWrite utw = PointToUniform( index, offset );
-				ReadUniform( utw, &value, offset, sizeof( Vec2 ) );
+				U32 index = Read<U32>();
+				U8 * data = PointToUniform( index, location.fOffset );
+				memcpy( data, &value, sizeof( Vec2 ) );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformVec3:
 			{
 				READ_UNIFORM_DATA( Vec3 );
-				U32 index = Read<U32>(), offset=0U;
-				UniformsToWrite utw = PointToUniform( index, offset );
-				ReadUniform( utw, &value, offset, sizeof( Vec3 ) );
+				U32 index = Read<U32>();
+				U8 * data = PointToUniform( index, location.fOffset );
+				memcpy( data, &value, sizeof( Vec3 ) );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformVec4:
 			{
 				READ_UNIFORM_DATA( Vec4 );
-				U32 index = Read<U32>(), offset=0U;
-				UniformsToWrite utw = PointToUniform( index, offset );
-				ReadUniform( utw, &value, offset, sizeof( Vec4 ) );
+				U32 index = Read<U32>();
+				U8 * data = PointToUniform( index, location.fOffset );
+				memcpy( data, &value, sizeof( Vec4 ) );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformMat3:
 			{
 				READ_UNIFORM_DATA( Mat3 );
-				U32 index = Read<U32>(), offset=0U;
-				UniformsToWrite utw = PointToUniform( index, offset );
+				U32 index = Read<U32>();
+				U8 * data = PointToUniform( index, location.fOffset );
 				for (int i = 0; i < 3; ++i)
 				{
-					ReadUniform( utw, &value.data[i * 3], offset + i * 4, sizeof( Vec3 ) );
+					memcpy( data, &value.data[i * 3], sizeof( Vec3 ) );
+
+					data += sizeof( float ) * 4;
 				}
 				CHECK_ERROR_AND_BREAK;
 			}
@@ -744,9 +750,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			{
 				READ_UNIFORM_DATA( Mat4 );
 				U32 index = Read<U32>();
-				size_t offset = Read<size_t>();
-				UniformsToWrite utw = PointToUniform( index, offset );
-				ReadUniform( utw, &value, offset, sizeof( Mat4 ) );
+				U8 * data = PointToUniform( index, location.fOffset );
+				memcpy( data, &value, sizeof( Mat4 ) );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyPushConstantFromPointerScalar:
@@ -1072,9 +1077,9 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 
 		// lists = ..., ubo, user data, textures, ...
 
-		lists[0].Reset( device );
-		lists[1].Reset( device );
-		lists[2].Reset( device );
+		lists[DescriptorLists::kUniforms].Reset( device, fUniforms );
+		lists[DescriptorLists::kUserData].Reset( device, fUserData );
+		lists[DescriptorLists::kTexture].Reset( device );
 		
 		VkCommandBufferBeginInfo beginInfo = {};
 
@@ -1108,8 +1113,10 @@ void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPas
 
 	VkDevice device = fRenderer.GetState()->GetDevice();
 	VkDescriptorSet sets[3] = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE };
-	int uboLists[] = { DescriptorLists::eUBO, DescriptorLists::eUserDataUBO };
+	int uboLists[] = { DescriptorLists::kUniforms, DescriptorLists::kUserData };
 	uint32_t dynamicOffsets[2], count = 0U;
+
+	std::vector< VkMappedMemoryRange > memoryRanges;
 
 	for (int i = 0; i < 2; ++i)
 	{
@@ -1122,22 +1129,33 @@ void VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPas
 			sets[listIndex] = lists.fSets[lists.fBufferIndex];
 			dynamicOffsets[count++] = lists.fOffset;
 
+			DynamicUniformData & uniforms = lists.fDynamicUniforms[lists.fBufferIndex];
+
+			memcpy( static_cast< U8 * >( uniforms.fMapped ) + lists.fOffset, lists.fWorkspace, lists.fRawSize );
+			
+			VkMappedMemoryRange range;
+
+			range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+			range.memory = uniforms.fBufferData->GetMemory();
+			range.offset = lists.fOffset;
+			range.size = lists.fRawSize;
+
+			memoryRanges.push_back( range );
+
 			lists.fOffset += U32( lists.fDynamicAlignment );
 		}
 	}
 
-	if (fLists[DescriptorLists::eTexture].fDirty)
+	if (fLists[DescriptorLists::kTexture].fDirty)
 	{
-		sets[DescriptorLists::eTexture] = fTextures;
+		sets[DescriptorLists::kTexture] = fTextures;
 	}
 
-	if (count || fLists[DescriptorLists::eTexture].fDirty)
+	if (count || fLists[DescriptorLists::kTexture].fDirty)
 	{
 		if (count)
 		{
-			vkFlushMappedMemoryRanges( device, fMappedMemoryRanges.size(), fMappedMemoryRanges.data() );
-
-			fMappedMemoryRanges.clear();
+			vkFlushMappedMemoryRanges( device, memoryRanges.size(), memoryRanges.data() );
 		}
 
 		vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fRenderer.GetPipelineLayout(), 0U, 3U, sets, count, dynamicOffsets );
@@ -1183,11 +1201,10 @@ void VulkanCommandBuffer::AddGraphicsPipeline( VkPipeline pipeline )
 	}
 }
 
-
 VkDescriptorSet VulkanCommandBuffer::AddTexture( U32 unit, const VkDescriptorImageInfo & imageInfo )
 {
 	VulkanState * state = fRenderer.GetState();
-	DescriptorLists & list = fLists[DescriptorLists::eTexture];
+	DescriptorLists & list = fLists[DescriptorLists::kTexture];
 	bool isNew = memcmp( &imageInfo, &fTextureState[unit], sizeof( VkDescriptorImageInfo ) ) != 0;
 	bool becameDirty = isNew && !list.fDirty;
 
@@ -1290,6 +1307,11 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 	
 	VulkanProgram* vulkanProgram = static_cast< VulkanProgram * >( resource );
 
+	U32 & uniformsCount = fLists[DescriptorLists::kUniforms].fUpdateCount, savedUniformsCount = uniformsCount;
+	U32 & userDataCount = fLists[DescriptorLists::kUserData].fUpdateCount, savedUserDataCount = userDataCount;
+
+	uniformsCount = userDataCount = 0U;
+
 	for( U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
 	{
 		const UniformUpdate& update = fUniformUpdates[i];
@@ -1298,6 +1320,9 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 			ApplyUniform( *vulkanProgram, i );
 		}
 	}
+
+	uniformsCount += savedUniformsCount;
+	userDataCount += savedUserDataCount;
 
 	if (transformed)
 	{
@@ -1397,16 +1422,19 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 
 	if (isValid && location.IsValid())
 	{
-		if (index >= Uniform::kMaskMatrix0 && index <= Uniform::kMaskMatrix2)
+		if (DescriptorLists::IsPushConstant( index ))
 		{
-			VulkanProgram::Location translationLocation = vulkanProgram.GetTranslationLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
+			if (DescriptorLists::IsMaskPushConstant( index ))
+			{
+				VulkanProgram::Location translationLocation = vulkanProgram.GetTranslationLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
 
-			ApplyPushConstant( uniform, location.fOffset, translationLocation.fOffset );
-		}
+				ApplyPushConstant( uniform, location.fOffset, translationLocation.fOffset );
+			}
 
-		else if (Uniform::kTotalTime == index) // TODO: other push constants
-		{
-			ApplyPushConstant( uniform, location.fOffset, 0U );
+			else
+			{
+				ApplyPushConstant( uniform, location.fOffset, 0U );
+			}
 		}
 
 		else
@@ -1433,6 +1461,8 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 			
 			Write<U32>(location.fOffset);
 			WriteUniform( uniform );
+
+			ListsForIndex( index ).fUpdateCount = 1U; // cf. ApplyUniforms()
 		}
 	}
 
@@ -1440,6 +1470,9 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 	{
 		Uniform* uniform = update.uniform;
 
+		if (DescriptorLists::IsPushConstant( index ))
+		{
+		/*
 		if (index >= Uniform::kMaskMatrix0 && index <= Uniform::kMaskMatrix2)
 		{
 			VulkanProgram::Location translationLocation = vulkanProgram.GetTranslationLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
@@ -1451,9 +1484,12 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 		{
 			ApplyPushConstant( uniform, location.fOffset, 0U );
 		}
+		*/
+		}
 
 		else
 		{
+		/*
 			Uniform::DataType dataType = uniform->GetDataType();
 
 			switch( dataType )
@@ -1495,157 +1531,61 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 			}
 
 			Write<U32>(index);
+		*/
+			ListsForIndex( index ).fUpdateCount = 1U; // cf. ApplyUniforms()
 		}
 	}
 }
 
-void VulkanCommandBuffer::ReadUniform( const UniformsToWrite & utw, const void * value, size_t offset, size_t size )
+U8 * VulkanCommandBuffer::PointToUniform( U32 index, size_t offset )
 {
-	if (utw.data)
-	{
-		memcpy( utw.data, value, size );
+	DescriptorLists & lists = ListsForIndex( index );
+	bool ok = lists.EnsureAvailability( fRenderer.GetState() );
 
-		VkMappedMemoryRange range;
-
-		range.memory = utw.memory;
-		range.offset = utw.offset + offset;
-		range.size = size;
-
-		fMappedMemoryRanges.push_back( range );
-	}
+	return ok ? lists.fWorkspace + offset : NULL;
 }
 
-VulkanCommandBuffer::UniformsToWrite VulkanCommandBuffer::PointToUniform( U32 index, size_t offset )
+DescriptorLists & VulkanCommandBuffer::ListsForIndex( U32 index )
 {
-	bool isUniformUserData = index >= Uniform::kUserData0;
-	int uboIndex = isUniformUserData ? DescriptorLists::eUserDataUBO : DescriptorLists::eUBO;
-	DescriptorLists & lists = fLists[uboIndex];
-	bool ok = PreparePool( fRenderer.GetState(), lists ), newSet = false;
-
-	if (ok && (~0U == lists.fBufferIndex || lists.fOffset == lists.fBufferSize)) // nothing allocated yet or current buffer full?
-	{
-		ok = lists.AddBuffer( fRenderer.GetState() );
-
-		if (ok)
-		{
-			++lists.fBufferIndex; // n.b. overflows to 0 first time
-
-			lists.fOffset = 0U;
-
-			newSet = lists.fBufferIndex == lists.fSets.size();
-		}
-	}
-	
-	UniformsToWrite uniformsToWrite = {};
-	DynamicUniformData * dud = ok ? &lists.fBufferData[lists.fBufferIndex] : NULL;
-
-	if (newSet)
-	{
-		VkDescriptorSetAllocateInfo allocInfo = {};
-
-		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocInfo.descriptorPool = lists.fPools.back();
-		allocInfo.descriptorSetCount = 1U;
-		allocInfo.pSetLayouts = &lists.fSetLayout;
-			
-		VkDescriptorSet set = VK_NULL_HANDLE;
-
-		vkAllocateDescriptorSets( fRenderer.GetState()->GetDevice(), &allocInfo, &set );
-
-		ok = set != VK_NULL_HANDLE;
-
-		if (ok)
-		{
-			VkWriteDescriptorSet descriptorWrite = {};
-			VkDescriptorBufferInfo bufferInfo = {};
-
-			bufferInfo.buffer = dud->fData->GetBuffer();
-			bufferInfo.range = lists.fBufferSize;
-
-			descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			descriptorWrite.descriptorCount = 1U;
-			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			descriptorWrite.dstSet = set;
-			descriptorWrite.pBufferInfo = &bufferInfo;
-
-			vkUpdateDescriptorSets( fRenderer.GetState()->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
-				
-			lists.fSets.push_back( set );
-		}
-	}
-
-	if (ok)
-	{
-		uniformsToWrite.memory = dud->fData->GetMemory();
-		uniformsToWrite.offset = lists.fOffset;
-		
-		void * mapped = static_cast< U8 * >( dud->fMapped ) + lists.fOffset;
-		float * dst;
-
-		if (isUniformUserData)
-		{
-			dst = reinterpret_cast< VulkanUserDataUBO * >( mapped )->UserData[index - Uniform::kUserData0];
-		}
-
-		else
-		{
-			dst = reinterpret_cast< VulkanUBO * >( mapped )->fData;
-		}
-
-		uniformsToWrite.data = reinterpret_cast< U8 * >( dst ) + offset;
-	}
-
-	return uniformsToWrite;
+	return DescriptorLists::IsUserData( index ) ? fLists[DescriptorLists::kUserData] : fLists[DescriptorLists::kUniforms];
 }
 
 void VulkanCommandBuffer::PushConstantState::Reset()
 {
-	lowerOffset = ~0U;
+	upperOffset = 0U;
+	lowerOffset = 1U;
 }
 
-void VulkanCommandBuffer::PushConstantState::ClaimOffsets( U32 offset1, U32 offset2 )
+void VulkanCommandBuffer::PushConstantState::Write( U32 offset, const void * src, size_t size )
 {
-	if (offset2 < offset1)
-	{
-		U32 temp = offset2;
+	memcpy( GetData( offset ), src, size );
 
-		offset2 = offset1;
-		offset1 = temp;
-	}
-
-	offset1 = VectorOffset( offset1 );
-	offset2 = VectorOffset( offset2 );
+	offset &= 0xF0;
 
 	if (IsValid())
 	{
-		if (offset1 < lowerOffset)
+		if (offset < lowerOffset)
 		{
-			lowerOffset = offset1;
+			lowerOffset = offset;
 		}
 
-		if (offset2 > upperOffset)
+		if (offset > upperOffset)
 		{
-			upperOffset = offset2;
+			upperOffset = offset;
 		}
 	}
 
 	else
 	{
-		lowerOffset = offset1;
-		upperOffset = offset2;
+		lowerOffset = upperOffset = offset;
 	}
-}
-
-U32 VulkanCommandBuffer::PushConstantState::VectorOffset( U32 offset )
-{
-	return offset & 0xF0;
 }
 
 float * VulkanCommandBuffer::PushConstantState::GetData( U32 offset )
 {
-	U8 * data = reinterpret_cast< U8 * >( fData );
+	U8 * bytes = reinterpret_cast< U8 * >( fData );
 
-	return reinterpret_cast< float * >( data + offset );
+	return reinterpret_cast< float * >( bytes + offset );
 }
 
 // ----------------------------------------------------------------------------
