@@ -46,7 +46,7 @@ RenderPassKey::operator < ( const RenderPassKey & other ) const
 	return result < 0 || (0 == result && other.fContents.size() > minSize);
 }
 
-VulkanBufferData::VulkanBufferData( VkDevice device, VkAllocationCallbacks * allocator )
+VulkanBufferData::VulkanBufferData( VkDevice device, const VkAllocationCallbacks * allocator )
 :	fDevice( device ),
 	fAllocator( allocator ),
 	fBuffer( VK_NULL_HANDLE ),

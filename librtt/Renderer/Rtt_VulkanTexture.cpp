@@ -338,7 +338,7 @@ VulkanTexture::Load( Texture * texture, VkFormat format, const VulkanBufferData 
 {
     fState->StageData( bufferData.GetMemory(), texture->GetData(), texture->GetSizeInBytes() );
         
-    if (TransitionImageLayout( fData.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels ))
+    if (TransitionImageLayout( fState, fData.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels ))
     {
         CopyBufferToImage( bufferData.GetBuffer(), fData.fImage, texture->GetWidth(), texture->GetHeight() );
 
@@ -376,7 +376,7 @@ HasStencilComponent( VkFormat format )
 }
 
 bool
-VulkanTexture::TransitionImageLayout( VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels )
+VulkanTexture::TransitionImageLayout( VulkanState * state, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels )
 {
     VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 
@@ -390,7 +390,7 @@ VulkanTexture::TransitionImageLayout( VkImage image, VkFormat format, VkImageLay
         }
     }
 
-    VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
+    VkCommandBuffer commandBuffer = state->BeginSingleTimeCommands();
     VkImageMemoryBarrier barrier = PrepareBarrier( image, aspectFlags, mipLevels );
 
     barrier.oldLayout = oldLayout;
@@ -444,7 +444,7 @@ VulkanTexture::TransitionImageLayout( VkImage image, VkFormat format, VkImageLay
         1U, &barrier // image memory
     );
 
-    fState->EndSingleTimeCommands( commandBuffer );
+    state->EndSingleTimeCommands( commandBuffer );
 
     return true;
 }

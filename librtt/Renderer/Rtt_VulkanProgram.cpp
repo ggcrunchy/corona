@@ -275,8 +275,9 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 	
 	shaderc_shader_kind kind = shaderc_shader_kind( ikind );
 	const char * what = shaderc_vertex_shader == kind ? "vertex shader" : "fragment shader";
+	bool isVertexSource = 'v' == what[0];
 
-	ReplaceVaryings( 'v' == what[0], code, maps );
+	ReplaceVaryings( isVertexSource, code, maps );
 
 	shaderc_compilation_result_t result = shaderc_compile_into_spv( fState->GetCompiler(), code.data(), code.size(), shaderc_vertex_shader, what, "main", fState->GetCompileOptions() );
 	shaderc_compilation_status status = shaderc_result_get_compilation_status( result );
@@ -305,13 +306,16 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 			}
 		}
 		
-		spirv_cross::Resource buffer = resources.push_constant_buffers.front();
-
-		for (auto & br : comp.get_active_buffer_ranges( buffer.id ))
+		if (isVertexSource)
 		{
-			std::string name = comp.get_member_name( buffer.base_type_id, br.index );
+			spirv_cross::Resource buffer = resources.push_constant_buffers.front();
 
-			maps.buffer_values.insert( std::make_pair( name, Maps::BufferValue( br.offset, br.range, false ) ) );
+			for (auto & br : comp.get_active_buffer_ranges( buffer.id ))
+			{
+				std::string name = comp.get_member_name( buffer.base_type_id, br.index );
+
+				maps.buffer_values.insert( std::make_pair( name, Maps::BufferValue( br.offset, br.range, false ) ) );
+			}
 		}
 
 		for (auto & sampler : resources.sampled_images)

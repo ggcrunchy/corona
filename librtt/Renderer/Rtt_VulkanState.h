@@ -43,7 +43,7 @@ struct RenderPassData {
 
 class VulkanBufferData {
 public:
-	VulkanBufferData( VkDevice device, VkAllocationCallbacks * allocator );
+	VulkanBufferData( VkDevice device, const VkAllocationCallbacks * allocator );
 	~VulkanBufferData();
 
 	VkBuffer GetBuffer() const;
@@ -55,7 +55,7 @@ public:
 	void Disown();
 
 private:
-	VkAllocationCallbacks * fAllocator;
+	const VkAllocationCallbacks * fAllocator;
 	VkDevice fDevice;
 	VkBuffer fBuffer;
 	VkDeviceMemory fMemory;
@@ -79,7 +79,7 @@ class VulkanState
 		};
 
 	public:
-		VkAllocationCallbacks * GetAllocator() const { return fAllocator; }
+		const VkAllocationCallbacks * GetAllocator() const { return fAllocator; }
 		VkInstance GetInstance() const { return fInstance; }
 		VkDevice GetDevice() const { return fDevice; }
 		VkPhysicalDevice GetPhysicalDevice() const { return fPhysicalDevice; }

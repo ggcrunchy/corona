@@ -217,7 +217,6 @@ TextureSwapchain::GetHeight() const
 
 VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanRenderer & renderer )
 :	fRenderer( renderer ),
-	fImage( VK_NULL_HANDLE ),
 	fRenderPassData( NULL )
 {
 }
@@ -252,11 +251,14 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 	fExtent.height = texture->GetHeight();
 
 	CleanUpImageData();
+	
+	const std::vector< VkImage > & swapchainImages = fRenderer.GetSwapchainImages();
+
+	RenderPassBuilder builder;
 
 	VulkanState * state = fRenderer.GetState();
-	const std::vector< VkImage > & swapchainImages = fRenderer.GetSwapchainImages();
-	
-	RenderPassBuilder builder;
+	VkDevice device = state->GetDevice();
+	const VkAllocationCallbacks * allocator = state->GetAllocator();
 
 	if (Texture::kNumFilters == texture->GetFilter()) // swapchain
 	{
@@ -264,10 +266,42 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 		const VulkanState::SwapchainDetails & details = state->GetSwapchainDetails();
 		VkFormat format = details.fFormat.format;
+/*
+VkFormat colorFormat = swapChainImageFormat;
+
+createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
+colorImageView = createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+
+transitionImageLayout(colorImage, colorFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1);
+
+    bool ok = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
+//    if ()
+*/
+		VkSampleCountFlagBits sampleCount = VkSampleCountFlagBits( state->GetSampleCountFlags() );
+		VulkanTexture::ImageData color = VulkanTexture::CreateImage(
+			state,
+			fExtent.width, fExtent.height, 1U,
+			sampleCount,
+			format,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+		);
+		VkImageView colorView = VulkanTexture::CreateImageView( state, color.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
+
+		VulkanTexture::TransitionImageLayout( state, color.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1U );
+
+		fImages.push_back( color.fImage );
+		fMemory.push_back( color.fMemory );
+		fImageViews.push_back( colorView );
 
 		for (size_t i = 0; i < swapchainImages.size(); ++i)
 		{
-			fImageData[i].fViews.push_back( VulkanTexture::CreateImageView( state, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U ) );
+			VkImageView swapchainView = VulkanTexture::CreateImageView( state, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
+
+			fImageData[i].fViews.push_back( colorView );
+			fImageData[i].fViews.push_back( swapchainView );
+			fImageViews.push_back( swapchainView );
 		}
 
 		builder.AddColorAttachment( format );
@@ -298,9 +332,6 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 	builder.GetKey( key );
 
 	fRenderPassData = state->FindRenderPassData( key );
-
-	VkDevice device = state->GetDevice();
-	const VkAllocationCallbacks * allocator = state->GetAllocator();
 
 	if (!fRenderPassData)
 	{
@@ -379,21 +410,16 @@ VulkanFrameBufferObject::Destroy()
 					name );*/
 
 	CleanUpImageData();
-
-	VulkanState * state = fRenderer.GetState();
-
-	vkDestroyImage( state->GetDevice(), fImage, state->GetAllocator() );
-
-	fImage = VK_NULL_HANDLE;
 }
 
 void
-VulkanFrameBufferObject::Bind( uint32_t index, VkRenderPassBeginInfo & passBeginInfo, U32 & id )
+VulkanFrameBufferObject::Bind( VulkanRenderer & renderer, uint32_t index, VkRenderPassBeginInfo & passBeginInfo )
 {
 	passBeginInfo.framebuffer = fImageData[index].fFramebuffer;
 	passBeginInfo.renderArea.extent = fExtent;
 	passBeginInfo.renderPass = fRenderPassData->fPass;
-	id = fRenderPassData->fID;
+
+	fRenderer.SetRenderPass( fRenderPassData->fID, fRenderPassData->fPass );
 }
 
 void
@@ -402,30 +428,31 @@ VulkanFrameBufferObject::CleanUpImageData()
 	VulkanState * state = fRenderer.GetState();
 	VkDevice device = state->GetDevice();
 	const VkAllocationCallbacks * allocator = state->GetAllocator();
-	const std::vector< VkImage > & swapchainImages = fRenderer.GetSwapchainImages();
-
-	if (VK_NULL_HANDLE == fImage) // swapchain
-	{
-		for (auto & imageData : fImageData)
-		{
-			for (VkImageView view : imageData.fViews)
-			{
-				vkDestroyImageView( device, view, allocator );
-			}
-		}
-	}
-
-	else
-	{
-		// TODO (might be the same)
-	}
 
 	for (auto & imageData : fImageData)
 	{
 		vkDestroyFramebuffer( device, imageData.fFramebuffer, allocator );
 	}
 
+	for (VkImageView view : fImageViews)
+	{
+		vkDestroyImageView( device, view, allocator );
+	}
+
+	for (VkImage image : fImages)
+	{
+		vkDestroyImage( device, image, allocator );
+	}
+
+	for (VkDeviceMemory memory : fMemory)
+	{
+		vkFreeMemory( device, memory, allocator );
+	}
+
 	fImageData.clear();
+	fImageViews.clear();
+	fImages.clear();
+	fMemory.clear();
 }
 /*
 GLuint
