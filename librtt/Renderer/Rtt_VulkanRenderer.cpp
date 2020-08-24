@@ -250,6 +250,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
     fSwapchainTexture( NULL ),
 	fPrimaryFBO( NULL ),
 	fFirstPipeline( VK_NULL_HANDLE ),
+	fBoundPipeline( VK_NULL_HANDLE ),
 	fUniformsLayout( VK_NULL_HANDLE ),
 	fUserDataLayout( VK_NULL_HANDLE ),
 	fTextureLayout( VK_NULL_HANDLE ),
