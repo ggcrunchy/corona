@@ -715,13 +715,30 @@ VulkanRenderer::Create( const CPUResource* resource )
 	}
 }
 
+static uint8_t &
+WithDynamicByte( uint8_t states[], uint8_t value, uint8_t & bit )
+{
+	uint8_t byteIndex = value / 8U;
+
+	bit = 1U << (value - byteIndex * 8U);
+
+	return states[byteIndex];
+}
+
 static void
 SetDynamicStateBit( uint8_t states[], uint8_t value )
 {
-	uint8_t offset = value;
-	uint8_t byteIndex = offset / 8U;
+	uint8_t bit, & byte = WithDynamicByte( states, value, bit );
 
-	states[byteIndex] |= 1U << (offset - byteIndex * 8U);
+	byte |= bit;
+}
+
+static bool
+IsDynamicBitSet( uint8_t states[], uint8_t value )
+{
+	uint8_t bit, & byte = WithDynamicByte( states, value, bit );
+
+	return !!(byte & bit);
 }
 
 void
@@ -750,13 +767,15 @@ VulkanRenderer::InitializePipelineState()
 
 	memcpy( fDefaultKey.fContents.data(), &packedPipeline, sizeof( PackedPipeline ) );
 
+	fWorkingKey = fDefaultKey;
+
 	RestartWorkingPipeline();
 }
 
 void
 VulkanRenderer::RestartWorkingPipeline()
 {
-    fPipelineCreateInfo = PipelineCreateInfo();
+    new (&fPipelineCreateInfo) PipelineCreateInfo;
 }
 
 void
@@ -767,10 +786,27 @@ VulkanRenderer::ResolvePipeline()
 
 	if (iter == fBuiltPipelines.end())
 	{
+		PackedPipeline & packedPipeline = GetPackedPipeline( fWorkingKey.fContents );
+
+		std::vector< VkDynamicState > dynamicStates;
+
+		for (uint8_t i = 0; i < kFinalDynamicState; ++i)
+		{
+			if (IsDynamicBitSet( packedPipeline.fDynamicStates, i ))
+			{
+				dynamicStates.push_back( VkDynamicState( i ) );
+			}
+		}
+
+		VkPipelineDynamicStateCreateInfo createDynamicStateInfo = {};
+
+		createDynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		createDynamicStateInfo.dynamicStateCount = dynamicStates.size();
+		createDynamicStateInfo.pDynamicStates = dynamicStates.data();
+
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
 
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		
         vertexInputInfo.pVertexAttributeDescriptions = fPipelineCreateInfo.fVertexAttributeDescriptions.data();
         vertexInputInfo.pVertexBindingDescriptions = fPipelineCreateInfo.fVertexBindingDescriptions.data();
         vertexInputInfo.vertexAttributeDescriptionCount = fPipelineCreateInfo.fVertexAttributeDescriptions.size();
@@ -779,13 +815,20 @@ VulkanRenderer::ResolvePipeline()
 		VkPipelineViewportStateCreateInfo viewportInfo = {};
 
 		viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		viewportInfo.scissorCount = 1U;
+		viewportInfo.viewportCount = 1U;
+
+		fPipelineCreateInfo.fColorBlend.attachmentCount = fPipelineCreateInfo.fColorBlendAttachments.size();
+		fPipelineCreateInfo.fColorBlend.pAttachments = fPipelineCreateInfo.fColorBlendAttachments.data();
 
         VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
 
         pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		pipelineCreateInfo.basePipelineHandle = fFirstPipeline;
+		pipelineCreateInfo.basePipelineIndex = -1;
 		pipelineCreateInfo.flags = fFirstPipeline != VK_NULL_HANDLE ? VK_PIPELINE_CREATE_DERIVATIVE_BIT : VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
 		pipelineCreateInfo.layout = fPipelineLayout;
+		pipelineCreateInfo.pDynamicState = &createDynamicStateInfo;
         pipelineCreateInfo.pInputAssemblyState = &fPipelineCreateInfo.fInputAssembly;
         pipelineCreateInfo.pColorBlendState = &fPipelineCreateInfo.fColorBlend;
         pipelineCreateInfo.pDepthStencilState = &fPipelineCreateInfo.fDepthStencil;

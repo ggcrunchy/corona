@@ -142,7 +142,6 @@ class VulkanRenderer : public Renderer
 		struct PipelineCreateInfo {
 			PipelineCreateInfo();
 
-			std::vector< VkDynamicState > fDynamicState;
 			std::vector< VkPipelineColorBlendAttachmentState > fColorBlendAttachments;
 			std::vector< VkPipelineShaderStageCreateInfo > fShaderStages;
 			std::vector< VkVertexInputAttributeDescription > fVertexAttributeDescriptions;
