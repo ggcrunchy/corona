@@ -335,7 +335,7 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 
 		VkShaderModule shaderModule;
 
-		if (VK_SUCCESS == vkCreateShaderModule( fState->GetDevice(), &createShaderModuleInfo, nullptr, &shaderModule ))
+		if (VK_SUCCESS == vkCreateShaderModule( fState->GetDevice(), &createShaderModuleInfo, fState->GetAllocator(), &shaderModule ))
 		{
 			module = shaderModule;
 		}
