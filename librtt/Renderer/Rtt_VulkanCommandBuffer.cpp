@@ -369,7 +369,7 @@ void
 VulkanCommandBuffer::BindUniform( Uniform* uniform, U32 unit )
 {
 	Rtt_ASSERT( unit < Uniform::kNumBuiltInVariables );
-
+	
 	UniformUpdate& update = fUniformUpdates[ unit ];
 	update.uniform = uniform;
 	update.timestamp = gUniformTimestamp++;
@@ -688,6 +688,7 @@ CoronaLog( "%u, %i", i, command );
 				U32 offset = Read<U32>();
 				Real value = Read<Real>();
 				fPushConstants->Write( offset, &value, sizeof( Real ) );
+				DEBUG_PRINT( "Set Push Constant: value=%f location=%i", value, offset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyPushConstantMaskTransform:
@@ -698,6 +699,8 @@ CoronaLog( "%u, %i", i, command );
 				Vec2 maskTranslation = Read<Vec2>();
 				fPushConstants->Write( maskOffset, &maskMatrix, sizeof( Vec4 ));
 				fPushConstants->Write( translationOffset, &maskTranslation, sizeof( Vec2 ) );
+				DEBUG_PRINT( "Set Push Constant, mask matrix: value=(%f, %f, %f, %f) location=%i", maskMatrix.data[0], maskMatrix.data[1], maskMatrix.data[2], maskMatrix.data[3], maskOffset );
+				DEBUG_PRINT( "Set Push Constant, mask translation: value=(%f, %f) location=%i", maskTranslation.data[0], maskTranslation.data[1], translationOffset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformScalar:
@@ -706,6 +709,7 @@ CoronaLog( "%u, %i", i, command );
 				U32 index = Read<U32>();
 				U8 * data = PointToUniform( index, location.fOffset );
 				memcpy( data, &value, sizeof( Real ) );
+				DEBUG_PRINT( "Set Uniform: value=%f location=%i", value, location.fOffset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformVec2:
@@ -714,6 +718,7 @@ CoronaLog( "%u, %i", i, command );
 				U32 index = Read<U32>();
 				U8 * data = PointToUniform( index, location.fOffset );
 				memcpy( data, &value, sizeof( Vec2 ) );
+				DEBUG_PRINT( "Set Uniform: value=(%f, %f) location=%i", value.data[0], value.data[1], location.fOffset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformVec3:
@@ -722,6 +727,7 @@ CoronaLog( "%u, %i", i, command );
 				U32 index = Read<U32>();
 				U8 * data = PointToUniform( index, location.fOffset );
 				memcpy( data, &value, sizeof( Vec3 ) );
+				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location.fOffset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformVec4:
@@ -730,6 +736,7 @@ CoronaLog( "%u, %i", i, command );
 				U32 index = Read<U32>();
 				U8 * data = PointToUniform( index, location.fOffset );
 				memcpy( data, &value, sizeof( Vec4 ) );
+				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformMat3:
@@ -743,6 +750,7 @@ CoronaLog( "%u, %i", i, command );
 
 					data += sizeof( float ) * 4;
 				}
+				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 9 );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformMat4:
@@ -751,6 +759,7 @@ CoronaLog( "%u, %i", i, command );
 				U32 index = Read<U32>();
 				U8 * data = PointToUniform( index, location.fOffset );
 				memcpy( data, &value, sizeof( Mat4 ) );
+				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyPushConstantFromPointerScalar:
@@ -760,6 +769,7 @@ CoronaLog( "%u, %i", i, command );
 				{
 					fPushConstants->Write( location.fOffset, &value, sizeof( Real ) );
 				}
+				DEBUG_PRINT( "Set Push Constant: value=%f location=%i", value, location.fOffset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyPushConstantFromPointerMaskTransform:
@@ -772,6 +782,8 @@ CoronaLog( "%u, %i", i, command );
 					fPushConstants->Write( location.fOffset, &value, sizeof( Vec4 ));
 					fPushConstants->Write( translationLocation.fOffset, &maskTranslation, sizeof( Vec2 ) );
 				}
+				DEBUG_PRINT( "Set Push Constant, mask matrix: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
+				DEBUG_PRINT( "Set Push Constant, mask translation: value=(%f, %f) location=%i", maskTranslation.data[0], maskTranslation.data[1], translationLocation.fOffset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformFromPointerScalar:
@@ -782,6 +794,7 @@ CoronaLog( "%u, %i", i, command );
 					U8 * data = PointToUniform( index, location.fOffset );
 					memcpy( data, &value, sizeof( Real ) );
 				}
+				DEBUG_PRINT( "Set Uniform: value=%f location=%i", value, location.fOffset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformFromPointerVec2:
@@ -792,6 +805,7 @@ CoronaLog( "%u, %i", i, command );
 					U8 * data = PointToUniform( index, location.fOffset );
 					memcpy( data, &value, sizeof( Vec2 ) );
 				}
+				DEBUG_PRINT( "Set Uniform: value=(%f, %f) location=%i", value.data[0], value.data[1], location.fOffset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformFromPointerVec3:
@@ -802,6 +816,7 @@ CoronaLog( "%u, %i", i, command );
 					U8 * data = PointToUniform( index, location.fOffset );
 					memcpy( data, &value, sizeof( Vec3 ) );
 				}
+				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location.fOffset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformFromPointerVec4:
@@ -812,6 +827,7 @@ CoronaLog( "%u, %i", i, command );
 					U8 * data = PointToUniform( index, location.fOffset );
 					memcpy( data, &value, sizeof( Vec4 ) );
 				}
+				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformFromPointerMat3:
@@ -827,6 +843,7 @@ CoronaLog( "%u, %i", i, command );
 						data += sizeof( float ) * 4;
 					}
 				}
+				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 9 );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandApplyUniformFromPointerMat4:
@@ -837,6 +854,7 @@ CoronaLog( "%u, %i", i, command );
 					U8 * data = PointToUniform( index, location.fOffset );
 					memcpy( data, &value, sizeof( Mat4 ) );
 				}
+				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandEnableBlend:
@@ -1227,6 +1245,8 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPas
 		{
 			sets[nsets++] = fTextures;
 		}
+			
+		VkPipelineLayout pipelineLayout = fRenderer.GetPipelineLayout();
 
 		if (nsets > 0U)
 		{
@@ -1234,8 +1254,6 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPas
 			{
 				vkFlushMappedMemoryRanges( device, memoryRanges.size(), memoryRanges.data() );
 			}
-			
-			VkPipelineLayout pipelineLayout = fRenderer.GetPipelineLayout();
 
 			if (2U == nsets && !fLists[DescriptorLists::kUserData].fDirty) // split?
 			{
@@ -1261,7 +1279,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPas
 		{
 			U32 offset = fPushConstants->Offset(), size = fPushConstants->Range() * sizeof( float );
 
-			vkCmdPushConstants( fCommandBuffer, fRenderer.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, offset * sizeof( float ), size, fPushConstants->GetData( offset ) );
+			vkCmdPushConstants( fCommandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, offset * sizeof( float ), size, fPushConstants->GetData( offset ) );
 
 			fPushConstants->Reset();
 		}
@@ -1434,8 +1452,6 @@ void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, s
 	{
 		Rtt_ASSERT( Uniform::kMat3 == dataType );
 
-	
-
 		// Mindful of the difficulties mentioned re. kVec3 in https://stackoverflow.com/questions/38172696/should-i-ever-use-a-vec3-inside-of-a-uniform-buffer-or-shader-storage-buffer-o,
 		// mask matrices are decomposed as a vec2[2] and vec2. Three components are always constant and thus omitted.
 		// The vec2 array avoids consuming two vectors, cf. https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL).
@@ -1558,8 +1574,9 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 					Rtt_ASSERT_NOT_REACHED();
 			}
 			
-			Write<U32>(location.fOffset);
+			Write<VulkanProgram::Location>(location);
 			WriteUniform( uniform );
+			Write<U32>(index);
 
 			ListsForIndex( index ).fDirty = true;
 		}
