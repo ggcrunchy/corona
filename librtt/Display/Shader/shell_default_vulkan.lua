@@ -68,7 +68,6 @@ varying P_UV vec2 v_TexCoord;
 varying P_COLOR vec4 v_ColorScale;
 varying P_DEFAULT vec4 v_UserData;
 varying P_DEFAULT float v_TotalTime;
-varying P_DEFAULT int v_SamplerIndex;
 
 #if MASK_COUNT > 0
     varying P_UV vec2 v_MaskUV0;
@@ -100,7 +99,6 @@ void main()
 	v_ColorScale = a_ColorScale;
 	v_UserData = a_UserData;
     v_TotalTime = CoronaTotalTime;
-    v_SamplerIndex = pc.SamplerIndex;
 
 	P_POSITION vec2 position = VertexKernel( a_Position );
 
@@ -152,7 +150,6 @@ varying P_UV vec2 v_TexCoord;
 varying P_COLOR vec4 v_ColorScale;
 varying P_DEFAULT vec4 v_UserData;
 varying P_DEFAULT float v_TotalTime;
-varying P_DEFAULT int v_SamplerIndex;
 
 #define CoronaColorScale( color ) (v_ColorScale*(color))
 #define CoronaVertexUserData v_UserData

@@ -279,7 +279,7 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 
 	ReplaceVaryings( isVertexSource, code, maps );
 
-	shaderc_compilation_result_t result = shaderc_compile_into_spv( fState->GetCompiler(), code.data(), code.size(), shaderc_vertex_shader, what, "main", fState->GetCompileOptions() );
+	shaderc_compilation_result_t result = shaderc_compile_into_spv( fState->GetCompiler(), code.data(), code.size(), kind, what, "main", fState->GetCompileOptions() );
 	shaderc_compilation_status status = shaderc_result_get_compilation_status( result );
 
 	if (shaderc_compilation_status_success == status)

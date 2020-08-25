@@ -242,21 +242,9 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 	auto multisampleTestResult = FetchMultisampleFormat();
 
 	// STEVE CHANGE
-	if (fVulkanState)
+	if (!fVulkanState)
 	{
-		if (!Rtt::VulkanState::PopulateSwapchainDetails( *static_cast< Rtt::VulkanState * >( fVulkanState ), uint32_t( GetClientWidth() ), uint32_t( GetClientHeight() ) ))
-		{
-			DestroyContext();
-
-			return;
-		}
-
-		// TODO: renderer version
-	}
-
-	else
-	{
-		// /STEVE CHANGE
+	// /STEVE CHANGE
 
 		// Fetch the control's device context.
 		fMainDeviceContextHandle = ::GetDC(windowHandle);
@@ -344,6 +332,7 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 		}
 	// STEVE CHANGE
 	}
+	// /STEVE CHANGE
 }
 
 void RenderSurfaceControl::DestroyContext()

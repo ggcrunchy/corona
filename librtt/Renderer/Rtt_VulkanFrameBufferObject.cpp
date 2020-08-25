@@ -50,7 +50,7 @@ GetLoadOp( const RenderPassBuilder::AttachmentOptions & options )
 }
 
 static VkAttachmentDescription
-PrepareAttachmentDescription( VkFormat format, bool noClear, VkAttachmentStoreOp storeOp )
+PrepareAttachmentDescription( VkFormat format, bool noClear )
 {
 	VkAttachmentDescription attachment = {};
 	
@@ -60,7 +60,7 @@ PrepareAttachmentDescription( VkFormat format, bool noClear, VkAttachmentStoreOp
     attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachment.storeOp = storeOp;
+	attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
 	return attachment;
 }
@@ -68,18 +68,20 @@ PrepareAttachmentDescription( VkFormat format, bool noClear, VkAttachmentStoreOp
 void
 RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions & options )
 {
-	VkAttachmentDescription colorAttachment = PrepareAttachmentDescription( format, options.noClear, VK_ATTACHMENT_STORE_OP_STORE );
+	VkAttachmentDescription colorAttachment = PrepareAttachmentDescription( format, options.noClear );
 
 	if (options.isResolve)
 	{
 		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		colorAttachment.samples = options.samples;
+		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
 		AddAttachment( colorAttachment, fResolveReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR );
 	}
 
 	else
 	{
+		colorAttachment.samples = options.samples;
+
 		AddAttachment( colorAttachment, fColorReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
 	}
 }
@@ -88,7 +90,7 @@ RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions 
 void
 RenderPassBuilder::AddDepthStencilAttachment( VkFormat format, const AttachmentOptions & options )
 {
-	VkAttachmentDescription depthAttachment = PrepareAttachmentDescription( format, options.noClear, VK_ATTACHMENT_STORE_OP_DONT_CARE );
+	VkAttachmentDescription depthAttachment = PrepareAttachmentDescription( format, options.noClear );
 
 	AddAttachment( depthAttachment, fDepthStencilReferences, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 }
@@ -266,17 +268,7 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 		const VulkanState::SwapchainDetails & details = state->GetSwapchainDetails();
 		VkFormat format = details.fFormat.format;
-/*
-VkFormat colorFormat = swapChainImageFormat;
 
-createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
-colorImageView = createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
-
-transitionImageLayout(colorImage, colorFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1);
-
-    bool ok = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
-//    if ()
-*/
 		VkSampleCountFlagBits sampleCount = VkSampleCountFlagBits( state->GetSampleCountFlags() );
 		VulkanTexture::ImageData color = VulkanTexture::CreateImage(
 			state,
@@ -304,14 +296,17 @@ transitionImageLayout(colorImage, colorFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMA
 			fImageViews.push_back( swapchainView );
 		}
 
-		builder.AddColorAttachment( format );
-
 		RenderPassBuilder::AttachmentOptions options;
 
-		options.isResolve = true;
 		options.samples = (VkSampleCountFlagBits)state->GetSampleCountFlags();
 
 		builder.AddColorAttachment( format, options );
+		
+		RenderPassBuilder::AttachmentOptions resolveOptions;
+
+		resolveOptions.isResolve = true;
+
+		builder.AddColorAttachment( format, resolveOptions );
 	}
 
 	else

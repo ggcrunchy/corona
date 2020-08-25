@@ -131,15 +131,12 @@ DescriptorLists::AddPool( VulkanState * state, VkDescriptorType type, U32 descri
 bool
 DescriptorLists::EnsureAvailability( VulkanState * state )
 {
-	if (0U == fUpdateCount)
-	{
-		return true;
-	}
 /*
 	TODO (probably once working properly?)
 
 	U32 total = fUpdateCount * fDynamicAlignment;
 
+	do these as we record commands? (if we submit uniform commands, set flag; increment if true when recording draw command)
 	we want to allocate enough new sets to accommodate this total, or fail
 	doling them out should go into a separate function
 
@@ -222,7 +219,6 @@ DescriptorLists::Reset( VkDevice device, void * workspace )
 	fWorkspace = static_cast< U8 * >( workspace );
 	fBufferIndex = ~0U;
 	fOffset = 0U;
-	fUpdateCount = 0U;
 	fDirty = false;
 }
 
@@ -254,7 +250,8 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	fUniformsLayout( VK_NULL_HANDLE ),
 	fUserDataLayout( VK_NULL_HANDLE ),
 	fTextureLayout( VK_NULL_HANDLE ),
-	fPipelineLayout( VK_NULL_HANDLE )
+	fPipelineLayout( VK_NULL_HANDLE ),
+	fPipelineCreateInfo( state )
 {
 	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
 	fBackCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
@@ -274,7 +271,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 	bindings[0].descriptorCount = 1U;
 	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetLayoutInfo, state->GetAllocator(), &fUniformsLayout ))
 	{
@@ -284,8 +281,6 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	{
 		CoronaLog( "Failed to create UBO descriptor set layout!" );
 	}
-
-	bindings[0].stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetLayoutInfo, state->GetAllocator(), &fUserDataLayout ))
 	{
@@ -300,7 +295,6 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 		//	createDescriptorSetLayoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT; TODO: this seems right?
 	bindings[0].descriptorCount = 5U; // TODO: locks in texture count, maybe later we'll want a higher value?
 	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	bindings[0].stageFlags &= ~VK_SHADER_STAGE_VERTEX_BIT;
 
 	// ^^ this will be MUCH different if the hardware can support push constant-indexed samplers, e.g. something like
 		// easy to do this without post-bind update?
@@ -336,14 +330,6 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	}
 
 	fSwapchainTexture = Rtt_NEW( allocator, TextureSwapchain( allocator, state ) );
-	fPrimaryFBO = Rtt_NEW( allocator, FrameBufferObject( allocator, fSwapchainTexture ) );
-
-	VkSwapchainKHR swapchain = MakeSwapchain();
-
-	if (swapchain != VK_NULL_HANDLE)
-	{
-		BuildUpSwapchain( swapchain );
-	}
 
 	InitializePipelineState();
 }
@@ -367,10 +353,30 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 	VulkanCommandBuffer * vulkanCommandBuffer = static_cast< VulkanCommandBuffer * >( fBackCommandBuffer );
 	VkResult result = vulkanCommandBuffer->GetExecuteResult();
 	bool canContinue = VK_SUCCESS == result;
+	VkSwapchainKHR swapchain = fState->GetSwapchain();
+	
+	if (VK_NULL_HANDLE == swapchain)
+	{
+		VulkanState::PopulateSwapchainDetails( *fState );
+
+		swapchain = MakeSwapchain();
+
+		if (swapchain != VK_NULL_HANDLE)
+		{
+			BuildUpSwapchain( swapchain );
+
+			fPrimaryFBO = Rtt_NEW( fAllocator, FrameBufferObject( fAllocator, fSwapchainTexture ) );
+		}
+
+		else
+		{
+			canContinue = false;
+		}
+	}
 
 	if (canContinue)
 	{
-		result = vulkanCommandBuffer->WaitAndAcquire( fState->GetDevice(), fState->GetSwapchain() );
+		result = vulkanCommandBuffer->WaitAndAcquire( fState->GetDevice(), swapchain );
 	CoronaLog( "ACQUIRE: %i", result );
 		canContinue = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
 	}
@@ -674,16 +680,11 @@ VulkanRenderer::SetBlendFactors( VkBlendFactor srcColor, VkBlendFactor srcAlpha,
 }
 
 void
-VulkanRenderer::SetPrimitiveTopology( VkPrimitiveTopology topology, bool resolvePipeline )
+VulkanRenderer::SetPrimitiveTopology( VkPrimitiveTopology topology )
 {
     fPipelineCreateInfo.fInputAssembly.topology = topology;
 
 	GetPackedPipeline( fWorkingKey.fContents ).fTopology = topology;
-
-    if (resolvePipeline)
-    {
-        ResolvePipeline();
-    }
 }
 
 void
@@ -700,20 +701,6 @@ VulkanRenderer::SetShaderStages( U32 id, const std::vector< VkPipelineShaderStag
 	fPipelineCreateInfo.fShaderStages = stages;
 
 	GetPackedPipeline( fWorkingKey.fContents ).fShaderID = id;
-}
-
-GPUResource* 
-VulkanRenderer::Create( const CPUResource* resource )
-{
-	switch( resource->GetType() )
-	{
-		case CPUResource::kFrameBufferObject: return new VulkanFrameBufferObject( *this );
-		case CPUResource::kGeometry: return new VulkanGeometry( fState );
-		case CPUResource::kProgram: return new VulkanProgram( fState );
-		case CPUResource::kTexture: return new VulkanTexture( fState );
-		case CPUResource::kUniform: return NULL;
-		default: Rtt_ASSERT_NOT_REACHED(); return NULL;
-	}
 }
 
 static uint8_t &
@@ -742,44 +729,7 @@ IsDynamicBitSet( uint8_t states[], uint8_t value )
 	return !!(byte & bit);
 }
 
-void
-VulkanRenderer::InitializePipelineState()
-{
-/*
-	glDisable( GL_SCISSOR_TEST );
-	// based on framebuffers, looks like we do NOT want this, but rather a full-screen scissor as default
-*/
-	PackedPipeline packedPipeline = {};
-
-	// TODO: this should be fleshed out with defaults
-	// these need not be relevant, but should properly handle being manually updated...
-
-	packedPipeline.fRasterSamplesFlags = 1U;
-	packedPipeline.fBlendAttachmentCount = 1U;
-	packedPipeline.fBlendAttachments[0].fEnable = VK_TRUE;
-	packedPipeline.fBlendAttachments[0].fColorWriteMask = 0xF;
-	packedPipeline.fBlendAttachments[0].fSrcColorFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	packedPipeline.fBlendAttachments[0].fSrcAlphaFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	packedPipeline.fBlendAttachments[0].fDstColorFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	packedPipeline.fBlendAttachments[0].fDstAlphaFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-
-	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_SCISSOR );
-	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_VIEWPORT );
-
-	memcpy( fDefaultKey.fContents.data(), &packedPipeline, sizeof( PackedPipeline ) );
-
-	fWorkingKey = fDefaultKey;
-
-	RestartWorkingPipeline();
-}
-
-void
-VulkanRenderer::RestartWorkingPipeline()
-{
-    new (&fPipelineCreateInfo) PipelineCreateInfo;
-}
-
-void
+bool
 VulkanRenderer::ResolvePipeline()
 {
 	auto iter = fBuiltPipelines.find( fWorkingKey );
@@ -829,10 +779,10 @@ VulkanRenderer::ResolvePipeline()
 		pipelineCreateInfo.basePipelineIndex = -1;
 		pipelineCreateInfo.flags = fFirstPipeline != VK_NULL_HANDLE ? VK_PIPELINE_CREATE_DERIVATIVE_BIT : VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
 		pipelineCreateInfo.layout = fPipelineLayout;
-		pipelineCreateInfo.pDynamicState = &createDynamicStateInfo;
-        pipelineCreateInfo.pInputAssemblyState = &fPipelineCreateInfo.fInputAssembly;
         pipelineCreateInfo.pColorBlendState = &fPipelineCreateInfo.fColorBlend;
         pipelineCreateInfo.pDepthStencilState = &fPipelineCreateInfo.fDepthStencil;
+		pipelineCreateInfo.pDynamicState = &createDynamicStateInfo;
+        pipelineCreateInfo.pInputAssemblyState = &fPipelineCreateInfo.fInputAssembly;
         pipelineCreateInfo.pMultisampleState = &fPipelineCreateInfo.fMultisample;
         pipelineCreateInfo.pRasterizationState = &fPipelineCreateInfo.fRasterization;
         pipelineCreateInfo.pStages = fPipelineCreateInfo.fShaderStages.data();
@@ -864,16 +814,71 @@ VulkanRenderer::ResolvePipeline()
 		pipeline = iter->second;
 	}
 
-	if (pipeline != VK_NULL_HANDLE && (VK_NULL_HANDLE == fBoundPipeline || pipeline != fBoundPipeline))
+	if (VK_NULL_HANDLE == pipeline)
 	{
-		static_cast< VulkanCommandBuffer * >( fBackCommandBuffer )->AddGraphicsPipeline( pipeline );
+		return false;
 	}
+
+	bool isNew = fBoundPipeline != pipeline;
 
 	fBoundPipeline = pipeline;
 	fWorkingKey = fDefaultKey;
+
+	return isNew;
 }
 
-VulkanRenderer::PipelineCreateInfo::PipelineCreateInfo()
+GPUResource* 
+VulkanRenderer::Create( const CPUResource* resource )
+{
+	switch( resource->GetType() )
+	{
+		case CPUResource::kFrameBufferObject: return new VulkanFrameBufferObject( *this );
+		case CPUResource::kGeometry: return new VulkanGeometry( fState );
+		case CPUResource::kProgram: return new VulkanProgram( fState );
+		case CPUResource::kTexture: return new VulkanTexture( fState );
+		case CPUResource::kUniform: return NULL;
+		default: Rtt_ASSERT_NOT_REACHED(); return NULL;
+	}
+}
+
+void
+VulkanRenderer::InitializePipelineState()
+{
+/*
+	glDisable( GL_SCISSOR_TEST );
+	// based on framebuffers, looks like we do NOT want this, but rather a full-screen scissor as default
+*/
+	PackedPipeline packedPipeline = {};
+
+	// TODO: this should be fleshed out with defaults
+	// these need not be relevant, but should properly handle being manually updated...
+
+	packedPipeline.fRasterSamplesFlags = 1U;
+	packedPipeline.fBlendAttachmentCount = 1U;
+	packedPipeline.fBlendAttachments[0].fEnable = VK_TRUE;
+	packedPipeline.fBlendAttachments[0].fColorWriteMask = 0xF;
+	packedPipeline.fBlendAttachments[0].fSrcColorFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	packedPipeline.fBlendAttachments[0].fSrcAlphaFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	packedPipeline.fBlendAttachments[0].fDstColorFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	packedPipeline.fBlendAttachments[0].fDstAlphaFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+
+	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_SCISSOR );
+	SetDynamicStateBit( packedPipeline.fDynamicStates, VK_DYNAMIC_STATE_VIEWPORT );
+
+	memcpy( fDefaultKey.fContents.data(), &packedPipeline, sizeof( PackedPipeline ) );
+
+	fWorkingKey = fDefaultKey;
+
+	RestartWorkingPipeline();
+}
+
+void
+VulkanRenderer::RestartWorkingPipeline()
+{
+    new (&fPipelineCreateInfo) PipelineCreateInfo( fState );
+}
+
+VulkanRenderer::PipelineCreateInfo::PipelineCreateInfo( VulkanState * state )
 {
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
         
@@ -891,7 +896,7 @@ VulkanRenderer::PipelineCreateInfo::PipelineCreateInfo()
 	VkPipelineMultisampleStateCreateInfo multisampling = {};
 
 	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisampling.rasterizationSamples = VkSampleCountFlagBits( state->GetSampleCountFlags() );
 
     fMultisample = multisampling;
 

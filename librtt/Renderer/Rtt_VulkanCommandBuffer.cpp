@@ -199,6 +199,8 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fUserData = (VulkanUserData *)alignedAlloc( sizeof( VulkanUserData ), 16U );
 	fPushConstants = (PushConstantState *)alignedAlloc( sizeof( PushConstantState ), 16U );
 
+	new (fPushConstants) PushConstantState;
+
 	if ( VK_NULL_HANDLE == fInFlight || VK_NULL_HANDLE == fImageAvailableSemaphore || VK_NULL_HANDLE == fRenderFinishedSemaphore)
 	{
 		CoronaLog( "Failed to create some synchronziation objects!" );
@@ -1170,26 +1172,38 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPas
 
 		fRenderer.SetPrimitiveTopology( topology );
 
+        if (fRenderer.ResolvePipeline())
+		{
+			vkCmdBindPipeline( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fRenderer.GetBoundPipeline() );
+		}
+
 		Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
 
 		ApplyUniforms( fProgram->GetGPUResource() );
 
 		VkDevice device = fRenderer.GetState()->GetDevice();
 		VkDescriptorSet sets[3] = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE };
-		int uboLists[] = { DescriptorLists::kUniforms, DescriptorLists::kUserData };
-		uint32_t dynamicOffsets[2], count = 0U;
+		uint32_t dynamicOffsets[2] = {}, count = 0U, nsets = 0U;
 
 		std::vector< VkMappedMemoryRange > memoryRanges;
 
-		for (int i = 0; i < 2; ++i)
+		static_assert( DescriptorLists::kUniforms < DescriptorLists::kUserData, "UBOs in unexpected order" );
+		static_assert( DescriptorLists::kUserData < DescriptorLists::kTexture, "UBO / textures in unexpected order" );
+
+		U32 first = 2U; // try to do better
+
+		for (U32 i = 0; i < 2; ++i)
 		{
-			int listIndex = uboLists[i];
-
-			if (fLists[listIndex].fDirty)
+			if (fLists[i].fDirty)
 			{
-				DescriptorLists & lists = fLists[listIndex];
+				if (i < first)
+				{
+					first = i;
+				}
 
-				sets[listIndex] = lists.fSets[lists.fBufferIndex];
+				DescriptorLists & lists = fLists[i];
+
+				sets[nsets++] = lists.fSets[lists.fBufferIndex];
 				dynamicOffsets[count++] = lists.fOffset;
 
 				DynamicUniformData & uniforms = lists.fDynamicUniforms[lists.fBufferIndex];
@@ -1211,17 +1225,31 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPas
 
 		if (fLists[DescriptorLists::kTexture].fDirty)
 		{
-			sets[DescriptorLists::kTexture] = fTextures;
+			sets[nsets++] = fTextures;
 		}
 
-		if (count || fLists[DescriptorLists::kTexture].fDirty)
+		if (nsets > 0U)
 		{
 			if (count)
 			{
 				vkFlushMappedMemoryRanges( device, memoryRanges.size(), memoryRanges.data() );
 			}
+			
+			VkPipelineLayout pipelineLayout = fRenderer.GetPipelineLayout();
 
-			vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, fRenderer.GetPipelineLayout(), 0U, 3U, sets, count, dynamicOffsets );
+			if (2U == nsets && !fLists[DescriptorLists::kUserData].fDirty) // split?
+			{
+				Rtt_ASSERT( 0U == first );
+				Rtt_ASSERT( 1U == count );
+
+				vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0U, 1U, &sets[0], 1U, dynamicOffsets );
+				vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 2U, 1U, &sets[1], 0U, NULL );
+			}
+
+			else
+			{
+				vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, first, nsets, sets, count, dynamicOffsets );
+			}
 		}
 
 		for (int i = 0; i < 3; ++i)
@@ -1256,14 +1284,6 @@ void VulkanCommandBuffer::CommitFBO( VkRenderPassBeginInfo *& renderPassBeginInf
 		vkCmdBeginRenderPass( fCommandBuffer, renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
 
 		renderPassBeginInfo = NULL;
-	}
-}
-
-void VulkanCommandBuffer::AddGraphicsPipeline( VkPipeline pipeline )
-{
-	if (fCommandBuffer != VK_NULL_HANDLE)
-	{
-		vkCmdBindPipeline( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
 	}
 }
 
@@ -1373,11 +1393,6 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 	
 	VulkanProgram* vulkanProgram = static_cast< VulkanProgram * >( resource );
 
-	U32 & uniformsCount = fLists[DescriptorLists::kUniforms].fUpdateCount, savedUniformsCount = uniformsCount;
-	U32 & userDataCount = fLists[DescriptorLists::kUserData].fUpdateCount, savedUserDataCount = userDataCount;
-
-	uniformsCount = userDataCount = 0U;
-
 	for( U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
 	{
 		const UniformUpdate& update = fUniformUpdates[i];
@@ -1386,9 +1401,6 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 			ApplyUniform( *vulkanProgram, i );
 		}
 	}
-
-	uniformsCount += savedUniformsCount;
-	userDataCount += savedUserDataCount;
 
 	if (transformed)
 	{
@@ -1549,7 +1561,7 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 			Write<U32>(location.fOffset);
 			WriteUniform( uniform );
 
-			ListsForIndex( index ).fUpdateCount = 1U; // cf. ApplyUniforms()
+			ListsForIndex( index ).fDirty = true;
 		}
 	}
 
@@ -1586,7 +1598,7 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 			Write<U32>(index);
 			WriteUniform(uniform);
 
-			ListsForIndex( index ).fUpdateCount = 1U; // cf. ApplyUniforms()
+			ListsForIndex( index ).fDirty = true; // cf. ApplyUniforms()
 		}
 	}
 }

@@ -96,9 +96,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		void CommitFBO( VkRenderPassBeginInfo *& renderPassBeginInfo );
 
 	public:
-		void AddGraphicsPipeline( VkPipeline pipeline );
-
-	public:
 		VkDescriptorSet AddTexture( U32 unit, const VkDescriptorImageInfo & imageInfo );
 
 	private:
