@@ -128,7 +128,7 @@ class VulkanState
 
 		static bool PopulateMultisampleDetails( VulkanState & state );
 		static bool PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
-		static bool PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height );
+		static bool PopulateSwapchainDetails( VulkanState & state );
 
 		struct SwapchainDetails {
 			VkSurfaceTransformFlagBitsKHR fTransformFlagBits;

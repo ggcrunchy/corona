@@ -83,7 +83,6 @@ struct DescriptorLists {
 	U32 fBufferIndex; // ...i.e. index 0
 	U32 fBufferSize;
 	U32 fOffset;
-	U32 fUpdateCount;
 	U8 * fWorkspace;
 	size_t fRawSize;
 	bool fDirty;
@@ -116,6 +115,7 @@ class VulkanRenderer : public Renderer
 		VkDescriptorSetLayout GetUserDataLayout() const { return fUserDataLayout; }
 		VkDescriptorSetLayout GetTextureLayout() const { return fTextureLayout; }
 		VkPipelineLayout GetPipelineLayout() const { return fPipelineLayout; }
+		VkPipeline GetBoundPipeline() const { return fBoundPipeline; }
 
 		const std::vector< VkImage > & GetSwapchainImages() const { return fSwapchainImages; }
 
@@ -125,9 +125,11 @@ class VulkanRenderer : public Renderer
 		void SetBindingDescriptions( U32 id, const std::vector< VkVertexInputBindingDescription > & descriptions );
 		void SetBlendEquations( VkBlendOp color, VkBlendOp alpha );
 		void SetBlendFactors( VkBlendFactor srcColor, VkBlendFactor srcAlpha, VkBlendFactor dstColor, VkBlendFactor dstAlpha );
-		void SetPrimitiveTopology( VkPrimitiveTopology topology, bool resolvePipeline = true );
+		void SetPrimitiveTopology( VkPrimitiveTopology topology );
 		void SetRenderPass( U32 id, VkRenderPass renderPass );
 		void SetShaderStages( U32 id, const std::vector< VkPipelineShaderStageCreateInfo > & stages );
+
+		bool ResolvePipeline();
 
 	protected:
 		// Create an OpenGL resource appropriate for the given CPUResource.
@@ -136,11 +138,10 @@ class VulkanRenderer : public Renderer
 	private:
 		void InitializePipelineState();
 		void RestartWorkingPipeline();
-		void ResolvePipeline();
 
 	private:
 		struct PipelineCreateInfo {
-			PipelineCreateInfo();
+			PipelineCreateInfo( VulkanState * state );
 
 			std::vector< VkPipelineColorBlendAttachmentState > fColorBlendAttachments;
 			std::vector< VkPipelineShaderStageCreateInfo > fShaderStages;

@@ -13,7 +13,6 @@
 #include "Core/Rtt_Assert.h"
 #include "CoronaLog.h"
 #include <shaderc/shaderc.h>
-#include <algorithm>
 #include <limits>
 #include <tuple>
 #include <utility>
@@ -957,7 +956,7 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 }
 
 bool
-VulkanState::PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint32_t height )
+VulkanState::PopulateSwapchainDetails( VulkanState & state )
 {
 	VkPhysicalDevice device = state.GetPhysicalDevice();
 	VkSurfaceKHR surface = state.GetSurface();
@@ -1008,8 +1007,7 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state, uint32_t width, uint
 	SwapchainDetails & details = state.fSwapchainDetails;
 
 	details.fImageCount = imageCount;
-    details.fExtent.width = std::max( capabilities.minImageExtent.width, std::min( capabilities.maxImageExtent.width, width ) );
-	details.fExtent.height = std::max( capabilities.minImageExtent.height, std::min( capabilities.maxImageExtent.height, height ) );
+    details.fExtent = capabilities.currentExtent;
 	details.fFormat = format;
 	details.fPresentMode = mode;
 	details.fTransformFlagBits = capabilities.currentTransform;
