@@ -1228,7 +1228,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPas
 
 				memcpy( static_cast< U8 * >( uniforms.fMapped ) + lists.fOffset, lists.fWorkspace, lists.fRawSize );
 			
-				VkMappedMemoryRange range;
+				VkMappedMemoryRange range = {};
 
 				range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
 				range.memory = uniforms.fBufferData->GetMemory();
@@ -1277,10 +1277,10 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, VkRenderPas
 
 		if (fPushConstants->IsValid())
 		{
-			U32 offset = fPushConstants->Offset(), size = fPushConstants->Range() * sizeof( float );
+			U32 offset = fPushConstants->Offset(), size = fPushConstants->Range();
 
 			vkCmdPushConstants( fCommandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, offset * sizeof( float ), size, fPushConstants->GetData( offset ) );
-
+			// TODO: want fragment bit if using sampler index...
 			fPushConstants->Reset();
 		}
 	}
@@ -1508,7 +1508,7 @@ void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, s
 			Write<U32>(translationOffset);
 		}
 
-		Vec2 maskTranslation = { src[2], src[5] };
+		Vec2 maskTranslation = { src[6], src[7] };
 
 		Write<Vec2>(maskTranslation);
 	}

@@ -46,6 +46,7 @@ DynamicUniformData::~DynamicUniformData()
 DescriptorLists::DescriptorLists( VulkanState * state, VkDescriptorSetLayout setLayout, U32 count, size_t size )
 :	fSetLayout( setLayout ),
 	fDynamicAlignment( 0U ),
+	fBufferIndex( ~0U ),
 	fWorkspace( NULL ),
 	fRawSize( size ),
 	fResetPools( false )
@@ -67,6 +68,7 @@ DescriptorLists::DescriptorLists( VulkanState * state, VkDescriptorSetLayout set
 DescriptorLists::DescriptorLists( VkDescriptorSetLayout setLayout, bool resetPools )
 :	fSetLayout( setLayout ),
 	fDynamicAlignment( 0U ),
+	fBufferIndex( ~0U ),
 	fBufferSize( 0U ),
 	fWorkspace( NULL ),
 	fRawSize( 0U ),
@@ -217,9 +219,13 @@ DescriptorLists::Reset( VkDevice device, void * workspace )
 	}
 
 	fWorkspace = static_cast< U8 * >( workspace );
-	fBufferIndex = ~0U;
 	fOffset = 0U;
 	fDirty = false;
+
+	if (!NoBuffers())
+	{
+		fBufferIndex = 0U;
+	}
 }
 
 bool
