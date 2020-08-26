@@ -429,7 +429,7 @@ VulkanProgram::Maps::CheckForUniform( const std::string & key )
 {
 	auto iter = buffer_values.find( key );
 
-	if (iter != buffer_values.end() && iter->second.fIsUniform)
+	if (iter != buffer_values.end())
 	{
 		return iter->second.fLocation;
 	}

@@ -53,9 +53,10 @@ class VulkanProgram : public GPUResource
 		void Bind( VulkanRenderer & renderer, Program::Version version );
 
 		struct Location {
-			Location( size_t offset = 0U, size_t range = 0U )
+			Location( size_t offset = 0U, size_t range = 0U, bool isUniform = false )
 			:	fOffset( offset ),
-				fRange( range )
+				fRange( range ),
+				fIsUniform( isUniform )
 			{
 			}
 
@@ -63,6 +64,7 @@ class VulkanProgram : public GPUResource
 
 			size_t fOffset;
 			size_t fRange;
+			bool fIsUniform;
 		};
 
 		// TODO: cleanup these functions
@@ -126,15 +128,13 @@ class VulkanProgram : public GPUResource
 		struct Maps {
 			struct BufferValue {
 				BufferValue( size_t offset, size_t range, bool isUniform )
-				:	fLocation( offset, range ),
-					fStages( 0U ),
-					fIsUniform( isUniform )
+				:	fLocation( offset, range, isUniform ),
+					fStages( 0U )
 				{
 				}
 
 				Location fLocation;
 				U32 fStages;
-				bool fIsUniform;
 			};
 
 			struct SamplerValue {

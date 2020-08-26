@@ -90,7 +90,7 @@ VulkanGeometry::Update( CPUResource* resource )
 	Rtt_ASSERT( CPUResource::kGeometry == resource->GetType() );
 	Geometry* geometry = static_cast<Geometry*>( resource );
 	const Geometry::Vertex* vertexData = geometry->GetVertexData();
-
+	CoronaLog( "#geometry = %i", fVertexCount );
 	if ( !fMappedVertices )
 	{
 		// The user may have resized the given Geometry instance
