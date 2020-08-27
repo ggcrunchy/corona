@@ -136,7 +136,7 @@ VulkanTexture::Create( CPUResource* resource )
         return;
     }
 
-    VkComponentMapping mapping = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+    VkComponentMapping mapping = {};
     VkFormat format = getFormatTokens( texture->GetFormat(), mapping );
     
     VkDeviceSize imageSize = texture->GetSizeInBytes();

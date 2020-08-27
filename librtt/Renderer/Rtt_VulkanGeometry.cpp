@@ -36,6 +36,7 @@ VulkanGeometry::VulkanGeometry( VulkanState * state )
 :	fState( state ),
 	fVertexBufferData( NULL ),
 	fIndexBufferData( NULL ),
+	fResource( NULL ),
 	fMappedVertices( NULL ),
 	fVertexCount( 0U ),
 	fIndexCount( 0U )
@@ -51,23 +52,19 @@ VulkanGeometry::Create( CPUResource* resource )
 	fVertexCount = geometry->GetVerticesAllocated();
 	fIndexCount = geometry->GetIndicesAllocated();
 
-	VkDeviceSize verticesSize = fVertexCount * sizeof( Geometry::Vertex );
-
 	if ( geometry->GetStoredOnGPU() )
 	{
-		fVertexBufferData = CreateBufferOnGPU( verticesSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT );
+		fVertexBufferData = CreateBufferOnGPU( fVertexCount * sizeof( Geometry::Vertex ), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT );
 
-		TransferToGPU( fVertexBufferData->GetBuffer(), geometry->GetVertexData(), verticesSize );
+		TransferToGPU( fVertexBufferData->GetBuffer(), geometry->GetVertexData(), geometry->GetVerticesUsed() * sizeof( Geometry::Vertex ) );
 
 		Geometry::Index * indices = geometry->GetIndexData();
 
 		if (indices)
 		{
-			VkDeviceSize indicesSize = fIndexCount * sizeof( Geometry::Index );
+			fIndexBufferData = CreateBufferOnGPU( fIndexCount * sizeof( Geometry::Index ), VK_BUFFER_USAGE_INDEX_BUFFER_BIT );
 
-			fIndexBufferData = CreateBufferOnGPU( indicesSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT );
-
-			TransferToGPU( fIndexBufferData->GetBuffer(), indices, indicesSize );
+			TransferToGPU( fIndexBufferData->GetBuffer(), indices, geometry->GetIndicesUsed() * sizeof( Geometry::Index ) );
 		}
 	}
 
@@ -75,12 +72,12 @@ VulkanGeometry::Create( CPUResource* resource )
 	{
         VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
 
-		fState->CreateBuffer( verticesSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
+		fState->CreateBuffer( fVertexCount * sizeof( Geometry::Vertex ), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
 
 		fMappedVertices = fState->MapData( bufferData.GetMemory() );
 		fVertexBufferData = bufferData.Extract( NULL );
 
-		Update( resource );
+		fResource = geometry;
 	}
 }
 
@@ -90,7 +87,7 @@ VulkanGeometry::Update( CPUResource* resource )
 	Rtt_ASSERT( CPUResource::kGeometry == resource->GetType() );
 	Geometry* geometry = static_cast<Geometry*>( resource );
 	const Geometry::Vertex* vertexData = geometry->GetVertexData();
-	CoronaLog( "#geometry = %i", fVertexCount );
+	CoronaLog( "#geometry = %i, %i", fVertexCount, geometry->GetVerticesUsed() );
 	if ( !fMappedVertices )
 	{
 		// The user may have resized the given Geometry instance
@@ -105,7 +102,7 @@ VulkanGeometry::Update( CPUResource* resource )
 		// Copy the vertex data from main memory to GPU memory.
 		else if ( vertexData )
 		{
-			TransferToGPU( fVertexBufferData->GetBuffer(), vertexData, fVertexCount * sizeof( Geometry::Vertex ) );
+			TransferToGPU( fVertexBufferData->GetBuffer(), vertexData, geometry->GetVerticesUsed() * sizeof( Geometry::Vertex ) );
 		}
 
 		else
@@ -115,7 +112,7 @@ VulkanGeometry::Update( CPUResource* resource )
 	}
 	else
 	{
-		memcpy( fMappedVertices, vertexData, fVertexCount * sizeof( Geometry::Vertex ) );
+		memcpy( fMappedVertices, vertexData, geometry->GetVerticesUsed() * sizeof( Geometry::Vertex ) );
 	}
 }
 
@@ -133,11 +130,19 @@ VulkanGeometry::Destroy()
 	Rtt_DELETE( fIndexBufferData );
 
 	fVertexBufferData = fIndexBufferData = NULL;
+	fResource = NULL;
 }
 
 void 
 VulkanGeometry::Bind( VulkanRenderer & renderer, VkCommandBuffer commandBuffer )
 {
+	if (fResource && fResource->GetVerticesUsed())
+	{
+		Rtt_ASSERT( fMappedVertices );
+
+		memcpy( fMappedVertices, fResource->GetVertexData(), fResource->GetVerticesUsed() * sizeof( Geometry::Vertex ) );
+	}
+
 	U32 bindingID = 0U; // n.b. for future use?
 
 	VkVertexInputBindingDescription description;

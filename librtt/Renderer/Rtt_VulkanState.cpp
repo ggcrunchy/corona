@@ -726,7 +726,7 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 
     vkEnumerateDeviceExtensionProperties( device, NULL, &extensionCount, availableExtensions.data() );
 
-	std::vector< const char * > extensions, required = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+	std::vector< const char * > extensions, required = { VK_KHR_MAINTENANCE1_EXTENSION_NAME, VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
 	CollectExtensions( extensions, required, availableExtensions );
 
@@ -975,7 +975,7 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state )
 
 	for (const VkSurfaceFormatKHR & formatInfo : formats)
 	{
-		if (VK_FORMAT_B8G8R8A8_SRGB == formatInfo.format && VK_COLOR_SPACE_SRGB_NONLINEAR_KHR == formatInfo.colorSpace) // TODO: use a rating system, in case not present?
+		if (VK_FORMAT_B8G8R8A8_SRGB == formatInfo.format)// && VK_COLOR_SPACE_SRGB_NONLINEAR_KHR == formatInfo.colorSpace) // TODO: use a rating system, in case not present?
 		{
             format = formatInfo;
 

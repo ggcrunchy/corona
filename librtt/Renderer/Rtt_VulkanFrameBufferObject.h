@@ -88,9 +88,6 @@ class VulkanFrameBufferObject : public GPUResource
 
 		void Bind( VulkanRenderer & renderer, uint32_t index, VkRenderPassBeginInfo & passBeginInfo );
 
-	public:
-		std::vector< VkClearValue > & GetClearValues() { return fClearValues; }
-
 	private:
 		struct ImageData {
 			ImageData()
@@ -107,7 +104,6 @@ class VulkanFrameBufferObject : public GPUResource
 	private:
 		VulkanRenderer & fRenderer;
 		VkExtent2D fExtent;
-		std::vector< VkClearValue > fClearValues;
 		std::vector< VkDeviceMemory > fMemory;
 		std::vector< VkImage > fImages;
 		std::vector< VkImageView > fImageViews;

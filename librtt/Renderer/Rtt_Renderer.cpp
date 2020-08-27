@@ -142,6 +142,11 @@ Renderer::Renderer( Rtt_Allocator* allocator )
 	fMultisampleEnabled( false ),
 	fFrameBufferObject( NULL ),
 	fInsertionLimit( std::numeric_limits<U32>::max() ),
+// STEVE CHANGE
+	fRenderDataCount( 0 ),
+	fVertexOffset( 0 ),
+	fCurrentGeometry( NULL ),
+// /STEVE CHANGE
 	fTimeDependencyCount( 0 )
 {
 	// Always have at least 1 mask count.
@@ -996,6 +1001,10 @@ Renderer::CheckAndInsertDrawCommand()
 void
 Renderer::FlushBatch()
 {
+if (!fPrevious.fGeometry && !fCurrentGeometry)
+{
+	return;
+}
 	bool storedOnGPU = fPrevious.fGeometry && fPrevious.fGeometry->GetStoredOnGPU();
 
 	UpdateBatch( false, NULL != fCurrentGeometry, storedOnGPU, 0 );

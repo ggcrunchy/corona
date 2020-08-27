@@ -82,7 +82,7 @@ DescriptorLists::AddBuffer( VulkanState * state )
 {
 	VulkanBufferData bufferData( state->GetDevice(), state->GetAllocator() );
 	
-	if (state->CreateBuffer( fBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, bufferData ))
+	if (state->CreateBuffer( fBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT/*VISIBLE_BIT*/, bufferData ))
 	{
 		fDynamicUniforms.push_back( DynamicUniformData{} );
 
@@ -252,7 +252,6 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
     fSwapchainTexture( NULL ),
 	fPrimaryFBO( NULL ),
 	fFirstPipeline( VK_NULL_HANDLE ),
-	fBoundPipeline( VK_NULL_HANDLE ),
 	fUniformsLayout( VK_NULL_HANDLE ),
 	fUserDataLayout( VK_NULL_HANDLE ),
 	fTextureLayout( VK_NULL_HANDLE ),
@@ -354,8 +353,6 @@ VulkanRenderer::~VulkanRenderer()
 void
 VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY )
 {
-	Super::BeginFrame( totalTime, deltaTime, contentScaleX, contentScaleY );
-
 	VulkanCommandBuffer * vulkanCommandBuffer = static_cast< VulkanCommandBuffer * >( fBackCommandBuffer );
 	VkResult result = vulkanCommandBuffer->GetExecuteResult();
 	bool canContinue = VK_SUCCESS == result;
@@ -387,11 +384,16 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 		canContinue = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
 	}
 
+	if (fPrimaryFBO)
+	{
+		SetFrameBufferObject( fPrimaryFBO );
+	}
+
+	Super::BeginFrame( totalTime, deltaTime, contentScaleX, contentScaleY );
+
 	if (canContinue)
 	{
 		uint32_t index = vulkanCommandBuffer->GetImageIndex();
-
-		SetFrameBufferObject( fPrimaryFBO );
 
 		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], fDescriptorLists.data() + 3U * index );
 		CoronaLog("OK");
@@ -735,7 +737,7 @@ IsDynamicBitSet( uint8_t states[], uint8_t value )
 	return !!(byte & bit);
 }
 
-bool
+VkPipeline
 VulkanRenderer::ResolvePipeline()
 {
 	auto iter = fBuiltPipelines.find( fWorkingKey );
@@ -820,17 +822,9 @@ VulkanRenderer::ResolvePipeline()
 		pipeline = iter->second;
 	}
 
-	if (VK_NULL_HANDLE == pipeline)
-	{
-		return false;
-	}
-
-	bool isNew = fBoundPipeline != pipeline;
-
-	fBoundPipeline = pipeline;
 	fWorkingKey = fDefaultKey;
 
-	return isNew;
+	return pipeline;
 }
 
 GPUResource* 
