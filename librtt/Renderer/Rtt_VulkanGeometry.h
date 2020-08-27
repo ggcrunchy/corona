@@ -20,6 +20,7 @@
 namespace Rtt
 {
 
+class Geometry;
 class VulkanBufferData;
 class VulkanRenderer;
 class VulkanState;
@@ -63,6 +64,7 @@ class VulkanGeometry : public GPUResource
 		VulkanState * fState;
 		VulkanBufferData * fVertexBufferData;
 		VulkanBufferData * fIndexBufferData;
+		Geometry * fResource;
 		void * fMappedVertices;
 		U32 fVertexCount;
 		U32 fIndexCount;

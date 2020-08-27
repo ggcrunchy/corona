@@ -91,9 +91,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		
 		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists );
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
-		bool PrepareDraw( VkPrimitiveTopology topology, VkRenderPassBeginInfo *& renderPassBeginInfo );
-
-		void CommitFBO( VkRenderPassBeginInfo *& renderPassBeginInfo );
+		bool PrepareDraw( VkPrimitiveTopology topology );
 
 	public:
 		VkDescriptorSet AddTexture( U32 unit, const VkDescriptorImageInfo & imageInfo );
@@ -169,9 +167,9 @@ class VulkanCommandBuffer : public CommandBuffer
 		// (some of this could go on the stack)
 		DescriptorLists * fLists;
 		VkCommandBuffer fCommandBuffer;
+		VkPipeline fPipeline;
 		VkDescriptorSet fTextures;
 		std::vector< VkDescriptorImageInfo > fTextureState;
-		VkViewport fViewport;
 
 		struct GraphNode {
 			U32 fOffset;

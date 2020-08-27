@@ -115,7 +115,6 @@ class VulkanRenderer : public Renderer
 		VkDescriptorSetLayout GetUserDataLayout() const { return fUserDataLayout; }
 		VkDescriptorSetLayout GetTextureLayout() const { return fTextureLayout; }
 		VkPipelineLayout GetPipelineLayout() const { return fPipelineLayout; }
-		VkPipeline GetBoundPipeline() const { return fBoundPipeline; }
 
 		const std::vector< VkImage > & GetSwapchainImages() const { return fSwapchainImages; }
 
@@ -129,7 +128,7 @@ class VulkanRenderer : public Renderer
 		void SetRenderPass( U32 id, VkRenderPass renderPass );
 		void SetShaderStages( U32 id, const std::vector< VkPipelineShaderStageCreateInfo > & stages );
 
-		bool ResolvePipeline();
+		VkPipeline ResolvePipeline();
 
 	protected:
 		// Create an OpenGL resource appropriate for the given CPUResource.
@@ -172,7 +171,6 @@ class VulkanRenderer : public Renderer
 		std::vector< DescriptorLists > fDescriptorLists;
 		std::map< PipelineKey, VkPipeline > fBuiltPipelines;
 		VkPipeline fFirstPipeline;
-		VkPipeline fBoundPipeline;
 		VkDescriptorSetLayout fUniformsLayout;
 		VkDescriptorSetLayout fUserDataLayout;
 		VkDescriptorSetLayout fTextureLayout;
