@@ -42,7 +42,7 @@ namespace /*anonymous*/
 		switch( format )
 		{
 			case Texture::kAlpha:
-                mapping.r = mapping.g = mapping.b = VK_COMPONENT_SWIZZLE_A;
+                mapping.g = mapping.b = mapping.a = VK_COMPONENT_SWIZZLE_R;
 
                 break;
             // ^^ TODO: guess!
@@ -57,16 +57,9 @@ namespace /*anonymous*/
                 break;
             case Texture::kRGBA:
                 break;
-			case Texture::kARGB:
-                mapping.r = VK_COMPONENT_SWIZZLE_A;
-                mapping.g = VK_COMPONENT_SWIZZLE_R;
-                mapping.b = VK_COMPONENT_SWIZZLE_G;
-                mapping.a = VK_COMPONENT_SWIZZLE_B;
-
-                break;
+			case Texture::kARGB: // cf. GLTexture
 			case Texture::kBGRA:
                 mapping.r = VK_COMPONENT_SWIZZLE_B;
-                mapping.g = VK_COMPONENT_SWIZZLE_G;
                 mapping.b = VK_COMPONENT_SWIZZLE_R;
 
                 break;

@@ -758,7 +758,7 @@ DisplayObject::DispatchEvent( lua_State *L, const MEvent& e ) const
 
 	if ( 0 == DispatchEventWithTarget( L, e, 1 ) )
 	{
-		Rtt_ASSERT( lua_isboolean( L, -1 ) );
+//		Rtt_ASSERT( lua_isboolean( L, -1 ) ); <- STEVE CHANGE
 		result = ( !! lua_toboolean( L, -1 ) );
 	}
 

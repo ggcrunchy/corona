@@ -495,7 +495,7 @@ VulkanRenderer::BuildUpSwapchain( VkSwapchainKHR swapchain )
 
 		fDescriptorLists.push_back( DescriptorLists( state, fUniformsLayout, 4096U, sizeof( VulkanUniforms ) ) );
 		fDescriptorLists.push_back( DescriptorLists( state, fUserDataLayout, 1024U, sizeof( VulkanUserData ) ) );
-		fDescriptorLists.push_back( DescriptorLists( fTextureLayout ) );
+		fDescriptorLists.push_back( DescriptorLists( fTextureLayout, true ) );
 	}
 
 	VkCommandBufferAllocateInfo allocInfo = {};
@@ -658,7 +658,7 @@ VulkanRenderer::SetBindingDescriptions( U32 id, const std::vector< VkVertexInput
 void
 VulkanRenderer::SetBlendEquations( VkBlendOp color, VkBlendOp alpha )
 {
-	auto attachment = fPipelineCreateInfo.fColorBlendAttachments.front();
+	VkPipelineColorBlendAttachmentState & attachment = fPipelineCreateInfo.fColorBlendAttachments.front();
 
     attachment.alphaBlendOp = alpha;
 	attachment.colorBlendOp = color;
@@ -672,7 +672,7 @@ VulkanRenderer::SetBlendEquations( VkBlendOp color, VkBlendOp alpha )
 void
 VulkanRenderer::SetBlendFactors( VkBlendFactor srcColor, VkBlendFactor srcAlpha, VkBlendFactor dstColor, VkBlendFactor dstAlpha )
 {
-	auto attachment = fPipelineCreateInfo.fColorBlendAttachments.front();
+	VkPipelineColorBlendAttachmentState & attachment = fPipelineCreateInfo.fColorBlendAttachments.front();
 
 	attachment.srcColorBlendFactor = srcColor;
 	attachment.dstColorBlendFactor = dstColor;
@@ -822,7 +822,7 @@ VulkanRenderer::ResolvePipeline()
 		pipeline = iter->second;
 	}
 
-	fWorkingKey = fDefaultKey;
+//	fWorkingKey = fDefaultKey;
 
 	return pipeline;
 }
@@ -918,7 +918,6 @@ VulkanRenderer::PipelineCreateInfo::PipelineCreateInfo( VulkanState * state )
 	VkPipelineColorBlendStateCreateInfo colorBlending = {};
 
 	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlending.attachmentCount = 1U;
 	fColorBlend = colorBlending;
 
 	fRenderPass = VK_NULL_HANDLE;
