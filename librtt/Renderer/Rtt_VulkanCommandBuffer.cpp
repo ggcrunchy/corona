@@ -169,7 +169,6 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fPushConstants( NULL ),
 	fCommandBuffer( VK_NULL_HANDLE ),
 	fPipeline( VK_NULL_HANDLE ),
-	fTextures( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE )
 {
 	for(U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
@@ -629,6 +628,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	fOffset = fBuffer;
 
 	//GL_CHECK_ERROR();
+	std::vector< VkDescriptorImageInfo > descriptorImageInfo( 5U, VkDescriptorImageInfo{} );
 	std::vector< VkClearValue > clearValues;
 	VkViewport viewport;
 
@@ -701,7 +701,7 @@ CoronaLog( "%u, %i", i, command );
 			{
 				U32 unit = Read<U32>();
 				VulkanTexture* texture = Read<VulkanTexture*>();
-				texture->Bind( *this, unit );
+				texture->Bind( fLists[DescriptorLists::kTexture], descriptorImageInfo[unit] );
 
 				DEBUG_PRINT( "Bind Texture: texture=%p unit=%i Vulkan ID=%" PRIx64,
 								texture,
@@ -981,7 +981,6 @@ CoronaLog( "%u, %i", i, command );
 				clearValues.push_back( value );
 
 				DEBUG_PRINT( "Clear " );
-			//	DEBUG_PRINT( "Clear: r=%f, g=%f, b=%f, a=%f", r, g, b, a );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandDraw:
@@ -990,7 +989,7 @@ CoronaLog( "%u, %i", i, command );
 				U32 offset = Read<U32>();
 				U32 count = Read<U32>();
 
-				if (PrepareDraw( mode ))
+				if (PrepareDraw( mode, descriptorImageInfo ))
 				{
 					vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
 				}
@@ -1003,7 +1002,7 @@ CoronaLog( "%u, %i", i, command );
 				VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
 				U32 count = Read<U32>();
 
-				if (PrepareDraw( mode ))
+				if (PrepareDraw( mode, descriptorImageInfo ))
 				{
 
 					// The first argument, offset, is currently unused. If support for non-
@@ -1129,22 +1128,7 @@ CoronaLog( "%u, %i", i, command );
 
 	return fElapsedTimeGPU;
 }
-/*
-    // begin
 
-	^^ FBO?
-
-		geometry
-        draw
-			descriptors
-			pipeline
-
-    vkCmdEndRenderPass(commandBuffers[i]);
-
-	^^ /FBO?
-
-	// end
-*/
 VkResult VulkanCommandBuffer::WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain )
 {
 	if (fInFlight != VK_NULL_HANDLE)
@@ -1182,9 +1166,6 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 		{
 			fCommandBuffer = commandBuffer;
 			fLists = lists;
-			fTextures = VK_NULL_HANDLE;
-
-			fTextureState.assign( 5U, VkDescriptorImageInfo{} );
 		}
 
 		else
@@ -1194,7 +1175,7 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 	}
 }
 
-bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
+bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & descriptorImageInfo )
 {
 	bool canDraw = fCommandBuffer != VK_NULL_HANDLE;
 
@@ -1264,9 +1245,9 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
 
 		if (fLists[DescriptorLists::kTexture].fDirty)
 		{
-			sets[nsets++] = fTextures;
+			sets[nsets++] = AddTextureSet( descriptorImageInfo );
 		}
-			
+
 		VkPipelineLayout pipelineLayout = fRenderer.GetPipelineLayout();
 
 		if (nsets > 0U)
@@ -1300,7 +1281,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
 		{
 			U32 offset = fPushConstants->Offset(), size = fPushConstants->Range();
 
-			vkCmdPushConstants( fCommandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, offset * sizeof( float ), size, fPushConstants->GetData( offset ) );
+			vkCmdPushConstants( fCommandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, offset, size, fPushConstants->GetData( offset ) );
 			// TODO: want fragment bit if using sampler index...
 			fPushConstants->Reset();
 		}
@@ -1309,61 +1290,82 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology )
 	return canDraw;
 }
 
-VkDescriptorSet VulkanCommandBuffer::AddTexture( U32 unit, const VkDescriptorImageInfo & imageInfo )
+VkDescriptorSet VulkanCommandBuffer::AddTextureSet( const std::vector< VkDescriptorImageInfo > & imageInfo )
 {
 	VulkanState * state = fRenderer.GetState();
 	DescriptorLists & list = fLists[DescriptorLists::kTexture];
-	bool isNew = memcmp( &imageInfo, &fTextureState[unit], sizeof( VkDescriptorImageInfo ) ) != 0;
-	bool becameDirty = isNew && !list.fDirty;
 
-	if (becameDirty)
+	if (list.fPools.empty() && !PrepareTexturesPool( state ))
 	{
-		fTextures = VK_NULL_HANDLE;
+		CoronaLog( "Failed to create initial descriptor texture pool!" );
 
-		if (list.fPools.empty() && !PrepareTexturesPool( state ))
-		{
-			CoronaLog( "Failed to create initial descriptor texture pool!" );
+		return VK_NULL_HANDLE;
+	}
 
-			return VK_NULL_HANDLE;
-		}
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	VkDescriptorSetLayout layout = fRenderer.GetTextureLayout();
 
-		VkDescriptorSetAllocateInfo allocInfo = {};
-		VkDescriptorSetLayout layout = fRenderer.GetTextureLayout();
-
-		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocInfo.descriptorSetCount = 1U;
-		allocInfo.pSetLayouts = &layout;
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorSetCount = 1U;
+	allocInfo.pSetLayouts = &layout;
 				
-		VkResult result = VK_ERROR_UNKNOWN;
-		bool doRetry = false;
+	VkDescriptorSet set = VK_NULL_HANDLE;
+	bool doRetry = false;
 
-		do {
-			allocInfo.descriptorPool = list.fPools.back();
-			result = vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &fTextures );
+	do {
+		allocInfo.descriptorPool = list.fPools.back();
+		VkResult result = vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &set );
 
-			if (VK_ERROR_OUT_OF_POOL_MEMORY == result)
-			{
-				Rtt_ASSERT( !doRetry ); // this should never happen
-
-				doRetry = PrepareTexturesPool( state );
-			}
-		} while (doRetry);
-
-		if (result != VK_SUCCESS)
+		if (VK_ERROR_OUT_OF_POOL_MEMORY == result)
 		{
-			CoronaLog( "Failed to allocate texture descriptor set!" );
+			Rtt_ASSERT( !doRetry ); // this should never happen
 
-			return VK_NULL_HANDLE;
+			doRetry = PrepareTexturesPool( state );
 		}
-	}
 
-	if (isNew && fTextures != VK_NULL_HANDLE)
-	{
-		list.fDirty = true;
-		fTextureState[unit] = imageInfo;
-	}
+		else if (VK_SUCCESS == result)
+		{
+			std::vector< VkWriteDescriptorSet > writes;
 
-	return fTextures;
+			bool wasValid = false;
+
+			for (size_t i = 0; i < imageInfo.size(); ++i)
+			{
+				if (VK_NULL_HANDLE == imageInfo[i].imageView)
+				{
+					wasValid = false;
+				}
+
+				else
+				{
+					if (!wasValid)
+					{
+						VkWriteDescriptorSet wds = {};
+
+						wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+						wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+						wds.dstArrayElement = i;
+						wds.pImageInfo = imageInfo.data() + i;
+						wds.dstSet = set;
+
+						writes.push_back( wds );
+
+						wasValid = true;
+					}
+
+					++writes.back().descriptorCount;
+				}
+			}
+         
+			vkUpdateDescriptorSets( state->GetDevice(), writes.size(), writes.data(), 0U, NULL );
+
+			return set;
+		}
+	} while (doRetry);
+
+	CoronaLog( "Failed to allocate texture descriptor set!" );
+
+	return VK_NULL_HANDLE;
 }
 
 template <typename T>
@@ -1467,34 +1469,6 @@ void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, s
 			src[1], // row 1, col 2
 			src[4]  // row 2, col 2
 		};
-/*
-( if possible, avoid this in favor of what Cross gives us )
-		S32 maskTranslationOffset, maskMatrixVectorOffset = S32( offset ) & 0xF0; // cf. shell_default_vulkan
-
-		switch (maskMatrixVectorOffset)
-		{
-		case 0x10: // mask matrix 0 = vector #2; translation = vector #1, offset #0
-		case 0x40: // mask matrix 2 = vector #5; translation = vector #4, offset #2
-			low = maskMatrixVectorOffset - 0x10;
-			high = maskMatrixVectorOffset;
-			maskTranslationOffset = low;
-					
-			if (0x40 == maskMatrixVectorOffset)
-			{
-				maskTranslationOffset += 0x8;
-			}
-
-			break;
-		case 0x20: // mask matrix 1 = vector #3; translation = vector #4, offset #0
-			low = maskMatrixVectorOffset;
-			high = maskMatrixVectorOffset + 0x10;
-			maskTranslationOffset = high;
-
-			break;
-		default:
-			Rtt_ASSERT_NOT_REACHED();
-		}
-*/
 
 		if (program)
 		{

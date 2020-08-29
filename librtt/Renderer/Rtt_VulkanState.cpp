@@ -124,38 +124,9 @@ VulkanState::VulkanState()
 {
 }
 
-/*
-    void initVulkan() {
-        createInstance();
-        setupDebugMessenger();
-        createSurface();
-        pickPhysicalDevice();
-        createLogicalDevice();
-        createSwapChain();
-        createImageViews();
-        createRenderPass();
-        createDescriptorSetLayout();
-        createGraphicsPipeline();
-        createCommandPool();
-        createColorResources();
-        createDepthResources();
-        createFramebuffers();
-        createTextureImage();
-        createTextureImageView();
-        createTextureSampler();
-        loadModel();
-        createVertexBuffer();
-        createIndexBuffer();
-        createUniformBuffers();
-        createDescriptorPool();
-        createDescriptorSets();
-        createCommandBuffers();
-        createSyncObjects();
-    }
-*/
-
 VulkanState::~VulkanState()
 {
+// vkDeviceWaitIdle( fDevice );
 	VulkanProgram::CleanUpCompiler( fCompiler, fCompileOptions );
 
 	vkDestroyCommandPool( fDevice, fCommandPool, fAllocator );
@@ -1014,24 +985,6 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state )
 
 	return true;
 }
-
-/*
-    void run() {
-        initWindow();
-        initVulkan();
-        mainLoop();
-        cleanup();
-    }
-
-    void mainLoop() {
-        while (!glfwWindowShouldClose(window)) {
-            glfwPollEvents();
-            drawFrame();
-        }
-
-        vkDeviceWaitIdle(device);
-    }
-*/
 
 // ----------------------------------------------------------------------------
 
