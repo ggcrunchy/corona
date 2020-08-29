@@ -9,7 +9,7 @@
 
 #include "Core/Rtt_Config.h"
 
-#include "Renderer/Rtt_VulkanCommandBuffer.h"
+#include "Renderer/Rtt_VulkanRenderer.h"
 #include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanTexture.h"
 #include "Renderer/Rtt_Texture.h"
@@ -250,36 +250,42 @@ VulkanTexture::Destroy()
 }
 
 void
-VulkanTexture::Bind( VulkanCommandBuffer & commandBuffer, U32 unit )
+VulkanTexture::Bind( DescriptorLists & lists, VkDescriptorImageInfo & imageInfo )
 {
-	VkDescriptorImageInfo imageInfo;
+//	VkDescriptorImageInfo imageInfo;
 
-	imageInfo.imageView = fImageView;
-	imageInfo.sampler = fSampler;
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    if (imageInfo.imageView != fImageView)
+    {
+        lists.fDirty = true;
 
+	    imageInfo.imageView = fImageView;
+	    imageInfo.sampler = fSampler;
+	    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    }
+/*
 	VkWriteDescriptorSet descriptorWrite = {};
 
 	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptorWrite.descriptorCount = 1U;
 	descriptorWrite.pImageInfo = &imageInfo;
-
+    */
 	if (true) // !fState->GetFeatures().shaderSampledImageArrayDynamicIndexing) // TODO: no indexing... this will presumably occur before binding
 	{
-		VkDescriptorSet set = commandBuffer.AddTexture( unit, imageInfo );
+/*		VkDescriptorSet set = commandBuffer.AddTexture( unit, fImageView );
 
 		if (set != VK_NULL_HANDLE)
 		{
 			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorWrite.dstArrayElement = unit;
 			descriptorWrite.dstSet = set;
-
+         
 			vkUpdateDescriptorSets( fState->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
-		}
+		}*/
 	}
 
 	else // TODO: do one bind at start of frame, update here?
 	{
+/*
 		VkWriteDescriptorSet write2 = descriptorWrite;
 
 		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -292,6 +298,7 @@ VulkanTexture::Bind( VulkanCommandBuffer & commandBuffer, U32 unit )
 		VkWriteDescriptorSet writes[] = { descriptorWrite, write2 };
 
 		vkUpdateDescriptorSets( fState->GetDevice(), 2U, writes, 0U, NULL );
+*/
 	}
 }
 

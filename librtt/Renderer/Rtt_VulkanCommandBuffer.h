@@ -91,10 +91,10 @@ class VulkanCommandBuffer : public CommandBuffer
 		
 		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists );
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
-		bool PrepareDraw( VkPrimitiveTopology topology );
+		bool PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & imageInfo );
 
 	public:
-		VkDescriptorSet AddTexture( U32 unit, const VkDescriptorImageInfo & imageInfo );
+		VkDescriptorSet AddTextureSet( const std::vector< VkDescriptorImageInfo > & imageInfo );
 
 	private:
 		virtual void InitializeFBO();
@@ -168,8 +168,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		DescriptorLists * fLists;
 		VkCommandBuffer fCommandBuffer;
 		VkPipeline fPipeline;
-		VkDescriptorSet fTextures;
-		std::vector< VkDescriptorImageInfo > fTextureState;
 
 		struct GraphNode {
 			U32 fOffset;

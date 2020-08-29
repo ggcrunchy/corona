@@ -25,13 +25,6 @@
 #include <string>
 #include <utility>
 #include <stdlib.h>
-/*
-#include <cstdio>
-#include <string.h> // memset.
-#ifdef Rtt_WIN_PHONE_ENV
-	#include <GLES2/gl2ext.h>
-#endif
-*/	
 
 // To reduce memory consumption and startup cost, defer the
 // creation of Vulkan shaders and programs until they're needed.
@@ -43,36 +36,7 @@
 namespace /*anonymous*/
 {
 	using namespace Rtt;
-	/*
-	// Check that the given shader compiled and log any errors
-	void CheckShaderCompilationStatus( GLuint name, bool isVerbose, const char *label, int startLine )
-	{
-		if ( isVerbose )
-		{
-			if ( label )
-			{
-				Rtt_LogException( "ERROR: An error occurred in the %s kernel.\n", label );
-			}
-			Rtt_LogException( "%s", infoLog );
-			Rtt_LogException( "\tNOTE: Kernel starts at line number (%d), so subtract that from the line numbers above.\n", startLine );
-		}
-	}
 
-	// Check that the given program linked and log any errors
-	void CheckProgramLinkStatus( GLuint name, bool isVerbose )
-	{
-		if ( isVerbose )
-		{
-			Rtt_LogException( "%s", infoLog );
-		}
-		else
-		{
-			Rtt_LogException(
-				"ERROR: A shader failed to compile. To see errors, add the following to the top of your main.lua:\n"
-				"\tdisplay.setDefault( 'isShaderCompilerVerbose', true )\n" );
-		}
-	}
-	*/
 	const char* kWireframeSource =
 		"void main()" \
 		"{" \
@@ -333,14 +297,7 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 			iter.first->second.fStages |= 1U << kind;
 		}
 
-		VkShaderModule shaderModule;
-
-		if (VK_SUCCESS == vkCreateShaderModule( fState->GetDevice(), &createShaderModuleInfo, fState->GetAllocator(), &shaderModule ))
-		{
-			module = shaderModule;
-		}
-
-		else
+		if (vkCreateShaderModule( fState->GetDevice(), &createShaderModuleInfo, fState->GetAllocator(), &module ) != VK_SUCCESS)
 		{
 			CoronaLog( "Failed to create shader module!" );
 		}

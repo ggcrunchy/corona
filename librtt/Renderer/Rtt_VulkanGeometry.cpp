@@ -15,15 +15,6 @@
 
 #include "Renderer/Rtt_Geometry_Renderer.h"
 #include "CoronaLog.h"
-/*
-#include "Renderer/Rtt_GL.h"
-
-#if defined( Rtt_EGL )
-	#include <EGL/egl.h>
-#endif
-
-#include <stdio.h>
-	*/
 
 // ----------------------------------------------------------------------------
 
