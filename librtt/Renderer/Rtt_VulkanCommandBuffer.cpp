@@ -1465,8 +1465,8 @@ void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, s
 		float * src = reinterpret_cast< float * >( uniform->GetData() );
 		Vec4 maskMatrix = {
 			src[0], // row 1, col 1
-			src[3], // row 2, col 1
-			src[1], // row 1, col 2
+			src[1], // row 2, col 1
+			src[3], // row 1, col 2
 			src[4]  // row 2, col 2
 		};
 
