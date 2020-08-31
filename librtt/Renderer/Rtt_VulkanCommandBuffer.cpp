@@ -55,6 +55,7 @@ namespace /*anonymous*/
 	{
 		kCommandBindFrameBufferObject,
 		kCommandUnBindFrameBufferObject,
+		kCommandJumpToOffset,
 		kCommandBeginRenderPass,
 		kCommandBindGeometry,
 		kCommandBindTexture,
@@ -154,7 +155,6 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fCurrentDrawVersion( Program::kMaskCount0 ),
 	fProgram( NULL ),
 	fDefaultFBO( NULL ),
-	fFBO( NULL ),
 	fTimeTransform( NULL ),
 //	fTimerQueries( new U32[kTimerQueryCount] ),
 //	fTimerQueryIndex( 0 ),
@@ -322,10 +322,60 @@ VulkanCommandBuffer::PrepareTexturesPool( VulkanState * state )
 void
 VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
+	bool popStack = NULL == fbo || (fGraphStack.size() > 1U && fGraphStack[fGraphStack.size() - 2U].fFBO == fbo->GetGPUResource());
+
+	if (popStack)
+	{/*
+		local cell = table.remove(stack)
+
+        if cell.left_lower_level then
+			// put(cell.fLowerLevel, ???)
+            jumps[cell.left_lower_level] = i + 1
+        end
+
+        if cell.will_jump_to then
+			// emit(jump-to-offset)
+			// put(???, will-jump-to)
+            jumps[i] = cell.will_jump_to
+        end
+
+        cell.ended_at = i*/
+	}
+
+	else
+	{
+		/*
+		local new = {}
+
+        if prev.ended_at then -- previous swath was on this stack level, or cleared the stack?
+			// put(prev.fEndedAt, ???)
+            jumps[prev.ended_at] = i
+        else -- this swath is within another still in progress
+			// prev.fJumpTo = ???
+            prev.will_jump_to = i
+        end
+
+        if #stack > 0 then
+			// emit(jump-to-offset, XXX)
+			// new.fLeftLowerLevel = ???
+            new.left_lower_level = i - 1
+        end
+
+        prev = new
+		// new.fbo = fbo
+        stack[#stack + 1] = new
+		*/
+	}
+/*
+local jumps, stack, prev = {}, {}, {} -- ??, fGraphStack, fPrevNode
+
+jumps[prev.ended_at] = "quit" -- ideally, this is accounted for by fNumCommands
+*/
 	if( fbo )
 	{
 		WRITE_COMMAND( kCommandBindFrameBufferObject );
 		Write<GPUResource*>( fbo->GetGPUResource() );
+		// move this into else...
 		// TODO: record this position on a stack...
 		// redirect if necessary...
 			// 
@@ -639,42 +689,61 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 
-	// TODO: initialize FBO... (or come up with better way to do set up swapchain one...)
+	VulkanFrameBufferObject * fbo = NULL;
+
 	if (VK_NULL_HANDLE == fCommandBuffer)
 	{
 		fNumCommands = 0U;
 	}
-	CoronaLog("RENDERER, %u", fNumCommands);
+
 	for( U32 i = 0; i < fNumCommands; ++i )
 	{
 		Command command = Read<Command>();
-CoronaLog( "%u, %i", i, command );
+
 // printf( "GLCommandBuffer::Execute [%d/%d] %d\n", i, fNumCommands, command );
 		Rtt_ASSERT( command < kNumCommands );
 		switch( command )
 		{
 			case kCommandBindFrameBufferObject:
 			{
-// TODO: if (fFBO)
-				VulkanFrameBufferObject* fbo = Read<VulkanFrameBufferObject*>();
+				if (!fGraphStack.empty())
+				{
+					Rtt_ASSERT( fGraphStack.back().fFBO == fbo );
+					Rtt_ASSERT( renderPassBeginInfo.renderPass );
 
-				fFBO = fbo;
+					vkCmdEndRenderPass( fCommandBuffer );
+				}
+
+				fbo = Read<VulkanFrameBufferObject*>();
 
 				fbo->Bind( fRenderer, fImageIndex, renderPassBeginInfo );
 
 				clearValues.clear();
-/*
-				DEBUG_PRINT( "Bind FrameBufferObject: Vulkan ID: %i, Vulkan Texture ID, if any: %d",
-								fbo->GetName(),
+				
+				DEBUG_PRINT( "Bind FrameBufferObject" );/*: Vulkan ID=%" PRIx64 ", Vulkan Texture ID, if any: %" PRIx64,
+								fbo->,
 								fbo->GetTextureName() );*/
-
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandUnBindFrameBufferObject:
 			{
-// TODO:
-			//	glBindFramebuffer( GL_FRAMEBUFFER, fDefaultFBO );
+				Rtt_ASSERT( !fGraphStack.empty() );
+				Rtt_ASSERT( fGraphStack.back().fFBO == fbo );
+				Rtt_ASSERT( renderPassBeginInfo.renderPass );
+
+				vkCmdEndRenderPass( fCommandBuffer );
+
+				renderPassBeginInfo.renderPass = VK_NULL_HANDLE;
+				fbo = NULL;
+
 				DEBUG_PRINT( "Unbind FrameBufferObject: Vulkan name: %p (fDefaultFBO)", fDefaultFBO );
+				CHECK_ERROR_AND_BREAK;
+			}
+			case kCommandJumpToOffset:
+			{
+				U32 pos = Read<U32>();
+				SetOffsetPosition(pos);
+				DEBUG_PRINT( "Jump to offset: %i", pos );
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandBeginRenderPass:
@@ -1040,12 +1109,6 @@ CoronaLog( "%u, %i", i, command );
 	bool okok=false;
 	if (fCommandBuffer != VK_NULL_HANDLE && fSwapchain != VK_NULL_HANDLE)
 	{okok=true;
-		if (renderPassBeginInfo.renderPass ) // dangling render pass?
-		{
-			vkCmdEndRenderPass( fCommandBuffer );
-		}
-
-		fFBO = NULL;
 		CoronaLog("ENDING");
 		endResult = vkEndCommandBuffer( fCommandBuffer );
 
@@ -1150,6 +1213,8 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 {
 	if (commandBuffer != VK_NULL_HANDLE && lists)
 	{
+		fPrevNode = GraphNode();
+
 		VkDevice device = fRenderer.GetState()->GetDevice();
 
 		// lists = ..., ubo, user data, textures, ...
@@ -1647,6 +1712,14 @@ float * VulkanCommandBuffer::PushConstantState::GetData( U32 offset )
 	U8 * bytes = reinterpret_cast< U8 * >( fData );
 
 	return reinterpret_cast< float * >( bytes + offset );
+}
+
+VulkanCommandBuffer::GraphNode::GraphNode()
+:	fFBO( NULL ),
+	fEndedAt( ~0U ),
+	fLeftLowerLevel( ~0U ),
+	fWillJumpTo( ~0U )
+{
 }
 
 // ----------------------------------------------------------------------------

@@ -20,16 +20,6 @@
 #include <cmath>
 
 // ----------------------------------------------------------------------------
-/*
-#define ENABLE_DEBUG_PRINT	0
-
-#if ENABLE_DEBUG_PRINT
-	#define DEBUG_PRINT( ... ) Rtt_LogException( __VA_ARGS__ );
-#else
-	#define DEBUG_PRINT( ... )
-#endif
-	*/
-// ----------------------------------------------------------------------------
 
 namespace /*anonymous*/ 
 { 
@@ -209,32 +199,8 @@ VulkanTexture::Update( CPUResource* resource )
 {
 	Rtt_ASSERT( CPUResource::kTexture == resource->GetType() );
 	Texture* texture = static_cast<Texture*>( resource );
-	/*
-	const U8* data = texture->GetData();		
-	if( data )
-	{		
-		const U32 w = texture->GetWidth();
-		const U32 h = texture->GetHeight();
-		GLint internalFormat;
-		GLenum format;
-		GLenum type;
-		getFormatTokens( texture->GetFormat(), internalFormat, format, type );
 
-		glBindTexture( GL_TEXTURE_2D, GetName() );
-		if (internalFormat == fCachedFormat && w == fCachedWidth && h == fCachedHeight )
-		{
-			glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, type, data );
-		}
-		else
-		{
-			glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
-			fCachedFormat = internalFormat;
-			fCachedWidth = w;
-			fCachedHeight = h;
-		}
-		GL_CHECK_ERROR();
-	}
-	texture->ReleaseData();*/
+    // TODO? (e.g. external textures)
 }
 
 void 

@@ -112,6 +112,12 @@ class VulkanCommandBuffer : public CommandBuffer
 		template <typename T>
 		void Write(T);
 
+	public:
+		U32 GetBytesUsed() const { return fBytesUsed; }
+		U8 * GetOffset() const { return fOffset; }
+		void SetOffsetPosition( U32 pos ) { fOffset = fBuffer + pos; }
+
+	private:
 		struct PushConstantState : public VulkanPushConstants {
 			PushConstantState()
 			{
@@ -154,7 +160,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		FrameBufferObject * fDefaultFBO;/*
 		U32* fTimerQueries;
 		U32 fTimerQueryIndex;*/
-		VulkanFrameBufferObject * fFBO;
 		Real fElapsedTimeGPU;
 		TimeTransform* fTimeTransform;
 		S32 fCachedQuery[kNumQueryableParams];
@@ -170,10 +175,15 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkPipeline fPipeline;
 
 		struct GraphNode {
-			U32 fOffset;
-			U32 fJump;
+			GraphNode();
+
+			VulkanFrameBufferObject * fFBO;
+			U32 fEndedAt;
+			U32 fLeftLowerLevel;
+			U32 fWillJumpTo;
 		};
 
+		GraphNode fPrevNode;
 		std::vector< GraphNode > fGraphStack;
 /*
 		dynamic uniform buffers - as a list?

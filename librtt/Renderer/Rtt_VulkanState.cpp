@@ -91,8 +91,8 @@ VulkanBufferData::Extract( Rtt_Allocator * allocator )
 void
 VulkanBufferData::Clear()
 {
-    vkDestroyBuffer( fDevice, fBuffer, fAllocator );
     vkFreeMemory( fDevice, fMemory, fAllocator );
+    vkDestroyBuffer( fDevice, fBuffer, fAllocator );
 
 	Disown();
 }

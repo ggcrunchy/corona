@@ -426,6 +426,7 @@ VulkanRenderer::EndFrame()
 {
 	Super::EndFrame();
 
+	SetFrameBufferObject( NULL );
 	// TODO: this always precedes Swap(), so hook up resources for Create() / Update()
 	// yank them in Execute()
 }
