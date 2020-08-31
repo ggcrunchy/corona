@@ -322,49 +322,76 @@ VulkanCommandBuffer::PrepareTexturesPool( VulkanState * state )
 void
 VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
-	bool popStack = NULL == fbo || (fGraphStack.size() > 1U && fGraphStack[fGraphStack.size() - 2U].fFBO == fbo->GetGPUResource());
+	size_t height = fGraphStack.size();
+	bool popStack = NULL == fbo || (height > 1U && fbo == fGraphStack[height - 2U].fFBO);
 
 	if (popStack)
-	{/*
-		local cell = table.remove(stack)
+	{
+		GraphNode & cell = fGraphStack.back();
+//		local cell = table.remove(stack)
 
-        if cell.left_lower_level then
+        if (cell.fLeftLowerLevel != GraphNode::kInvalidLocation)
+		{
 			// put(cell.fLowerLevel, ???)
-            jumps[cell.left_lower_level] = i + 1
-        end
+// jumps[cell.left_lower_level] = i + 1
+		}
 
-        if cell.will_jump_to then
-			// emit(jump-to-offset)
-			// put(???, will-jump-to)
-            jumps[i] = cell.will_jump_to
-        end
+        if (cell.fWillJumpTo != GraphNode::kInvalidLocation)
+		{
+			WRITE_COMMAND( kCommandJumpToOffset );
+			Write<U32>(cell.fWillJumpTo);
+// jumps[i] = cell.will_jump_to
+		}
 
-        cell.ended_at = i*/
+		if (&cell == fPrevNode)
+		{
+			WRITE_COMMAND( kCommandJumpToOffset );
+
+			fEndedAt = GetWritePosition();
+
+			Write<U32>(GraphNode::kInvalidLocation);
+		}
+
+		fGraphStack.pop_back();
 	}
 
 	else
 	{
-		/*
-		local new = {}
+		fGraphStack.push_back( GraphNode() );
 
-        if prev.ended_at then -- previous swath was on this stack level, or cleared the stack?
-			// put(prev.fEndedAt, ???)
-            jumps[prev.ended_at] = i
-        else -- this swath is within another still in progress
-			// prev.fJumpTo = ???
-            prev.will_jump_to = i
-        end
+		GraphNode & newNode = fGraphStack.back();
+// local new = {}
+		U32 here = GetWritePosition();
 
-        if #stack > 0 then
+		newNode.fFBO = fbo;
+
+		if (fPrevNode)
+		{
+			if (GraphNode::kInvalidLocation == fEndedAt) //  this is a nested swath (possibly the first of many), whose parent is still in progress?
+			{
+				fPrevNode->fWillJumpTo = here;
+// prev.will_jump_to = i
+			}
+
+			else // otherwise, either the previous swath was on this stack level, or we cleared the stack
+			if (fEndedAt != here) // in the former case, the two swaths might blend together, in which case a jump would be pointless
+			{
+				SetOffsetPosition( fEndedAt );
+				Write<U32>(here); // TODO: eyeballing it looked okay, but check if this is robust when potentially < fBytesAllocated
+// jumps[prev.ended_at] = i
+				SetOffsetPosition( here );
+			}
+		}
+
+		if (0U == height)
+		{
 			// emit(jump-to-offset, XXX)
 			// new.fLeftLowerLevel = ???
-            new.left_lower_level = i - 1
-        end
+        //		new.left_lower_level = i - 1
+		}
 
-        prev = new
-		// new.fbo = fbo
-        stack[#stack + 1] = new
-		*/
+		fPrevNode = &newNode;
+		fEndedAt = GraphNode::kInvalidLocation;
 	}
 /*
 local jumps, stack, prev = {}, {}, {} -- ??, fGraphStack, fPrevNode
@@ -708,7 +735,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			{
 				if (!fGraphStack.empty())
 				{
-					Rtt_ASSERT( fGraphStack.back().fFBO == fbo );
+					Rtt_ASSERT( fGraphStack.back().fFBO );
+					Rtt_ASSERT( fGraphStack.back().fFBO->GetGPUResource() == fbo );
 					Rtt_ASSERT( renderPassBeginInfo.renderPass );
 
 					vkCmdEndRenderPass( fCommandBuffer );
@@ -728,7 +756,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			case kCommandUnBindFrameBufferObject:
 			{
 				Rtt_ASSERT( !fGraphStack.empty() );
-				Rtt_ASSERT( fGraphStack.back().fFBO == fbo );
+				Rtt_ASSERT( fGraphStack.back().fFBO );
+				Rtt_ASSERT( fGraphStack.back().fFBO->GetGPUResource() == fbo );
 				Rtt_ASSERT( renderPassBeginInfo.renderPass );
 
 				vkCmdEndRenderPass( fCommandBuffer );
@@ -1213,7 +1242,8 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 {
 	if (commandBuffer != VK_NULL_HANDLE && lists)
 	{
-		fPrevNode = GraphNode();
+		fPrevNode = NULL;
+		fEndedAt = ~0U;
 
 		VkDevice device = fRenderer.GetState()->GetDevice();
 
@@ -1716,7 +1746,6 @@ float * VulkanCommandBuffer::PushConstantState::GetData( U32 offset )
 
 VulkanCommandBuffer::GraphNode::GraphNode()
 :	fFBO( NULL ),
-	fEndedAt( ~0U ),
 	fLeftLowerLevel( ~0U ),
 	fWillJumpTo( ~0U )
 {

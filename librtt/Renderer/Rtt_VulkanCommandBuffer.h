@@ -113,7 +113,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		void Write(T);
 
 	public:
-		U32 GetBytesUsed() const { return fBytesUsed; }
+		U32 GetWritePosition() const { return fBytesUsed; }
 		U8 * GetOffset() const { return fOffset; }
 		void SetOffsetPosition( U32 pos ) { fOffset = fBuffer + pos; }
 
@@ -175,16 +175,18 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkPipeline fPipeline;
 
 		struct GraphNode {
+			enum { kInvalidLocation = ~0U };
+
 			GraphNode();
 
-			VulkanFrameBufferObject * fFBO;
-			U32 fEndedAt;
+			FrameBufferObject * fFBO;
 			U32 fLeftLowerLevel;
 			U32 fWillJumpTo;
 		};
 
-		GraphNode fPrevNode;
 		std::vector< GraphNode > fGraphStack;
+		GraphNode * fPrevNode;
+		U32 fEndedAt;
 /*
 		dynamic uniform buffers - as a list?
 
