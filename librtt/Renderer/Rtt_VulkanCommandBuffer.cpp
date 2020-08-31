@@ -716,8 +716,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 
-	VulkanFrameBufferObject * fbo = NULL;
-
 	if (VK_NULL_HANDLE == fCommandBuffer)
 	{
 		fNumCommands = 0U;
@@ -733,16 +731,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 		{
 			case kCommandBindFrameBufferObject:
 			{
-				if (!fGraphStack.empty())
-				{
-					Rtt_ASSERT( fGraphStack.back().fFBO );
-					Rtt_ASSERT( fGraphStack.back().fFBO->GetGPUResource() == fbo );
-					Rtt_ASSERT( renderPassBeginInfo.renderPass );
-
-					vkCmdEndRenderPass( fCommandBuffer );
-				}
-
-				fbo = Read<VulkanFrameBufferObject*>();
+				VulkanFrameBufferObject * fbo = Read<VulkanFrameBufferObject*>();
 
 				fbo->Bind( fRenderer, fImageIndex, renderPassBeginInfo );
 
@@ -755,15 +744,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			}
 			case kCommandUnBindFrameBufferObject:
 			{
-				Rtt_ASSERT( !fGraphStack.empty() );
-				Rtt_ASSERT( fGraphStack.back().fFBO );
-				Rtt_ASSERT( fGraphStack.back().fFBO->GetGPUResource() == fbo );
 				Rtt_ASSERT( renderPassBeginInfo.renderPass );
 
 				vkCmdEndRenderPass( fCommandBuffer );
 
 				renderPassBeginInfo.renderPass = VK_NULL_HANDLE;
-				fbo = NULL;
 
 				DEBUG_PRINT( "Unbind FrameBufferObject: Vulkan name: %p (fDefaultFBO)", fDefaultFBO );
 				CHECK_ERROR_AND_BREAK;
@@ -1133,16 +1118,14 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 //	VULKAN_CHECK_ERROR();
 	const VulkanState * state = fRenderer.GetState();
-	CoronaLog( "ERR: %s", fCommandBuffer ? "YES" : "NO" );
 	VkResult endResult = VK_SUCCESS, submitResult = VK_SUCCESS;
 	bool okok=false;
 	if (fCommandBuffer != VK_NULL_HANDLE && fSwapchain != VK_NULL_HANDLE)
 	{okok=true;
-		CoronaLog("ENDING");
 		endResult = vkEndCommandBuffer( fCommandBuffer );
 
 		if (VK_SUCCESS == endResult)
-		{CoronaLog("ENDED");
+		{
 			VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 			VkSubmitInfo submitInfo = {};
 
@@ -1157,14 +1140,13 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 			vkResetFences( state->GetDevice(), 1U, &fInFlight );
 
-			submitResult = vkQueueSubmit( state->GetGraphicsQueue(), 1, &submitInfo, fInFlight );
-			CoronaLog( "SUBMIT %i", submitResult );
+			submitResult = vkQueueSubmit( state->GetGraphicsQueue(), 1U, &submitInfo, fInFlight );
 		}
 	}
 			if (true)//VK_SUCCESS == submitResult)
-			{CoronaLog("PRESENTING");
+			{
 				VkPresentInfoKHR presentInfo = {};
-
+CoronaLog("PRESENTING");
 				presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 				presentInfo.pImageIndices = &fImageIndex;
 				presentInfo.pSwapchains = &fSwapchain;
@@ -1176,18 +1158,13 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 				if (VK_ERROR_OUT_OF_DATE_KHR == presentResult || VK_SUBOPTIMAL_KHR == presentResult) // || framebufferResized)
 				{
-					CoronaLog("MUTTER: %i", presentResult);
+CoronaLog("MUTTER: %i", presentResult);
 				//    framebufferResized = false;
 				}
 
 				else if (presentResult != VK_SUCCESS)
 				{
 					CoronaLog( "Failed to present swap chain image!" );
-				}
-
-				else
-				{
-					CoronaLog("WOO");
 				}
 
 				fExecuteResult = presentResult;
