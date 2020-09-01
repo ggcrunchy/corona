@@ -31,15 +31,18 @@ struct TimeTransform;
 
 // cf. shell_default_vulkan:
 
-struct alignas(16) VulkanUniforms {
+struct alignas(16) VulkanUniforms
+{
 	float fData[6 * 4];
 };
 
-struct alignas(16) VulkanUserData {
+struct alignas(16) VulkanUserData
+{
 	float UserData[4][16];
 };
 
-struct alignas(16) VulkanPushConstants {
+struct alignas(16) VulkanPushConstants
+{
 	float fData[5 * 4];
 };
 
@@ -55,14 +58,20 @@ class VulkanCommandBuffer : public CommandBuffer
 		virtual ~VulkanCommandBuffer();
 
 		virtual void Initialize();
-		
 		virtual void Denitialize();
-
 		virtual void ClearUserUniforms();
 
 		bool PrepareTexturesPool( VulkanState * state );
 
-		// Generate the appropriate buffered OpenGL commands to accomplish the
+	private:
+		U32 JumpInstructionStub();
+
+		void PatchJumpInstructionStub( U32 instructionPosition );
+		void PopFrameBufferObject();
+		void PushFrameBufferObject( FrameBufferObject * fbo );
+
+	public:
+		// Generate the appropriate buffered Vulkan commands to accomplish the
 		// specified state changes.
 		virtual void BindFrameBufferObject( FrameBufferObject* fbo );
 		virtual void BindGeometry( Geometry* geometry );
@@ -84,40 +93,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		// Execute all buffered commands. A valid OpenGL context must be active.
 		virtual Real Execute( bool measureGPU );
 	
-	public:
-		VkResult WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain );
-		VkResult GetExecuteResult() const { return fExecuteResult; }
-		uint32_t GetImageIndex() const { return fImageIndex; }
-		
-		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists );
-		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
-		bool PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & imageInfo );
-
-	public:
-		VkDescriptorSet AddTextureSet( const std::vector< VkDescriptorImageInfo > & imageInfo );
-
-	private:
-		virtual void InitializeFBO();
-		virtual void InitializeCachedParams();
-		virtual void CacheQueryParam( CommandBuffer::QueryableParams param );
-
-	private:
-		// Templatized helper function for reading an arbitrary argument from
-		// the command buffer.
-		template <typename T>
-		T Read();
-
-		// Templatized helper function for writing an arbitrary argument to the
-		// command buffer.
-		template <typename T>
-		void Write(T);
-
-	public:
-		U32 GetWritePosition() const { return fBytesUsed; }
-		U8 * GetOffset() const { return fOffset; }
-		void SetOffsetPosition( U32 pos ) { fOffset = fBuffer + pos; }
-
-	private:
+	private:	
 		struct PushConstantState : public VulkanPushConstants {
 			PushConstantState()
 			{
@@ -136,6 +112,42 @@ class VulkanCommandBuffer : public CommandBuffer
 			U32 upperOffset;
 		};
 
+	public:
+		VkResult WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain );
+		VkResult GetExecuteResult() const { return fExecuteResult; }
+		uint32_t GetImageIndex() const { return fImageIndex; }
+		
+		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists );
+		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
+		bool PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & imageInfo, PushConstantState & pushConstants );
+
+	public:
+		VkDescriptorSet AddTextureSet( const std::vector< VkDescriptorImageInfo > & imageInfo );
+
+	private:
+		virtual void InitializeFBO();
+		virtual void InitializeCachedParams();
+		virtual void CacheQueryParam( CommandBuffer::QueryableParams param );
+
+	private:
+		// Templatized helper function for reading an arbitrary argument from
+		// the command buffer.
+		template <typename T>
+		T Read();
+
+		void RawWrite( U32 position, const void * data, U32 size );
+
+		// Templatized helper function for writing an arbitrary argument to the
+		// command buffer.
+		template <typename T>
+		void Write(T);
+
+	public:
+		U32 GetWritePosition() const { return fBytesUsed; }
+		U8 * GetOffset() const { return fOffset; }
+		void SetOffsetPosition( U32 pos ) { fOffset = fBuffer + pos; }
+
+	private:
 		struct UniformUpdate
 		{
 			Uniform* uniform;
@@ -185,16 +197,17 @@ class VulkanCommandBuffer : public CommandBuffer
 		};
 
 		std::vector< GraphNode > fGraphStack;
-		GraphNode * fPrevNode;
+		GraphNode * fMostRecentNode;
 		U32 fEndedAt;
 /*
 		dynamic uniform buffers - as a list?
 
 */
+/*
 		VulkanUniforms * fUniforms;
 		VulkanUserData * fUserData;
 		PushConstantState * fPushConstants;
-
+*/
 		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;
 		uint32_t fImageIndex;

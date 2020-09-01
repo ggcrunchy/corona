@@ -398,7 +398,6 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 		uint32_t index = vulkanCommandBuffer->GetImageIndex();
 
 		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], fDescriptorLists.data() + 3U * index );
-		CoronaLog("OK");
 	}
 
 	else
