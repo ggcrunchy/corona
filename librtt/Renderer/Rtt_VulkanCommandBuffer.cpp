@@ -20,10 +20,10 @@
 
 #include <cinttypes> // https://stackoverflow.com/questions/8132399/how-to-printf-uint64-t-fails-with-spurious-trailing-in-format#comment9979590_8132440
 #include <limits>
-#include <malloc.h>
+//#include <malloc.h>
 
 #include "CoronaLog.h"
-
+/*
 // From Vulkan example on dynamic uniform buffers, by Sascha Willems:
 void* alignedAlloc(size_t size, size_t alignment)
 {
@@ -46,7 +46,7 @@ void alignedFree(void* data)
 	free(data);
 #endif
 }
-
+*/
 // ----------------------------------------------------------------------------
 
 namespace /*anonymous*/
@@ -163,10 +163,10 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fImageAvailableSemaphore( VK_NULL_HANDLE ),
 	fRenderFinishedSemaphore( VK_NULL_HANDLE ),
 	fInFlight( VK_NULL_HANDLE ),
-	fLists( NULL ),
+	fLists( NULL ),/*
 	fUniforms( NULL ),
 	fUserData( NULL ),
-	fPushConstants( NULL ),
+	fPushConstants( NULL ),*/
 	fCommandBuffer( VK_NULL_HANDLE ),
 	fPipeline( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE )
@@ -195,13 +195,13 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 
 	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fImageAvailableSemaphore );
 	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fRenderFinishedSemaphore );
-
+	/*
 	fUniforms = (VulkanUniforms *)alignedAlloc( sizeof( VulkanUniforms ), 16U );
 	fUserData = (VulkanUserData *)alignedAlloc( sizeof( VulkanUserData ), 16U );
 	fPushConstants = (PushConstantState *)alignedAlloc( sizeof( PushConstantState ), 16U );
 
 	new (fPushConstants) PushConstantState;
-
+	*/
 	if ( VK_NULL_HANDLE == fInFlight || VK_NULL_HANDLE == fImageAvailableSemaphore || VK_NULL_HANDLE == fRenderFinishedSemaphore)
 	{
 		CoronaLog( "Failed to create some synchronziation objects!" );
@@ -213,14 +213,14 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 		fImageAvailableSemaphore = VK_NULL_HANDLE;
 		fRenderFinishedSemaphore = VK_NULL_HANDLE;
 		fInFlight = VK_NULL_HANDLE;
-
+/*
 		alignedFree( fUniforms );
 		alignedFree( fUserData );
 		alignedFree( fPushConstants );
 
 		fUniforms = NULL;
 		fUserData = NULL;
-		fPushConstants = NULL;
+		fPushConstants = NULL;*/
 	}
 }
 
@@ -234,9 +234,10 @@ VulkanCommandBuffer::~VulkanCommandBuffer()
 	vkDestroySemaphore( device, fImageAvailableSemaphore, allocator );
 	vkDestroySemaphore( device, fRenderFinishedSemaphore, allocator );
 //	delete [] fTimerQueries;
+/*
 	alignedFree( fUniforms );
 	alignedFree( fUserData );
-	alignedFree( fPushConstants );
+	alignedFree( fPushConstants );*/
 }
 
 void
@@ -319,11 +320,105 @@ VulkanCommandBuffer::PrepareTexturesPool( VulkanState * state )
 	return fLists[DescriptorLists::kTexture].AddPool( state, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorCount, arrayCount );
 }
 
+U32
+VulkanCommandBuffer::JumpInstructionStub()
+{
+	WRITE_COMMAND( kCommandJumpToOffset );
+
+	U32 instructionPosition = GetWritePosition();
+
+	Write<U32>(GraphNode::kInvalidLocation);
+
+	return instructionPosition;
+}
+
+void
+VulkanCommandBuffer::PatchJumpInstructionStub( U32 instructionPosition )
+{
+	U32 destination = GetWritePosition();
+
+	RawWrite( instructionPosition, &destination, sizeof( U32 ) );
+}
+
+void
+VulkanCommandBuffer::PopFrameBufferObject()
+{
+	WRITE_COMMAND( kCommandUnBindFrameBufferObject );
+
+	GraphNode & cell = fGraphStack.back();
+
+    if (cell.fLeftLowerLevel != GraphNode::kInvalidLocation) // 'nested' jump, cf. PushFrameBufferObject
+	{
+		PatchJumpInstructionStub( cell.fLeftLowerLevel );
+
+		// examples in the diagram below: I -> H, H -> G, G -> D, J -> E, L -> K, K -> F, M -> F
+	}
+
+    if (cell.fWillJumpTo != GraphNode::kInvalidLocation) // parent as predecessor, cf. PushFrameBufferObject
+	{
+		WRITE_COMMAND( kCommandJumpToOffset );
+		Write<U32>(cell.fWillJumpTo);
+	}
+
+	if (&cell == fMostRecentNode) // never interrupted by a nested framebuffer? TODO: is this only relevant if this buffer was itself nested?
+	{
+		fEndedAt = JumpInstructionStub(); // a top-level node must point ahead, but the swath it represents might not be contiguous with the one that follows
+	}
+
+	fGraphStack.pop_back();
+}
+
+void
+VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
+{
+	bool nested = !fGraphStack.empty();
+
+	fGraphStack.push_back( GraphNode() );
+
+	GraphNode & newNode = fGraphStack.back();
+
+	if (nested)
+	{
+		newNode.fLeftLowerLevel = JumpInstructionStub(); // the parent must skip these nested instructions; we only discover where they end, however, once this node is popped
+
+		// examples in the diagram below: D -> G, G -> H, H -> I, E -> J, F -> K, K -> L, F -> M
+	}
+
+	newNode.fFBO = fbo;
+
+	// If this swath is its parent's first child, the parent node will be its predecessor.
+	if (GraphNode::kInvalidLocation == fEndedAt)
+	{
+		Rtt_ASSERT( nested );
+		Rtt_ASSERT( &fGraphStack[fGraphStack.size() - 2U] == fMostRecentNode );
+
+		fMostRecentNode->fWillJumpTo = GetWritePosition(); // the parent has not ended yet, but will point back here
+
+		// examples in the diagram below: D -> G, G -> H, H -> I, E -> J, F -> K, K -> L
+	}
+
+	else // Otherwise, we are either a later child, or moved to a lower level.
+	if (fEndedAt != GetWritePosition()) // the two swaths might blend together, making a jump pointless (TODO: verify this for child swaths)
+	{
+		Rtt_ASSERT( fEndedAt != GraphNode::kInvalidLocation );
+		Rtt_ASSERT( fEndedAt > 0U );
+		Rtt_ASSERT( fMostRecentNode );
+
+		PatchJumpInstructionStub( fEndedAt );
+
+		// examples in the diagram below: I -> E, J -> F, L -> M
+	}
+
+	WRITE_COMMAND( kCommandBindFrameBufferObject );
+	Write<GPUResource*>( fbo->GetGPUResource() );
+
+	fMostRecentNode = &newNode;
+	fEndedAt = GraphNode::kInvalidLocation;
+}
+
 void
 VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
-	size_t oldHeight = fGraphStack.size();
-	bool popStack = NULL == fbo || (oldHeight > 1U && fbo == fGraphStack[oldHeight - 2U].fFBO);
 
 	// The goal of the graph stack itself, and the logic that follows, is to unravel nested framebuffers and put them into a flattened
 	// representation, one that works just as well for sequential buffers. This assumes the current GL semantics, that invalidates will
@@ -364,91 +459,19 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 	// L: 54-57
 	// M: 61-63
 
-	if (popStack)
+	size_t height = fGraphStack.size();
+
+	if (
+		NULL == fbo || // done with un-nested framebuffer?
+		(height >= 2U && fbo == fGraphStack[height - 2U].fFBO) // was this the previous framebuffer?
+	)
 	{
-		GraphNode & cell = fGraphStack.back();
-// local cell = table.remove(stack)
-        if (cell.fLeftLowerLevel != GraphNode::kInvalidLocation)
-		{
-			// put(cell.fLowerLevel, ???)
-// jumps[cell.left_lower_level] = i + 1
-		}
-
-        if (cell.fWillJumpTo != GraphNode::kInvalidLocation)
-		{
-			WRITE_COMMAND( kCommandJumpToOffset );
-			Write<U32>(cell.fWillJumpTo); // see note below
-		}
-
-		if (&cell == fPrevNode)
-		{
-			WRITE_COMMAND( kCommandJumpToOffset );
-
-			fEndedAt = GetWritePosition();
-
-			Write<U32>(GraphNode::kInvalidLocation); // see note below (later child or lower level)
-		}
-
-		fGraphStack.pop_back();
+		PopFrameBufferObject();
 	}
 
 	else
 	{
-		fGraphStack.push_back( GraphNode() );
-
-		GraphNode & newNode = fGraphStack.back();
-
-		// If this is a nested buffer, the parent will want to jump past many instructions that follow.
-		if (oldHeight > 0U)
-		{
-			WRITE_COMMAND( kCommandJumpToOffset ); 
-
-			newNode.fLeftLowerLevel = GetWritePosition(); // we need to come back to the next instruction once the node is popped...
-
-			Write<U32>(GraphNode::kInvalidLocation); // ...since the target is still unknown; reserve space for now
-		}
-
-		newNode.fFBO = fbo;
-
-		U32 currentPosition = GetWritePosition();
-
-		// If this swath is its parent's first child, the parent node will be its predecessor.
-		if (GraphNode::kInvalidLocation == fEndedAt) //  this is a nested swath (possibly the first of many), whose parent is still in progress?
-		{
-			Rtt_ASSERT( oldHeight > 0U );
-			Rtt_ASSERT( fPrevNode == &fGraphStack[oldHeight - 1U] );
-
-			fPrevNode->fWillJumpTo = currentPosition; // the parent has not ended yet, but will only need to know where to jump
-		}
-
-		else // Otherwise, we are either a later child, or down at a lower level.
-		if (fEndedAt != currentPosition) // the two swaths might blend together, making a jump pointless (TODO: verify this for child swaths)
-		{
-			Rtt_ASSERT( fPrevNode );
-
-			SetOffsetPosition( fEndedAt );
-			Write<U32>(currentPosition); // TODO: memory already reserved, just being revisited; seems okay, but double-check we don't trip any side effects
-			SetOffsetPosition( currentPosition );
-		}
-
-		fPrevNode = &newNode;
-		fEndedAt = GraphNode::kInvalidLocation;
-	}
-
-	if( fbo )
-	{
-		WRITE_COMMAND( kCommandBindFrameBufferObject );
-		Write<GPUResource*>( fbo->GetGPUResource() );
-		// move this into else...
-		// TODO: record this position on a stack...
-		// redirect if necessary...
-			// 
-	}
-	else
-	{
-		WRITE_COMMAND( kCommandUnBindFrameBufferObject );
-		// TODO: assuming this always happens before a new bind (probably not true, but for reasoning purposes)
-			// leave pointer (or space, rather) to next instruction
+		PushFrameBufferObject( fbo );
 	}
 }
 
@@ -753,6 +776,18 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 
+	VkDevice device = fRenderer.GetState()->GetDevice();
+
+	// lists = ..., ubo, user data, textures, ...
+
+	VulkanUniforms uniforms;
+	VulkanUserData userData;
+	PushConstantState pushConstants;
+
+	fLists[DescriptorLists::kUniforms].Reset( device, &uniforms );
+	fLists[DescriptorLists::kUserData].Reset( device, &userData );
+	fLists[DescriptorLists::kTexture].Reset( device );
+
 	if (VK_NULL_HANDLE == fCommandBuffer)
 	{
 		fNumCommands = 0U;
@@ -841,7 +876,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			{
 				U32 offset = Read<U32>();
 				Real value = Read<Real>();
-				fPushConstants->Write( offset, &value, sizeof( Real ) );
+				//fPushConstants->
+				pushConstants.Write( offset, &value, sizeof( Real ) );
 				DEBUG_PRINT( "Set Push Constant: value=%f location=%i", value, offset );
 				CHECK_ERROR_AND_BREAK;
 			}
@@ -851,8 +887,10 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				Vec4 maskMatrix = Read<Vec4>();
 				U32 translationOffset = Read<U32>();
 				Vec2 maskTranslation = Read<Vec2>();
-				fPushConstants->Write( maskOffset, &maskMatrix, sizeof( Vec4 ));
-				fPushConstants->Write( translationOffset, &maskTranslation, sizeof( Vec2 ) );
+				//fPushConstants->
+				pushConstants.Write( maskOffset, &maskMatrix, sizeof( Vec4 ));
+				//fPushConstants->
+				pushConstants.Write( translationOffset, &maskTranslation, sizeof( Vec2 ) );
 				DEBUG_PRINT( "Set Push Constant, mask matrix: value=(%f, %f, %f, %f) location=%i", maskMatrix.data[0], maskMatrix.data[1], maskMatrix.data[2], maskMatrix.data[3], maskOffset );
 				DEBUG_PRINT( "Set Push Constant, mask translation: value=(%f, %f) location=%i", maskTranslation.data[0], maskTranslation.data[1], translationOffset );
 				CHECK_ERROR_AND_BREAK;
@@ -921,7 +959,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				READ_UNIFORM_DATA_WITH_PROGRAM( Real );
 				if (location.IsValid())
 				{
-					fPushConstants->Write( location.fOffset, &value, sizeof( Real ) );
+//					fPushConstants->
+					pushConstants.Write( location.fOffset, &value, sizeof( Real ) );
 				}
 				DEBUG_PRINT( "Set Push Constant: value=%f location=%i", value, location.fOffset );
 				CHECK_ERROR_AND_BREAK;
@@ -933,8 +972,10 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				Vec2 maskTranslation = Read<Vec2>();
 				if (location.IsValid())
 				{
-					fPushConstants->Write( location.fOffset, &value, sizeof( Vec4 ));
-					fPushConstants->Write( translationLocation.fOffset, &maskTranslation, sizeof( Vec2 ) );
+					//fPushConstants->
+					pushConstants.Write( location.fOffset, &value, sizeof( Vec4 ));
+					//fPushConstants->
+					pushConstants.Write( translationLocation.fOffset, &maskTranslation, sizeof( Vec2 ) );
 				}
 				DEBUG_PRINT( "Set Push Constant, mask matrix: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
 				DEBUG_PRINT( "Set Push Constant, mask translation: value=(%f, %f) location=%i", maskTranslation.data[0], maskTranslation.data[1], translationLocation.fOffset );
@@ -1109,7 +1150,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				U32 offset = Read<U32>();
 				U32 count = Read<U32>();
 
-				if (PrepareDraw( mode, descriptorImageInfo ))
+				if (PrepareDraw( mode, descriptorImageInfo, pushConstants ))
 				{
 					vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
 				}
@@ -1122,7 +1163,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
 				U32 count = Read<U32>();
 
-				if (PrepareDraw( mode, descriptorImageInfo ))
+				if (PrepareDraw( mode, descriptorImageInfo, pushConstants ))
 				{
 
 					// The first argument, offset, is currently unused. If support for non-
@@ -1256,16 +1297,8 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 {
 	if (commandBuffer != VK_NULL_HANDLE && lists)
 	{
-		fPrevNode = NULL;
+		fMostRecentNode = NULL;
 		fEndedAt = 0U; // i.e. pretend we just ended one swath and entered an adjacent one
-
-		VkDevice device = fRenderer.GetState()->GetDevice();
-
-		// lists = ..., ubo, user data, textures, ...
-
-		lists[DescriptorLists::kUniforms].Reset( device, fUniforms );
-		lists[DescriptorLists::kUserData].Reset( device, fUserData );
-		lists[DescriptorLists::kTexture].Reset( device );
 		
 		VkCommandBufferBeginInfo beginInfo = {};
 
@@ -1284,7 +1317,7 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 	}
 }
 
-bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & descriptorImageInfo )
+bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & descriptorImageInfo, PushConstantState & pushConstants )
 {
 	bool canDraw = fCommandBuffer != VK_NULL_HANDLE;
 
@@ -1386,13 +1419,13 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 			fLists[i].fDirty = false;
 		}
 
-		if (fPushConstants->IsValid())
+		if (pushConstants.IsValid())
 		{
-			U32 offset = fPushConstants->Offset(), size = fPushConstants->Range();
+			U32 offset = pushConstants.Offset(), size = pushConstants.Range();
 
-			vkCmdPushConstants( fCommandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, offset, size, fPushConstants->GetData( offset ) );
+			vkCmdPushConstants( fCommandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, offset, size, pushConstants.GetData( offset ) );
 			// TODO: want fragment bit if using sampler index...
-			fPushConstants->Reset();
+			pushConstants.Reset();
 		}
 	}
 
@@ -1487,6 +1520,12 @@ VulkanCommandBuffer::Read()
 	return result;
 }
 
+void
+VulkanCommandBuffer::RawWrite( U32 position, const void * data, U32 size )
+{
+	memcpy( fBuffer + position, data, size );
+}
+
 template <typename T>
 void 
 VulkanCommandBuffer::Write( T value )
@@ -1506,7 +1545,7 @@ VulkanCommandBuffer::Write( T value )
 		fBytesAllocated = newSize;
 	}
 
-	memcpy( fBuffer + fBytesUsed, &value, size );
+	RawWrite( fBytesUsed, &value, size );
 	fBytesUsed += size;
 }
 
