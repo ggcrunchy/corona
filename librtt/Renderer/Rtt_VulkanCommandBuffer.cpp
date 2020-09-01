@@ -322,14 +322,52 @@ VulkanCommandBuffer::PrepareTexturesPool( VulkanState * state )
 void
 VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
-	size_t height = fGraphStack.size();
-	bool popStack = NULL == fbo || (height > 1U && fbo == fGraphStack[height - 2U].fFBO);
+	size_t oldHeight = fGraphStack.size();
+	bool popStack = NULL == fbo || (oldHeight > 1U && fbo == fGraphStack[oldHeight - 2U].fFBO);
+
+	// The goal of the graph stack itself, and the logic that follows, is to unravel nested framebuffers and put them into a flattened
+	// representation, one that works just as well for sequential buffers. This assumes the current GL semantics, that invalidates will
+	// happen at the end of the frame, so the natural arrangement has child buffers show up later.
+	//
+	// Take the following example. Each framebuffer has a label, in this case alphabetically from A to M. The diagram below represents
+	// a stream of instructions, where a given label means the corresponding buffer is potentially active in that bit of the stream;
+	// nested buffers are shown above their parents.
+
+    //                             III                     
+    //                            HHHHHH                    LLLL
+    //                         GGGGGGGGGGGGG        JJJ   KKKKKKK  MMM
+    // AAAAAABBBBBBBCCCCCCCCCDDDDDDDDDDDDDDDDDDDDEEEEEEEFFFFFFFFFFFFFFFF
+    //     ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^
+    //     5   10   15   20   25   30   35   40   45   50   55   60   65
+
+	// This becomes:
+
+    // AAAAAA * BBBBBBB * CCCCCCCCC * DD------------>DDDDD => GGG----->GGGG => H-->HH => III => EEE-->E => JJJ => FF------>FF-->FF => KK--->K => LLLL => MMM
+
+	// Each letter represents one instruction belonging to a framebuffer. Adjacent swaths of instructions are separated with asterisk '*',
+	// whereas a fat arrow ('=>') means we must do a jump. A thin arrow (string of '-' characters ending with a '>') denotes another sort
+	// of jump, with length #dashes + 1, past a nested buffer.
+	//
+	// The flattened result has the following control flow:
+	//
+	// A: 1-6
+	// B: 7-13
+	// C: 14-22
+	// D: 23-24, 38-42
+	// G: 25-27, 34-37
+	// H: 28, 32-33
+	// I: 29-31
+	// E: 43-45, 49
+	// J: 46-48
+	// F: 50-51, 59-60, 64-65
+	// K: 52-53, 58
+	// L: 54-57
+	// M: 61-63
 
 	if (popStack)
 	{
 		GraphNode & cell = fGraphStack.back();
-//		local cell = table.remove(stack)
-
+// local cell = table.remove(stack)
         if (cell.fLeftLowerLevel != GraphNode::kInvalidLocation)
 		{
 			// put(cell.fLowerLevel, ???)
@@ -339,8 +377,7 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
         if (cell.fWillJumpTo != GraphNode::kInvalidLocation)
 		{
 			WRITE_COMMAND( kCommandJumpToOffset );
-			Write<U32>(cell.fWillJumpTo);
-// jumps[i] = cell.will_jump_to
+			Write<U32>(cell.fWillJumpTo); // see note below
 		}
 
 		if (&cell == fPrevNode)
@@ -349,7 +386,7 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 
 			fEndedAt = GetWritePosition();
 
-			Write<U32>(GraphNode::kInvalidLocation);
+			Write<U32>(GraphNode::kInvalidLocation); // see note below (later child or lower level)
 		}
 
 		fGraphStack.pop_back();
@@ -360,44 +397,44 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 		fGraphStack.push_back( GraphNode() );
 
 		GraphNode & newNode = fGraphStack.back();
-// local new = {}
-		U32 here = GetWritePosition();
+
+		// If this is a nested buffer, the parent will want to jump past many instructions that follow.
+		if (oldHeight > 0U)
+		{
+			WRITE_COMMAND( kCommandJumpToOffset ); 
+
+			newNode.fLeftLowerLevel = GetWritePosition(); // we need to come back to the next instruction once the node is popped...
+
+			Write<U32>(GraphNode::kInvalidLocation); // ...since the target is still unknown; reserve space for now
+		}
 
 		newNode.fFBO = fbo;
 
-		if (fPrevNode)
-		{
-			if (GraphNode::kInvalidLocation == fEndedAt) //  this is a nested swath (possibly the first of many), whose parent is still in progress?
-			{
-				fPrevNode->fWillJumpTo = here;
-// prev.will_jump_to = i
-			}
+		U32 currentPosition = GetWritePosition();
 
-			else // otherwise, either the previous swath was on this stack level, or we cleared the stack
-			if (fEndedAt != here) // in the former case, the two swaths might blend together, in which case a jump would be pointless
-			{
-				SetOffsetPosition( fEndedAt );
-				Write<U32>(here); // TODO: eyeballing it looked okay, but check if this is robust when potentially < fBytesAllocated
-// jumps[prev.ended_at] = i
-				SetOffsetPosition( here );
-			}
+		// If this swath is its parent's first child, the parent node will be its predecessor.
+		if (GraphNode::kInvalidLocation == fEndedAt) //  this is a nested swath (possibly the first of many), whose parent is still in progress?
+		{
+			Rtt_ASSERT( oldHeight > 0U );
+			Rtt_ASSERT( fPrevNode == &fGraphStack[oldHeight - 1U] );
+
+			fPrevNode->fWillJumpTo = currentPosition; // the parent has not ended yet, but will only need to know where to jump
 		}
 
-		if (0U == height)
+		else // Otherwise, we are either a later child, or down at a lower level.
+		if (fEndedAt != currentPosition) // the two swaths might blend together, making a jump pointless (TODO: verify this for child swaths)
 		{
-			// emit(jump-to-offset, XXX)
-			// new.fLeftLowerLevel = ???
-        //		new.left_lower_level = i - 1
+			Rtt_ASSERT( fPrevNode );
+
+			SetOffsetPosition( fEndedAt );
+			Write<U32>(currentPosition); // TODO: memory already reserved, just being revisited; seems okay, but double-check we don't trip any side effects
+			SetOffsetPosition( currentPosition );
 		}
 
 		fPrevNode = &newNode;
 		fEndedAt = GraphNode::kInvalidLocation;
 	}
-/*
-local jumps, stack, prev = {}, {}, {} -- ??, fGraphStack, fPrevNode
 
-jumps[prev.ended_at] = "quit" -- ideally, this is accounted for by fNumCommands
-*/
 	if( fbo )
 	{
 		WRITE_COMMAND( kCommandBindFrameBufferObject );
@@ -1220,7 +1257,7 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 	if (commandBuffer != VK_NULL_HANDLE && lists)
 	{
 		fPrevNode = NULL;
-		fEndedAt = ~0U;
+		fEndedAt = 0U; // i.e. pretend we just ended one swath and entered an adjacent one
 
 		VkDevice device = fRenderer.GetState()->GetDevice();
 
