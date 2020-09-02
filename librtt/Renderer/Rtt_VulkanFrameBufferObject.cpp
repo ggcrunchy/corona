@@ -318,10 +318,10 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
         createFramebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         createFramebufferInfo.renderPass = fRenderPassData->fPass;
         createFramebufferInfo.attachmentCount = imageData.fViews.size();
-        createFramebufferInfo.height = fExtent.width;
+        createFramebufferInfo.height = fExtent.height;
         createFramebufferInfo.layers = 1U;
         createFramebufferInfo.pAttachments = imageData.fViews.data();
-        createFramebufferInfo.width = fExtent.height;
+        createFramebufferInfo.width = fExtent.width;
 
         if (vkCreateFramebuffer( device, &createFramebufferInfo, allocator, &imageData.fFramebuffer ) != VK_SUCCESS)
 		{
