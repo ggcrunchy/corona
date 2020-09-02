@@ -46,8 +46,9 @@ public:
 	VulkanBufferData( VkDevice device, const VkAllocationCallbacks * allocator );
 	~VulkanBufferData();
 
-	VkBuffer GetBuffer() const;
-	VkDeviceMemory GetMemory() const;
+	VkDevice GetDevice() const { return fDevice; }
+	VkBuffer GetBuffer() const { return fBuffer; }
+	VkDeviceMemory GetMemory() const { return fMemory; }
 
 	VulkanBufferData * Extract( Rtt_Allocator * allocator );
 

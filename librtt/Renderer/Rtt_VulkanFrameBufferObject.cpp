@@ -75,7 +75,6 @@ RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions 
 	}
 }
 
-
 void
 RenderPassBuilder::AddDepthStencilAttachment( VkFormat format, const AttachmentOptions & options )
 {

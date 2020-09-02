@@ -117,6 +117,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkResult GetExecuteResult() const { return fExecuteResult; }
 		uint32_t GetImageIndex() const { return fImageIndex; }
 		
+		void BeginFrame();
 		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists );
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
 		bool PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & imageInfo, PushConstantState & pushConstants );
@@ -135,16 +136,14 @@ class VulkanCommandBuffer : public CommandBuffer
 		template <typename T>
 		T Read();
 
-		void RawWrite( U32 position, const void * data, U32 size );
-
 		// Templatized helper function for writing an arbitrary argument to the
 		// command buffer.
 		template <typename T>
 		void Write(T);
 
-	public:
+	private:
 		U32 GetWritePosition() const { return fBytesUsed; }
-		U8 * GetOffset() const { return fOffset; }
+		U8 * GetOffset( U32 pos ) const { return fBuffer + pos; }
 		void SetOffsetPosition( U32 pos ) { fOffset = fBuffer + pos; }
 
 	private:
@@ -202,11 +201,6 @@ class VulkanCommandBuffer : public CommandBuffer
 /*
 		dynamic uniform buffers - as a list?
 
-*/
-/*
-		VulkanUniforms * fUniforms;
-		VulkanUserData * fUserData;
-		PushConstantState * fPushConstants;
 */
 		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;

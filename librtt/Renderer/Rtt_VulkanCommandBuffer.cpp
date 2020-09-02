@@ -20,33 +20,9 @@
 
 #include <cinttypes> // https://stackoverflow.com/questions/8132399/how-to-printf-uint64-t-fails-with-spurious-trailing-in-format#comment9979590_8132440
 #include <limits>
-//#include <malloc.h>
 
 #include "CoronaLog.h"
-/*
-// From Vulkan example on dynamic uniform buffers, by Sascha Willems:
-void* alignedAlloc(size_t size, size_t alignment)
-{
-	void *data = nullptr;
-#if defined(_MSC_VER) || defined(__MINGW32__)
-	data = _aligned_malloc(size, alignment);
-#else
-	int res = posix_memalign(&data, alignment, size);
-	if (res != 0)
-		data = nullptr;
-#endif
-	return data;
-}
 
-void alignedFree(void* data)
-{
-#if	defined(_MSC_VER) || defined(__MINGW32__)
-	_aligned_free(data);
-#else
-	free(data);
-#endif
-}
-*/
 // ----------------------------------------------------------------------------
 
 namespace /*anonymous*/
@@ -163,10 +139,7 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fImageAvailableSemaphore( VK_NULL_HANDLE ),
 	fRenderFinishedSemaphore( VK_NULL_HANDLE ),
 	fInFlight( VK_NULL_HANDLE ),
-	fLists( NULL ),/*
-	fUniforms( NULL ),
-	fUserData( NULL ),
-	fPushConstants( NULL ),*/
+	fLists( NULL ),
 	fCommandBuffer( VK_NULL_HANDLE ),
 	fPipeline( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE )
@@ -195,13 +168,7 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 
 	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fImageAvailableSemaphore );
 	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fRenderFinishedSemaphore );
-	/*
-	fUniforms = (VulkanUniforms *)alignedAlloc( sizeof( VulkanUniforms ), 16U );
-	fUserData = (VulkanUserData *)alignedAlloc( sizeof( VulkanUserData ), 16U );
-	fPushConstants = (PushConstantState *)alignedAlloc( sizeof( PushConstantState ), 16U );
 
-	new (fPushConstants) PushConstantState;
-	*/
 	if ( VK_NULL_HANDLE == fInFlight || VK_NULL_HANDLE == fImageAvailableSemaphore || VK_NULL_HANDLE == fRenderFinishedSemaphore)
 	{
 		CoronaLog( "Failed to create some synchronziation objects!" );
@@ -213,14 +180,6 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 		fImageAvailableSemaphore = VK_NULL_HANDLE;
 		fRenderFinishedSemaphore = VK_NULL_HANDLE;
 		fInFlight = VK_NULL_HANDLE;
-/*
-		alignedFree( fUniforms );
-		alignedFree( fUserData );
-		alignedFree( fPushConstants );
-
-		fUniforms = NULL;
-		fUserData = NULL;
-		fPushConstants = NULL;*/
 	}
 }
 
@@ -234,10 +193,6 @@ VulkanCommandBuffer::~VulkanCommandBuffer()
 	vkDestroySemaphore( device, fImageAvailableSemaphore, allocator );
 	vkDestroySemaphore( device, fRenderFinishedSemaphore, allocator );
 //	delete [] fTimerQueries;
-/*
-	alignedFree( fUniforms );
-	alignedFree( fUserData );
-	alignedFree( fPushConstants );*/
 }
 
 void
@@ -335,9 +290,11 @@ VulkanCommandBuffer::JumpInstructionStub()
 void
 VulkanCommandBuffer::PatchJumpInstructionStub( U32 instructionPosition )
 {
+	Rtt_ASSERT( fBuffer );
+
 	U32 destination = GetWritePosition();
 
-	RawWrite( instructionPosition, &destination, sizeof( U32 ) );
+	memcpy( GetOffset( instructionPosition ), &destination, sizeof( U32 ) );
 }
 
 void
@@ -828,8 +785,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			case kCommandJumpToOffset:
 			{
 				U32 pos = Read<U32>();
-				SetOffsetPosition(pos);
-				DEBUG_PRINT( "Jump to offset: %i", pos );
+				if (pos != GraphNode::kInvalidLocation)
+				{
+					SetOffsetPosition(pos);
+					DEBUG_PRINT( "Jump to offset: %i", pos );
+				}
 				CHECK_ERROR_AND_BREAK;
 			}
 			case kCommandBeginRenderPass:
@@ -876,7 +836,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			{
 				U32 offset = Read<U32>();
 				Real value = Read<Real>();
-				//fPushConstants->
 				pushConstants.Write( offset, &value, sizeof( Real ) );
 				DEBUG_PRINT( "Set Push Constant: value=%f location=%i", value, offset );
 				CHECK_ERROR_AND_BREAK;
@@ -887,9 +846,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				Vec4 maskMatrix = Read<Vec4>();
 				U32 translationOffset = Read<U32>();
 				Vec2 maskTranslation = Read<Vec2>();
-				//fPushConstants->
 				pushConstants.Write( maskOffset, &maskMatrix, sizeof( Vec4 ));
-				//fPushConstants->
 				pushConstants.Write( translationOffset, &maskTranslation, sizeof( Vec2 ) );
 				DEBUG_PRINT( "Set Push Constant, mask matrix: value=(%f, %f, %f, %f) location=%i", maskMatrix.data[0], maskMatrix.data[1], maskMatrix.data[2], maskMatrix.data[3], maskOffset );
 				DEBUG_PRINT( "Set Push Constant, mask translation: value=(%f, %f) location=%i", maskTranslation.data[0], maskTranslation.data[1], translationOffset );
@@ -959,7 +916,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				READ_UNIFORM_DATA_WITH_PROGRAM( Real );
 				if (location.IsValid())
 				{
-//					fPushConstants->
 					pushConstants.Write( location.fOffset, &value, sizeof( Real ) );
 				}
 				DEBUG_PRINT( "Set Push Constant: value=%f location=%i", value, location.fOffset );
@@ -972,9 +928,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				Vec2 maskTranslation = Read<Vec2>();
 				if (location.IsValid())
 				{
-					//fPushConstants->
 					pushConstants.Write( location.fOffset, &value, sizeof( Vec4 ));
-					//fPushConstants->
 					pushConstants.Write( translationLocation.fOffset, &maskTranslation, sizeof( Vec2 ) );
 				}
 				DEBUG_PRINT( "Set Push Constant, mask matrix: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
@@ -1269,10 +1223,6 @@ CoronaLog("MUTTER: %i", presentResult);
 		fExecuteResult = VK_ERROR_INITIALIZATION_FAILED;
 	}
 
-	fCommandBuffer = VK_NULL_HANDLE;
-	fPipeline = VK_NULL_HANDLE;
-	fSwapchain = VK_NULL_HANDLE;
-
 	return fElapsedTimeGPU;
 }
 
@@ -1293,13 +1243,21 @@ VkResult VulkanCommandBuffer::WaitAndAcquire( VkDevice device, VkSwapchainKHR sw
 	}
 }
 
+void
+VulkanCommandBuffer::BeginFrame()
+{
+	fLists = NULL;
+	fMostRecentNode = NULL;
+	fEndedAt = 0U; // i.e. as though ending one swath and entering an adjacent one
+	fCommandBuffer = VK_NULL_HANDLE;
+	fPipeline = VK_NULL_HANDLE;
+	fSwapchain = VK_NULL_HANDLE;
+}
+
 void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists )
 {
 	if (commandBuffer != VK_NULL_HANDLE && lists)
-	{
-		fMostRecentNode = NULL;
-		fEndedAt = 0U; // i.e. pretend we just ended one swath and entered an adjacent one
-		
+	{	
 		VkCommandBufferBeginInfo beginInfo = {};
 
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1520,12 +1478,6 @@ VulkanCommandBuffer::Read()
 	return result;
 }
 
-void
-VulkanCommandBuffer::RawWrite( U32 position, const void * data, U32 size )
-{
-	memcpy( fBuffer + position, data, size );
-}
-
 template <typename T>
 void 
 VulkanCommandBuffer::Write( T value )
@@ -1545,7 +1497,7 @@ VulkanCommandBuffer::Write( T value )
 		fBytesAllocated = newSize;
 	}
 
-	RawWrite( fBytesUsed, &value, size );
+	memcpy( fBuffer + fBytesUsed, &value, size );
 	fBytesUsed += size;
 }
 

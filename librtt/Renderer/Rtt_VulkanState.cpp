@@ -58,18 +58,6 @@ VulkanBufferData::~VulkanBufferData()
 	Clear();
 }
 
-VkBuffer
-VulkanBufferData::GetBuffer() const
-{
-	return fBuffer;
-}
-
-VkDeviceMemory
-VulkanBufferData::GetMemory() const
-{
-	return fMemory;
-}
-
 VulkanBufferData *
 VulkanBufferData::Extract( Rtt_Allocator * allocator )
 {

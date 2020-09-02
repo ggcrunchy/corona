@@ -37,7 +37,9 @@ DynamicUniformData::~DynamicUniformData()
 {
 	if (fMapped)
 	{
-//		vkUnmapMemory( device, fData->mMemory );
+		Rtt_ASSERT( fBufferData );
+
+		vkUnmapMemory( fBufferData->GetDevice(), fBufferData->GetMemory() );
 	}
 
 	Rtt_DELETE( fBufferData );
@@ -357,6 +359,9 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 
 	VulkanCommandBuffer * vulkanCommandBuffer = static_cast< VulkanCommandBuffer * >( fBackCommandBuffer );
 	VkResult result = vulkanCommandBuffer->GetExecuteResult();
+
+	vulkanCommandBuffer->BeginFrame();
+
 	bool canContinue = VK_SUCCESS == result;
 	VkSwapchainKHR swapchain = fState->GetSwapchain();
 	
