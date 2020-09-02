@@ -50,10 +50,12 @@ DescriptorLists::DescriptorLists( VulkanState * state, VkDescriptorSetLayout set
 	fDynamicAlignment( 0U ),
 	fBufferIndex( ~0U ),
 	fWorkspace( NULL ),
+	fNonCoherentRawSize( size ),
 	fRawSize( size ),
 	fResetPools( false )
 {
-	VkDeviceSize alignment = state->GetProperties().limits.minUniformBufferOffsetAlignment;
+	const VkPhysicalDeviceLimits & limits = state->GetProperties().limits;
+	VkDeviceSize alignment = limits.minUniformBufferOffsetAlignment;
 
 	fDynamicAlignment = fRawSize;
 
@@ -62,7 +64,16 @@ DescriptorLists::DescriptorLists( VulkanState * state, VkDescriptorSetLayout set
 		fDynamicAlignment = (fDynamicAlignment + alignment - 1) & ~(alignment - 1);
 	}
 
-	fBufferSize = U32( count * fDynamicAlignment );
+	U32 remainder = fNonCoherentRawSize % limits.nonCoherentAtomSize;
+
+	if (remainder)
+	{
+		fNonCoherentRawSize += limits.nonCoherentAtomSize - remainder;
+
+		Rtt_ASSERT( fNonCoherentRawSize <= fDynamicAlignment );
+	}
+
+	fBufferSize = std::min( U32( count * fDynamicAlignment ), limits.maxUniformBufferRange );
 
 	Reset( VK_NULL_HANDLE );
 }
@@ -73,6 +84,7 @@ DescriptorLists::DescriptorLists( VkDescriptorSetLayout setLayout, bool resetPoo
 	fBufferIndex( ~0U ),
 	fBufferSize( 0U ),
 	fWorkspace( NULL ),
+	fNonCoherentRawSize( 0U ),
 	fRawSize( 0U ),
 	fResetPools( resetPools )
 {
@@ -208,7 +220,7 @@ DescriptorLists::PreparePool( VulkanState * state )
 }
 
 void
-DescriptorLists::Reset( VkDevice device, void * workspace )
+DescriptorLists::Reset( VkDevice device )
 {
 	if (fResetPools)
 	{
@@ -220,7 +232,6 @@ DescriptorLists::Reset( VkDevice device, void * workspace )
 		fSets.clear();
 	}
 
-	fWorkspace = static_cast< U8 * >( workspace );
 	fOffset = 0U;
 	fDirty = false;
 
@@ -228,6 +239,12 @@ DescriptorLists::Reset( VkDevice device, void * workspace )
 	{
 		fBufferIndex = 0U;
 	}
+}
+
+void
+DescriptorLists::SetWorkspace( void * workspace )
+{
+	fWorkspace = static_cast< U8 * >( workspace );
 }
 
 bool

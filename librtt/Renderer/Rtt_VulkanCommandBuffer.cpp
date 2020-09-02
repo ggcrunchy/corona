@@ -387,14 +387,14 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 
     //                             III                     
     //                            HHHHHH                    LLLL
-    //                         GGGGGGGGGGGGG        JJJ   KKKKKKK  MMM
-    // AAAAAABBBBBBBCCCCCCCCCDDDDDDDDDDDDDDDDDDDDEEEEEEEFFFFFFFFFFFFFFFF
-    //     ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^
-    //     5   10   15   20   25   30   35   40   45   50   55   60   65
+    //                         GGGGGGGGGGGGG        JJJ   KKKKKKK  MMMNNNN
+    // AAAAAABBBBBBBCCCCCCCCCDDDDDDDDDDDDDDDDDDDDEEEEEEEFFFFFFFFFFFFFFFFFFFFF
+    //     ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^
+    //     5   10   15   20   25   30   35   40   45   50   55   60   65   70
 
 	// This becomes:
 
-    // AAAAAA * BBBBBBB * CCCCCCCCC * DD------------>DDDDD => GGG----->GGGG => H-->HH => III => EEE-->E => JJJ => FF------>FF-->FF => KK--->K => LLLL => MMM
+    // AAAAAA * BBBBBBB * CCCCCCCCC * DD------------>DDDDD => GGG----->GGGG => H-->HH => III => EEE-->E => JJJ => FF------>FF-->FF => KK--->K => LLLL => MMM * NNNN
 
 	// Each letter represents one instruction belonging to a framebuffer. Adjacent swaths of instructions are separated with asterisk '*',
 	// whereas a fat arrow ('=>') means we must do a jump. A thin arrow (string of '-' characters ending with a '>') denotes another sort
@@ -411,10 +411,11 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 	// I: 29-31
 	// E: 43-45, 49
 	// J: 46-48
-	// F: 50-51, 59-60, 64-65
+	// F: 50-51, 59-60, 68-70
 	// K: 52-53, 58
 	// L: 54-57
 	// M: 61-63
+	// N: 64-67
 
 	size_t height = fGraphStack.size();
 
@@ -733,17 +734,12 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 
-	VkDevice device = fRenderer.GetState()->GetDevice();
-
-	// lists = ..., ubo, user data, textures, ...
-
 	VulkanUniforms uniforms;
 	VulkanUserData userData;
 	PushConstantState pushConstants;
 
-	fLists[DescriptorLists::kUniforms].Reset( device, &uniforms );
-	fLists[DescriptorLists::kUserData].Reset( device, &userData );
-	fLists[DescriptorLists::kTexture].Reset( device );
+	fLists[DescriptorLists::kUniforms].SetWorkspace( &uniforms );
+	fLists[DescriptorLists::kUserData].SetWorkspace( &userData );
 
 	if (VK_NULL_HANDLE == fCommandBuffer)
 	{
@@ -1257,7 +1253,15 @@ VulkanCommandBuffer::BeginFrame()
 void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists )
 {
 	if (commandBuffer != VK_NULL_HANDLE && lists)
-	{	
+	{
+		VkDevice device = fRenderer.GetState()->GetDevice();
+
+		// lists = ..., ubo, user data, textures, ...
+	
+		lists[DescriptorLists::kUniforms].Reset( device );
+		lists[DescriptorLists::kUserData].Reset( device );
+		lists[DescriptorLists::kTexture].Reset( device );
+
 		VkCommandBufferBeginInfo beginInfo = {};
 
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1335,7 +1339,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 				range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
 				range.memory = uniforms.fBufferData->GetMemory();
 				range.offset = lists.fOffset;
-				range.size = lists.fRawSize;
+				range.size = lists.fNonCoherentRawSize;
 
 				memoryRanges.push_back( range );
 

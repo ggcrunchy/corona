@@ -69,7 +69,8 @@ struct DescriptorLists {
 	bool AddPool( VulkanState * state, VkDescriptorType type, U32 descriptorCount, U32 maxSets, VkDescriptorPoolCreateFlags flags = 0 );
 	bool EnsureAvailability( VulkanState * state );
 	bool PreparePool( VulkanState * state );
-	void Reset( VkDevice device, void * workspace = NULL );
+	void Reset( VkDevice device );
+	void SetWorkspace( void * workspace );
 
 	static bool IsMaskPushConstant( int index );
 	static bool IsPushConstant( int index );
@@ -85,6 +86,7 @@ struct DescriptorLists {
 	U32 fOffset;
 	U8 * fWorkspace;
 	size_t fRawSize;
+	size_t fNonCoherentRawSize;
 	bool fDirty;
 	bool fResetPools;
 };
