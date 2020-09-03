@@ -180,15 +180,6 @@ class VulkanRenderer : public Renderer
 		PipelineCreateInfo fPipelineCreateInfo;
 		PipelineKey fDefaultKey;
 		PipelineKey fWorkingKey;
-/*
-    VkImage colorImage;
-    VkDeviceMemory colorImageMemory;
-    VkImageView colorImageView;
-
-    VkImage depthImage;
-    VkDeviceMemory depthImageMemory;
-    VkImageView depthImageView;
-*/
 };
 
 // ----------------------------------------------------------------------------

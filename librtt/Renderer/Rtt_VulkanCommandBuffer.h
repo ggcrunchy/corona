@@ -198,10 +198,9 @@ class VulkanCommandBuffer : public CommandBuffer
 		std::vector< GraphNode > fGraphStack;
 		GraphNode * fMostRecentNode;
 		U32 fEndedAt;
-/*
-		dynamic uniform buffers - as a list?
-
-*/
+		U32 fLeftBeforeRejoin;
+		U32 fRejoinedStackBefore;
+//		dynamic uniform buffers - as a list?
 		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;
 		uint32_t fImageIndex;
