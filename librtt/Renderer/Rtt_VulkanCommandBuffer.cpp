@@ -308,6 +308,9 @@ VulkanCommandBuffer::PopFrameBufferObject()
 	{
 		PatchJumpInstructionStub( cell.fLeftLowerLevel );
 
+		fLeftBeforeRejoin = cell.fLeftLowerLevel;
+		fRejoinedStackBefore = GetWritePosition();
+
 		// examples in the diagram below: I -> H, H -> G, G -> D, J -> E, L -> K, K -> F, M -> F
 	}
 
@@ -319,6 +322,8 @@ VulkanCommandBuffer::PopFrameBufferObject()
 
 	if (&cell == fMostRecentNode) // never interrupted by a nested framebuffer? TODO: is this only relevant if this buffer was itself nested?
 	{
+		Rtt_ASSERT( GraphNode::kInvalidLocation == cell.fWillJumpTo );
+
 		fEndedAt = JumpInstructionStub(); // a top-level node must point ahead, but the swath it represents might not be contiguous with the one that follows
 	}
 
@@ -333,12 +338,25 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 	fGraphStack.push_back( GraphNode() );
 
 	GraphNode & newNode = fGraphStack.back();
+	U32 here = GetWritePosition();
 
 	if (nested)
 	{
-		newNode.fLeftLowerLevel = JumpInstructionStub(); // the parent must skip these nested instructions; we only discover where they end, however, once this node is popped
+		bool didAnythingOnLowerLevel = here != fRejoinedStackBefore;
 
-		// examples in the diagram below: D -> G, G -> H, H -> I, E -> J, F -> K, K -> L, F -> M
+		if (didAnythingOnLowerLevel)
+		{
+			newNode.fLeftLowerLevel = JumpInstructionStub(); // the parent must skip these nested instructions; we only discover where they end, however, once this node is popped
+
+			// examples in the diagram below: D -> G, G -> H, H -> I, E -> J, F -> K, K -> L, F -> M
+		}
+
+		else
+		{
+			newNode.fLeftLowerLevel = fLeftBeforeRejoin; // as with true branch, but revise the jump instruction emitted by the first of the contiguous swaths
+
+			// examples in the diagram below: M -> N
+		}
 	}
 
 	newNode.fFBO = fbo;
@@ -349,13 +367,13 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 		Rtt_ASSERT( nested );
 		Rtt_ASSERT( &fGraphStack[fGraphStack.size() - 2U] == fMostRecentNode );
 
-		fMostRecentNode->fWillJumpTo = GetWritePosition(); // the parent has not ended yet, but will point back here
+		fMostRecentNode->fWillJumpTo = here; // the parent has not ended yet, but will point back here
 
 		// examples in the diagram below: D -> G, G -> H, H -> I, E -> J, F -> K, K -> L
 	}
 
 	else // Otherwise, we are either a later child, or moved to a lower level.
-	if (fEndedAt != GetWritePosition()) // the two swaths might blend together, making a jump pointless (TODO: verify this for child swaths)
+	if (fEndedAt != here) // the two swaths might blend together, making a jump pointless (TODO: verify this for child swaths)
 	{
 		Rtt_ASSERT( fEndedAt != GraphNode::kInvalidLocation );
 		Rtt_ASSERT( fEndedAt > 0U );
@@ -371,6 +389,8 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 
 	fMostRecentNode = &newNode;
 	fEndedAt = GraphNode::kInvalidLocation;
+	fLeftBeforeRejoin = GraphNode::kInvalidLocation;
+	fRejoinedStackBefore = GraphNode::kInvalidLocation;
 }
 
 void
@@ -1245,6 +1265,8 @@ VulkanCommandBuffer::BeginFrame()
 	fLists = NULL;
 	fMostRecentNode = NULL;
 	fEndedAt = 0U; // i.e. as though ending one swath and entering an adjacent one
+	fLeftBeforeRejoin = GraphNode::kInvalidLocation;
+	fRejoinedStackBefore = GraphNode::kInvalidLocation;
 	fCommandBuffer = VK_NULL_HANDLE;
 	fPipeline = VK_NULL_HANDLE;
 	fSwapchain = VK_NULL_HANDLE;
@@ -1755,8 +1777,8 @@ float * VulkanCommandBuffer::PushConstantState::GetData( U32 offset )
 
 VulkanCommandBuffer::GraphNode::GraphNode()
 :	fFBO( NULL ),
-	fLeftLowerLevel( ~0U ),
-	fWillJumpTo( ~0U )
+	fLeftLowerLevel( kInvalidLocation ),
+	fWillJumpTo( kInvalidLocation )
 {
 }
 
