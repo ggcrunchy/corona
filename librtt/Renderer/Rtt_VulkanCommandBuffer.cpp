@@ -311,7 +311,7 @@ VulkanCommandBuffer::PopFrameBufferObject()
 		fLeftBeforeRejoin = cell.fLeftLowerLevel;
 		fRejoinedStackBefore = GetWritePosition();
 
-		// examples in the diagram below: I -> H, H -> G, G -> D, J -> E, L -> K, K -> F, M -> F
+		// examples in the diagram below: I -> H, H -> G, G -> D, J -> E, L -> K, K -> F, M -> F, N -> F
 	}
 
     if (cell.fWillJumpTo != GraphNode::kInvalidLocation) // parent as predecessor, cf. PushFrameBufferObject
