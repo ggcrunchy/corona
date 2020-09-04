@@ -191,12 +191,13 @@ class VulkanCommandBuffer : public CommandBuffer
 			GraphNode();
 
 			FrameBufferObject * fFBO;
+			U32 fID;
 			U32 fLeftLowerLevel;
 			U32 fWillJumpTo;
 		};
 
 		std::vector< GraphNode > fGraphStack;
-		GraphNode * fMostRecentNode;
+		U32 fMostRecentNodeID;
 		U32 fEndedAt;
 		U32 fLeftBeforeRejoin;
 		U32 fRejoinedStackBefore;
