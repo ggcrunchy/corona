@@ -17,6 +17,8 @@
 #include <tuple>
 #include <utility>
 
+#include <cinttypes> // debugging
+
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -117,6 +119,11 @@ VulkanState::~VulkanState()
 // vkDeviceWaitIdle( fDevice );
 	VulkanProgram::CleanUpCompiler( fCompiler, fCompileOptions );
 
+	for (auto & renderPass : fRenderPasses)
+	{
+		vkDestroyRenderPass( fDevice, renderPass.second.fPass, fAllocator );
+	}
+
 	vkDestroyCommandPool( fDevice, fCommandPool, fAllocator );
     vkDestroySurfaceKHR( fInstance, fSurface, fAllocator );
     vkDestroyDevice( fDevice, fAllocator );
@@ -183,6 +190,10 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 
 				bufferData.fBuffer = buffer;
 				bufferData.fMemory = bufferMemory;
+
+			#if 1
+				CoronaLog( "Buffer Vulkan ID=%" PRIx64 ", Memory=%" PRIx64, buffer, bufferMemory );
+			#endif
 
 				return true;
 			}
@@ -839,6 +850,7 @@ MakeCommandPool( VkDevice device, uint32_t graphicsFamily, const VkAllocationCal
     VkCommandPoolCreateInfo createPoolInfo = {};
 
     createPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	createPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     createPoolInfo.queueFamilyIndex = graphicsFamily;
 
 	VkCommandPool commandPool = VK_NULL_HANDLE;

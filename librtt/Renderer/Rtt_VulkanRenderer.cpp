@@ -95,7 +95,7 @@ bool
 DescriptorLists::AddBuffer( VulkanState * state )
 {
 	VulkanBufferData bufferData( state->GetDevice(), state->GetAllocator() );
-	
+
 	if (state->CreateBuffer( fBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT/*VISIBLE_BIT*/, bufferData ))
 	{
 		fDynamicUniforms.push_back( DynamicUniformData{} );
@@ -247,6 +247,16 @@ DescriptorLists::SetWorkspace( void * workspace )
 	fWorkspace = static_cast< U8 * >( workspace );
 }
 
+void
+DescriptorLists::Wipe( VkDevice device, const VkAllocationCallbacks * allocator )
+{
+	for (VkDescriptorPool pool : fPools)
+	{
+		vkResetDescriptorPool( device, pool, 0 );
+		vkDestroyDescriptorPool( device, pool, allocator );
+	}
+}
+
 bool
 DescriptorLists::IsMaskPushConstant( int index )
 {
@@ -366,7 +376,25 @@ VulkanRenderer::~VulkanRenderer()
 
 	Rtt_DELETE( fPrimaryFBO );
 	Rtt_DELETE( fSwapchainTexture );
-	Rtt_DELETE( fState );
+
+	VulkanState * state = GetState();
+	VkDevice device = state->GetDevice();
+	const VkAllocationCallbacks * allocator = state->GetAllocator();
+
+	for (DescriptorLists & lists : fDescriptorLists)
+	{
+		lists.Wipe( device, allocator );
+	}
+
+	for (auto & pipeline : fBuiltPipelines)
+	{
+		vkDestroyPipeline( device, pipeline.second, allocator );
+	}
+
+	vkDestroyPipelineLayout( device, fPipelineLayout, allocator );
+	vkDestroyDescriptorSetLayout( device, fUniformsLayout, allocator );
+	vkDestroyDescriptorSetLayout( device, fUserDataLayout, allocator );
+	vkDestroyDescriptorSetLayout( device, fTextureLayout, allocator );
 }
 
 void
@@ -404,7 +432,7 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 	if (canContinue)
 	{
 		result = vulkanCommandBuffer->WaitAndAcquire( fState->GetDevice(), swapchain );
-	CoronaLog( "ACQUIRE: %i", result );
+CoronaLog( "ACQUIRE: %i", result );
 		canContinue = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
 	}
 

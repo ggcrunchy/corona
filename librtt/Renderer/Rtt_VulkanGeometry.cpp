@@ -34,6 +34,11 @@ VulkanGeometry::VulkanGeometry( VulkanState * state )
 {
 }
 
+VulkanGeometry::~VulkanGeometry()
+{
+	Destroy(); // TODO: not being put on destroy queue... bug?
+}
+
 void
 VulkanGeometry::Create( CPUResource* resource )
 {
@@ -78,7 +83,7 @@ VulkanGeometry::Update( CPUResource* resource )
 	Rtt_ASSERT( CPUResource::kGeometry == resource->GetType() );
 	Geometry* geometry = static_cast<Geometry*>( resource );
 	const Geometry::Vertex* vertexData = geometry->GetVertexData();
-	CoronaLog( "#geometry = %i, %i", fVertexCount, geometry->GetVerticesUsed() );
+
 	if ( !fMappedVertices )
 	{
 		// The user may have resized the given Geometry instance

@@ -126,6 +126,7 @@ VulkanTexture::Create( CPUResource* resource )
     U32 mipLevels = /* static_cast< uint32_t >( std::floor( std::log2( std::max( texture->GetWidth(), texture->GetHeight() ) ) ) ) + */ 1U;
     
 	VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
+
     bool ok = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
                                         // ^^ TODO: also non-buffered approach? (suggestions that we should recycle a buffer)
                                         // is it okay to let this go away or should it be backed for a while still?

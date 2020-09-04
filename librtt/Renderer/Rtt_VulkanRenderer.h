@@ -71,6 +71,7 @@ struct DescriptorLists {
 	bool PreparePool( VulkanState * state );
 	void Reset( VkDevice device );
 	void SetWorkspace( void * workspace );
+	void Wipe( VkDevice device, const VkAllocationCallbacks * allocator );
 
 	static bool IsMaskPushConstant( int index );
 	static bool IsPushConstant( int index );
