@@ -142,7 +142,8 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fLists( NULL ),
 	fCommandBuffer( VK_NULL_HANDLE ),
 	fPipeline( VK_NULL_HANDLE ),
-	fSwapchain( VK_NULL_HANDLE )
+	fSwapchain( VK_NULL_HANDLE ),
+	fMostRecentNodeID( ~0U )
 {
 	for(U32 i = 0; i < Uniform::kNumBuiltInVariables; ++i)
 	{
@@ -320,7 +321,7 @@ VulkanCommandBuffer::PopFrameBufferObject()
 		Write<U32>(cell.fWillJumpTo);
 	}
 
-	if (&cell == fMostRecentNode) // never interrupted by a nested framebuffer? TODO: is this only relevant if this buffer was itself nested?
+	if (cell.fID == fMostRecentNodeID) // never interrupted by a nested framebuffer? TODO: is this only relevant if this buffer was itself nested?
 	{
 		Rtt_ASSERT( GraphNode::kInvalidLocation == cell.fWillJumpTo );
 
@@ -365,9 +366,12 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 	if (GraphNode::kInvalidLocation == fEndedAt)
 	{
 		Rtt_ASSERT( nested );
-		Rtt_ASSERT( &fGraphStack[fGraphStack.size() - 2U] == fMostRecentNode );
 
-		fMostRecentNode->fWillJumpTo = here; // the parent has not ended yet, but will point back here
+		GraphNode & parent = fGraphStack[fGraphStack.size() - 2U];
+
+		Rtt_ASSERT( parent.fID == fMostRecentNodeID );
+
+		parent.fWillJumpTo = here; // the parent has not ended yet, but will point back here
 
 		// examples in the diagram below: D -> G, G -> H, H -> I, E -> J, F -> K, K -> L
 	}
@@ -377,7 +381,6 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 	{
 		Rtt_ASSERT( fEndedAt != GraphNode::kInvalidLocation );
 		Rtt_ASSERT( fEndedAt > 0U );
-		Rtt_ASSERT( fMostRecentNode );
 
 		PatchJumpInstructionStub( fEndedAt );
 
@@ -387,7 +390,10 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 	WRITE_COMMAND( kCommandBindFrameBufferObject );
 	Write<GPUResource*>( fbo->GetGPUResource() );
 
-	fMostRecentNode = &newNode;
+	++fMostRecentNodeID;
+
+	newNode.fID = fMostRecentNodeID;
+
 	fEndedAt = GraphNode::kInvalidLocation;
 	fLeftBeforeRejoin = GraphNode::kInvalidLocation;
 	fRejoinedStackBefore = GraphNode::kInvalidLocation;
@@ -1263,7 +1269,6 @@ void
 VulkanCommandBuffer::BeginFrame()
 {
 	fLists = NULL;
-	fMostRecentNode = NULL;
 	fEndedAt = 0U; // i.e. as though ending one swath and entering an adjacent one
 	fLeftBeforeRejoin = GraphNode::kInvalidLocation;
 	fRejoinedStackBefore = GraphNode::kInvalidLocation;
