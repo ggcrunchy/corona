@@ -35,6 +35,7 @@ class VulkanGeometry : public GPUResource
 
 	public:
 		VulkanGeometry( VulkanState * state );
+		virtual ~VulkanGeometry();
 
 		struct Binding {
 			Binding()
