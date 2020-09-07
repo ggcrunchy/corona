@@ -46,7 +46,6 @@ PrepareAttachmentDescription( VkFormat format, bool noClear )
 	attachment.format = format;
     attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	attachment.loadOp = noClear ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -62,17 +61,21 @@ RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions 
 	if (options.isResolve)
 	{
 		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
-		AddAttachment( colorAttachment, fResolveReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR );
 	}
 
 	else
 	{
 		colorAttachment.samples = options.samples;
-
-		AddAttachment( colorAttachment, fColorReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
 	}
+
+	if (options.isPresentable || options.isResolve || options.isResult)
+	{
+		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	}
+
+	VkImageLayout finalLayout = options.isPresentable ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_UNDEFINED;
+
+	AddAttachment( colorAttachment, options.isResolve ? fResolveReferences : fColorReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, finalLayout );
 }
 
 void
@@ -179,6 +182,7 @@ RenderPassBuilder::AddAttachment( VkAttachmentDescription & description, std::ve
 	references.push_back( attachmentRef );
 
 	description.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED == finalLayout ? layout : finalLayout;
+	description.samples = description.samples;
 
 	fDescriptions.push_back( description );
 }
@@ -234,20 +238,18 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 	RenderPassBuilder builder;
 
-	VulkanState * state = fRenderer.GetState();
-	VkDevice device = state->GetDevice();
-	const VkAllocationCallbacks * allocator = state->GetAllocator();
+	auto ci = fRenderer.GetState()->GetCommonInfo();
 
 	if (Texture::kNumFilters == texture->GetFilter()) // swapchain
 	{
 		fImageData.resize( swapchainImages.size() );
 
-		const VulkanState::SwapchainDetails & details = state->GetSwapchainDetails();
+		const VulkanState::SwapchainDetails & details = ci.state->GetSwapchainDetails();
 		VkFormat format = details.fFormat.format;
 
-		VkSampleCountFlagBits sampleCount = VkSampleCountFlagBits( state->GetSampleCountFlags() );
+		VkSampleCountFlagBits sampleCount = VkSampleCountFlagBits( ci.state->GetSampleCountFlags() );
 		VulkanTexture::ImageData color = VulkanTexture::CreateImage(
-			state,
+			ci.state,
 			fExtent.width, fExtent.height, 1U,
 			sampleCount,
 			format,
@@ -255,9 +257,9 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 			VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
 		);
-		VkImageView colorView = VulkanTexture::CreateImageView( state, color.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
+		VkImageView colorView = VulkanTexture::CreateImageView( ci.state, color.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
-		VulkanTexture::TransitionImageLayout( state, color.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1U );
+		VulkanTexture::TransitionImageLayout( ci.state, color.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1U );
 
 		fImages.push_back( color.fImage );
 		fMemory.push_back( color.fMemory );
@@ -265,7 +267,7 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 		for (size_t i = 0; i < swapchainImages.size(); ++i)
 		{
-			VkImageView swapchainView = VulkanTexture::CreateImageView( state, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
+			VkImageView swapchainView = VulkanTexture::CreateImageView( ci.state, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
 			fImageData[i].fViews.push_back( colorView );
 			fImageData[i].fViews.push_back( swapchainView );
@@ -274,12 +276,13 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 		RenderPassBuilder::AttachmentOptions options;
 
-		options.samples = (VkSampleCountFlagBits)state->GetSampleCountFlags();
+		options.samples = sampleCount;
 
 		builder.AddColorAttachment( format, options );
 		
 		RenderPassBuilder::AttachmentOptions resolveOptions;
-
+		
+		resolveOptions.isPresentable = true;
 		resolveOptions.isResolve = true;
 
 		builder.AddColorAttachment( format, resolveOptions );
@@ -302,13 +305,13 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 	builder.GetKey( key );
 
-	fRenderPassData = state->FindRenderPassData( key );
+	fRenderPassData = ci.state->FindRenderPassData( key );
 
 	if (!fRenderPassData)
 	{
-		VkRenderPass renderPass = builder.Build( device, allocator );
+		VkRenderPass renderPass = builder.Build( ci.device, ci.allocator );
 
-		fRenderPassData = state->AddRenderPass( key, renderPass );
+		fRenderPassData = ci.state->AddRenderPass( key, renderPass );
 	}
 
 	for (auto & imageData : fImageData)
@@ -323,7 +326,7 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
         createFramebufferInfo.pAttachments = imageData.fViews.data();
         createFramebufferInfo.width = fExtent.width;
 
-        if (vkCreateFramebuffer( device, &createFramebufferInfo, allocator, &imageData.fFramebuffer ) != VK_SUCCESS)
+        if (vkCreateFramebuffer( ci.device, &createFramebufferInfo, ci.allocator, &imageData.fFramebuffer ) != VK_SUCCESS)
 		{
             CoronaLog( "Failed to create framebuffer!" );
 
@@ -351,28 +354,26 @@ VulkanFrameBufferObject::Bind( VulkanRenderer & renderer, uint32_t index, VkRend
 void
 VulkanFrameBufferObject::CleanUpImageData()
 {
-	VulkanState * state = fRenderer.GetState();
-	VkDevice device = state->GetDevice();
-	const VkAllocationCallbacks * allocator = state->GetAllocator();
+	auto ci = fRenderer.GetState()->GetCommonInfo();
 
 	for (auto & imageData : fImageData)
 	{
-		vkDestroyFramebuffer( device, imageData.fFramebuffer, allocator );
+		vkDestroyFramebuffer( ci.device, imageData.fFramebuffer, ci.allocator );
 	}
 
 	for (VkImageView view : fImageViews)
 	{
-		vkDestroyImageView( device, view, allocator );
+		vkDestroyImageView( ci.device, view, ci.allocator );
 	}
 
 	for (VkImage image : fImages)
 	{
-		vkDestroyImage( device, image, allocator );
+		vkDestroyImage( ci.device, image, ci.allocator );
 	}
 
 	for (VkDeviceMemory memory : fMemory)
 	{
-		vkFreeMemory( device, memory, allocator );
+		vkFreeMemory( ci.device, memory, ci.allocator );
 	}
 
 	fImageData.clear();
