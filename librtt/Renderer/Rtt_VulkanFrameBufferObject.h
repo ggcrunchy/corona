@@ -31,8 +31,10 @@ class RenderPassBuilder {
 	public:
 		struct AttachmentOptions {
 			VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-			bool noClear = false;
+			bool isPresentable = false;
 			bool isResolve = false;
+			bool isResult = false; // n.b. already implied by isPresentable or isResolve
+			bool noClear = false;
 		};
 
 		void AddColorAttachment( VkFormat format, const AttachmentOptions & options = AttachmentOptions() );

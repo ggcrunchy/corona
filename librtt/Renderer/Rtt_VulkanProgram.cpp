@@ -88,8 +88,7 @@ VulkanProgram::Update( CPUResource* resource )
 void 
 VulkanProgram::Destroy()
 {
-	const VkAllocationCallbacks * allocator = fState->GetAllocator();
-	VkDevice device = fState->GetDevice();
+	auto ci = fState->GetCommonInfo();
 
 	for( U32 i = 0; i < Program::kNumVersions; ++i )
 	{
@@ -97,8 +96,8 @@ VulkanProgram::Destroy()
 		if( data.IsValid() )
 		{
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
-			vkDestroyShaderModule( device, data.fVertexShader, allocator );
-			vkDestroyShaderModule( device, data.fFragmentShader, allocator );
+			vkDestroyShaderModule( ci.device, data.fVertexShader, ci.allocator );
+			vkDestroyShaderModule( ci.device, data.fFragmentShader, ci.allocator );
 #endif
 			Reset( data );
 		}

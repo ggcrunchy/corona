@@ -377,24 +377,22 @@ VulkanRenderer::~VulkanRenderer()
 	Rtt_DELETE( fPrimaryFBO );
 	Rtt_DELETE( fSwapchainTexture );
 
-	VulkanState * state = GetState();
-	VkDevice device = state->GetDevice();
-	const VkAllocationCallbacks * allocator = state->GetAllocator();
+	auto ci = GetState()->GetCommonInfo();
 
 	for (DescriptorLists & lists : fDescriptorLists)
 	{
-		lists.Wipe( device, allocator );
+		lists.Wipe( ci.device, ci.allocator );
 	}
 
 	for (auto & pipeline : fBuiltPipelines)
 	{
-		vkDestroyPipeline( device, pipeline.second, allocator );
+		vkDestroyPipeline( ci.device, pipeline.second, ci.allocator );
 	}
 
-	vkDestroyPipelineLayout( device, fPipelineLayout, allocator );
-	vkDestroyDescriptorSetLayout( device, fUniformsLayout, allocator );
-	vkDestroyDescriptorSetLayout( device, fUserDataLayout, allocator );
-	vkDestroyDescriptorSetLayout( device, fTextureLayout, allocator );
+	vkDestroyPipelineLayout( ci.device, fPipelineLayout, ci.allocator );
+	vkDestroyDescriptorSetLayout( ci.device, fUniformsLayout, ci.allocator );
+	vkDestroyDescriptorSetLayout( ci.device, fUserDataLayout, ci.allocator );
+	vkDestroyDescriptorSetLayout( ci.device, fTextureLayout, ci.allocator );
 }
 
 void
@@ -590,14 +588,13 @@ VulkanRenderer::TearDownSwapchain()
 {
 	// TODO: tell frame buffers they're invalid, e.g. iterate list
 
-    const VkAllocationCallbacks * allocator = fState->GetAllocator();
-    VkDevice device = fState->GetDevice();
+    auto ci = fState->GetCommonInfo();
 
-	vkDestroySwapchainKHR( device, fState->GetSwapchain(), allocator );
+	vkDestroySwapchainKHR( ci.device, fState->GetSwapchain(), ci.allocator );
 
 	// TODO: lots more stuff...
 
-	vkFreeCommandBuffers( device, fState->GetCommandPool(), fCommandBuffers.size(), fCommandBuffers.data() );
+	vkFreeCommandBuffers( ci.device, fState->GetCommandPool(), fCommandBuffers.size(), fCommandBuffers.data() );
 
     fState->SetSwapchain( VK_NULL_HANDLE );
 }
@@ -851,9 +848,9 @@ VulkanRenderer::ResolvePipeline()
 		pipelineCreateInfo.renderPass = fPipelineCreateInfo.fRenderPass;
         pipelineCreateInfo.stageCount = fPipelineCreateInfo.fShaderStages.size();
 
-		const VkAllocationCallbacks * allocator = fState->GetAllocator();
+		auto ci = fState->GetCommonInfo();
 // TODO: can we use another queue to actually build this while still recording commands?
-        if (VK_SUCCESS == vkCreateGraphicsPipelines( fState->GetDevice(), fState->GetPipelineCache(), 1U, &pipelineCreateInfo, allocator, &pipeline ))
+        if (VK_SUCCESS == vkCreateGraphicsPipelines( ci.device, fState->GetPipelineCache(), 1U, &pipelineCreateInfo, ci.allocator, &pipeline ))
 		{
 			if (VK_NULL_HANDLE == fFirstPipeline)
 			{

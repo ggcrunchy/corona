@@ -207,13 +207,12 @@ VulkanTexture::Update( CPUResource* resource )
 void 
 VulkanTexture::Destroy()
 {
-    const VkAllocationCallbacks * allocator = fState->GetAllocator();
-    VkDevice device = fState->GetDevice();
+    auto ci = fState->GetCommonInfo();
 
-    vkDestroySampler( device, fSampler, allocator );
-    vkDestroyImageView( device, fImageView, allocator );
-    vkDestroyImage( device, fData.fImage, allocator );
-    vkFreeMemory( device, fData.fMemory, allocator );
+    vkDestroySampler( ci.device, fSampler, ci.allocator );
+    vkDestroyImageView( ci.device, fImageView, ci.allocator );
+    vkDestroyImage( ci.device, fData.fImage, ci.allocator );
+    vkFreeMemory( ci.device, fData.fMemory, ci.allocator );
 }
 
 void
@@ -433,16 +432,15 @@ VulkanTexture::CreateImage( VulkanState * state, uint32_t width, uint32_t height
     createImageInfo.tiling = tiling;
     createImageInfo.usage = usage;
 
-    const VkAllocationCallbacks * allocator = state->GetAllocator();
-    VkDevice device = state->GetDevice();
+    auto ci = state->GetCommonInfo();
     VkImage image = VK_NULL_HANDLE;
     ImageData imageData;
 
-    if (VK_SUCCESS == vkCreateImage( device, &createImageInfo, allocator, &image ))
+    if (VK_SUCCESS == vkCreateImage( ci.device, &createImageInfo, ci.allocator, &image ))
     {
         VkMemoryRequirements memRequirements;
 
-        vkGetImageMemoryRequirements( device, image, &memRequirements );
+        vkGetImageMemoryRequirements( ci.device, image, &memRequirements );
 
         VkMemoryAllocateInfo allocInfo = {};
 
@@ -451,21 +449,21 @@ VulkanTexture::CreateImage( VulkanState * state, uint32_t width, uint32_t height
 
         bool foundMemoryType = state->FindMemoryType( memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex );
 
-        if (foundMemoryType && vkAllocateMemory( device, &allocInfo, allocator, &imageData.fMemory ) != VK_SUCCESS)
+        if (foundMemoryType && vkAllocateMemory( ci.device, &allocInfo, ci.allocator, &imageData.fMemory ) != VK_SUCCESS)
         {
             CoronaLog( "Failed to allocate image memory!" );
         }
 
         if (imageData.fMemory != VK_NULL_HANDLE)
         {
-            vkBindImageMemory( device, image, imageData.fMemory, 0U );
+            vkBindImageMemory( ci.device, image, imageData.fMemory, 0U );
 
             imageData.fImage = image;
         }
 
         else
         {
-            vkDestroyImage( device, image, allocator );
+            vkDestroyImage( ci.device, image, ci.allocator );
         }
     }
 

@@ -95,6 +95,21 @@ class VulkanState
 		const Features & GetFeatures() const { return fDeviceDetails.features; }
 		const VkPhysicalDeviceProperties & GetProperties() const { return fDeviceDetails.properties; }
 
+		struct CommonInfo {
+			CommonInfo( VulkanState * vs )
+			:	state( vs ),
+				device( vs->GetDevice() ),
+				allocator( vs->GetAllocator() )
+			{
+			}
+
+			VulkanState * state;
+			VkDevice device;
+			const VkAllocationCallbacks * allocator;
+		};
+
+		CommonInfo GetCommonInfo() { return CommonInfo( this ); }
+
 		void SetSwapchain( VkSwapchainKHR swapchain ) { fSwapchain = swapchain; }
 
 		shaderc_compiler * GetCompiler() const { return fCompiler; }

@@ -153,30 +153,28 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 
 	ClearExecuteResult();
 
-	VulkanState * state = fRenderer.GetState();
-	const VkAllocationCallbacks * vulkanAllocator = state->GetAllocator();
-	VkDevice device = state->GetDevice();
+	auto ci = fRenderer.GetState()->GetCommonInfo();
 	VkFenceCreateInfo createFenceInfo = {};
 
     createFenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     createFenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-	vkCreateFence( device, &createFenceInfo, vulkanAllocator, &fInFlight );
+	vkCreateFence( ci.device, &createFenceInfo, ci.allocator, &fInFlight );
 
 	VkSemaphoreCreateInfo createSemaphoreInfo = {};
 
 	createSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fImageAvailableSemaphore );
-	vkCreateSemaphore( device, &createSemaphoreInfo, vulkanAllocator, &fRenderFinishedSemaphore );
+	vkCreateSemaphore( ci.device, &createSemaphoreInfo, ci.allocator, &fImageAvailableSemaphore );
+	vkCreateSemaphore( ci.device, &createSemaphoreInfo, ci.allocator, &fRenderFinishedSemaphore );
 
 	if ( VK_NULL_HANDLE == fInFlight || VK_NULL_HANDLE == fImageAvailableSemaphore || VK_NULL_HANDLE == fRenderFinishedSemaphore)
 	{
 		CoronaLog( "Failed to create some synchronziation objects!" );
 
-		vkDestroySemaphore( device, fImageAvailableSemaphore, vulkanAllocator );
-		vkDestroySemaphore( device, fRenderFinishedSemaphore, vulkanAllocator );
-		vkDestroyFence( device, fInFlight, vulkanAllocator );
+		vkDestroySemaphore( ci.device, fImageAvailableSemaphore, ci.allocator );
+		vkDestroySemaphore( ci.device, fRenderFinishedSemaphore, ci.allocator );
+		vkDestroyFence( ci.device, fInFlight, ci.allocator );
 
 		fImageAvailableSemaphore = VK_NULL_HANDLE;
 		fRenderFinishedSemaphore = VK_NULL_HANDLE;
@@ -186,13 +184,11 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 
 VulkanCommandBuffer::~VulkanCommandBuffer()
 {
-	VulkanState * state = fRenderer.GetState();
-	const VkAllocationCallbacks * allocator = state->GetAllocator();
-	VkDevice device = state->GetDevice();
+	auto ci = fRenderer.GetState()->GetCommonInfo();
 
-	vkDestroyFence( device, fInFlight, allocator );
-	vkDestroySemaphore( device, fImageAvailableSemaphore, allocator );
-	vkDestroySemaphore( device, fRenderFinishedSemaphore, allocator );
+	vkDestroyFence( ci.device, fInFlight, ci.allocator );
+	vkDestroySemaphore( ci.device, fImageAvailableSemaphore, ci.allocator );
+	vkDestroySemaphore( ci.device, fRenderFinishedSemaphore, ci.allocator );
 //	delete [] fTimerQueries;
 }
 
