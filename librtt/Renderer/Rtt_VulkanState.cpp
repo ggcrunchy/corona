@@ -503,7 +503,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* pUserData
 ) {
-    CoronaLog( "validation layer: %s", pCallbackData->pMessage );
+	if (strcmp( pCallbackData->pMessageIdName, "VUID-VkViewport-height-01772" ) != 0) // seems spurious with VK_KHR_MAINTENANCE1_EXTENSION_NAME enabled...
+	{
+		CoronaLog( "validation layer: %s", pCallbackData->pMessage );
+	}
 
 //	VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT: Some event has happened that is unrelated to the specification or performance
 //	VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT: Something has happened that violates the specification or indicates a possible mistake
