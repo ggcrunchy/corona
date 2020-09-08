@@ -1453,37 +1453,54 @@ VkDescriptorSet VulkanCommandBuffer::AddTextureSet( const std::vector< VkDescrip
 		else if (VK_SUCCESS == result)
 		{
 			std::vector< VkWriteDescriptorSet > writes;
+			
+			U32 inUse = 0U;
+			VkWriteDescriptorSet wds = {};
 
-			bool wasValid = false;
+			wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			wds.dstSet = set;
 
 			for (size_t i = 0; i < imageInfo.size(); ++i)
 			{
-				if (VK_NULL_HANDLE == imageInfo[i].imageView)
+				if (imageInfo[i].imageView != VK_NULL_HANDLE)
 				{
-					wasValid = false;
-				}
+					U32 mask = i > 0 ? 1U << (i - 1) : 0U;
 
-				else
-				{
-					if (!wasValid)
+					if (0U == (inUse & mask))
 					{
-						VkWriteDescriptorSet wds = {};
-
-						wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-						wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 						wds.dstArrayElement = i;
 						wds.pImageInfo = imageInfo.data() + i;
-						wds.dstSet = set;
 
 						writes.push_back( wds );
 
-						wasValid = true;
+						inUse |= 1U << i;
 					}
 
 					++writes.back().descriptorCount;
 				}
 			}
          
+			Rtt_ASSERT( inUse );
+
+			// if (!ThatFeatureThatLetsUsSkipThis && (mask != (1 << MAX_TEXTURES) - 1)
+			{
+				wds.descriptorCount = 1U;
+				wds.pImageInfo = writes.back().pImageInfo;
+
+				for (size_t i = 0; i < imageInfo.size(); ++i)
+				{
+					U32 used = inUse & (1U << i);
+
+					if (!used)
+					{
+						wds.dstArrayElement = i;
+
+						writes.push_back( wds );
+					}
+				}
+			}
+
 			vkUpdateDescriptorSets( state->GetDevice(), writes.size(), writes.data(), 0U, NULL );
 
 			return set;
