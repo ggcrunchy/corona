@@ -46,6 +46,7 @@ PrepareAttachmentDescription( VkFormat format, bool noClear )
 	attachment.format = format;
     attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	attachment.loadOp = noClear ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
