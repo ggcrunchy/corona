@@ -103,7 +103,7 @@ VulkanTexture::Create( CPUResource* resource )
 
         ok = fData.fImage != VK_NULL_HANDLE;
 
-        if (ok && texture->GetData())
+        if (ok)
         {
             ok = Load( texture, format, bufferData, mipLevels );
         }
@@ -253,7 +253,12 @@ PrepareBarrier( VkImage image, VkImageAspectFlags aspectFlags, uint32_t mipLevel
 bool
 VulkanTexture::Load( Texture * texture, VkFormat format, const VulkanBufferData & bufferData, U32 mipLevels )
 {
-    fState->StageData( bufferData.GetMemory(), texture->GetData(), texture->GetSizeInBytes() );
+    const void * data = texture->GetData();
+
+    if (data)
+    {
+        fState->StageData( bufferData.GetMemory(), data, texture->GetSizeInBytes() );
+    }
         
     if (TransitionImageLayout( fState, fData.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels ))
     {
