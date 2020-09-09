@@ -191,7 +191,7 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 				bufferData.fBuffer = buffer;
 				bufferData.fMemory = bufferMemory;
 
-			#if 1
+			#if 0
 				CoronaLog( "Buffer Vulkan ID=%" PRIx64 ", Memory=%" PRIx64, buffer, bufferMemory );
 			#endif
 

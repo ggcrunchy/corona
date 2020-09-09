@@ -1453,37 +1453,44 @@ VkDescriptorSet VulkanCommandBuffer::AddTextureSet( const std::vector< VkDescrip
 		else if (VK_SUCCESS == result)
 		{
 			std::vector< VkWriteDescriptorSet > writes;
-			
-			U32 inUse = 0U;
+
 			VkWriteDescriptorSet wds = {};
 
 			wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			wds.dstSet = set;
 
+			Rtt_ASSERT( imageInfo.size() <= 31 );
+
+			U32 inUse = 0U, previousMask = 0U;
+
 			for (size_t i = 0; i < imageInfo.size(); ++i)
 			{
-				if (imageInfo[i].imageView != VK_NULL_HANDLE)
-				{
-					U32 mask = i > 0 ? 1U << (i - 1) : 0U;
+				U32 currentMask = 1U << i;
 
-					if (0U == (inUse & mask))
+				if (imageInfo[i].imageView != VK_NULL_HANDLE) // valid entry...
+				{
+					if (0U == (inUse & previousMask)) // ...but previous entry was not?
 					{
 						wds.dstArrayElement = i;
 						wds.pImageInfo = imageInfo.data() + i;
 
 						writes.push_back( wds );
-
-						inUse |= 1U << i;
 					}
+
+					inUse |= currentMask;
 
 					++writes.back().descriptorCount;
 				}
+
+				previousMask = currentMask;
 			}
          
 			Rtt_ASSERT( inUse );
 
-			// if (!ThatFeatureThatLetsUsSkipThis && (mask != (1 << MAX_TEXTURES) - 1)
+			// If the images were only partially bound, but this is not supported by the hardware, populate
+			// the unoccupied slots with one of the valid entries.
+			// if (!ThatFeatureThatLetsUsSkipThis && (inUse + 1U != (1U << imageInfo.size()) - 1U)
 			{
 				wds.descriptorCount = 1U;
 				wds.pImageInfo = writes.back().pImageInfo;

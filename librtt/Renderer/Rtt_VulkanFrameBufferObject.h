@@ -91,25 +91,15 @@ class VulkanFrameBufferObject : public GPUResource
 		void Bind( VulkanRenderer & renderer, uint32_t index, VkRenderPassBeginInfo & passBeginInfo );
 
 	private:
-		struct ImageData {
-			ImageData()
-			:	fFramebuffer( VK_NULL_HANDLE )
-			{
-			}
-
-			std::vector< VkImageView > fViews;
-			VkFramebuffer fFramebuffer;
-		};
-
 		void CleanUpImageData();
 
 	private:
 		VulkanRenderer & fRenderer;
 		VkExtent2D fExtent;
+		std::vector< VkFramebuffer > fFramebuffers;
 		std::vector< VkDeviceMemory > fMemory;
 		std::vector< VkImage > fImages;
 		std::vector< VkImageView > fImageViews;
-		std::vector< ImageData > fImageData;
 		const RenderPassData * fRenderPassData;
 };
 
