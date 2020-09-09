@@ -11,6 +11,7 @@
 #define _Rtt_VulkanTexture_H__
 
 #include "Renderer/Rtt_GPUResource.h"
+#include "Renderer/Rtt_Texture.h"
 #include <vulkan/vulkan.h>
 #include <utility>
 
@@ -64,10 +65,9 @@ class VulkanTexture : public GPUResource
 
 		static ImageData CreateImage( VulkanState * state, uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties );
 		static VkImageView CreateImageView( VulkanState * state, VkImage image, VkFormat format, VkImageAspectFlags flags, uint32_t mipLevels, const VkComponentMapping * componentMapping = NULL );
+		static VkFormat GetVulkanFormat( Texture::Format format, VkComponentMapping & mapping );
 
 	private:
-//		GLint fCachedFormat;
-//		unsigned long fCachedWidth, fCachedHeight;
 		VulkanState * fState;
 		ImageData fData;
 		VkImageView fImageView;

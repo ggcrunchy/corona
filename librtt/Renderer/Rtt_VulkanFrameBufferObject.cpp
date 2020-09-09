@@ -234,20 +234,16 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 	fExtent.height = texture->GetHeight();
 
 	CleanUpImageData();
-	
-	const std::vector< VkImage > & swapchainImages = fRenderer.GetSwapchainImages();
+
+	bool isSwapchain = Texture::kNumFilters == texture->GetFilter(), wantMultisampleResources = true;
+	auto ci = fRenderer.GetState()->GetCommonInfo();
+	VkComponentMapping mapping = {};
+	VkFormat format = isSwapchain ? ci.state->GetSwapchainDetails().fFormat.format : VulkanTexture::GetVulkanFormat( texture->GetFormat(), mapping );
 
 	RenderPassBuilder builder;
 
-	auto ci = fRenderer.GetState()->GetCommonInfo();
-
-	if (Texture::kNumFilters == texture->GetFilter()) // swapchain
+	if (wantMultisampleResources)
 	{
-		fImageData.resize( swapchainImages.size() );
-
-		const VulkanState::SwapchainDetails & details = ci.state->GetSwapchainDetails();
-		VkFormat format = details.fFormat.format;
-
 		VkSampleCountFlagBits sampleCount = VkSampleCountFlagBits( ci.state->GetSampleCountFlags() );
 		VulkanTexture::ImageData color = VulkanTexture::CreateImage(
 			ci.state,
@@ -266,41 +262,40 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 		fMemory.push_back( color.fMemory );
 		fImageViews.push_back( colorView );
 
-		for (size_t i = 0; i < swapchainImages.size(); ++i)
-		{
-			VkImageView swapchainView = VulkanTexture::CreateImageView( ci.state, swapchainImages[i], format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
-
-			fImageData[i].fViews.push_back( colorView );
-			fImageData[i].fViews.push_back( swapchainView );
-			fImageViews.push_back( swapchainView );
-		}
-
 		RenderPassBuilder::AttachmentOptions options;
 
 		options.samples = sampleCount;
 
 		builder.AddColorAttachment( format, options );
-		
-		RenderPassBuilder::AttachmentOptions resolveOptions;
-		
-		resolveOptions.isPresentable = true;
-		resolveOptions.isResolve = true;
-
-		builder.AddColorAttachment( format, resolveOptions );
 	}
 
+	RenderPassBuilder::AttachmentOptions finalResultOptions;
+
+	size_t currentSize = fImageViews.size();
+
+	if (isSwapchain)
+	{
+		for (VkImage swapchainImage : fRenderer.GetSwapchainImages())
+		{
+			VkImageView swapchainView = VulkanTexture::CreateImageView( ci.state, swapchainImage, format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
+
+			fImageViews.push_back( swapchainView );
+		}
+	}
+	
 	else
 	{
-		VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() ); // n.b. GLFrameBufferObject says this will already exist
-		VkImageView view = vulkanTexture->GetImageView();
+		VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() );
 
-		for (size_t i = 0; i < swapchainImages.size(); ++i)
-		{
-			fImageData[i].fViews.push_back( view );
-		}
-
-		// TODO: settings...
+		fImageViews.push_back( vulkanTexture->GetImageView() );
 	}
+
+	size_t count = fImageViews.size() - currentSize;
+
+	finalResultOptions.isPresentable = isSwapchain;
+	finalResultOptions.isResolve = wantMultisampleResources;
+
+	builder.AddColorAttachment( format, finalResultOptions );
 
 	RenderPassKey key;
 
@@ -315,24 +310,44 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 		fRenderPassData = ci.state->AddRenderPass( key, renderPass );
 	}
 
-	for (auto & imageData : fImageData)
+	for (size_t i = 0; i < count; ++i)
 	{
         VkFramebufferCreateInfo createFramebufferInfo = {};
 
         createFramebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         createFramebufferInfo.renderPass = fRenderPassData->fPass;
-        createFramebufferInfo.attachmentCount = imageData.fViews.size();
+        createFramebufferInfo.attachmentCount = currentSize + 1U; // n.b. ignore "extra" image views, cf. note a few lines below
         createFramebufferInfo.height = fExtent.height;
         createFramebufferInfo.layers = 1U;
-        createFramebufferInfo.pAttachments = imageData.fViews.data();
+        createFramebufferInfo.pAttachments = fImageViews.data();
         createFramebufferInfo.width = fExtent.width;
+// TODO: look into VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT...
+		VkFramebuffer framebuffer = VK_NULL_HANDLE;
 
-        if (vkCreateFramebuffer( ci.device, &createFramebufferInfo, ci.allocator, &imageData.fFramebuffer ) != VK_SUCCESS)
+        if (VK_SUCCESS == vkCreateFramebuffer( ci.device, &createFramebufferInfo, ci.allocator, &framebuffer ))
+		{
+			fFramebuffers.push_back( framebuffer );
+
+			if (isSwapchain && i + 1 != count) // move relevant swapchain image view to front; will only be used afterward for cleanup, so order only matters here
+			{
+				VkImageView temp = fImageViews[currentSize];
+
+				fImageViews[currentSize] = fImageViews[currentSize + i + 1];
+				fImageViews[currentSize + i + 1] = temp;
+			}
+		}
+
+		else
 		{
             CoronaLog( "Failed to create framebuffer!" );
 
 			// TODO?
         }
+	}
+
+	if (!isSwapchain)
+	{
+		fImageViews.pop_back(); // owned by texture
 	}
 }
 
@@ -345,7 +360,7 @@ VulkanFrameBufferObject::Destroy()
 void
 VulkanFrameBufferObject::Bind( VulkanRenderer & renderer, uint32_t index, VkRenderPassBeginInfo & passBeginInfo )
 {
-	passBeginInfo.framebuffer = fImageData[index].fFramebuffer;
+	passBeginInfo.framebuffer = fFramebuffers[index];
 	passBeginInfo.renderArea.extent = fExtent;
 	passBeginInfo.renderPass = fRenderPassData->fPass;
 
@@ -357,9 +372,9 @@ VulkanFrameBufferObject::CleanUpImageData()
 {
 	auto ci = fRenderer.GetState()->GetCommonInfo();
 
-	for (auto & imageData : fImageData)
+	for (VkFramebuffer framebuffer : fFramebuffers)
 	{
-		vkDestroyFramebuffer( ci.device, imageData.fFramebuffer, ci.allocator );
+		vkDestroyFramebuffer( ci.device, framebuffer, ci.allocator );
 	}
 
 	for (VkImageView view : fImageViews)
@@ -377,7 +392,7 @@ VulkanFrameBufferObject::CleanUpImageData()
 		vkFreeMemory( ci.device, memory, ci.allocator );
 	}
 
-	fImageData.clear();
+	fFramebuffers.clear();
 	fImageViews.clear();
 	fImages.clear();
 	fMemory.clear();

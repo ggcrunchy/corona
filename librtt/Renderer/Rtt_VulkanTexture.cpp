@@ -12,7 +12,6 @@
 #include "Renderer/Rtt_VulkanRenderer.h"
 #include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanTexture.h"
-#include "Renderer/Rtt_Texture.h"
 #include "Core/Rtt_Assert.h"
 #include "CoronaLog.h"
 
@@ -24,47 +23,6 @@
 namespace /*anonymous*/ 
 { 
 	using namespace Rtt;
-
-	VkFormat getFormatTokens( Texture::Format format, VkComponentMapping & mapping )
-	{
-        VkFormat vulkanFormat = VK_FORMAT_R8G8B8A8_UNORM; // TODO: allow sR* forms, floats, etc.
-
-		switch( format )
-		{
-			case Texture::kAlpha:
-                mapping.g = mapping.b = mapping.a = VK_COMPONENT_SWIZZLE_R;
-
-                break;
-            // ^^ TODO: guess!
-			case Texture::kLuminance:
-                vulkanFormat = VK_FORMAT_R8_UNORM;
-                
-                break;
-            // ^^ TODO: guess!
-            case Texture::kRGB:
-                vulkanFormat = VK_FORMAT_R8G8B8_UNORM;
-                
-                break;
-            case Texture::kRGBA:
-                break;
-			case Texture::kARGB: // cf. GLTexture
-			case Texture::kBGRA:
-                mapping.r = VK_COMPONENT_SWIZZLE_B;
-                mapping.b = VK_COMPONENT_SWIZZLE_R;
-
-                break;
-			case Texture::kABGR:
-                mapping.r = VK_COMPONENT_SWIZZLE_A;
-                mapping.g = VK_COMPONENT_SWIZZLE_B;
-                mapping.b = VK_COMPONENT_SWIZZLE_G;
-                mapping.a = VK_COMPONENT_SWIZZLE_R;
-
-                break;
-			default: Rtt_ASSERT_NOT_REACHED();
-		}
-
-        return vulkanFormat;
-	}
 
 	void getFilterTokens( Texture::Filter filter, VkFilter & minFilter, VkFilter & magFilter )
 	{
@@ -120,7 +78,7 @@ VulkanTexture::Create( CPUResource* resource )
     }
 
     VkComponentMapping mapping = {};
-    VkFormat format = getFormatTokens( texture->GetFormat(), mapping );
+    VkFormat format = GetVulkanFormat( texture->GetFormat(), mapping );
     
     VkDeviceSize imageSize = texture->GetSizeInBytes();
     U32 mipLevels = /* static_cast< uint32_t >( std::floor( std::log2( std::max( texture->GetWidth(), texture->GetHeight() ) ) ) ) + */ 1U;
@@ -145,7 +103,7 @@ VulkanTexture::Create( CPUResource* resource )
 
         ok = fData.fImage != VK_NULL_HANDLE;
 
-        if (ok)
+        if (ok && texture->GetData())
         {
             ok = Load( texture, format, bufferData, mipLevels );
         }
@@ -172,11 +130,6 @@ VulkanTexture::Create( CPUResource* resource )
         }
 
         samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-/*
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-*/
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
         samplerInfo.maxLod = 1.f;
 
@@ -218,8 +171,6 @@ VulkanTexture::Destroy()
 void
 VulkanTexture::Bind( DescriptorLists & lists, VkDescriptorImageInfo & imageInfo )
 {
-//	VkDescriptorImageInfo imageInfo;
-
     if (imageInfo.imageView != fImageView)
     {
         lists.fDirty = true;
@@ -289,9 +240,9 @@ PrepareBarrier( VkImage image, VkImageAspectFlags aspectFlags, uint32_t mipLevel
     VkImageMemoryBarrier barrier = {};
 
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.layerCount = 1U;
     barrier.subresourceRange.levelCount = mipLevels;
@@ -515,6 +466,48 @@ VulkanTexture::CreateImageView( VulkanState * state, VkImage image, VkFormat for
 
         return VK_NULL_HANDLE;
     }
+}
+
+VkFormat
+VulkanTexture::GetVulkanFormat( Texture::Format format, VkComponentMapping & mapping )
+{
+    VkFormat vulkanFormat = VK_FORMAT_R8G8B8A8_UNORM; // TODO: allow sR* forms, floats, etc.
+
+	switch( format )
+	{
+		case Texture::kAlpha:
+            mapping.g = mapping.b = mapping.a = VK_COMPONENT_SWIZZLE_R;
+
+            break;
+        // ^^ TODO: guess!
+		case Texture::kLuminance:
+            vulkanFormat = VK_FORMAT_R8_UNORM;
+                
+            break;
+        // ^^ TODO: guess!
+        case Texture::kRGB:
+            vulkanFormat = VK_FORMAT_R8G8B8_UNORM;
+                
+            break;
+        case Texture::kRGBA:
+            break;
+		case Texture::kARGB: // cf. GLTexture
+		case Texture::kBGRA:
+            mapping.r = VK_COMPONENT_SWIZZLE_B;
+            mapping.b = VK_COMPONENT_SWIZZLE_R;
+
+            break;
+		case Texture::kABGR:
+            mapping.r = VK_COMPONENT_SWIZZLE_A;
+            mapping.g = VK_COMPONENT_SWIZZLE_B;
+            mapping.b = VK_COMPONENT_SWIZZLE_G;
+            mapping.a = VK_COMPONENT_SWIZZLE_R;
+
+            break;
+		default: Rtt_ASSERT_NOT_REACHED();
+	}
+
+    return vulkanFormat;
 }
 
 /*
