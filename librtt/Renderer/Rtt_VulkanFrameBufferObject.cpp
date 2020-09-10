@@ -61,6 +61,8 @@ RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions 
 
 	if (options.isResolve)
 	{
+		Rtt_ASSERT( options.isResult );
+
 		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	}
 
@@ -69,14 +71,12 @@ RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions 
 		colorAttachment.samples = options.samples;
 	}
 
-	if (options.isPresentable || options.isResolve || options.isResult)
+	if (options.isResult)
 	{
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	}
 
-	VkImageLayout finalLayout = options.isPresentable ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_UNDEFINED;
-
-	AddAttachment( colorAttachment, options.isResolve ? fResolveReferences : fColorReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, finalLayout );
+	AddAttachment( colorAttachment, options.isResolve ? fResolveReferences : fColorReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, options.finalLayout );
 }
 
 void
@@ -288,12 +288,37 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 		VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() );
 
 		fImageViews.push_back( vulkanTexture->GetImageView() );
+
+		VkSubpassDependency srcDependency;
+
+		srcDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+		srcDependency.dstSubpass = 0;
+		srcDependency.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		srcDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		srcDependency.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		srcDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		srcDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		builder.AddSubpassDependency( srcDependency );
+
+		VkSubpassDependency dstDependency;
+
+		dstDependency.srcSubpass = 0;
+		dstDependency.dstSubpass = VK_SUBPASS_EXTERNAL;
+		dstDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dstDependency.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		dstDependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		dstDependency.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		dstDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		builder.AddSubpassDependency( dstDependency );
 	}
 
 	size_t count = fImageViews.size() - currentSize;
 
-	finalResultOptions.isPresentable = isSwapchain;
+	finalResultOptions.finalLayout = isSwapchain ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	finalResultOptions.isResolve = wantMultisampleResources;
+	finalResultOptions.isResult = true;
 
 	builder.AddColorAttachment( format, finalResultOptions );
 

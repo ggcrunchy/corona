@@ -234,6 +234,14 @@ Renderer::EndFrame()
 	DEBUG_PRINT( "--End Frame: Renderer--\n\n" );
 }
 
+// STEVE CHANGE
+void
+Renderer::BeginDrawing()
+{
+	fBackCommandBuffer->WillRender();
+}
+// /STEVE CHANGE
+
 void 
 Renderer::GetFrustum( Real* viewMatrix, Real* projMatrix ) const
 {

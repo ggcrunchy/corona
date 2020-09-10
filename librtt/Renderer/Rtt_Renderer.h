@@ -59,6 +59,10 @@ class Renderer
 		// Perform any per-frame finalization.
 		virtual void EndFrame();
 
+		// STEVE CHANGE
+		void BeginDrawing();
+		// /STEVE CHANGE
+
 		// Get the current view and projection matrices. These 4x4 matrices are
 		// returned via the given pointers, which are assumed to be non-null.
 		void GetFrustum( Real* viewMatrix, Real* projectionMatrix ) const;

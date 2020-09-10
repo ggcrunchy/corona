@@ -85,9 +85,21 @@ VulkanTexture::Create( CPUResource* resource )
     
 	VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
 
-    bool ok = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    bool ok = true;
+
+    if (texture->isTarget())
+    {
+        usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    }
+
+    else
+    {
+        usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        ok = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
                                         // ^^ TODO: also non-buffered approach? (suggestions that we should recycle a buffer)
                                         // is it okay to let this go away or should it be backed for a while still?
+    }
 
     if (ok)
     {
@@ -98,12 +110,12 @@ VulkanTexture::Create( CPUResource* resource )
             VK_SAMPLE_COUNT_1_BIT,
             format,
             VK_IMAGE_TILING_OPTIMAL, // might not want if frequently changed?
-            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
 
         ok = fData.fImage != VK_NULL_HANDLE;
 
-        if (ok)
+        if (ok && !texture->isTarget())
         {
             ok = Load( texture, format, bufferData, mipLevels );
         }

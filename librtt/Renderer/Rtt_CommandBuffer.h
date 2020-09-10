@@ -88,6 +88,10 @@ class CommandBuffer
 		virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
 		virtual S32 GetCachedParam( CommandBuffer::QueryableParams param ) = 0;
 		
+		// STEVE CHANGE
+		virtual void WillRender() {}
+		// /STEVE CHANGE
+
 		// Execute the generated command buffer. This function should only be
 		// called from a thread with an active rendering context. If requested
 		// (and the platform supports it), this function should return the time
