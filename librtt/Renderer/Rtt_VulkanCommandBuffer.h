@@ -90,6 +90,8 @@ class VulkanCommandBuffer : public CommandBuffer
 		virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type );
 		virtual S32 GetCachedParam( CommandBuffer::QueryableParams param );
 		
+		virtual void WillRender();
+
 		// Execute all buffered commands. A valid OpenGL context must be active.
 		virtual Real Execute( bool measureGPU );
 	
@@ -144,7 +146,7 @@ class VulkanCommandBuffer : public CommandBuffer
 	private:
 		U32 GetWritePosition() const { return fBytesUsed; }
 		U8 * GetOffset( U32 pos ) const { return fBuffer + pos; }
-		void SetOffsetPosition( U32 pos ) { fOffset = fBuffer + pos; }
+		void SetOffsetPosition( U32 pos ) { fOffset = GetOffset( pos ); }
 
 	private:
 		struct UniformUpdate

@@ -299,7 +299,7 @@ VulkanCommandBuffer::PopFrameBufferObject()
 {
 	WRITE_COMMAND( kCommandUnBindFrameBufferObject );
 
-	GraphNode & cell = fGraphStack.back();
+	const GraphNode & cell = fGraphStack.back();
 
     if (cell.fLeftLowerLevel != GraphNode::kInvalidLocation) // 'nested' jump, cf. PushFrameBufferObject
 	{
@@ -335,11 +335,10 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 	fGraphStack.push_back( GraphNode() );
 
 	GraphNode & newNode = fGraphStack.back();
-	U32 here = GetWritePosition();
 
 	if (nested)
 	{
-		bool didAnythingOnLowerLevel = here != fRejoinedStackBefore;
+		bool didAnythingOnLowerLevel = fRejoinedStackBefore != GetWritePosition();
 
 		if (didAnythingOnLowerLevel)
 		{
@@ -367,13 +366,14 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 
 		Rtt_ASSERT( parent.fID == fMostRecentNodeID );
 
-		parent.fWillJumpTo = here; // the parent has not ended yet, but will point back here
+		parent.fWillJumpTo = GetWritePosition(); // the parent has not ended yet, but will point back here
+												 // n.b. this will be after the stub, if we left one earlier
 
 		// examples in the diagram below: D -> G, G -> H, H -> I, E -> J, F -> K, K -> L
 	}
 
 	else // Otherwise, we are either a later child, or moved to a lower level.
-	if (fEndedAt != here) // the two swaths might blend together, making a jump pointless (TODO: verify this for child swaths)
+	if (fEndedAt != GetWritePosition()) // the two swaths might blend together, making a jump pointless (TODO: verify this for child swaths)
 	{
 		Rtt_ASSERT( fEndedAt != GraphNode::kInvalidLocation );
 		Rtt_ASSERT( fEndedAt > 0U );
@@ -652,8 +652,6 @@ VulkanCommandBuffer::Clear( Real r, Real g, Real b, Real a )
 	Write<VkClearValue>(value);
 
 	// TODO: write others, if necessary...
-
-	WRITE_COMMAND( kCommandBeginRenderPass );
 }
 
 void 
@@ -707,6 +705,12 @@ VulkanCommandBuffer::GetCachedParam( CommandBuffer::QueryableParams param )
 	Rtt_ASSERT_MSG(result != -1, "Parameter not cached");
 	
 	return result;
+}
+
+void
+VulkanCommandBuffer::WillRender()
+{
+	WRITE_COMMAND( kCommandBeginRenderPass );
 }
 
 Real 

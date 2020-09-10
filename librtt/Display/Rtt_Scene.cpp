@@ -188,6 +188,9 @@ Scene::Clear( Renderer& renderer )
 	
 	Real inv255 = 1.f / 255.f;
 	renderer.Clear( c.rgba.r * inv255, c.rgba.g * inv255, c.rgba.b * inv255, c.rgba.a * inv255 );
+	// STEVE CHANGE
+	renderer.BeginDrawing();
+	// /STEVE CHANGE
 }
 void
 Scene::Render( Renderer& renderer, PlatformSurface& rTarget )
