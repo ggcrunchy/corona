@@ -96,7 +96,7 @@ DescriptorLists::AddBuffer( VulkanState * state )
 {
 	VulkanBufferData bufferData( state->GetDevice(), state->GetAllocator() );
 
-	if (state->CreateBuffer( fBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT/*VISIBLE_BIT*/, bufferData ))
+	if (state->CreateBuffer( fBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, bufferData ))
 	{
 		fDynamicUniforms.push_back( DynamicUniformData{} );
 
@@ -264,9 +264,11 @@ DescriptorLists::IsMaskPushConstant( int index )
 }
 
 bool
-DescriptorLists::IsPushConstant( int index )
+DescriptorLists::IsPushConstant( int index, bool usePushConstants )
 {
-	return Uniform::kTotalTime == index || IsMaskPushConstant( index ); // TODO: others, e.g. SamplerIndex?
+	return Uniform::kTotalTime == index
+		|| IsMaskPushConstant( index )
+		|| (usePushConstants && index >= Uniform::kUserData0 && index <= Uniform::kUserData3);
 }
 
 bool
@@ -294,7 +296,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 	pushConstantRange.offset = 0U;
 	pushConstantRange.size = sizeof( VulkanPushConstants );
-	pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	VkDescriptorSetLayoutCreateInfo createDescriptorSetLayoutInfo = {};
 	VkDescriptorSetLayoutBinding bindings[2] = {};
@@ -427,9 +429,11 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 		}
 	}
 
+	uint32_t index;
+
 	if (canContinue)
 	{
-		result = vulkanCommandBuffer->WaitAndAcquire( fState->GetDevice(), swapchain );
+		result = vulkanCommandBuffer->WaitAndAcquire( fState->GetDevice(), swapchain, index );
 CoronaLog( "ACQUIRE: %i", result );
 		canContinue = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
 	}
@@ -443,8 +447,6 @@ CoronaLog( "ACQUIRE: %i", result );
 
 	if (canContinue)
 	{
-		uint32_t index = vulkanCommandBuffer->GetImageIndex();
-
 		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], fDescriptorLists.data() + 3U * index );
 	}
 
@@ -599,8 +601,8 @@ VulkanRenderer::TearDownSwapchain()
     fState->SetSwapchain( VK_NULL_HANDLE );
 }
 
-const size_t kFinalBlendFactor = VK_BLEND_OP_MAX;
-const size_t kFinalBlendOp = VK_BLEND_OP_MAX;
+const size_t kFinalBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
+const size_t kFinalBlendOp = VK_BLEND_OP_MAX; // n.b. this is the max() operation; its use in this way is a coincidence
 
 constexpr int BitsNeeded( int x ) // n.b. x > 0
 {
@@ -983,13 +985,13 @@ VulkanRenderer::PipelineKey::PipelineKey()
 bool
 VulkanRenderer::PipelineKey::operator < ( const PipelineKey & other ) const
 {
-	return memcmp( fContents.data(), other.fContents.data(), sizeof( PipelineKey ) ) < 0;
+	return fContents < other.fContents;
 }
 
 bool
 VulkanRenderer::PipelineKey::operator == ( const PipelineKey & other ) const
 {
-	return !(*this < other) && !(other < *this);
+	return fContents == other.fContents;
 }
 
 // ----------------------------------------------------------------------------

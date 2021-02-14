@@ -31,9 +31,9 @@ class RenderPassBuilder {
 	public:
 		struct AttachmentOptions {
 			VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-			bool isPresentable = false;
+			VkImageLayout finalLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			bool isResolve = false;
-			bool isResult = false; // n.b. already implied by isPresentable or isResolve
+			bool isResult = false; // n.b. already implied by isResolve
 			bool noClear = false;
 		};
 

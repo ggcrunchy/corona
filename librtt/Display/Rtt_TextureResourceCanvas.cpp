@@ -189,6 +189,9 @@ void TextureResourceCanvas::Render(Rtt::Renderer &renderer, GroupObject *group, 
 			renderer.Clear( color.rgba.r * inv255, color.rgba.g * inv255, color.rgba.b * inv255, color.rgba.a * inv255 );
 		}
 		
+		// STEVE CHANGE
+		renderer.BeginDrawing();
+		// /STEVE CHANGE
 		group->WillDraw( renderer );
 		group->Draw( renderer );
 		group->DidDraw( renderer );

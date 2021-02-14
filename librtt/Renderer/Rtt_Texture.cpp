@@ -20,7 +20,10 @@ namespace Rtt
 
 Texture::Texture( Rtt_Allocator* allocator )
 :	Super( allocator ),
-	fIsRetina( false )
+	fIsRetina( false ),
+// STEVE CHANGE
+	fIsTarget( false )
+// /STEVE CHANGE
 {
 }
 

@@ -22,6 +22,7 @@
 #include "CoronaLog.h"
 
 #include <shaderc/shaderc.h>
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <stdlib.h>
@@ -52,7 +53,9 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 VulkanProgram::VulkanProgram( VulkanState * state )
-:	fState( state )
+:	fState( state ),
+	fFragmentConstants( false ),
+	fPushConstantUniforms( false )
 {
 	for( U32 i = 0; i < Program::kNumVersions; ++i )
 	{
@@ -193,6 +196,121 @@ CountLines( const char **segments, int numSegments )
 	return result;
 }
 
+static std::string 
+CombineSources( const char * sources[], int sourceCount )
+{
+	std::string code;
+
+	for (int i = 0; i < sourceCount; ++i)
+	{
+		code += sources[i];
+	}
+
+	return code;
+}
+
+void
+VulkanProgram::GatherUniformUserdata( bool isVertexSource, std::string & code, UserdataValue values[], std::vector< UserdataDeclaration > & declarations, bool & canUsePushConstants )
+{
+	size_t offset = code.find( "void main(" ); // skip past declarations in shell; this particular landmark is arbitrary
+// TODO: we must ignore anything in comments
+	while (true)
+	{
+		size_t pos = code.find( "uniform ", offset );
+
+		if (std::string::npos == pos)
+		{
+			return;
+		}
+
+		size_t cpos = code.find( ";", pos + sizeof( "uniform " ) );
+
+		if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
+		{
+			CoronaLog( "`uniform` never followed by a semi-colon" );
+
+			return;
+		}
+
+		char precision[16], type[16];
+		int index;
+
+		if (sscanf( code.c_str() + pos, "uniform %15s %15s u_UserData%1i", precision, type, &index ) < 3)
+		{
+			CoronaLog( "Uniform in shader was ill-formed" );
+
+			return;
+		}
+
+		if (index < 0 || index > 3)
+		{
+			CoronaLog( "Invalid uniform userdata `%i`", index );
+
+			return;
+		}
+
+		U32 componentCount = 1U;
+
+		if (strcmp( type, "float" ) != 0)
+		{
+			switch (Uniform::DataTypeForString( type ))
+			{
+				case Uniform::kVec2:
+					componentCount = 2U; break;
+				case Uniform::kVec3:
+					componentCount = 3U; break;
+				case Uniform::kVec4:
+					componentCount = 4U; break;
+				case Uniform::kMat4:
+					componentCount = 16U; break;
+				case Uniform::kMat3:
+					canUsePushConstants = false; // contract broken
+					break;
+				// TODO: allow mat2?
+				default:
+					CoronaLog( "Ill-formed uniform type" );
+
+					return;
+			}
+		}
+
+		VkShaderStageFlagBits stage = isVertexSource ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		if (0 == values[index].fStages)
+		{
+			values[index].fComponentCount = componentCount;
+		}
+	
+		else if (values[index].fStages & stage)
+		{
+			CoronaLog( "Uniform userdata `%i` already defined in %s stage", index, isVertexSource ? "vertex" : "kernel" );
+
+			return;
+		}
+
+		else if (values[index].fComponentCount != componentCount)
+		{
+			Rtt_ASSERT( !isVertexSource );
+
+			CoronaLog( "Uniform userdata `%i` definition differs between vertex and fragment stages", index );
+
+			return;
+		}
+
+		values[index].fStages |= stage;
+
+		UserdataDeclaration declaration;
+
+		declaration.fValue = &values[index];
+		declaration.fPosition = pos;
+		declaration.fLength = cpos - pos + 1; // include semi-colon as well
+
+		declarations.push_back( declaration );
+
+		offset = pos + 1U;
+	}
+}
+
 void
 VulkanProgram::ReplaceVaryings( bool isVertexSource, std::string & code, Maps & maps )
 {
@@ -207,13 +325,37 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, std::string & code, Maps & 
 			return;
 		}
 
-		char precision[256], type[256], name[256];
+		char precision[16], type[16], name[64];
 
-		sscanf( code.c_str() + pos, "varying %s %s %s", precision, type, name );
+		if (sscanf( code.c_str() + pos, "varying %15s %15s %63s", precision, type, name ) < 3)
+		{
+			CoronaLog( "Varying in shader was ill-formed" );
 
-		char buf[256];
+			return;
+		}
 
-		sprintf( buf, "layout(location = %u) %s ", isVertexSource ? varyingLocation : maps.varyings[name], isVertexSource ? "out" : "in" );
+		// TODO: validate: known precision, known type, identifier
+		// also, if we don't care about mobile we could forgo the type...
+
+		size_t location = varyingLocation;
+
+		if (!isVertexSource)
+		{
+			auto & varying = maps.varyings.find( name );
+
+			if (maps.varyings.end() == varying)
+			{
+				CoronaLog( "Fragment kernel refers to varying `%s`, not found on vertex side", name );
+
+				return;
+			}
+
+			location = varying->second;
+		}
+
+		char buf[64];
+
+		sprintf( buf, "layout(location = %u) %s ", location, isVertexSource ? "out" : "in" );
 
 		code.replace( pos, sizeof( "varying" ), buf );
 
@@ -227,15 +369,8 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, std::string & code, Maps & 
 }
 
 void
-VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps & maps, VkShaderModule & module )
+VulkanProgram::Compile( int ikind, std::string & code, Maps & maps, VkShaderModule & module )
 {
-	std::string code;
-
-	for (int i = 0; i < sourceCount; ++i)
-	{
-		code += sources[i];
-	}
-	
 	shaderc_shader_kind kind = shaderc_shader_kind( ikind );
 	const char * what = shaderc_vertex_shader == kind ? "vertex shader" : "fragment shader";
 	bool isVertexSource = 'v' == what[0];
@@ -257,11 +392,15 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 		spirv_cross::CompilerGLSL comp( ir, createShaderModuleInfo.codeSize / 4U );
 		spirv_cross::ShaderResources resources = comp.get_shader_resources();
 
-		for (auto & uniform : resources.uniform_buffers)
+		auto uniformBuffers = resources.uniform_buffers;
+
+		for (auto & buffer : uniformBuffers)
 		{
-			for (auto & br : comp.get_active_buffer_ranges( uniform.id ))
+			auto ranges = comp.get_active_buffer_ranges( buffer.id );
+
+			for (auto & br : ranges)
 			{
-				std::string name = comp.get_member_name( uniform.base_type_id, br.index );
+				std::string name = comp.get_member_name( buffer.base_type_id, br.index );
 				auto iter = maps.buffer_values.insert( std::make_pair( name, Maps::BufferValue( br.offset, br.range, true ) ) );
 
 				iter.first->second.fStages |= 1U << kind;
@@ -269,11 +408,11 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 			}
 		}
 		
-		if (isVertexSource)
+		for (auto & buffer : resources.push_constant_buffers) // 0 or 1
 		{
-			spirv_cross::Resource buffer = resources.push_constant_buffers.front();
+			auto ranges = comp.get_active_buffer_ranges( buffer.id );
 
-			for (auto & br : comp.get_active_buffer_ranges( buffer.id ))
+			for (auto & br : ranges)
 			{
 				std::string name = comp.get_member_name( buffer.base_type_id, br.index );
 
@@ -310,6 +449,36 @@ VulkanProgram::Compile( int ikind, const char * sources[], int sourceCount, Maps
 	shaderc_result_release( result );
 }
 
+static bool
+AreRowsOpen( int used[], int row, int nrows, int ncols )
+{
+	for (int i = 0; i < nrows; ++i)
+	{
+		int count = used[row++];
+
+		if (count + ncols > 4)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static int
+GetFirstRow( int used[], int nrows, int ncols )
+{
+	for (int row = 0, last = 11 - nrows; row <= last; ++row)
+	{
+		if (AreRowsOpen( used, row, nrows, ncols ))
+		{
+			return row;
+		}
+	}
+
+	return -1;
+}
+
 VulkanProgram::Maps
 VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data )
 {
@@ -341,22 +510,207 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 		data.fHeaderNumLines = CountLines( shader_source, numSegments );
 	}
 
+// TODO: if we have uniform userdata it MIGHT be possible to place them in the push constants;
+// the prequisites may be violated in either the vertex or fragment stages, so we should avoid
+// compiling them until both have been examined; it should actually be possible to just handle
+// this part first, then do what follows here.
+
+	std::string vertexCode, fragmentCode;
+	std::vector< UserdataDeclaration > vertexDeclarations, fragmentDeclarations;
+
+	UserdataValue values[4];
+	bool canUsePushConstants = true;
+
 	// Vertex shader.
 	{
 		shader_source[3] = program->GetVertexShaderSource();
+		vertexCode = CombineSources( shader_source, sizeof( shader_source ) / sizeof( shader_source[0] ) );
 
-		Compile( shaderc_vertex_shader, shader_source, sizeof( shader_source ) / sizeof( shader_source[0] ), maps, data.fVertexShader );
+		GatherUniformUserdata( true, vertexCode, values, vertexDeclarations, canUsePushConstants );
 	}
 
 	// Fragment shader.
 	{
 		shader_source[3] = ( version == Program::kWireframe ) ? kWireframeSource : program->GetFragmentShaderSource();
+		fragmentCode = CombineSources( shader_source, sizeof( shader_source ) / sizeof( shader_source[0] ) );
 
-		Compile( shaderc_fragment_shader, shader_source, sizeof( shader_source ) / sizeof( shader_source[0] ), maps, data.fFragmentShader );
+		GatherUniformUserdata( false, fragmentCode, values, fragmentDeclarations, canUsePushConstants );
 	}
+
+	U32 vertexExtra = 0U, fragmentExtra = 0U;
+
+	if (!vertexDeclarations.empty() || !fragmentDeclarations.empty())
+	{
+		// TODO: still valid?
+
+		for (int i = 0; i < 4; ++i)
+		{
+			values[i].fIndex = i;
+		}
+
+		std::sort( values, values + 4 );
+
+		UserdataPosition positions[4];
+
+		for (int i = 0; i < 4; ++i)
+		{
+			positions[i].fValue = &values[i];
+		}
+
+		int used[11] = {}; // 11 vectors, cf. shell_default_vulkan.lua
+
+		for (int i = 0; i < 4 && values[i].IsValid(); ++i)
+		{
+			int nrows = 1, ncols = values[i].fComponentCount;
+
+			if (16 == values[i].fComponentCount)
+			{
+				ncols = nrows = 4;
+			}
+
+			int row = GetFirstRow( used, nrows, ncols );
+
+			if (row >= 0)
+			{
+				positions[i].fRow = row;
+				positions[i].fOffset = used[row];
+
+				for (int j = 0; j < nrows; ++j)
+				{
+					used[row + j] += ncols;
+				}
+			}
+
+			else
+			{
+				canUsePushConstants = false;
+
+				break;
+			}
+		}
+
+		std::sort( positions, positions + 4 );
+
+		if (canUsePushConstants)
+		{
+			std::string extra;
+			U32 paddingCount = 0U, lastComponentCount;
+
+			for (int i = 0; i < 4 && positions[i].IsValid(); ++i)
+			{
+				extra += " ";
+
+				if (i > 0 && 0U == positions[i].fOffset)
+				{
+					U32 lastUpTo = positions[i - 1].fOffset + lastComponentCount;
+
+					if (lastUpTo < 4U) // incomplete vector?
+					{
+						const char * padding[] = { "vec3 pad", "vec2 pad" "float pad" };
+
+						extra += padding[lastUpTo - 1];
+						extra += '0' + paddingCount;
+						extra += ";  ";
+
+						++paddingCount;
+					}
+				}
+
+				U32 componentCount = positions[i].fValue->fComponentCount;
+
+				switch (componentCount)
+				{
+				case 16:
+					extra += "mat4 ";
+					break;
+				case 4:
+					extra += "vec4 ";
+					break;
+				case 3:
+					extra += "vec3 ";
+					break;
+				case 2:
+					extra += "vec2 ";
+					break;
+				case 1:
+					extra += "float ";
+					break;
+				default:
+					Rtt_ASSERT_NOT_REACHED();
+				}
+
+				extra += "UserData";
+				extra += '0' + positions[i].fValue->fIndex;
+				extra += ";";
+
+				lastComponentCount = componentCount;
+			}
+
+			if (!vertexDeclarations.empty())
+			{
+				size_t epos = vertexCode.find( "PUSH_CONSTANTS_EXTRA" );
+
+				if (std::string::npos == epos)
+				{
+					// error!
+				}
+
+				vertexCode.insert( epos + sizeof( "PUSH_CONSTANTS_EXTRA" ) - 1, extra );
+
+				vertexExtra = extra.size();
+			}
+
+			if (!fragmentDeclarations.empty())
+			{
+				size_t epos = fragmentCode.find( "PUSH_CONSTANTS_EXTRA" );
+
+				if (std::string::npos == epos)
+				{
+					// error!
+				}
+
+				fragmentCode.insert( epos + sizeof( "PUSH_CONSTANTS_EXTRA" ) - 1, extra );
+
+				fragmentExtra = extra.size();
+
+				fFragmentConstants = true;
+			}
+		}
+
+		else
+		{
+			// do something similar with userDataObject
+		}
+
+		std::string prefix1( "#define u_UserData" ), prefix2( " pc.UserData" );
+
+		for (auto && iter = vertexDeclarations.rbegin(); iter != vertexDeclarations.rend(); ++iter)
+		{
+			const char suffix[] = { '0' + iter->fValue->fIndex, 0 };
+
+			vertexCode.replace( iter->fPosition + vertexExtra, iter->fLength, (prefix1 + suffix) + (prefix2 + suffix) );
+		}
+if (!vertexDeclarations.empty()) CoronaLog( "Vertex code: %s\n\n", vertexCode.c_str() );
+		for (auto && iter = fragmentDeclarations.rbegin(); iter != fragmentDeclarations.rend(); ++iter)
+		{
+			const char suffix[] = { '0' + iter->fValue->fIndex, 0 };
+
+			fragmentCode.replace( iter->fPosition + fragmentExtra, iter->fLength, (prefix1 + suffix) + (prefix2 + suffix) );
+		}
+if (!fragmentDeclarations.empty()) CoronaLog( "Fragment code: %s\n\n", fragmentCode.c_str() );
+		fPushConstantUniforms = true;
+	}
+
+	// Vertex shader.
+	Compile( shaderc_vertex_shader, vertexCode, maps, data.fVertexShader );
+
+	// Fragment shader.
+	Compile( shaderc_fragment_shader, fragmentCode, maps, data.fFragmentShader );
+
 #else
 	// no need to compile, but reflection here...
 #endif
+
 	return maps;
 }
 

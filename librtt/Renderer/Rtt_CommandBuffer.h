@@ -30,13 +30,41 @@ class Uniform;
 
 // ----------------------------------------------------------------------------
 
+// STEVE CHANGE
+class CommandBufferlet {
+	public:
+		typedef CommandBufferlet Self;
+
+		CommandBufferlet();
+		virtual ~CommandBufferlet();
+
+	public:
+		void ReadBytes( void * value, size_t size );
+		void WriteBytes( const void * value, size_t size );
+		void Swap( CommandBufferlet & other );
+
+	protected:
+		U32 GetWritePosition() const { return fBytesUsed; }
+		U8 * GetOffsetFromPosition( U32 pos ) const { return fBuffer + pos; }
+		void SetOffsetFromPosition( U32 pos ) { fOffset = GetOffsetFromPosition( pos ); }
+
+	protected:
+		Rtt_Allocator* fAllocator;
+		U8* fBuffer;
+		U8* fOffset;
+		U32 fNumCommands;
+		U32 fBytesAllocated;
+		U32 fBytesUsed;
+};
+// /STEVE CHANGE
+
 // The CommandBuffer has two primary responsibilities. The first is to provide
 // an abstract interface through which render state may be specified, without
 // knowledge of the underlying rendering API. The second is to facilitate 
 // multithreaded rendering by storing all of the commands (and the data needed
 // by those commands) during a given frame N and then actually executing those
 // commands on frame N + 1.
-class CommandBuffer
+class CommandBuffer : public CommandBufferlet
 {
 	public:
 		typedef CommandBuffer Self;
@@ -88,6 +116,10 @@ class CommandBuffer
 		virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
 		virtual S32 GetCachedParam( CommandBuffer::QueryableParams param ) = 0;
 		
+		// STEVE CHANGE
+		virtual void WillRender() {}
+		// /STEVE CHANGE
+
 		// Execute the generated command buffer. This function should only be
 		// called from a thread with an active rendering context. If requested
 		// (and the platform supports it), this function should return the time
@@ -102,11 +134,13 @@ class CommandBuffer
 
 	protected:
 		Rtt_Allocator* fAllocator;
+/* STEVE CHANGE
 		U8* fBuffer;
 		U8* fOffset;
 		U32 fNumCommands;
 		U32 fBytesAllocated;
 		U32 fBytesUsed;
+/STEVE CHANGE */
 };
 
 // ----------------------------------------------------------------------------

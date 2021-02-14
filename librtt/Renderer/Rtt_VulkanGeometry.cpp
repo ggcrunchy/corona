@@ -130,9 +130,9 @@ VulkanGeometry::Destroy()
 }
 
 void 
-VulkanGeometry::Bind( VulkanRenderer & renderer, VkCommandBuffer commandBuffer )
+VulkanGeometry::Bind( VulkanRenderer & renderer, VkCommandBuffer commandBuffer, bool populate )
 {
-	if (fResource && fResource->GetVerticesUsed())
+	if (populate && fResource && fResource->GetVerticesUsed())
 	{
 		Rtt_ASSERT( fMappedVertices );
 
