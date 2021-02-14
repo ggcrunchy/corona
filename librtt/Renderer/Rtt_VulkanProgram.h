@@ -99,6 +99,9 @@ class VulkanProgram : public GPUResource
 			return fData[version].IsValid();
 		}
 
+		bool HaveFragmentConstants() const { return fFragmentConstants; }
+		bool HavePushConstantUniforms() const { return fPushConstantUniforms; }
+
 	private:
 		// To make custom shader code work seamlessly with masking, multiple
 		// versions of each Program are automatically compiled and linked, 
@@ -158,8 +161,46 @@ class VulkanProgram : public GPUResource
 			Location CheckForUniform( const std::string & key );
 		};
 
+		struct UserdataValue {
+			UserdataValue()
+			:	fComponentCount( 0U ),
+				fStages( 0U )
+			{
+			}
+
+			bool operator < (const UserdataValue & other) const { return fComponentCount > other.fComponentCount; } // process largest-sized elements first
+			bool IsValid() const { return !!fComponentCount; }
+
+			int fIndex;
+			U32 fComponentCount;
+			U32 fStages;
+		};
+
+		struct UserdataDeclaration {
+			UserdataValue * fValue;
+			size_t fPosition;
+			size_t fLength;
+		};
+
+		struct UserdataPosition {
+			UserdataPosition()
+			:	fValue( NULL ),
+				fOffset( 0U ),
+				fRow( ~0U )
+			{
+			}
+
+			bool operator < (const UserdataPosition & other) const { return fRow != other.fRow ? fRow < other.fRow : fOffset < other.fOffset; }
+			bool IsValid() const { return fRow != ~0U; }
+
+			UserdataValue * fValue;
+			U32 fOffset;
+			U32 fRow;
+		};
+
+		void GatherUniformUserdata( bool isVertexSource, std::string & code, UserdataValue values[], std::vector< UserdataDeclaration > & declarations, bool & canUsePushConstants );
 		void ReplaceVaryings( bool isVertexSource, std::string & code, Maps & maps );
-		void Compile( int kind, const char * sources[], int sourceCount, Maps & maps, VkShaderModule & module );
+		void Compile( int kind, std::string & code, Maps & maps, VkShaderModule & module );
 		Maps UpdateShaderSource( Program* program, Program::Version version, VersionData& data );
 
 		static void InitializeCompiler( shaderc_compiler ** compiler, shaderc_compile_options ** options );
@@ -168,6 +209,8 @@ class VulkanProgram : public GPUResource
 		VulkanState * fState;
 		VersionData fData[Program::kNumVersions];
 		CPUResource* fResource;
+		bool fPushConstantUniforms;
+		bool fFragmentConstants;
 
 		static U32 sID;
 

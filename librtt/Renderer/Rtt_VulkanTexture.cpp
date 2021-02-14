@@ -85,9 +85,21 @@ VulkanTexture::Create( CPUResource* resource )
     
 	VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
 
-    bool ok = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    bool ok = true;
+
+    if (texture->IsTarget())
+    {
+        usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    }
+
+    else
+    {
+        usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        ok = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
                                         // ^^ TODO: also non-buffered approach? (suggestions that we should recycle a buffer)
                                         // is it okay to let this go away or should it be backed for a while still?
+    }
 
     if (ok)
     {
@@ -98,7 +110,7 @@ VulkanTexture::Create( CPUResource* resource )
             VK_SAMPLE_COUNT_1_BIT,
             format,
             VK_IMAGE_TILING_OPTIMAL, // might not want if frequently changed?
-            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         );
 
         ok = fData.fImage != VK_NULL_HANDLE;
@@ -259,8 +271,12 @@ VulkanTexture::Load( Texture * texture, VkFormat format, const VulkanBufferData 
     {
         fState->StageData( bufferData.GetMemory(), data, texture->GetSizeInBytes() );
     }
-        
-    if (TransitionImageLayout( fState, fData.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels ))
+
+    VkImageLayout newLayout = texture->IsTarget() ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+    bool ok = TransitionImageLayout( fState, fData.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, newLayout, mipLevels );
+
+    if (ok && !texture->IsTarget())
     {
         CopyBufferToImage( bufferData.GetBuffer(), fData.fImage, texture->GetWidth(), texture->GetHeight() );
 
@@ -284,11 +300,9 @@ VulkanTexture::Load( Texture * texture, VkFormat format, const VulkanBufferData 
         );
 
         fState->EndSingleTimeCommands( commandBuffer );
-
-        return true;
     }
 
-    return false;
+    return ok;
 }
 
 static bool
@@ -318,43 +332,50 @@ VulkanTexture::TransitionImageLayout( VulkanState * state, VkImage image, VkForm
     barrier.oldLayout = oldLayout;
     barrier.newLayout = newLayout;
 
-    VkPipelineStageFlags destinationStage, sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    VkPipelineStageFlags destinationStage, sourceStage;
 
-    if (VK_IMAGE_LAYOUT_UNDEFINED == oldLayout && VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL == newLayout)
+    // TODO: where do we want unstaged writes? (frequent texture updates)
+
+    switch (oldLayout)
     {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+        break;
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+        break;
+    default:
+        Rtt_ASSERT_NOT_IMPLEMENTED();
+    }
+
+    switch (newLayout)
+    {
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    }
-    
-    else if (VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL == oldLayout && VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL == newLayout)
-    {
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        // TODO: where do we want unstaged writes? (frequent texture updates)
-        // maybe oldLayout == undefined and changes like:
-            // srcAccessMask = 0
-            // sourceStage = top of pipe
-    }
-    
-    else if (VK_IMAGE_LAYOUT_UNDEFINED == oldLayout && VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL == newLayout)
-    {
+
+        break;
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
         barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    }
 
-    else if (VK_IMAGE_LAYOUT_UNDEFINED == oldLayout && VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL == newLayout)
-    {
+        break;
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
         barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    }
 
-    else
-    {
-        CoronaLog( "Unsupported layout transition! ");
+        break;
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
-        return false;
+        break;
+
+    default:
+        Rtt_ASSERT_NOT_IMPLEMENTED();
     }
 
     vkCmdPipelineBarrier(

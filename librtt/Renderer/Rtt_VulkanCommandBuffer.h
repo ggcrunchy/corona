@@ -43,7 +43,8 @@ struct alignas(16) VulkanUserData
 
 struct alignas(16) VulkanPushConstants
 {
-	float fData[5 * 4];
+	float fData[5 * 4];	// masks, time, sampler index
+	float fUniforms[11 * 4];// uniform userdata (compact representation, i.e. <= 11 vectors)
 };
 
 // 
@@ -90,6 +91,8 @@ class VulkanCommandBuffer : public CommandBuffer
 		virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type );
 		virtual S32 GetCachedParam( CommandBuffer::QueryableParams param );
 		
+		virtual void WillRender();
+
 		// Execute all buffered commands. A valid OpenGL context must be active.
 		virtual Real Execute( bool measureGPU );
 	
@@ -101,21 +104,23 @@ class VulkanCommandBuffer : public CommandBuffer
 			}
 
 			void Reset();
+			void UseFragmentStage() { stages |= VK_SHADER_STAGE_FRAGMENT_BIT; } // TODO: if using sampler index or "small userdata"...
 			void Write( U32 offset, const void * src, size_t size );
 
 			float * GetData( U32 offset );
 			bool IsValid() const { return lowerOffset <= upperOffset; }
 			U32 Offset() const { return lowerOffset; }
 			U32 Range() const { return IsValid() ? upperOffset - lowerOffset + 4U * sizeof( float ) : 0U; }
+			U32 Stages() const { return stages; }
 
 			U32 lowerOffset;
 			U32 upperOffset;
+			U32 stages;
 		};
 
 	public:
-		VkResult WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain );
+		VkResult WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain, uint32_t & index );
 		VkResult GetExecuteResult() const { return fExecuteResult; }
-		uint32_t GetImageIndex() const { return fImageIndex; }
 		
 		void BeginFrame();
 		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists );
@@ -140,11 +145,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		// command buffer.
 		template <typename T>
 		void Write(T);
-
-	private:
-		U32 GetWritePosition() const { return fBytesUsed; }
-		U8 * GetOffset( U32 pos ) const { return fBuffer + pos; }
-		void SetOffsetPosition( U32 pos ) { fOffset = fBuffer + pos; }
 
 	private:
 		struct UniformUpdate
@@ -196,7 +196,15 @@ class VulkanCommandBuffer : public CommandBuffer
 			U32 fWillJumpTo;
 		};
 
+struct GraphNode2 {
+	enum { kInvalidLocation = ~0U };
+
+	FrameBufferObject * fFBO;
+	U32 fWillJumpTo;
+};
+
 		std::vector< GraphNode > fGraphStack;
+std::vector< GraphNode2 > fGraphStack2;
 		U32 fMostRecentNodeID;
 		U32 fEndedAt;
 		U32 fLeftBeforeRejoin;
@@ -204,7 +212,6 @@ class VulkanCommandBuffer : public CommandBuffer
 //		dynamic uniform buffers - as a list?
 		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;
-		uint32_t fImageIndex;
 };
 
 // ----------------------------------------------------------------------------

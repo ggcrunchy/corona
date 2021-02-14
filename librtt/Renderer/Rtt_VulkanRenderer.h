@@ -74,7 +74,7 @@ struct DescriptorLists {
 	void Wipe( VkDevice device, const VkAllocationCallbacks * allocator );
 
 	static bool IsMaskPushConstant( int index );
-	static bool IsPushConstant( int index );
+	static bool IsPushConstant( int index, bool usePushConstants );
 	static bool IsUserData( int index );
 
 	std::vector< VkDescriptorSet > fSets;

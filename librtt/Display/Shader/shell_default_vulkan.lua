@@ -37,6 +37,8 @@ layout(set = 1, binding = 0) uniform UserDataObject {
 
 layout(set = 2, binding = 0) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3]; // TODO: does this stage need the "+ 3"?
 
+#define PUSH_CONSTANTS_EXTRA
+
 // these may vary per batch, somewhat independently:
 layout(push_constant) uniform PushConstants {
     vec2 MaskTranslation0; // vector #1
@@ -47,6 +49,17 @@ layout(push_constant) uniform PushConstants {
     vec2 MaskTranslation1; // vector #4
     vec2 MaskTranslation2;
     vec2 MaskMatrix2[2]; // vector #5
+
+    PUSH_CONSTANTS_EXTRA
+
+    // TODO: we have at least 3 or 11 more vectors...
+    // Assuming no contrary outlier got overlooked, this will accommodate the uniform userdata demands of all built-in effects.
+    // while lacking full generality, e.g. three or four mat4s would overflow it, these effects are an important common use case.
+    // The idea will be to pick these userdata out from the shader source, sort them by size, then allocate them to slots; if the
+    // packing comes within 11 vectors, proceed. There might also be precompiled shader considerations here.
+    // might pack as say mat4 ExtraMatrices[2]; vec4 ExtraVectors[3];
+    // then alias or expand according to type / offset... no built-in uses a mat3, so disqualifying them should be fine
+    // new TODO: clean this up and decide on a proper home (needs revision in light of lower minimum than I thought)
 } pc;
 
 #define CoronaVertexUserData a_UserData
@@ -58,6 +71,11 @@ layout(push_constant) uniform PushConstants {
 #define CoronaContentScale ubo.ContentScale
 #define u_FillSampler0 u_Samplers[0]
 #define u_FillSampler1 u_Samplers[1]
+
+// some built-ins use these raw names directly:
+#define u_ContentScale CoronaContentScale
+#define u_TexelSize CoronaTexelSize
+#define u_TotalTime CoronaTotalTime
 
 varying P_POSITION vec2 v_Position;
 varying P_UV vec2 v_TexCoord;
@@ -141,6 +159,15 @@ layout(set = 1, binding = 1) uniform UserDataObject {
 
 layout(set = 2, binding = 0) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3];
 
+#define PUSH_CONSTANTS_EXTRA
+
+// cf. vertex
+layout(push_constant) uniform PushConstants {
+    vec4 Unused[5];
+
+    PUSH_CONSTANTS_EXTRA
+} pc;
+
 varying P_POSITION vec2 v_Position;
 varying P_UV vec2 v_TexCoord;
 #ifdef TEX_COORD_Z
@@ -149,7 +176,7 @@ varying P_UV vec2 v_TexCoord;
 
 varying P_COLOR vec4 v_ColorScale;
 varying P_DEFAULT vec4 v_UserData;
-varying P_DEFAULT float v_TotalTime;
+varying P_DEFAULT float v_TotalTime; // TODO? we could actually grab this from the push constants (as well as the sampler index)
 
 #define CoronaColorScale( color ) (v_ColorScale*(color))
 #define CoronaVertexUserData v_UserData
@@ -159,12 +186,17 @@ varying P_DEFAULT float v_TotalTime;
 #define CoronaTexelSize ubo.TexelSize
 #define CoronaContentScale ubo.ContentScale
 
-// TODO: allow for sampler index too...
-
-#define u_FillSampler0 u_Samplers[0] // used by default kernel
+// TODO: allow for sampler index too... see note for v_TotalTime
 
 #define CoronaSampler0 u_Samplers[0]
 #define CoronaSampler1 u_Samplers[1]
+
+// some built-ins use these raw names directly:
+#define u_FillSampler0 CoronaSampler0
+#define u_FillSampler1 CoronaSampler1
+#define u_ContentScale CoronaContentScale
+#define u_TexelSize CoronaTexelSize
+#define u_TotalTime CoronaTotalTime
 
 #if MASK_COUNT > 0
     varying P_UV vec2 v_MaskUV0;
