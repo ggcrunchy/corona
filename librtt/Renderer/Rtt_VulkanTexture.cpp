@@ -115,7 +115,7 @@ VulkanTexture::Create( CPUResource* resource )
 
         ok = fData.fImage != VK_NULL_HANDLE;
 
-        if (ok)
+        if (ok && !texture->isTarget())
         {
             ok = Load( texture, format, bufferData, mipLevels );
         }

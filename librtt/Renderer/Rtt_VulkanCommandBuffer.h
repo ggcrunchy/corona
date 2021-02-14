@@ -147,6 +147,11 @@ class VulkanCommandBuffer : public CommandBuffer
 		void Write(T);
 
 	private:
+		U32 GetWritePosition() const { return fBytesUsed; }
+		U8 * GetOffset( U32 pos ) const { return fBuffer + pos; }
+		void SetOffsetPosition( U32 pos ) { fOffset = GetOffset( pos ); }
+
+	private:
 		struct UniformUpdate
 		{
 			Uniform* uniform;
