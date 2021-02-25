@@ -23,9 +23,10 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-// STEVE CHANGE
-CommandBufferlet::CommandBufferlet()
-:	fBuffer( NULL ), 
+
+CommandBuffer::CommandBuffer( Rtt_Allocator* allocator )
+:	fAllocator( allocator ),
+	fBuffer( NULL ), 
 	fOffset( NULL ), 
 	fNumCommands( 0 ), 
 	fBytesAllocated( 0 ), 
@@ -33,7 +34,7 @@ CommandBufferlet::CommandBufferlet()
 {
 }
 
-CommandBufferlet::~CommandBufferlet()
+CommandBuffer::~CommandBuffer()
 {
     if (fBuffer != NULL)
     {
@@ -41,8 +42,9 @@ CommandBufferlet::~CommandBufferlet()
     }
 }
 
+// STEVE CHANGE
 void
-CommandBufferlet::ReadBytes( void * value, size_t size )
+CommandBuffer::ReadBytes( void * value, size_t size )
 {
 	Rtt_ASSERT( fOffset < fBuffer + fBytesAllocated );
 	memcpy( value, fOffset, size );
@@ -50,7 +52,7 @@ CommandBufferlet::ReadBytes( void * value, size_t size )
 }
 
 void
-CommandBufferlet::WriteBytes( const void * value, size_t size )
+CommandBuffer::WriteBytes( const void * value, size_t size )
 {
 	U32 bytesNeeded = fBytesUsed + size;
 	if( bytesNeeded > fBytesAllocated )
@@ -69,43 +71,7 @@ CommandBufferlet::WriteBytes( const void * value, size_t size )
 	memcpy( fBuffer + fBytesUsed, value, size );
 	fBytesUsed += size;
 }
-
-void
-CommandBufferlet::Swap( CommandBufferlet & other )
-{
-	CommandBufferlet temp = other;
-
-	other = *this;
-	*this = temp;
-
-	temp.fBuffer = NULL; // since destructor calls delete
-}
 // /STEVE CHANGE
-
-CommandBuffer::CommandBuffer( Rtt_Allocator* allocator )
-:	CommandBufferlet(), // <- STEVE CHANGE
-	fAllocator( allocator )
-// STEVE CHANGE
-/*	fBuffer( NULL ), 
-	fOffset( NULL ), 
-	fNumCommands( 0 ), 
-	fBytesAllocated( 0 ), 
-	fBytesUsed( 0 )*/
-// /STEVE CHANGE
-{
-}
-
-CommandBuffer::~CommandBuffer()
-{
-// STEVE CHANGE
-/*
-    if (fBuffer != NULL)
-    {
-        delete [] fBuffer;
-    }
-*/
-// /STEVE CHANGE
-}
 
 // ----------------------------------------------------------------------------
 

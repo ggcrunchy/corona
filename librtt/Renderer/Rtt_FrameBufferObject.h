@@ -29,12 +29,17 @@ class FrameBufferObject : public CPUResource
 		typedef FrameBufferObject Self;
 
 	public:
-		FrameBufferObject( Rtt_Allocator* allocator, Texture* texture );
+		FrameBufferObject( Rtt_Allocator* allocator, Texture* texture, bool mustClear = true ); // <- STEVE CHANGE
 		virtual ResourceType GetType() const;
 		Texture* GetTexture() const;
-		
+	// STEVE CHANGE
+		bool GetMustClear() const { return fMustClear; }
+	// /STEVE CHANGE
 	private:
 		Texture* fTexture;
+	// STEVE CHANGE
+		bool fMustClear;
+	// /STEVE CHANGE
 };
 
 // ----------------------------------------------------------------------------

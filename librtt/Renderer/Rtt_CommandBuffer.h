@@ -30,33 +30,6 @@ class Uniform;
 
 // ----------------------------------------------------------------------------
 
-// STEVE CHANGE
-class CommandBufferlet {
-	public:
-		typedef CommandBufferlet Self;
-
-		CommandBufferlet();
-		virtual ~CommandBufferlet();
-
-	public:
-		void ReadBytes( void * value, size_t size );
-		void WriteBytes( const void * value, size_t size );
-		void Swap( CommandBufferlet & other );
-
-	protected:
-		U32 GetWritePosition() const { return fBytesUsed; }
-		U8 * GetOffsetFromPosition( U32 pos ) const { return fBuffer + pos; }
-		void SetOffsetFromPosition( U32 pos ) { fOffset = GetOffsetFromPosition( pos ); }
-
-	protected:
-		Rtt_Allocator* fAllocator;
-		U8* fBuffer;
-		U8* fOffset;
-		U32 fNumCommands;
-		U32 fBytesAllocated;
-		U32 fBytesUsed;
-};
-// /STEVE CHANGE
 
 // The CommandBuffer has two primary responsibilities. The first is to provide
 // an abstract interface through which render state may be specified, without
@@ -64,7 +37,7 @@ class CommandBufferlet {
 // multithreaded rendering by storing all of the commands (and the data needed
 // by those commands) during a given frame N and then actually executing those
 // commands on frame N + 1.
-class CommandBuffer : public CommandBufferlet
+class CommandBuffer
 {
 	public:
 		typedef CommandBuffer Self;
@@ -75,7 +48,11 @@ class CommandBuffer : public CommandBufferlet
 			kNumQueryableParams,
 		}
 		QueryableParams;
-		
+	
+	public:
+		void ReadBytes( void * value, size_t size );
+		void WriteBytes( const void * value, size_t size );
+
 	public:
 		static size_t GetMaxVertexTextureUnits();
 		static size_t GetMaxTextureSize();
@@ -134,13 +111,11 @@ class CommandBuffer : public CommandBufferlet
 
 	protected:
 		Rtt_Allocator* fAllocator;
-/* STEVE CHANGE
 		U8* fBuffer;
 		U8* fOffset;
 		U32 fNumCommands;
 		U32 fBytesAllocated;
 		U32 fBytesUsed;
-/STEVE CHANGE */
 };
 
 // ----------------------------------------------------------------------------
