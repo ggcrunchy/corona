@@ -19,9 +19,12 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-FrameBufferObject::FrameBufferObject( Rtt_Allocator* allocator, Texture* texture )
+FrameBufferObject::FrameBufferObject( Rtt_Allocator* allocator, Texture* texture, bool mustClear ) // <- STEVE CHANGE
 :	CPUResource( allocator ),
-	fTexture( texture )
+	fTexture( texture ),
+// STEVE CHANGE
+	fMustClear( mustClear )
+// /STEVE CHANGE
 {
 	// STEVE CHANGE
 	fTexture->SetTarget( true );

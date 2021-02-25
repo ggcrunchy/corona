@@ -32,9 +32,9 @@ namespace /*anonymous*/
 		kCommandBindImageIndex,
 		kCommandBindFrameBufferObject,
 		kCommandUnBindFrameBufferObject,
-		kCommandJumpToOffset,
 		kCommandBeginRenderPass,
 		kCommandBindGeometry,
+		kCommandFetchGeometry,
 		kCommandBindTexture,
 		kCommandBindProgram,
 		kCommandApplyPushConstantScalar,
@@ -141,6 +141,7 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fProgram( NULL ),
 	fDefaultFBO( NULL ),
 	fTimeTransform( NULL ),
+	fCurrentGeometry( NULL ),
 //	fTimerQueries( new U32[kTimerQueryCount] ),
 //	fTimerQueryIndex( 0 ),
 	fElapsedTimeGPU( 0.0f ),
@@ -280,175 +281,84 @@ VulkanCommandBuffer::PrepareTexturesPool( VulkanState * state )
 	return fLists[DescriptorLists::kTexture].AddPool( state, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorCount, arrayCount );
 }
 
-U32
-VulkanCommandBuffer::JumpInstructionStub()
-{
-	WRITE_COMMAND( kCommandJumpToOffset );
-
-	U32 instructionPosition = GetWritePosition();
-
-	Write<U32>(GraphNode::kInvalidLocation);
-
-	return instructionPosition;
-}
-
-void
-VulkanCommandBuffer::PatchJumpInstructionStub( U32 instructionPosition )
-{
-	Rtt_ASSERT( fBuffer );
-
-	U32 destination = GetWritePosition();
-
-	memcpy( GetOffsetFromPosition( instructionPosition ), &destination, sizeof( U32 ) );
-}
-
 void
 VulkanCommandBuffer::PopFrameBufferObject()
 {
 	WRITE_COMMAND( kCommandUnBindFrameBufferObject );
 
-	const GraphNode & cell = fGraphStack.back();
+	FBONode back = fFBOStack.back();
 
-    if (cell.fLeftLowerLevel != GraphNode::kInvalidLocation) // 'nested' jump, cf. PushFrameBufferObject
+	fFBOStack.pop_back();
+
+	if (!fFBOStack.empty())
 	{
-		PatchJumpInstructionStub( cell.fLeftLowerLevel );
+		OffscreenNode entry;
 
-		fLeftBeforeRejoin = cell.fLeftLowerLevel;
-		fRejoinedStackBefore = GetWritePosition();
+		entry.fBuffer = fBuffer;
+		entry.fBytesAllocated = fBytesAllocated;
+		entry.fNumCommands = fNumCommands;
 
-		// examples in the diagram below: I -> H, H -> G, G -> D, J -> E, L -> K, K -> F, M -> F, N -> F
+		fOffscreenSequence.push_back( entry );
+
+		fBuffer = back.fOldBuffer;
+		fBytesAllocated = back.fOldBytesAllocated;
+		fBytesUsed = back.fOldBytesUsed;
+		fNumCommands = back.fOldNumCommands;
 	}
 
-    if (cell.fWillJumpTo != GraphNode::kInvalidLocation) // parent as predecessor, cf. PushFrameBufferObject
+	Rtt_ASSERT( fGeometryStack.size() == fFBOStack.size() );
+
+	if (!fGeometryStack.empty())
 	{
-		WRITE_COMMAND( kCommandJumpToOffset );
-		Write<U32>(cell.fWillJumpTo);
+		Geometry * old = fGeometryStack.back();
+
+		if (old != fCurrentGeometry)
+		{
+			WRITE_COMMAND( kCommandFetchGeometry );
+
+			Write< GPUResource * >( old->GetGPUResource() );
+
+			fCurrentGeometry = old;
+		}
+
+		fGeometryStack.pop_back();
 	}
-
-	if (cell.fID == fMostRecentNodeID) // never interrupted by a nested framebuffer? TODO: is this only relevant if this buffer was itself nested?
-	{
-		Rtt_ASSERT( GraphNode::kInvalidLocation == cell.fWillJumpTo );
-
-		fEndedAt = JumpInstructionStub(); // a top-level node must point ahead, but the swath it represents might not be contiguous with the one that follows
-	}
-
-	fGraphStack.pop_back();
 }
 
 void
 VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 {
-	bool nested = !fGraphStack.empty();
+	FBONode node;
 
-	fGraphStack.push_back( GraphNode() );
+	node.fOldBytesAllocated = fBytesAllocated;
+	node.fOldBytesUsed = fBytesUsed;
+	node.fOldNumCommands = fNumCommands;
+	node.fOldBuffer = fBuffer;
+	node.fFBO = fbo;
 
-	GraphNode & newNode = fGraphStack.back();
-
-	if (nested)
+	if (!fFBOStack.empty())
 	{
-		bool didAnythingOnLowerLevel = fRejoinedStackBefore != GetWritePosition();
-
-		if (didAnythingOnLowerLevel)
-		{
-			newNode.fLeftLowerLevel = JumpInstructionStub(); // the parent must skip these nested instructions; we only discover where they end, however, once this node is popped
-
-			// examples in the diagram below: D -> G, G -> H, H -> I, E -> J, F -> K, K -> L, F -> M
-		}
-
-		else
-		{
-			newNode.fLeftLowerLevel = fLeftBeforeRejoin; // as with true branch, but revise the jump instruction emitted by the first of the contiguous swaths
-
-			// examples in the diagram below: M -> N
-		}
+		fBytesAllocated = 0U;
+		fBytesUsed = 0U;
+		fNumCommands = 0U;
+		fBuffer = NULL;
 	}
 
-	newNode.fFBO = fbo;
-
-	// If this swath is its parent's first child, the parent node will be its predecessor.
-	if (GraphNode::kInvalidLocation == fEndedAt)
-	{
-		Rtt_ASSERT( nested );
-
-		GraphNode & parent = fGraphStack[fGraphStack.size() - 2U];
-
-		Rtt_ASSERT( parent.fID == fMostRecentNodeID );
-
-		parent.fWillJumpTo = GetWritePosition(); // the parent has not ended yet, but will point back here
-												 // n.b. this will be after the stub, if we left one earlier
-
-		// examples in the diagram below: D -> G, G -> H, H -> I, E -> J, F -> K, K -> L
-	}
-
-	else // Otherwise, we are either a later child, or moved to a lower level.
-	if (fEndedAt > 0U && fEndedAt != GetWritePosition()) // the two swaths might blend together, making a jump pointless (TODO: verify this for child swaths)
-	{
-		PatchJumpInstructionStub( fEndedAt );
-
-		// examples in the diagram below: I -> E, J -> F, L -> M
-	}
+	fFBOStack.push_back( node );
 
 	WRITE_COMMAND( kCommandBindFrameBufferObject );
-	Write<GPUResource*>( fbo->GetGPUResource() );
 
-	++fMostRecentNodeID;
-
-	newNode.fID = fMostRecentNodeID;
-
-	fEndedAt = GraphNode::kInvalidLocation;
-	fLeftBeforeRejoin = GraphNode::kInvalidLocation;
-	fRejoinedStackBefore = GraphNode::kInvalidLocation;
+	Write< GPUResource * >( fbo->GetGPUResource() );
 }
 
 void
 VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 {
-
-	// The goal of the graph stack itself, and the logic that follows, is to unravel nested framebuffers and put them into a flattened
-	// representation, one that works just as well for sequential buffers. This assumes the current GL semantics, that invalidates will
-	// happen at the end of the frame, so the natural arrangement has child buffers show up later.
-	//
-	// Take the following example. Each framebuffer has a label, in this case alphabetically from A to M. The diagram below represents
-	// a stream of instructions, where a given label means the corresponding buffer is potentially active in that bit of the stream;
-	// nested buffers are shown above their parents.
-
-    //                             III                     
-    //                            HHHHHH                    LLLL
-    //                         GGGGGGGGGGGGG        JJJ   KKKKKKK  MMMNNNN
-    // AAAAAABBBBBBBCCCCCCCCCDDDDDDDDDDDDDDDDDDDDEEEEEEEFFFFFFFFFFFFFFFFFFFFF
-    //     ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^
-    //     5   10   15   20   25   30   35   40   45   50   55   60   65   70
-
-	// This becomes:
-
-    // AAAAAA * BBBBBBB * CCCCCCCCC * DD------------>DDDDD => GGG----->GGGG => H-->HH => III => EEE-->E => JJJ => FF------>FF-->FF => KK--->K => LLLL => MMM * NNNN
-
-	// Each letter represents one instruction belonging to a framebuffer. Adjacent swaths of instructions are separated with asterisk '*',
-	// whereas a fat arrow ('=>') means we must do a jump. A thin arrow (string of '-' characters ending with a '>') denotes another sort
-	// of jump, with length #dashes + 1, past a nested buffer.
-	//
-	// The flattened result has the following control flow:
-	//
-	// A: 1-6
-	// B: 7-13
-	// C: 14-22
-	// D: 23-24, 38-42
-	// G: 25-27, 34-37
-	// H: 28, 32-33
-	// I: 29-31
-	// E: 43-45, 49
-	// J: 46-48
-	// F: 50-51, 59-60, 68-70
-	// K: 52-53, 58
-	// L: 54-57
-	// M: 61-63
-	// N: 64-67
-
-	size_t height = fGraphStack.size();
+	size_t height = fFBOStack.size();
 
 	if (
 		NULL == fbo || // done with un-nested framebuffer?
-		(height >= 2U && fbo == fGraphStack[height - 2U].fFBO) // was this the previous framebuffer?
+		(height >= 2U && fbo == fFBOStack[height - 2U].fFBO) // was this the previous framebuffer?
 	)
 	{
 		PopFrameBufferObject();
@@ -465,6 +375,8 @@ VulkanCommandBuffer::BindGeometry( Geometry* geometry )
 {
 	WRITE_COMMAND( kCommandBindGeometry );
 	Write<GPUResource*>( geometry->GetGPUResource() );
+
+	fCurrentGeometry = geometry;
 }
 
 void 
@@ -715,12 +627,31 @@ VulkanCommandBuffer::GetCachedParam( CommandBuffer::QueryableParams param )
 void
 VulkanCommandBuffer::WillRender()
 {
+//	Rtt_ASSERT( fCurrentGeometry );
+
+	if (fFBOStack.size() > 1U)
+	{
+	//	Rtt_ASSERT( fGeometryStack.size() == fFBOStack.size() );
+
+		fGeometryStack.push_back( fCurrentGeometry );
+
+		if (fCurrentGeometry)
+		{
+			WRITE_COMMAND( kCommandFetchGeometry );
+
+			Write< GPUResource * >( fCurrentGeometry->GetGPUResource() );
+		}
+	}
+
 	WRITE_COMMAND( kCommandBeginRenderPass );
 }
 
 Real 
 VulkanCommandBuffer::Execute( bool measureGPU )
 {
+	Rtt_ASSERT( fFBOStack.empty() );
+	Rtt_ASSERT( fGeometryStack.empty() );
+
 	DEBUG_PRINT( "--Begin Rendering: VulkanCommandBuffer --" );
 
 	InitializeFBO();
@@ -748,6 +679,9 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	//	glEndQuery( GL_TIME_ELAPSED );
 	}
 #endif
+	U8 * savedBuffer = fBuffer;
+	U32 savedBytesAllocated = 0U;
+
 	// Reset the offset pointer to the start of the buffer.
 	// This is safe to do here, as preparation work is done
 	// on another CommandBuffer while this one is executing.
@@ -772,339 +706,227 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	fLists[DescriptorLists::kUniforms].SetWorkspace( &uniforms );
 	fLists[DescriptorLists::kUserData].SetWorkspace( &userData );
 
+	U32 numPasses = 1U + fOffscreenSequence.size();
+
 	if (VK_NULL_HANDLE == fCommandBuffer)
 	{
-		fNumCommands = 0U;
+		numPasses = 0U;
 	}
 
-	VulkanGeometry * geometry = NULL;
-	VulkanFrameBufferObject * ffbo = NULL;
 	uint32_t imageIndex = ~0U;
 
-	for( U32 i = 0; i < fNumCommands; ++i )
+	for ( U32 pass = 0; pass < numPasses; ++pass )
 	{
-		Command command = Read<Command>();
-
-// printf( "GLCommandBuffer::Execute [%d/%d] %d\n", i, fNumCommands, command );
-		Rtt_ASSERT( command < kNumCommands );
-		switch( command )
+		if (pass > 0)
 		{
-			case kCommandBindImageIndex:
+			if (!savedBytesAllocated)
 			{
-				imageIndex = Read<uint32_t>();
-
-				DEBUG_PRINT( "Image index %i", imageIndex );
-				CHECK_ERROR_AND_BREAK;
+				savedBytesAllocated = fBytesAllocated;
 			}
-			case kCommandBindFrameBufferObject:
-			{
-				VulkanFrameBufferObject * fbo = Read<VulkanFrameBufferObject*>();
-				ffbo = fbo;
-				fbo->Bind( fRenderer, imageIndex, renderPassBeginInfo );
 
-				clearValues.clear();
+			OffscreenNode & current = fOffscreenSequence[pass - 1];
+
+			fBuffer = fOffset = current.fBuffer;
+			fBytesAllocated = current.fBytesAllocated;
+			fNumCommands = current.fNumCommands;
+		}
+
+		VulkanGeometry * geometry = NULL;
+		VulkanFrameBufferObject * fbo = NULL;
+
+		for( U32 i = 0; i < fNumCommands; ++i )
+		{
+			Command command = Read<Command>();
+
+	// printf( "GLCommandBuffer::Execute [%d/%d] %d\n", i, fNumCommands, command );
+			Rtt_ASSERT( command < kNumCommands );
+			switch( command )
+			{
+				case kCommandBindImageIndex:
+				{
+					imageIndex = Read<uint32_t>();
+
+					DEBUG_PRINT( "Image index %i", imageIndex );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandBindFrameBufferObject:
+				{
+					fbo = Read<VulkanFrameBufferObject*>();
+
+					clearValues.clear();
 				
-				DEBUG_PRINT( "Bind FrameBufferObject" );/*: Vulkan ID=%" PRIx64 ", Vulkan Texture ID, if any: %" PRIx64,
-								fbo->,
-								fbo->GetTextureName() );*/
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandUnBindFrameBufferObject:
-			{
-				Rtt_ASSERT( renderPassBeginInfo.renderPass );
-
-				vkCmdEndRenderPass( fCommandBuffer );
-
-				renderPassBeginInfo.renderPass = VK_NULL_HANDLE;
-
-				DEBUG_PRINT( "Unbind FrameBufferObject: Vulkan name: %p (fDefaultFBO)", fDefaultFBO );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandJumpToOffset:
-			{
-				U32 pos = Read<U32>();
-				if (pos != GraphNode::kInvalidLocation)
-				{
-					SetOffsetFromPosition(pos);
-					DEBUG_PRINT( "Jump to offset: %i", pos );
+					DEBUG_PRINT( "Bind FrameBufferObject, %p", fbo );/*: Vulkan ID=%" PRIx64 ", Vulkan Texture ID, if any: %" PRIx64,
+									fbo->,
+									fbo->GetTextureName() );*/
+					CHECK_ERROR_AND_BREAK;
 				}
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandBeginRenderPass:
-			{
-				renderPassBeginInfo.clearValueCount = clearValues.size();
-				renderPassBeginInfo.pClearValues = clearValues.data();
+				case kCommandUnBindFrameBufferObject:
+				{
+					Rtt_ASSERT( renderPassBeginInfo.renderPass );
+
+					vkCmdEndRenderPass( fCommandBuffer );
+
+					renderPassBeginInfo.renderPass = VK_NULL_HANDLE;
+
+					DEBUG_PRINT( "Unbind FrameBufferObject: Vulkan name: %p (fDefaultFBO)", fDefaultFBO );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandBeginRenderPass:
+				{
+					Rtt_ASSERT( fbo );
+
+					uint32_t index = 0 == pass ? imageIndex : clearValues.empty();	// with the swapchain, choose the appropriate image; else use the buffer / pass
+																					// for the desired clear behavior
+
+					fbo->Bind( fRenderer, index, renderPassBeginInfo );
+
+					renderPassBeginInfo.clearValueCount = clearValues.size();
+					renderPassBeginInfo.pClearValues = clearValues.data();
 		
-				vkCmdBeginRenderPass( fCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
-				vkCmdSetViewport( fCommandBuffer, 0U, 1U, &viewport );
-				vkCmdSetScissor( fCommandBuffer, 0U, 1U, &renderPassBeginInfo.renderArea );
+					vkCmdBeginRenderPass( fCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
+					vkCmdSetViewport( fCommandBuffer, 0U, 1U, &viewport );
+					vkCmdSetScissor( fCommandBuffer, 0U, 1U, &renderPassBeginInfo.renderArea );
 
-				if (geometry)
-				{
-					geometry->Bind( fRenderer, fCommandBuffer, false );
-				}
-				DEBUG_PRINT( "BEGIN RENDER PASS " );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandBindGeometry:
-			{
-			//	VulkanGeometry* 
-				geometry = Read<VulkanGeometry*>();
-				geometry->Bind( fRenderer, fCommandBuffer, true );
-				DEBUG_PRINT( "Bind Geometry %p", geometry );
-				CHECK_ERROR_AND_BREAK;
+					if (geometry)
+					{
+						geometry->Bind( fRenderer, fCommandBuffer, false );
+					}
 
-			}
-			case kCommandBindTexture:
-			{
-				U32 unit = Read<U32>();
-				VulkanTexture* texture = Read<VulkanTexture*>();
-				texture->Bind( fLists[DescriptorLists::kTexture], descriptorImageInfo[unit] );
+					DEBUG_PRINT( "BEGIN RENDER PASS " );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandBindGeometry:
+				{
+					geometry = Read<VulkanGeometry*>();
+					geometry->Bind( fRenderer, fCommandBuffer, true );
+					DEBUG_PRINT( "Bind Geometry %p", geometry );
+					CHECK_ERROR_AND_BREAK;
 
-				DEBUG_PRINT( "Bind Texture: texture=%p unit=%i Vulkan ID=%" PRIx64,
-								texture,
-								unit,
-								texture->GetImage() );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandBindProgram:
-			{
-				fCurrentDrawVersion = Read<Program::Version>();
-				VulkanProgram* program = Read<VulkanProgram*>();
-				program->Bind( fRenderer, fCurrentDrawVersion );
+				}
+				case kCommandFetchGeometry:
+				{
+					/*geometry = */Read<VulkanGeometry*>();
+					DEBUG_PRINT( "Fetch Geometry %p", geometry );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandBindTexture:
+				{
+					U32 unit = Read<U32>();
+					VulkanTexture* texture = Read<VulkanTexture*>();
+					texture->Bind( fLists[DescriptorLists::kTexture], descriptorImageInfo[unit] );
 
-				if (program->HaveFragmentConstants() && Program::Version::kWireframe != fCurrentDrawVersion)
-				{
-					pushConstants.UseFragmentStage();
+					DEBUG_PRINT( "Bind Texture: texture=%p unit=%i Vulkan ID=%" PRIx64,
+									texture,
+									unit,
+									texture->GetImage() );
+					CHECK_ERROR_AND_BREAK;
 				}
+				case kCommandBindProgram:
+				{
+					fCurrentDrawVersion = Read<Program::Version>();
+					VulkanProgram* program = Read<VulkanProgram*>();
+					program->Bind( fRenderer, fCurrentDrawVersion );
 
-				DEBUG_PRINT( "Bind Program: program=%p version=%i", program, fCurrentDrawVersion );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantScalar:
-			{
-				U32 offset = Read<U32>();
-				Real value = Read<Real>();
-				pushConstants.Write( offset, &value, sizeof( Real ) );
-				DEBUG_PRINT( "Set Push Constant: value=%f location=%i", value, offset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantVec2:
-			{
-				U32 offset = Read<U32>();
-				Vec2 value = Read<Vec2>();
-				pushConstants.Write( offset, &value, sizeof( Vec2 ) );
-				DEBUG_PRINT( "Set Push Constant: value=(%f, %f) location=%i", value.data[0], value.data[1], offset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantVec3:
-			{
-				U32 offset = Read<U32>();
-				Vec3 value = Read<Vec3>();
-				pushConstants.Write( offset, &value, sizeof( Vec3 ) );
-				DEBUG_PRINT( "Set Push Constant: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], offset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantVec4:
-			{
-				U32 offset = Read<U32>();
-				Vec4 value = Read<Vec4>();
-				pushConstants.Write( offset, &value, sizeof( Vec4 ) );
-				DEBUG_PRINT( "Set Push Constant: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], offset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantMat4:
-			{
-				U32 offset = Read<U32>();
-				Mat4 value = Read<Mat4>();
-				pushConstants.Write( offset, &value, sizeof( Mat4 ) );
-				DEBUG_PRINT_MATRIX( "Set Push Constant: value=", value.data, 16 );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantMaskTransform:
-			{
-				U32 maskOffset = Read<U32>();
-				Vec4 maskMatrix = Read<Vec4>();
-				U32 translationOffset = Read<U32>();
-				Vec2 maskTranslation = Read<Vec2>();
-				pushConstants.Write( maskOffset, &maskMatrix, sizeof( Vec4 ));
-				pushConstants.Write( translationOffset, &maskTranslation, sizeof( Vec2 ) );
-				DEBUG_PRINT( "Set Push Constant, mask matrix: value=(%f, %f, %f, %f) location=%i", maskMatrix.data[0], maskMatrix.data[1], maskMatrix.data[2], maskMatrix.data[3], maskOffset );
-				DEBUG_PRINT( "Set Push Constant, mask translation: value=(%f, %f) location=%i", maskTranslation.data[0], maskTranslation.data[1], translationOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformScalar:
-			{
-				READ_UNIFORM_DATA( Real );
-				U32 index = Read<U32>();
-				U8 * data = PointToUniform( index, location.fOffset );
-				memcpy( data, &value, sizeof( Real ) );
-				DEBUG_PRINT( "Set Uniform: value=%f location=%i", value, location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformVec2:
-			{
-				READ_UNIFORM_DATA( Vec2 );
-				U32 index = Read<U32>();
-				U8 * data = PointToUniform( index, location.fOffset );
-				memcpy( data, &value, sizeof( Vec2 ) );
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f) location=%i", value.data[0], value.data[1], location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformVec3:
-			{
-				READ_UNIFORM_DATA( Vec3 );
-				U32 index = Read<U32>();
-				U8 * data = PointToUniform( index, location.fOffset );
-				memcpy( data, &value, sizeof( Vec3 ) );
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformVec4:
-			{
-				READ_UNIFORM_DATA( Vec4 );
-				U32 index = Read<U32>();
-				U8 * data = PointToUniform( index, location.fOffset );
-				memcpy( data, &value, sizeof( Vec4 ) );
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformMat3:
-			{
-				READ_UNIFORM_DATA( Mat3 );
-				U32 index = Read<U32>();
-				U8 * data = PointToUniform( index, location.fOffset );
-				for (int i = 0; i < 3; ++i)
-				{
-					memcpy( data, &value.data[i * 3], sizeof( Vec3 ) );
+					if (program->HaveFragmentConstants() && Program::Version::kWireframe != fCurrentDrawVersion)
+					{
+						pushConstants.UseFragmentStage();
+					}
 
-					data += sizeof( float ) * 4;
+					DEBUG_PRINT( "Bind Program: program=%p version=%i", program, fCurrentDrawVersion );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 9 );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformMat4:
-			{
-				READ_UNIFORM_DATA( Mat4 );
-				U32 index = Read<U32>();
-				U8 * data = PointToUniform( index, location.fOffset );
-				memcpy( data, &value, sizeof( Mat4 ) );
-				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantFromPointerScalar:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Real );
-				if (location.IsValid())
+				case kCommandApplyPushConstantScalar:
 				{
-					pushConstants.Write( location.fOffset, &value, sizeof( Real ) );
+					U32 offset = Read<U32>();
+					Real value = Read<Real>();
+					pushConstants.Write( offset, &value, sizeof( Real ) );
+					DEBUG_PRINT( "Set Push Constant: value=%f location=%i", value, offset );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT( "Set Push Constant: value=%f location=%i", value, location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantFromPointerVec2:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Vec2 );
-				if (location.IsValid())
+				case kCommandApplyPushConstantVec2:
 				{
-					pushConstants.Write( location.fOffset, &value, sizeof( Vec2 ) );
+					U32 offset = Read<U32>();
+					Vec2 value = Read<Vec2>();
+					pushConstants.Write( offset, &value, sizeof( Vec2 ) );
+					DEBUG_PRINT( "Set Push Constant: value=(%f, %f) location=%i", value.data[0], value.data[1], offset );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT( "Set Push Constant: value=(%f, %f) location=%i", value.data[0], value.data[1], location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantFromPointerVec3:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Vec3 );
-				if (location.IsValid())
+				case kCommandApplyPushConstantVec3:
 				{
-					pushConstants.Write( location.fOffset, &value, sizeof( Vec3 ) );
+					U32 offset = Read<U32>();
+					Vec3 value = Read<Vec3>();
+					pushConstants.Write( offset, &value, sizeof( Vec3 ) );
+					DEBUG_PRINT( "Set Push Constant: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], offset );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT( "Set Push Constant: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantFromPointerVec4:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Vec4 );
-				if (location.IsValid())
+				case kCommandApplyPushConstantVec4:
 				{
-					pushConstants.Write( location.fOffset, &value, sizeof( Vec4 ) );
+					U32 offset = Read<U32>();
+					Vec4 value = Read<Vec4>();
+					pushConstants.Write( offset, &value, sizeof( Vec4 ) );
+					DEBUG_PRINT( "Set Push Constant: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], offset );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT( "Set Push Constant: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantFromPointerMat4:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Mat4 );
-				if (location.IsValid())
+				case kCommandApplyPushConstantMat4:
 				{
-					pushConstants.Write( location.fOffset, &value, sizeof( Mat4 ) );
+					U32 offset = Read<U32>();
+					Mat4 value = Read<Mat4>();
+					pushConstants.Write( offset, &value, sizeof( Mat4 ) );
+					DEBUG_PRINT_MATRIX( "Set Push Constant: value=", value.data, 16 );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT_MATRIX( "Set Push Constant: value=", value.data, 16 );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyPushConstantFromPointerMaskTransform:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Vec4 );
-				VulkanProgram::Location translationLocation = program->GetTranslationLocation( Uniform::kViewProjectionMatrix + index, fCurrentDrawVersion );
-				Vec2 maskTranslation = Read<Vec2>();
-				if (location.IsValid())
+				case kCommandApplyPushConstantMaskTransform:
 				{
-					pushConstants.Write( location.fOffset, &value, sizeof( Vec4 ));
-					pushConstants.Write( translationLocation.fOffset, &maskTranslation, sizeof( Vec2 ) );
+					U32 maskOffset = Read<U32>();
+					Vec4 maskMatrix = Read<Vec4>();
+					U32 translationOffset = Read<U32>();
+					Vec2 maskTranslation = Read<Vec2>();
+					pushConstants.Write( maskOffset, &maskMatrix, sizeof( Vec4 ));
+					pushConstants.Write( translationOffset, &maskTranslation, sizeof( Vec2 ) );
+					DEBUG_PRINT( "Set Push Constant, mask matrix: value=(%f, %f, %f, %f) location=%i", maskMatrix.data[0], maskMatrix.data[1], maskMatrix.data[2], maskMatrix.data[3], maskOffset );
+					DEBUG_PRINT( "Set Push Constant, mask translation: value=(%f, %f) location=%i", maskTranslation.data[0], maskTranslation.data[1], translationOffset );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT( "Set Push Constant, mask matrix: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
-				DEBUG_PRINT( "Set Push Constant, mask translation: value=(%f, %f) location=%i", maskTranslation.data[0], maskTranslation.data[1], translationLocation.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformFromPointerScalar:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Real );
-				if (location.IsValid())
+				case kCommandApplyUniformScalar:
 				{
+					READ_UNIFORM_DATA( Real );
+					U32 index = Read<U32>();
 					U8 * data = PointToUniform( index, location.fOffset );
 					memcpy( data, &value, sizeof( Real ) );
+					DEBUG_PRINT( "Set Uniform: value=%f location=%i", value, location.fOffset );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT( "Set Uniform: value=%f location=%i", value, location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformFromPointerVec2:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Vec2 );
-				if (location.IsValid())
+				case kCommandApplyUniformVec2:
 				{
+					READ_UNIFORM_DATA( Vec2 );
+					U32 index = Read<U32>();
 					U8 * data = PointToUniform( index, location.fOffset );
 					memcpy( data, &value, sizeof( Vec2 ) );
+					DEBUG_PRINT( "Set Uniform: value=(%f, %f) location=%i", value.data[0], value.data[1], location.fOffset );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f) location=%i", value.data[0], value.data[1], location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformFromPointerVec3:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Vec3 );
-				if (location.IsValid())
+				case kCommandApplyUniformVec3:
 				{
+					READ_UNIFORM_DATA( Vec3 );
+					U32 index = Read<U32>();
 					U8 * data = PointToUniform( index, location.fOffset );
 					memcpy( data, &value, sizeof( Vec3 ) );
+					DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location.fOffset );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformFromPointerVec4:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Vec4 );
-				if (location.IsValid())
+				case kCommandApplyUniformVec4:
 				{
+					READ_UNIFORM_DATA( Vec4 );
+					U32 index = Read<U32>();
 					U8 * data = PointToUniform( index, location.fOffset );
 					memcpy( data, &value, sizeof( Vec4 ) );
+					DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformFromPointerMat3:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Mat3 );
-				if (location.IsValid())
+				case kCommandApplyUniformMat3:
 				{
+					READ_UNIFORM_DATA( Mat3 );
+					U32 index = Read<U32>();
 					U8 * data = PointToUniform( index, location.fOffset );
 					for (int i = 0; i < 3; ++i)
 					{
@@ -1112,149 +934,294 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 						data += sizeof( float ) * 4;
 					}
+					DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 9 );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 9 );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandApplyUniformFromPointerMat4:
-			{
-				READ_UNIFORM_DATA_WITH_PROGRAM( Mat4 );
-				if (location.IsValid())
+				case kCommandApplyUniformMat4:
 				{
+					READ_UNIFORM_DATA( Mat4 );
+					U32 index = Read<U32>();
 					U8 * data = PointToUniform( index, location.fOffset );
 					memcpy( data, &value, sizeof( Mat4 ) );
+					DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
+					CHECK_ERROR_AND_BREAK;
 				}
-				DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandEnableBlend:
-			{
-				fRenderer.EnableBlend( true );
-				DEBUG_PRINT( "Enable blend" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDisableBlend:
-			{
-				fRenderer.EnableBlend( false );
-				DEBUG_PRINT( "Disable blend" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandSetBlendFunction:
-			{
-				VkBlendFactor srcColor = Read<VkBlendFactor>();
-				VkBlendFactor dstColor = Read<VkBlendFactor>();
-
-				VkBlendFactor srcAlpha = Read<VkBlendFactor>();
-				VkBlendFactor dstAlpha = Read<VkBlendFactor>();
-
-				fRenderer.SetBlendFactors( srcColor, srcAlpha, dstColor, dstAlpha );
-				DEBUG_PRINT(
-					"Set blend function: srcColor=%i, dstColor=%i, srcAlpha=%i, dstAlpha=%i",
-					srcColor, dstColor, srcAlpha, dstAlpha );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandSetBlendEquation:
-			{
-				VkBlendOp equation = Read<VkBlendOp>();
-				fRenderer.SetBlendEquations( equation, equation );
-				DEBUG_PRINT( "Set blend equation: equation=%i", equation );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandSetViewport:
-			{
-				int x = Read<int>();
-				int y = Read<int>();
-				int width = Read<int>();
-				int height = Read<int>();
-
-				viewport.x = float( x );
-				viewport.y = float( y );
-				viewport.width = float( width );
-				viewport.height = float( height );
-				DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandEnableScissor:
-			{
-				// TODO?
-				DEBUG_PRINT( "Enable scissor test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDisableScissor:
-			{
-				// TODO?
-				DEBUG_PRINT( "Disable scissor test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandSetScissorRegion:
-			{
-				// TODO?
-				/*
-				GLint x = Read<GLint>();
-				GLint y = Read<GLint>();
-				GLsizei width = Read<GLsizei>();
-				GLsizei height = Read<GLsizei>();
-				glScissor( x, y, width, height );
-				DEBUG_PRINT( "Set scissor window x=%i, y=%i, width=%i, height=%i", x, y, width, height );*/
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandEnableMultisample:
-			{
-				// TODO: Rtt_glEnableMultisample();
-				DEBUG_PRINT( "Enable multisample test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDisableMultisample:
-			{
-				// TODO: Rtt_glDisableMultisample();
-				DEBUG_PRINT( "Disable multisample test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandClear:
-			{
-				VkClearValue value = Read<VkClearValue>();
-
-				clearValues.push_back( value );
-
-				DEBUG_PRINT( "Clear " );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDraw:
-			{
-				VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
-				U32 offset = Read<U32>();
-				U32 count = Read<U32>();
-
-				if (PrepareDraw( mode, descriptorImageInfo, pushConstants ))
+				case kCommandApplyPushConstantFromPointerScalar:
 				{
-					vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
+					READ_UNIFORM_DATA_WITH_PROGRAM( Real );
+					if (location.IsValid())
+					{
+						pushConstants.Write( location.fOffset, &value, sizeof( Real ) );
+					}
+					DEBUG_PRINT( "Set Push Constant: value=%f location=%i", value, location.fOffset );
+					CHECK_ERROR_AND_BREAK;
 				}
-
-				DEBUG_PRINT( "Draw: mode=%i, offset=%u, count=%u", mode, offset, count );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDrawIndexed:
-			{
-				VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
-				U32 count = Read<U32>();
-
-				if (PrepareDraw( mode, descriptorImageInfo, pushConstants ))
+				case kCommandApplyPushConstantFromPointerVec2:
 				{
-
-					// The first argument, offset, is currently unused. If support for non-
-					// VBO based indexed rendering is added later, an offset may be needed.
-
-					vkCmdDrawIndexed( fCommandBuffer, count, 1U, 0U, 0U, 0U );
+					READ_UNIFORM_DATA_WITH_PROGRAM( Vec2 );
+					if (location.IsValid())
+					{
+						pushConstants.Write( location.fOffset, &value, sizeof( Vec2 ) );
+					}
+					DEBUG_PRINT( "Set Push Constant: value=(%f, %f) location=%i", value.data[0], value.data[1], location.fOffset );
+					CHECK_ERROR_AND_BREAK;
 				}
+				case kCommandApplyPushConstantFromPointerVec3:
+				{
+					READ_UNIFORM_DATA_WITH_PROGRAM( Vec3 );
+					if (location.IsValid())
+					{
+						pushConstants.Write( location.fOffset, &value, sizeof( Vec3 ) );
+					}
+					DEBUG_PRINT( "Set Push Constant: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location.fOffset );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandApplyPushConstantFromPointerVec4:
+				{
+					READ_UNIFORM_DATA_WITH_PROGRAM( Vec4 );
+					if (location.IsValid())
+					{
+						pushConstants.Write( location.fOffset, &value, sizeof( Vec4 ) );
+					}
+					DEBUG_PRINT( "Set Push Constant: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandApplyPushConstantFromPointerMat4:
+				{
+					READ_UNIFORM_DATA_WITH_PROGRAM( Mat4 );
+					if (location.IsValid())
+					{
+						pushConstants.Write( location.fOffset, &value, sizeof( Mat4 ) );
+					}
+					DEBUG_PRINT_MATRIX( "Set Push Constant: value=", value.data, 16 );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandApplyPushConstantFromPointerMaskTransform:
+				{
+					READ_UNIFORM_DATA_WITH_PROGRAM( Vec4 );
+					VulkanProgram::Location translationLocation = program->GetTranslationLocation( Uniform::kViewProjectionMatrix + index, fCurrentDrawVersion );
+					Vec2 maskTranslation = Read<Vec2>();
+					if (location.IsValid())
+					{
+						pushConstants.Write( location.fOffset, &value, sizeof( Vec4 ));
+						pushConstants.Write( translationLocation.fOffset, &maskTranslation, sizeof( Vec2 ) );
+					}
+					DEBUG_PRINT( "Set Push Constant, mask matrix: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
+					DEBUG_PRINT( "Set Push Constant, mask translation: value=(%f, %f) location=%i", maskTranslation.data[0], maskTranslation.data[1], translationLocation.fOffset );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandApplyUniformFromPointerScalar:
+				{
+					READ_UNIFORM_DATA_WITH_PROGRAM( Real );
+					if (location.IsValid())
+					{
+						U8 * data = PointToUniform( index, location.fOffset );
+						memcpy( data, &value, sizeof( Real ) );
+					}
+					DEBUG_PRINT( "Set Uniform: value=%f location=%i", value, location.fOffset );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandApplyUniformFromPointerVec2:
+				{
+					READ_UNIFORM_DATA_WITH_PROGRAM( Vec2 );
+					if (location.IsValid())
+					{
+						U8 * data = PointToUniform( index, location.fOffset );
+						memcpy( data, &value, sizeof( Vec2 ) );
+					}
+					DEBUG_PRINT( "Set Uniform: value=(%f, %f) location=%i", value.data[0], value.data[1], location.fOffset );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandApplyUniformFromPointerVec3:
+				{
+					READ_UNIFORM_DATA_WITH_PROGRAM( Vec3 );
+					if (location.IsValid())
+					{
+						U8 * data = PointToUniform( index, location.fOffset );
+						memcpy( data, &value, sizeof( Vec3 ) );
+					}
+					DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], location.fOffset );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandApplyUniformFromPointerVec4:
+				{
+					READ_UNIFORM_DATA_WITH_PROGRAM( Vec4 );
+					if (location.IsValid())
+					{
+						U8 * data = PointToUniform( index, location.fOffset );
+						memcpy( data, &value, sizeof( Vec4 ) );
+					}
+					DEBUG_PRINT( "Set Uniform: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandApplyUniformFromPointerMat3:
+				{
+					READ_UNIFORM_DATA_WITH_PROGRAM( Mat3 );
+					if (location.IsValid())
+					{
+						U8 * data = PointToUniform( index, location.fOffset );
+						for (int i = 0; i < 3; ++i)
+						{
+							memcpy( data, &value.data[i * 3], sizeof( Vec3 ) );
 
-				DEBUG_PRINT( "Draw indexed: mode=%i, count=%u", mode, count );
-				CHECK_ERROR_AND_BREAK;
+							data += sizeof( float ) * 4;
+						}
+					}
+					DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 9 );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandApplyUniformFromPointerMat4:
+				{
+					READ_UNIFORM_DATA_WITH_PROGRAM( Mat4 );
+					if (location.IsValid())
+					{
+						U8 * data = PointToUniform( index, location.fOffset );
+						memcpy( data, &value, sizeof( Mat4 ) );
+					}
+					DEBUG_PRINT_MATRIX( "Set Uniform: value=", value.data, 16 );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandEnableBlend:
+				{
+					fRenderer.EnableBlend( true );
+					DEBUG_PRINT( "Enable blend" );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandDisableBlend:
+				{
+					fRenderer.EnableBlend( false );
+					DEBUG_PRINT( "Disable blend" );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandSetBlendFunction:
+				{
+					VkBlendFactor srcColor = Read<VkBlendFactor>();
+					VkBlendFactor dstColor = Read<VkBlendFactor>();
+
+					VkBlendFactor srcAlpha = Read<VkBlendFactor>();
+					VkBlendFactor dstAlpha = Read<VkBlendFactor>();
+
+					fRenderer.SetBlendFactors( srcColor, srcAlpha, dstColor, dstAlpha );
+					DEBUG_PRINT(
+						"Set blend function: srcColor=%i, dstColor=%i, srcAlpha=%i, dstAlpha=%i",
+						srcColor, dstColor, srcAlpha, dstAlpha );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandSetBlendEquation:
+				{
+					VkBlendOp equation = Read<VkBlendOp>();
+					fRenderer.SetBlendEquations( equation, equation );
+					DEBUG_PRINT( "Set blend equation: equation=%i", equation );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandSetViewport:
+				{
+					int x = Read<int>();
+					int y = Read<int>();
+					int width = Read<int>();
+					int height = Read<int>();
+
+					if (pass > 0)
+					{
+						y = -(y + height); // undo -height - y
+						height = -height;  // undo -height
+					}
+
+					viewport.x = float( x );
+					viewport.y = float( y );
+					viewport.width = float( width );
+					viewport.height = float( height );
+					DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandEnableScissor:
+				{
+					// TODO?
+					DEBUG_PRINT( "Enable scissor test" );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandDisableScissor:
+				{
+					// TODO?
+					DEBUG_PRINT( "Disable scissor test" );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandSetScissorRegion:
+				{
+					// TODO?
+					/*
+					GLint x = Read<GLint>();
+					GLint y = Read<GLint>();
+					GLsizei width = Read<GLsizei>();
+					GLsizei height = Read<GLsizei>();
+					glScissor( x, y, width, height );
+					DEBUG_PRINT( "Set scissor window x=%i, y=%i, width=%i, height=%i", x, y, width, height );*/
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandEnableMultisample:
+				{
+					// TODO: Rtt_glEnableMultisample();
+					DEBUG_PRINT( "Enable multisample test" );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandDisableMultisample:
+				{
+					// TODO: Rtt_glDisableMultisample();
+					DEBUG_PRINT( "Disable multisample test" );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandClear:
+				{
+					VkClearValue value = Read<VkClearValue>();
+
+					clearValues.push_back( value );
+
+					DEBUG_PRINT( "Clear " );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandDraw:
+				{
+					VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
+					U32 offset = Read<U32>();
+					U32 count = Read<U32>();
+
+					if (PrepareDraw( mode, descriptorImageInfo, pushConstants ))
+					{
+						vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
+					}
+
+					DEBUG_PRINT( "Draw: mode=%i, offset=%u, count=%u", mode, offset, count );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandDrawIndexed:
+				{
+					VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
+					U32 count = Read<U32>();
+
+					if (PrepareDraw( mode, descriptorImageInfo, pushConstants ))
+					{
+
+						// The first argument, offset, is currently unused. If support for non-
+						// VBO based indexed rendering is added later, an offset may be needed.
+
+						vkCmdDrawIndexed( fCommandBuffer, count, 1U, 0U, 0U, 0U );
+					}
+
+					DEBUG_PRINT( "Draw indexed: mode=%i, count=%u", mode, count );
+					CHECK_ERROR_AND_BREAK;
+				}
+				default:
+					DEBUG_PRINT( "Unknown command(%d)", command );
+					Rtt_ASSERT_NOT_REACHED();
+					break;
 			}
-			default:
-				DEBUG_PRINT( "Unknown command(%d)", command );
-				Rtt_ASSERT_NOT_REACHED();
-				break;
 		}
+	}
+
+	if (savedBytesAllocated)
+	{
+		fBuffer = savedBuffer;
+		fBytesAllocated = savedBytesAllocated;
 	}
 
 	fBytesUsed = 0;
@@ -1339,6 +1306,13 @@ CoronaLog("MUTTER: %i", presentResult);
 		}
 //	}
 
+	for (OffscreenNode & node : fOffscreenSequence)
+	{
+		Rtt_DELETE( node.fBuffer );
+	}
+
+	fOffscreenSequence.clear();
+
 	if (!okok)//else
 	{
 		fExecuteResult = VK_ERROR_INITIALIZATION_FAILED;
@@ -1373,10 +1347,6 @@ void
 VulkanCommandBuffer::BeginFrame()
 {
 	fLists = NULL;
-	fEndedAt = 0U; // i.e. as though ending one swath and entering an adjacent one
-	fLeftBeforeRejoin = GraphNode::kInvalidLocation;
-	fRejoinedStackBefore = GraphNode::kInvalidLocation;
-	fMostRecentNodeID = ~0U;
 	fCommandBuffer = VK_NULL_HANDLE;
 	fPipeline = VK_NULL_HANDLE;
 	fSwapchain = VK_NULL_HANDLE;
@@ -1904,13 +1874,6 @@ float * VulkanCommandBuffer::PushConstantState::GetData( U32 offset )
 	U8 * bytes = reinterpret_cast< U8 * >( fData );
 
 	return reinterpret_cast< float * >( bytes + offset );
-}
-
-VulkanCommandBuffer::GraphNode::GraphNode()
-:	fFBO( NULL ),
-	fLeftLowerLevel( kInvalidLocation ),
-	fWillJumpTo( kInvalidLocation )
-{
 }
 
 // ----------------------------------------------------------------------------

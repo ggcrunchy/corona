@@ -62,7 +62,7 @@ TextureResourceCanvas* TextureResourceCanvas::Create(Rtt::TextureFactory &factor
 							   TextureVolatile( display.GetAllocator(), texWidth, texHeight, format, filter, wrap, wrap ) );
 	
 	FrameBufferObject * fbo = Rtt_NEW( pAllocator,
-									  FrameBufferObject( pAllocator, texture ) );
+									  FrameBufferObject( pAllocator, texture, false ) ); // <- STEVE CHANGE
 
 	GroupObject *cache = Rtt_NEW( pAllocator,
 								 GroupObject(display.GetAllocator(), display.GetStageOffscreen() ) );
@@ -175,7 +175,7 @@ void TextureResourceCanvas::Render(Rtt::Renderer &renderer, GroupObject *group, 
 						   contentBounds.xMin, contentBounds.xMax,
 						   contentBounds.yMin, contentBounds.yMax,
 						   0.0f, 1.0f, offscreenProjMatrix );
-	
+
 	renderer.SetFrameBufferObject( fDstFBO );
 	renderer.PushMaskCount();
 	{

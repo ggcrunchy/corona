@@ -65,9 +65,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		bool PrepareTexturesPool( VulkanState * state );
 
 	private:
-		U32 JumpInstructionStub();
-
-		void PatchJumpInstructionStub( U32 instructionPosition );
 		void PopFrameBufferObject();
 		void PushFrameBufferObject( FrameBufferObject * fbo );
 
@@ -147,11 +144,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		void Write(T);
 
 	private:
-		U32 GetWritePosition() const { return fBytesUsed; }
-		U8 * GetOffset( U32 pos ) const { return fBuffer + pos; }
-		void SetOffsetPosition( U32 pos ) { fOffset = GetOffset( pos ); }
-
-	private:
 		struct UniformUpdate
 		{
 			Uniform* uniform;
@@ -190,30 +182,24 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkCommandBuffer fCommandBuffer;
 		VkPipeline fPipeline;
 
-		struct GraphNode {
-			enum { kInvalidLocation = ~0U };
-
-			GraphNode();
-
+		struct FBONode {
 			FrameBufferObject * fFBO;
-			U32 fID;
-			U32 fLeftLowerLevel;
-			U32 fWillJumpTo;
+			U8 * fOldBuffer;
+			U32 fOldBytesAllocated;
+			U32 fOldBytesUsed;
+			U32 fOldNumCommands;
 		};
 
-struct GraphNode2 {
-	enum { kInvalidLocation = ~0U };
+		struct OffscreenNode {
+			U8 * fBuffer;
+			U32 fBytesAllocated;
+			U32 fNumCommands;
+		};
 
-	FrameBufferObject * fFBO;
-	U32 fWillJumpTo;
-};
-
-		std::vector< GraphNode > fGraphStack;
-std::vector< GraphNode2 > fGraphStack2;
-		U32 fMostRecentNodeID;
-		U32 fEndedAt;
-		U32 fLeftBeforeRejoin;
-		U32 fRejoinedStackBefore;
+		std::vector< FBONode > fFBOStack;
+		std::vector< OffscreenNode > fOffscreenSequence;
+		std::vector< Geometry * > fGeometryStack;
+		Geometry * fCurrentGeometry;
 //		dynamic uniform buffers - as a list?
 		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;

@@ -27,25 +27,17 @@ namespace Rtt
 static VkAttachmentLoadOp
 GetLoadOp( const RenderPassBuilder::AttachmentOptions & options )
 {
-	if (!options.isResolve)
-	{
-		return options.noClear ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
-	}
-
-	else
-	{
-		return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	}
+	return options.isResolve ? VK_ATTACHMENT_LOAD_OP_DONT_CARE : VK_ATTACHMENT_LOAD_OP_CLEAR;
 }
 
 static VkAttachmentDescription
-PrepareAttachmentDescription( VkFormat format, bool noClear )
+PrepareAttachmentDescription( VkFormat format )
 {
 	VkAttachmentDescription attachment = {};
 	
 	attachment.format = format;
     attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachment.loadOp = noClear ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -57,7 +49,7 @@ PrepareAttachmentDescription( VkFormat format, bool noClear )
 void
 RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions & options )
 {
-	VkAttachmentDescription colorAttachment = PrepareAttachmentDescription( format, options.noClear );
+	VkAttachmentDescription colorAttachment = PrepareAttachmentDescription( format );
 
 	if (options.isResolve)
 	{
@@ -82,7 +74,7 @@ RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions 
 void
 RenderPassBuilder::AddDepthStencilAttachment( VkFormat format, const AttachmentOptions & options )
 {
-	VkAttachmentDescription depthAttachment = PrepareAttachmentDescription( format, options.noClear );
+	VkAttachmentDescription depthAttachment = PrepareAttachmentDescription( format );
 
 	AddAttachment( depthAttachment, fDepthStencilReferences, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 }
@@ -173,6 +165,18 @@ RenderPassBuilder::GetKey( RenderPassKey & key ) const
 }
 
 void
+RenderPassBuilder::ReplaceClearsWithLoads()
+{
+	for (VkAttachmentDescription & desc : fDescriptions)
+	{
+		if (VK_ATTACHMENT_LOAD_OP_CLEAR == desc.loadOp)
+		{
+			desc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		}
+	}
+}
+
+void
 RenderPassBuilder::AddAttachment( VkAttachmentDescription & description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, VkImageLayout finalLayout )
 {
 	VkAttachmentReference attachmentRef = {};
@@ -211,9 +215,9 @@ TextureSwapchain::GetHeight() const
 }
 
 VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanRenderer & renderer )
-:	fRenderer( renderer ),
-	fRenderPassData( NULL )
+:	fRenderer( renderer )
 {
+	fRenderPassData[0] = fRenderPassData[1] = NULL;
 }
 
 void 
@@ -228,14 +232,15 @@ void
 VulkanFrameBufferObject::Update( CPUResource* resource )
 {
 	Rtt_ASSERT( CPUResource::kFrameBufferObject == resource->GetType() );
-	Texture * texture = static_cast< FrameBufferObject * >( resource )->GetTexture();
+	FrameBufferObject * fbo = static_cast< FrameBufferObject * >( resource );
+	Texture * texture = fbo->GetTexture();
 
 	fExtent.width = texture->GetWidth();
 	fExtent.height = texture->GetHeight();
 
 	CleanUpImageData();
 
-	bool isSwapchain = Texture::kNumFilters == texture->GetFilter(), wantMultisampleResources = true;
+	bool isSwapchain = Texture::kNumFilters == texture->GetFilter(), mustClear = true, wantMultisampleResources = true;
 	auto ci = fRenderer.GetState()->GetCommonInfo();
 	VkComponentMapping mapping = {};
 	VkFormat format = isSwapchain ? ci.state->GetSwapchainDetails().fFormat.format : VulkanTexture::GetVulkanFormat( texture->GetFormat(), mapping );
@@ -312,6 +317,8 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 		dstDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
 		builder.AddSubpassDependency( dstDependency );
+
+		mustClear = fbo->GetMustClear();
 	}
 
 	size_t count = fImageViews.size() - currentSize;
@@ -322,52 +329,62 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 	builder.AddColorAttachment( format, finalResultOptions );
 
-	RenderPassKey key;
+	size_t passCount = mustClear ? 1 : 2;
 
-	builder.GetKey( key );
-
-	fRenderPassData = ci.state->FindRenderPassData( key );
-
-	if (!fRenderPassData)
+	for (size_t i = 0; i < passCount; ++i)
 	{
-		VkRenderPass renderPass = builder.Build( ci.device, ci.allocator );
+		RenderPassKey key;
 
-		fRenderPassData = ci.state->AddRenderPass( key, renderPass );
-	}
+		builder.GetKey( key );
 
-	for (size_t i = 0; i < count; ++i)
-	{
-        VkFramebufferCreateInfo createFramebufferInfo = {};
+		fRenderPassData[i] = ci.state->FindRenderPassData( key );
 
-        createFramebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        createFramebufferInfo.renderPass = fRenderPassData->fPass;
-        createFramebufferInfo.attachmentCount = currentSize + 1U; // n.b. ignore "extra" image views, cf. note a few lines below
-        createFramebufferInfo.height = fExtent.height;
-        createFramebufferInfo.layers = 1U;
-        createFramebufferInfo.pAttachments = fImageViews.data();
-        createFramebufferInfo.width = fExtent.width;
-// TODO: look into VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT...
-		VkFramebuffer framebuffer = VK_NULL_HANDLE;
-
-        if (VK_SUCCESS == vkCreateFramebuffer( ci.device, &createFramebufferInfo, ci.allocator, &framebuffer ))
+		if (!fRenderPassData[i])
 		{
-			fFramebuffers.push_back( framebuffer );
+			VkRenderPass renderPass = builder.Build( ci.device, ci.allocator );
 
-			if (isSwapchain && i + 1 != count) // move relevant swapchain image view to front; will only be used afterward for cleanup, so order only matters here
-			{
-				VkImageView temp = fImageViews[currentSize];
-
-				fImageViews[currentSize] = fImageViews[currentSize + i + 1];
-				fImageViews[currentSize + i + 1] = temp;
-			}
+			fRenderPassData[i] = ci.state->AddRenderPass( key, renderPass );
 		}
 
-		else
-		{
-            CoronaLog( "Failed to create framebuffer!" );
+		builder.ReplaceClearsWithLoads();
+	}
 
-			// TODO?
-        }
+	for (size_t i = 0; i < passCount; ++i)
+	{
+		for (size_t j = 0; j < count; ++j)
+		{
+			VkFramebufferCreateInfo createFramebufferInfo = {};
+
+			createFramebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			createFramebufferInfo.renderPass = fRenderPassData[i]->fPass;
+			createFramebufferInfo.attachmentCount = currentSize + 1U; // n.b. ignore "extra" image views, cf. note a few lines below
+			createFramebufferInfo.height = fExtent.height;
+			createFramebufferInfo.layers = 1U;
+			createFramebufferInfo.pAttachments = fImageViews.data();
+			createFramebufferInfo.width = fExtent.width;
+	// TODO: look into VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT...
+			VkFramebuffer framebuffer = VK_NULL_HANDLE;
+
+			if (VK_SUCCESS == vkCreateFramebuffer( ci.device, &createFramebufferInfo, ci.allocator, &framebuffer ))
+			{
+				fFramebuffers.push_back( framebuffer );
+
+				if (isSwapchain && j + 1 != count) // move relevant swapchain image view to front; will only be used afterward for cleanup, so order only matters here
+				{
+					VkImageView temp = fImageViews[currentSize];
+
+					fImageViews[currentSize] = fImageViews[currentSize + j + 1];
+					fImageViews[currentSize + j + 1] = temp;
+				}
+			}
+
+			else
+			{
+				CoronaLog( "Failed to create framebuffer!" );
+
+				// TODO?
+			}
+		}
 	}
 
 	if (!isSwapchain)
@@ -387,9 +404,13 @@ VulkanFrameBufferObject::Bind( VulkanRenderer & renderer, uint32_t index, VkRend
 {
 	passBeginInfo.framebuffer = fFramebuffers[index];
 	passBeginInfo.renderArea.extent = fExtent;
-	passBeginInfo.renderPass = fRenderPassData->fPass;
 
-	fRenderer.SetRenderPass( fRenderPassData->fID, fRenderPassData->fPass );
+	uint32_t passIndex = fRenderPassData[1] ? index : 0;
+	const RenderPassData * renderPassData = fRenderPassData[passIndex];
+
+	passBeginInfo.renderPass = renderPassData->fPass;
+
+	fRenderer.SetRenderPass( renderPassData->fID, renderPassData->fPass );
 }
 
 void
