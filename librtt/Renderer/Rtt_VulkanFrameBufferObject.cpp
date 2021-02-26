@@ -140,7 +140,7 @@ RenderPassBuilder::GetKey( RenderPassKey & key ) const
 	for ( const VkAttachmentDescription & desc : fDescriptions )
 	{
 		contents[index++] = U8( desc.format );
-		contents[index++] = U8( (desc.loadOp & 0x0F) | ((desc.storeOp << 4U) & 0x0F) );
+		contents[index++] = U8( (desc.loadOp & 0x0F) | ((desc.storeOp << 4U) & 0xF0) );
 		contents[index++] = U8( desc.samples );
 
 		if (desc.finalLayout != VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) // non-byte extension enum
@@ -167,11 +167,21 @@ RenderPassBuilder::GetKey( RenderPassKey & key ) const
 void
 RenderPassBuilder::ReplaceClearsWithLoads()
 {
+	for (VkSubpassDependency & dependency : fDependencies)
+	{
+		if (VK_SUBPASS_EXTERNAL == dependency.srcSubpass)
+		{
+			dependency.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+		}
+	}
+
 	for (VkAttachmentDescription & desc : fDescriptions)
 	{
 		if (VK_ATTACHMENT_LOAD_OP_CLEAR == desc.loadOp)
 		{
 			desc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			desc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			desc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		}
 	}
 }
@@ -240,7 +250,7 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 	CleanUpImageData();
 
-	bool isSwapchain = Texture::kNumFilters == texture->GetFilter(), mustClear = true, wantMultisampleResources = true;
+	bool isSwapchain = Texture::kNumFilters == texture->GetFilter(), mustClear = true, wantMultisampleResources = isSwapchain;
 	auto ci = fRenderer.GetState()->GetCommonInfo();
 	VkComponentMapping mapping = {};
 	VkFormat format = isSwapchain ? ci.state->GetSwapchainDetails().fFormat.format : VulkanTexture::GetVulkanFormat( texture->GetFormat(), mapping );
@@ -321,8 +331,6 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 		mustClear = fbo->GetMustClear();
 	}
 
-	size_t count = fImageViews.size() - currentSize;
-
 	finalResultOptions.finalLayout = isSwapchain ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	finalResultOptions.isResolve = wantMultisampleResources;
 	finalResultOptions.isResult = true;
@@ -349,6 +357,8 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 		builder.ReplaceClearsWithLoads();
 	}
 
+	size_t count = fImageViews.size() - currentSize;
+
 	for (size_t i = 0; i < passCount; ++i)
 	{
 		for (size_t j = 0; j < count; ++j)
@@ -357,7 +367,7 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 			createFramebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 			createFramebufferInfo.renderPass = fRenderPassData[i]->fPass;
-			createFramebufferInfo.attachmentCount = currentSize + 1U; // n.b. ignore "extra" image views, cf. note a few lines below
+			createFramebufferInfo.attachmentCount = currentSize + 1; // n.b. ignore "extra" image views, cf. note a few lines below
 			createFramebufferInfo.height = fExtent.height;
 			createFramebufferInfo.layers = 1U;
 			createFramebufferInfo.pAttachments = fImageViews.data();

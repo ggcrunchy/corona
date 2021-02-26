@@ -314,9 +314,12 @@ VulkanCommandBuffer::PopFrameBufferObject()
 
 		if (old != fCurrentGeometry)
 		{
-			WRITE_COMMAND( kCommandFetchGeometry );
+			if (old)
+			{
+				WRITE_COMMAND( kCommandFetchGeometry );
 
-			Write< GPUResource * >( old->GetGPUResource() );
+				Write< GPUResource * >( old->GetGPUResource() );
+			}
 
 			fCurrentGeometry = old;
 		}
@@ -805,7 +808,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				}
 				case kCommandFetchGeometry:
 				{
-					/*geometry = */Read<VulkanGeometry*>();
+					geometry = Read<VulkanGeometry*>();
 					DEBUG_PRINT( "Fetch Geometry %p", geometry );
 					CHECK_ERROR_AND_BREAK;
 				}
