@@ -198,7 +198,6 @@ class VulkanCommandBuffer : public CommandBuffer
 
 		std::vector< FBONode > fFBOStack;
 		std::vector< OffscreenNode > fOffscreenSequence;
-		std::vector< Geometry * > fGeometryStack;
 		Geometry * fCurrentGeometry;
 //		dynamic uniform buffers - as a list?
 		VkSwapchainKHR fSwapchain;

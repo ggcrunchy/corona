@@ -304,27 +304,13 @@ VulkanCommandBuffer::PopFrameBufferObject()
 		fBytesAllocated = back.fOldBytesAllocated;
 		fBytesUsed = back.fOldBytesUsed;
 		fNumCommands = back.fOldNumCommands;
-	}
 
-	Rtt_ASSERT( fGeometryStack.size() == fFBOStack.size() );
-
-	if (!fGeometryStack.empty())
-	{
-		Geometry * old = fGeometryStack.back();
-
-		if (old != fCurrentGeometry)
+		if (fCurrentGeometry)
 		{
-			if (old)
-			{
-				WRITE_COMMAND( kCommandFetchGeometry );
+			WRITE_COMMAND( kCommandFetchGeometry );
 
-				Write< GPUResource * >( old->GetGPUResource() );
-			}
-
-			fCurrentGeometry = old;
+			Write< GPUResource * >( fCurrentGeometry->GetGPUResource() );
 		}
-
-		fGeometryStack.pop_back();
 	}
 }
 
@@ -564,10 +550,10 @@ VulkanCommandBuffer::Clear( Real r, Real g, Real b, Real a )
 
 	// TODO: allow this to accommodate float targets?
 
-	value.color.uint32[0] = uint32_t( 255. * r );
-	value.color.uint32[1] = uint32_t( 255. * g );
-	value.color.uint32[2] = uint32_t( 255. * b );
-	value.color.uint32[3] = uint32_t( 255. * a );
+	value.color.float32[0] = r;
+	value.color.float32[1] = g;
+	value.color.float32[2] = b;
+	value.color.float32[3] = a;
 
 	Write<VkClearValue>(value);
 
@@ -630,14 +616,8 @@ VulkanCommandBuffer::GetCachedParam( CommandBuffer::QueryableParams param )
 void
 VulkanCommandBuffer::WillRender()
 {
-//	Rtt_ASSERT( fCurrentGeometry );
-
 	if (fFBOStack.size() > 1U)
 	{
-	//	Rtt_ASSERT( fGeometryStack.size() == fFBOStack.size() );
-
-		fGeometryStack.push_back( fCurrentGeometry );
-
 		if (fCurrentGeometry)
 		{
 			WRITE_COMMAND( kCommandFetchGeometry );
@@ -653,7 +633,6 @@ Real
 VulkanCommandBuffer::Execute( bool measureGPU )
 {
 	Rtt_ASSERT( fFBOStack.empty() );
-	Rtt_ASSERT( fGeometryStack.empty() );
 
 	DEBUG_PRINT( "--Begin Rendering: VulkanCommandBuffer --" );
 
