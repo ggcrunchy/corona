@@ -873,9 +873,15 @@ VulkanRenderer::ResolvePipeline()
 		pipeline = iter->second;
 	}
 
-//	fWorkingKey = fDefaultKey;
-
 	return pipeline;
+}
+
+void
+VulkanRenderer::ResetPipelineInfo()
+{
+	fWorkingKey = fDefaultKey;
+
+	RestartWorkingPipeline();
 }
 
 GPUResource* 
@@ -918,9 +924,9 @@ VulkanRenderer::InitializePipelineState()
 
 	memcpy( fDefaultKey.fContents.data(), &packedPipeline, sizeof( PackedPipeline ) );
 
-	fWorkingKey = fDefaultKey;
+	ResetPipelineInfo();
 
-	RestartWorkingPipeline();
+	fColorBlendState = fPipelineCreateInfo.fColorBlendAttachments[0];
 }
 
 void

@@ -35,6 +35,7 @@ namespace /*anonymous*/
 		kCommandBeginRenderPass,
 		kCommandBindGeometry,
 		kCommandFetchGeometry,
+		kCommandFetchRenderState,
 		kCommandBindTexture,
 		kCommandBindProgram,
 		kCommandApplyPushConstantScalar,
@@ -325,7 +326,9 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 	node.fOldBuffer = fBuffer;
 	node.fFBO = fbo;
 
-	if (!fFBOStack.empty())
+	bool isOffscreen = !fFBOStack.empty();
+
+	if (isOffscreen)
 	{
 		fBytesAllocated = 0U;
 		fBytesUsed = 0U;
@@ -338,6 +341,17 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 	WRITE_COMMAND( kCommandBindFrameBufferObject );
 
 	Write< GPUResource * >( fbo->GetGPUResource() );
+
+	if (isOffscreen)
+	{
+		WRITE_COMMAND( kCommandFetchRenderState );
+
+		Write<VkPipelineColorBlendAttachmentState>( fRenderer.GetColorBlendState() );
+
+		WRITE_COMMAND( kCommandBindProgram );
+		Write<Program::Version>( fCurrentPrepVersion );
+		Write<GPUResource*>( fProgram->GetGPUResource() );
+	}
 }
 
 void
@@ -403,6 +417,10 @@ void
 VulkanCommandBuffer::SetBlendEnabled( bool enabled )
 {
 	WRITE_COMMAND( enabled ? kCommandEnableBlend : kCommandDisableBlend );
+
+	VkPipelineColorBlendAttachmentState & state = fRenderer.GetColorBlendState();
+
+	state.blendEnable = enabled ? VK_TRUE : VK_FALSE;
 }
 
 static VkBlendFactor
@@ -464,6 +482,13 @@ VulkanCommandBuffer::SetBlendFunction( const BlendMode& mode )
 	VkBlendFactor srcAlpha = VulkanFactorForBlendParam( mode.fSrcAlpha );
 	VkBlendFactor dstAlpha = VulkanFactorForBlendParam( mode.fDstAlpha );
 
+	VkPipelineColorBlendAttachmentState & state = fRenderer.GetColorBlendState();
+
+	state.srcColorBlendFactor = srcColor;
+	state.srcAlphaBlendFactor = srcAlpha;
+	state.dstColorBlendFactor = dstColor;
+	state.dstAlphaBlendFactor = dstAlpha;
+
 	Write<VkBlendFactor>( srcColor );
 	Write<VkBlendFactor>( dstColor );
 	Write<VkBlendFactor>( srcAlpha );
@@ -489,6 +514,10 @@ VulkanCommandBuffer::SetBlendEquation( RenderTypes::BlendEquation mode )
 			break;
 	}
 	
+	VkPipelineColorBlendAttachmentState & state = fRenderer.GetColorBlendState();
+
+	state.alphaBlendOp = state.colorBlendOp = equation;
+
 	Write<VkBlendOp>( equation );
 }
 
@@ -629,6 +658,22 @@ VulkanCommandBuffer::WillRender()
 	WRITE_COMMAND( kCommandBeginRenderPass );
 }
 
+static bool
+AddGeometryToList( std::vector< VulkanGeometry * > & list, VulkanGeometry * geometry )
+{
+	for (VulkanGeometry * vg : list)
+	{
+		if (vg == geometry)
+		{
+			return false;
+		}
+	}
+
+	list.push_back( geometry );
+
+	return true;
+}
+
 Real 
 VulkanCommandBuffer::Execute( bool measureGPU )
 {
@@ -661,13 +706,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	//	glEndQuery( GL_TIME_ELAPSED );
 	}
 #endif
-	U8 * savedBuffer = fBuffer;
-	U32 savedBytesAllocated = 0U;
 
-	// Reset the offset pointer to the start of the buffer.
-	// This is safe to do here, as preparation work is done
-	// on another CommandBuffer while this one is executing.
-	fOffset = fBuffer;
+	std::vector< VulkanGeometry * > geometryList;
 
 	//GL_CHECK_ERROR();
 	std::vector< VkDescriptorImageInfo > descriptorImageInfo( 5U, VkDescriptorImageInfo{} );
@@ -697,20 +737,34 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	uint32_t imageIndex = ~0U;
 
+	U8 * savedBuffer = fBuffer;
+	U32 savedBytesAllocated = fBytesAllocated, savedNumCommands = fNumCommands;
+
 	for ( U32 pass = 0; pass < numPasses; ++pass )
 	{
-		if (pass > 0)
-		{
-			if (!savedBytesAllocated)
-			{
-				savedBytesAllocated = fBytesAllocated;
-			}
+		fRenderer.ResetPipelineInfo();
 
-			OffscreenNode & current = fOffscreenSequence[pass - 1];
+		bool isSwapchainPass = fOffscreenSequence.empty();
+
+		if (isSwapchainPass)
+		{
+			// Reset the offset pointer to the start of the buffer.
+			// This is safe to do here, as preparation work is done
+			// on another CommandBuffer while this one is executing.
+			fBuffer = fOffset = savedBuffer;
+			fBytesAllocated = savedBytesAllocated;
+			fNumCommands = savedNumCommands;
+		}
+
+		else
+		{
+			OffscreenNode current = fOffscreenSequence.back();
 
 			fBuffer = fOffset = current.fBuffer;
 			fBytesAllocated = current.fBytesAllocated;
 			fNumCommands = current.fNumCommands;
+
+			fOffscreenSequence.pop_back();
 		}
 
 		VulkanGeometry * geometry = NULL;
@@ -757,8 +811,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				{
 					Rtt_ASSERT( fbo );
 
-					uint32_t index = 0 == pass ? imageIndex : clearValues.empty();	// with the swapchain, choose the appropriate image; else use the buffer / pass
-																					// for the desired clear behavior
+					uint32_t index = isSwapchainPass ? imageIndex : clearValues.empty();// with the swapchain, choose the appropriate image; else use the buffer / pass
+																						// for the desired clear behavior
 
 					fbo->Bind( fRenderer, index, renderPassBeginInfo );
 
@@ -780,15 +834,38 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandBindGeometry:
 				{
 					geometry = Read<VulkanGeometry*>();
-					geometry->Bind( fRenderer, fCommandBuffer, true );
+
+					if (AddGeometryToList( geometryList, geometry ))
+					{
+						geometry->Bind( fRenderer, fCommandBuffer, true );
+					}
+
 					DEBUG_PRINT( "Bind Geometry %p", geometry );
 					CHECK_ERROR_AND_BREAK;
 
 				}
-				case kCommandFetchGeometry:
+				case kCommandFetchGeometry: // TODO: only differs in debug output, should eventually just replace with Bind?
 				{
 					geometry = Read<VulkanGeometry*>();
+
+					if (AddGeometryToList( geometryList, geometry ))
+					{
+						geometry->Bind( fRenderer, fCommandBuffer, true );
+					}
+
 					DEBUG_PRINT( "Fetch Geometry %p", geometry );
+					CHECK_ERROR_AND_BREAK;
+				}
+				case kCommandFetchRenderState:
+				{
+					VkPipelineColorBlendAttachmentState state = Read<VkPipelineColorBlendAttachmentState>();
+
+					fRenderer.EnableBlend( state.blendEnable );
+					fRenderer.SetBlendFactors( state.srcColorBlendFactor, state.srcAlphaBlendFactor, state.dstColorBlendFactor, state.dstAlphaBlendFactor );
+					fRenderer.SetBlendEquations( state.colorBlendOp, state.alphaBlendOp );
+					// write mask, etc.
+
+					DEBUG_PRINT( "Fetch render state" );
 					CHECK_ERROR_AND_BREAK;
 				}
 				case kCommandBindTexture:
@@ -1103,7 +1180,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					int width = Read<int>();
 					int height = Read<int>();
 
-					if (pass > 0)
+					if (!isSwapchainPass)
 					{
 						y = -(y + height); // undo -height - y
 						height = -height;  // undo -height
@@ -1198,12 +1275,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					break;
 			}
 		}
-	}
-
-	if (savedBytesAllocated)
-	{
-		fBuffer = savedBuffer;
-		fBytesAllocated = savedBytesAllocated;
 	}
 
 	fBytesUsed = 0;
