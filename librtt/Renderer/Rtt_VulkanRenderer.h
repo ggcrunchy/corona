@@ -133,6 +133,9 @@ class VulkanRenderer : public Renderer
 
 		VkPipeline ResolvePipeline();
 
+		void ResetPipelineInfo();
+		VkPipelineColorBlendAttachmentState & GetColorBlendState() { return fColorBlendState; }
+
 	protected:
 		// Create an OpenGL resource appropriate for the given CPUResource.
 		virtual GPUResource* Create( const CPUResource* resource );
@@ -181,6 +184,7 @@ class VulkanRenderer : public Renderer
 		PipelineCreateInfo fPipelineCreateInfo;
 		PipelineKey fDefaultKey;
 		PipelineKey fWorkingKey;
+		VkPipelineColorBlendAttachmentState fColorBlendState;
 };
 
 // ----------------------------------------------------------------------------
