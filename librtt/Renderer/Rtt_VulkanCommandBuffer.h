@@ -31,20 +31,20 @@ struct TimeTransform;
 
 // cf. shell_default_vulkan:
 
-struct alignas(16) VulkanUniforms
+struct VulkanUniforms
 {
 	float fData[6 * 4];
 };
 
-struct alignas(16) VulkanUserData
+struct VulkanUserData
 {
 	float UserData[4][16];
 };
 
-struct alignas(16) VulkanPushConstants
+struct VulkanPushConstants
 {
 	float fData[5 * 4];	// masks, time, sampler index
-	float fUniforms[11 * 4];// uniform userdata (compact representation, i.e. <= 11 vectors)
+	float fUniforms[11 * 4];// uniform userdata (compact representation, i.e. <= 3 or 11 vectors)
 };
 
 // 

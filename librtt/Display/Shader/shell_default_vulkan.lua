@@ -85,7 +85,6 @@ varying P_UV vec2 v_TexCoord;
 
 varying P_COLOR vec4 v_ColorScale;
 varying P_DEFAULT vec4 v_UserData;
-varying P_DEFAULT float v_TotalTime;
 
 #if MASK_COUNT > 0
     varying P_UV vec2 v_MaskUV0;
@@ -116,7 +115,6 @@ void main()
 #endif
 	v_ColorScale = a_ColorScale;
 	v_UserData = a_UserData;
-    v_TotalTime = CoronaTotalTime;
 
 	P_POSITION vec2 position = VertexKernel( a_Position );
 
@@ -163,7 +161,10 @@ layout(set = 2, binding = 0) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3]
 
 // cf. vertex
 layout(push_constant) uniform PushConstants {
-    vec4 Unused[5];
+    vec2 Unused;
+    float TotalTime;
+    int SamplerIndex;
+    vec4 UnusedRows[4];
 
     PUSH_CONSTANTS_EXTRA
 } pc;
@@ -176,17 +177,14 @@ varying P_UV vec2 v_TexCoord;
 
 varying P_COLOR vec4 v_ColorScale;
 varying P_DEFAULT vec4 v_UserData;
-varying P_DEFAULT float v_TotalTime; // TODO? we could actually grab this from the push constants (as well as the sampler index)
 
 #define CoronaColorScale( color ) (v_ColorScale*(color))
 #define CoronaVertexUserData v_UserData
 
-#define CoronaTotalTime v_TotalTime
+#define CoronaTotalTime pc.TotalTime
 #define CoronaDeltaTime ubo.DeltaTime
 #define CoronaTexelSize ubo.TexelSize
 #define CoronaContentScale ubo.ContentScale
-
-// TODO: allow for sampler index too... see note for v_TotalTime
 
 #define CoronaSampler0 u_Samplers[0]
 #define CoronaSampler1 u_Samplers[1]

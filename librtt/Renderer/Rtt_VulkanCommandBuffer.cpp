@@ -348,9 +348,12 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 
 		Write<VkPipelineColorBlendAttachmentState>( fRenderer.GetColorBlendState() );
 
-		WRITE_COMMAND( kCommandBindProgram );
-		Write<Program::Version>( fCurrentPrepVersion );
-		Write<GPUResource*>( fProgram->GetGPUResource() );
+		if (fProgram)
+		{
+			WRITE_COMMAND( kCommandBindProgram );
+			Write<Program::Version>( fCurrentPrepVersion );
+			Write<GPUResource*>( fProgram->GetGPUResource() );
+		}
 	}
 }
 
