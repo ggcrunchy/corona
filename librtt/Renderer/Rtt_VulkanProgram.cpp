@@ -364,22 +364,30 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, std::string & code, U
 void
 VulkanProgram::ReplaceVaryings( bool isVertexSource, std::string & code, Maps & maps, const std::vector< Interval > & intervals )
 {
+	struct Varying {
+		size_t location;
+		size_t pos;
+	};
+
+	std::vector< Varying > varyingStack;
 	size_t offset = 0U, varyingLocation = 0U;
 
 	while (true)
 	{
-		size_t pos = FindOutsideIntervals( code, "varying ", intervals, offset );
+		Varying v;
 
-		if (std::string::npos == pos)
+		v.pos = FindOutsideIntervals( code, "varying ", intervals, offset );
+
+		if (std::string::npos == v.pos)
 		{
-			return;
+			break;
 		}
 
-		if (NoLeadingCharacters( code, pos ))
+		if (NoLeadingCharacters( code, v.pos ))
 		{
 			char precision[16], type[16], name[64];
 
-			if (sscanf( code.c_str() + pos, "varying %15s %15s %63s", precision, type, name ) < 3)
+			if (sscanf( code.c_str() + v.pos, "varying %15s %15s %63s", precision, type, name ) < 3)
 			{
 				CoronaLog( "Varying in shader was ill-formed" );
 
@@ -389,7 +397,7 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, std::string & code, Maps & 
 			// TODO: validate: known precision, known type, identifier
 			// also, if we don't care about mobile we could forgo the type...
 
-			size_t location = varyingLocation;
+			v.location = varyingLocation;
 
 			if (!isVertexSource)
 			{
@@ -402,22 +410,27 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, std::string & code, Maps & 
 					return;
 				}
 
-				location = varying->second;
+				v.location = varying->second;
 			}
-
-			char buf[64];
-
-			sprintf( buf, "layout(location = %u) %s ", location, isVertexSource ? "out" : "in" );
-
-			code.replace( pos, sizeof( "varying" ), buf );
 
 			if (isVertexSource)
 			{
 				maps.varyings[name] = varyingLocation++;
 			}
+
+			varyingStack.push_back( v );
 		}
 
-		offset = pos + 1U;
+		offset = v.pos + sizeof( "uniform" );
+	}
+
+	char buf[64];
+
+	for (auto && iter = varyingStack.rbegin(); iter != varyingStack.rend(); ++iter)
+	{
+		sprintf( buf, "layout(location = %u) %s ", iter->location, isVertexSource ? "out" : "in" );
+
+		code.replace( iter->pos, sizeof( "varying" ), buf );
 	}
 }
 
