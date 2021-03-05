@@ -20,7 +20,6 @@ layout(location = 3) in attribute vec4 a_UserData;
 // < 256 bytes:
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 ViewProjectionMatrix;
-    vec4 TexelSize;
     vec2 ContentScale;
     float DeltaTime;
 } ubo;
@@ -41,23 +40,24 @@ layout(set = 2, binding = 0) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3]
 
 // these may vary per batch, somewhat independently:
 layout(push_constant) uniform PushConstants {
-    vec2 MaskTranslation0; // vector #1
+    vec4 TexelSize; // vector #1
+    vec2 MaskTranslation0; // vector #2
     float TotalTime;
     int SamplerIndex;
-    vec2 MaskMatrix0[2]; // vector #2
-    vec2 MaskMatrix1[2]; // vector #3
-    vec2 MaskTranslation1; // vector #4
+    vec2 MaskMatrix0[2]; // vector #3
+    vec2 MaskMatrix1[2]; // vector #4
+    vec2 MaskTranslation1; // vector #5
     vec2 MaskTranslation2;
-    vec2 MaskMatrix2[2]; // vector #5
+    vec2 MaskMatrix2[2]; // vector #6
 
     PUSH_CONSTANTS_EXTRA
 
-    // TODO: we have at least 3 or 11 more vectors...
+    // TODO: we have at least 2 or 10 more vectors...
     // Assuming no contrary outlier got overlooked, this will accommodate the uniform userdata demands of all built-in effects.
     // while lacking full generality, e.g. three or four mat4s would overflow it, these effects are an important common use case.
     // The idea will be to pick these userdata out from the shader source, sort them by size, then allocate them to slots; if the
-    // packing comes within 11 vectors, proceed. There might also be precompiled shader considerations here.
-    // might pack as say mat4 ExtraMatrices[2]; vec4 ExtraVectors[3];
+    // packing comes within 10 vectors, proceed. There might also be precompiled shader considerations here.
+    // might pack as say mat4 ExtraMatrices[2]; vec4 ExtraVectors[2];
     // then alias or expand according to type / offset... no built-in uses a mat3, so disqualifying them should be fine
     // new TODO: clean this up and decide on a proper home (needs revision in light of lower minimum than I thought)
 } pc;
@@ -65,10 +65,10 @@ layout(push_constant) uniform PushConstants {
 #define CoronaVertexUserData a_UserData
 #define CoronaTexCoord a_TexCoord.xy
 
+#define CoronaTexelSize pc.TexelSize
 #define CoronaTotalTime pc.TotalTime
-#define CoronaDeltaTime ubo.DeltaTime
-#define CoronaTexelSize ubo.TexelSize
 #define CoronaContentScale ubo.ContentScale
+#define CoronaDeltaTime ubo.DeltaTime
 #define u_FillSampler0 u_Samplers[0]
 #define u_FillSampler1 u_Samplers[1]
 
@@ -140,7 +140,6 @@ shell.fragment =
 // cf. vertex
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 ViewProjectionMatrix;
-    vec4 TexelSize;
     vec2 ContentScale;
     float DeltaTime;
 } ubo;
@@ -161,6 +160,7 @@ layout(set = 2, binding = 0) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3]
 
 // cf. vertex
 layout(push_constant) uniform PushConstants {
+    vec4 TexelSize;
     vec2 Unused;
     float TotalTime;
     int SamplerIndex;
@@ -181,10 +181,10 @@ varying P_DEFAULT vec4 v_UserData;
 #define CoronaColorScale( color ) (v_ColorScale*(color))
 #define CoronaVertexUserData v_UserData
 
+#define CoronaTexelSize pc.TexelSize
 #define CoronaTotalTime pc.TotalTime
-#define CoronaDeltaTime ubo.DeltaTime
-#define CoronaTexelSize ubo.TexelSize
 #define CoronaContentScale ubo.ContentScale
+#define CoronaDeltaTime ubo.DeltaTime
 
 #define CoronaSampler0 u_Samplers[0]
 #define CoronaSampler1 u_Samplers[1]

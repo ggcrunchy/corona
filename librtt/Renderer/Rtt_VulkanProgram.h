@@ -16,6 +16,7 @@
 #include "Core/Rtt_Assert.h"
 #include <vulkan/vulkan.h>
 #include <map>
+#include <utility>
 #include <vector>
 
 #ifdef free
@@ -42,6 +43,8 @@ class VulkanProgram : public GPUResource
 	public:
 		typedef GPUResource Super;
 		typedef VulkanProgram Self;
+
+		typedef std::pair< size_t, size_t > Interval;
 
 	public:
 		VulkanProgram( VulkanState * state );
@@ -198,9 +201,11 @@ class VulkanProgram : public GPUResource
 			U32 fRow;
 		};
 
-		void GatherUniformUserdata( bool isVertexSource, std::string & code, UserdataValue values[], std::vector< UserdataDeclaration > & declarations, bool & canUsePushConstants );
-		void ReplaceVaryings( bool isVertexSource, std::string & code, Maps & maps );
-		void Compile( int kind, std::string & code, Maps & maps, VkShaderModule & module );
+		size_t GatherUniformUserdata( bool isVertexSource, std::string & code, UserdataValue values[], const std::vector< Interval > & intervals, std::vector< UserdataDeclaration > & declarations, bool & canUsePushConstants );
+		void ReplaceVaryings( bool isVertexSource, std::string & code, Maps & maps, const std::vector< Interval > & intervals );
+		void Compile( int kind, std::string & code, Maps & maps, VkShaderModule & module, const std::vector< Interval > & intervals );
+		std::pair< bool, int > SearchForFreeRows( const UserdataValue values[], UserdataPosition positions[] );
+		U32 AddToString( std::string & str, const UserdataValue & value );
 		Maps UpdateShaderSource( Program* program, Program::Version version, VersionData& data );
 
 		static void InitializeCompiler( shaderc_compiler ** compiler, shaderc_compile_options ** options );
