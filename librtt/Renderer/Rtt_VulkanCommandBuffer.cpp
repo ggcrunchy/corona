@@ -1075,7 +1075,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerScalar:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Real );
-					if (location.IsValid())
+					if (program->HavePushConstantUniforms() && DescriptorLists::IsPushConstant( index, true ))
+					{
+						pushConstants.Write( location.fOffset, &value, sizeof( Real ) );
+					}
+					else if (location.IsValid())
 					{
 						U8 * data = PointToUniform( index, location.fOffset );
 						memcpy( data, &value, sizeof( Real ) );
@@ -1086,7 +1090,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerVec2:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Vec2 );
-					if (location.IsValid())
+					if (program->HavePushConstantUniforms() && DescriptorLists::IsPushConstant( index, true ))
+					{
+						pushConstants.Write( location.fOffset, &value, sizeof( Vec2 ) );
+					}
+					else if (location.IsValid())
 					{
 						U8 * data = PointToUniform( index, location.fOffset );
 						memcpy( data, &value, sizeof( Vec2 ) );
@@ -1097,7 +1105,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerVec3:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Vec3 );
-					if (location.IsValid())
+					if (program->HavePushConstantUniforms() && DescriptorLists::IsPushConstant( index, true ))
+					{
+						pushConstants.Write( location.fOffset, &value, sizeof( Vec3 ) );
+					}
+					else if (location.IsValid())
 					{
 						U8 * data = PointToUniform( index, location.fOffset );
 						memcpy( data, &value, sizeof( Vec3 ) );
@@ -1108,7 +1120,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerVec4:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Vec4 );
-					if (location.IsValid())
+					if (program->HavePushConstantUniforms() && DescriptorLists::IsPushConstant( index, true ))
+					{
+						pushConstants.Write( location.fOffset, &value, sizeof( Vec4 ) );
+					}
+					else if (location.IsValid())
 					{
 						U8 * data = PointToUniform( index, location.fOffset );
 						memcpy( data, &value, sizeof( Vec4 ) );
@@ -1119,6 +1135,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerMat3:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Mat3 );
+					// TODO: push constants (currently invalidates policy)
 					if (location.IsValid())
 					{
 						U8 * data = PointToUniform( index, location.fOffset );
@@ -1135,7 +1152,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerMat4:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Mat4 );
-					if (location.IsValid())
+					if (program->HavePushConstantUniforms() && DescriptorLists::IsPushConstant( index, true ))
+					{
+						pushConstants.Write( location.fOffset, &value, sizeof( Mat4 ) );
+					}
+					else if (location.IsValid())
 					{
 						U8 * data = PointToUniform( index, location.fOffset );
 						memcpy( data, &value, sizeof( Mat4 ) );
@@ -1484,8 +1505,9 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 				DescriptorLists & lists = fLists[i];
 
 				sets[nsets++] = lists.fSets[lists.fBufferIndex];
-				dynamicOffsets[count++] = lists.fOffset;
-
+				dynamicOffsets[count++] = /*0U;*/lists.fOffset;
+//if (!lists.fOffset)
+{
 				DynamicUniformData & uniforms = lists.fDynamicUniforms[lists.fBufferIndex];
 
 				memcpy( static_cast< U8 * >( uniforms.fMapped ) + lists.fOffset, lists.fWorkspace, lists.fRawSize );
@@ -1498,7 +1520,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 				range.size = lists.fNonCoherentRawSize;
 
 				memoryRanges.push_back( range );
-
+}
 				lists.fOffset += U32( lists.fDynamicAlignment );
 			}
 		}
@@ -1845,7 +1867,7 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 	{
 		Uniform* uniform = update.uniform;
 
-		if (DescriptorLists::IsPushConstant( index, vulkanProgram.HavePushConstantUniforms() ))
+		if (DescriptorLists::IsPushConstant( index, false ))
 		{
 			ApplyPushConstant( uniform, 0U, 0U, &vulkanProgram, index );
 		}

@@ -43,8 +43,8 @@ struct VulkanUserData
 
 struct VulkanPushConstants
 {
-	float fData[5 * 4];	// masks, time, sampler index
-	float fUniforms[11 * 4];// uniform userdata (compact representation, i.e. <= 3 or 11 vectors)
+	float fData[6 * 4];	// masks, time, sampler index, texel size
+	float fUniforms[10 * 4];// uniform userdata (compact representation, i.e. <= 2 or 10 vectors)
 };
 
 // 

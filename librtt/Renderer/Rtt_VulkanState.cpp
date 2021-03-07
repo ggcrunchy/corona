@@ -762,6 +762,11 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 			score += 1000U;
 		}
 
+		if (deviceDetails.properties.limits.maxPushConstantsSize > 128)
+		{
+			score += 250U;
+		}
+
 		if (features.shaderSampledImageArrayDynamicIndexing)
 		{
 			score += 500U;

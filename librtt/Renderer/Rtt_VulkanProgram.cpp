@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <string>
 #include <utility>
+#include <vector>
 #include <stdlib.h>
 
 // To reduce memory consumption and startup cost, defer the
@@ -270,7 +271,7 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, std::string & code, U
 
 		if (NoLeadingCharacters( code, pos ))
 		{
-			size_t cpos = FindOutsideIntervals( code, ";", intervals, pos + sizeof( "uniform " ) );
+			size_t cpos = FindOutsideIntervals( code, ";", intervals, pos + strlen( "uniform " ) );
 
 			if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
 			{
@@ -421,16 +422,16 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, std::string & code, Maps & 
 			varyingStack.push_back( v );
 		}
 
-		offset = v.pos + sizeof( "uniform" );
+		offset = v.pos + strlen( "varying " );
 	}
 
 	char buf[64];
 
 	for (auto && iter = varyingStack.rbegin(); iter != varyingStack.rend(); ++iter)
 	{
-		sprintf( buf, "layout(location = %u) %s ", iter->location, isVertexSource ? "out" : "in" );
+		sprintf( buf, "layout(location = %u) %s", iter->location, isVertexSource ? "out" : "in" );
 
-		code.replace( iter->pos, sizeof( "varying" ), buf );
+		code.replace( iter->pos, strlen( "varying" ), buf ); // done last, so intervals left as is
 	}
 }
 
@@ -516,7 +517,7 @@ VulkanProgram::Compile( int ikind, std::string & code, Maps & maps, VkShaderModu
 }
 
 static bool
-AreRowsOpen( int used[], int row, int nrows, int ncols )
+AreRowsOpen( const std::vector< int > & used, int row, int nrows, int ncols )
 {
 	for (int i = 0; i < nrows; ++i)
 	{
@@ -532,9 +533,9 @@ AreRowsOpen( int used[], int row, int nrows, int ncols )
 }
 
 static int
-GetFirstRow( int used[], int nrows, int ncols )
+GetFirstRow( const std::vector< int > & used, int nrows, int ncols )
 {
-	for (int row = 0, last = 10 - nrows; row <= last; ++row)
+	for (int row = 0, last = used.size() - nrows; row <= last; ++row)
 	{
 		if (AreRowsOpen( used, row, nrows, ncols ))
 		{
@@ -548,7 +549,10 @@ GetFirstRow( int used[], int nrows, int ncols )
 std::pair< bool, int >
 VulkanProgram::SearchForFreeRows( const UserdataValue values[], UserdataPosition positions[] )
 {
-	int used[10] = {}; // 10 vectors, cf. shell_default_vulkan.lua
+	const VkPhysicalDeviceLimits & limits = fState->GetDeviceDetails().properties.limits;
+	const size_t spareVectorCount = limits.maxPushConstantsSize / 16 - 6;	// cf. shell_default_vulkan.lua
+
+	std::vector< int > used( spareVectorCount, 0 );
 
 	for (int i = 0; i < 4 && values[i].IsValid(); ++i)
 	{
@@ -596,15 +600,16 @@ FindCommentIntervals( const std::string & code, std::vector< VulkanProgram::Inte
 			break;
 		}
 
-		offset = beginPos + sizeof( "/*" );
+		offset = beginPos + strlen( "/*" );
 
 		size_t endPos = code.find( "*/", offset );
 
 		if (std::string::npos != endPos) // unclosed comments mean code itself is broken
 		{
-			intervals.push_back( std::make_pair( beginPos, endPos ) );
 
-			offset = endPos + sizeof( "*/" );
+			offset = endPos + strlen( "*/" );
+
+			intervals.push_back( std::make_pair( beginPos, offset - 1U ) );
 		}
 	}
 
@@ -633,9 +638,9 @@ FindCommentIntervals( const std::string & code, std::vector< VulkanProgram::Inte
 
 			else
 			{
-				intervals.push_back( std::make_pair( beginPos, endPos ) );
+				offset = endPos + strlen( "\n" );
 
-				offset = endPos + sizeof( "\n" );
+				intervals.push_back( std::make_pair( beginPos, offset - 1U ) );
 			}
 		}
 	}
@@ -664,7 +669,7 @@ UsesPushConstant( const std::string & code, const char * what, const std::vector
 		return false;
 	}
 
-	const size_t TotalTimeLen = sizeof( "TotalTime" );
+	const size_t TotalTimeLen = strlen( "TotalTime" );
 
 	if (isalnum( code[pos + TotalTimeLen] ) || code[pos + TotalTimeLen] == '_' )
 	{
@@ -717,6 +722,42 @@ VulkanProgram::AddToString( std::string & str, const UserdataValue & value )
 	str += ";";
 
 	return componentCount;
+}
+
+static void
+AdvanceIntervals( size_t pos, size_t count, const std::string & replacement, std::vector< VulkanProgram::Interval > & intervals )
+{
+	int oldSize = int( count ), newSize = int( replacement.size() ), delta = newSize - oldSize;
+
+	for (auto && iter = intervals.rbegin(); iter != intervals.rend(); ++iter)
+	{
+		if (iter->first > pos)
+		{
+			iter->first += delta;
+			iter->second += delta;
+		}
+
+		else
+		{
+			break;
+		}
+	}
+}
+
+static void
+Insert( std::string & str, size_t pos, const std::string & insertion, std::vector< VulkanProgram::Interval > & intervals )
+{
+	str.insert( pos, insertion );
+
+	AdvanceIntervals( pos, 0U, insertion, intervals );
+}
+
+static void
+Replace( std::string & str, size_t pos, size_t count, const std::string & replacement, std::vector< VulkanProgram::Interval > & intervals )
+{
+	str.replace( pos, count, replacement );
+
+	AdvanceIntervals( pos, count, replacement, intervals );
 }
 
 VulkanProgram::Maps
@@ -880,28 +921,28 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 
 			if (!vertexDeclarations.empty())
 			{
-				size_t epos = vertexCode.find( "PUSH_CONSTANTS_EXTRA" );
+				size_t epos = FindOutsideIntervals( vertexCode, "PUSH_CONSTANTS_EXTRA", vertexIntervals, 0U );
 
 				if (std::string::npos == epos)
 				{
 					// error!
 				}
 
-				vertexCode.insert( epos + sizeof( "PUSH_CONSTANTS_EXTRA" ) - 1, extra );
+				Insert( vertexCode, epos + strlen( "PUSH_CONSTANTS_EXTRA" ), extra, vertexIntervals );
 
 				vertexExtra = extra.size();
 			}
 
 			if (!fragmentDeclarations.empty())
 			{
-				size_t epos = fragmentCode.find( "PUSH_CONSTANTS_EXTRA" );
+				size_t epos = FindOutsideIntervals( fragmentCode, "PUSH_CONSTANTS_EXTRA", fragmentIntervals, 0U );
 
 				if (std::string::npos == epos)
 				{
 					// error!
 				}
 
-				fragmentCode.insert( epos + sizeof( "PUSH_CONSTANTS_EXTRA" ) - 1, extra );
+				Insert( fragmentCode, epos + strlen( "PUSH_CONSTANTS_EXTRA" ), extra, fragmentIntervals );
 
 				fragmentExtra = extra.size();
 
@@ -920,31 +961,29 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 		{
 			const char suffix[] = { '0' + iter->fValue->fIndex, 0 };
 
-			vertexCode.replace( iter->fPosition + vertexExtra, iter->fLength, (prefix1 + suffix) + (prefix2 + suffix) );
+			Replace( vertexCode, iter->fPosition + vertexExtra, iter->fLength, (prefix1 + suffix) + (prefix2 + suffix), vertexIntervals );
 		}
 
-if (!vertexDeclarations.empty()) CoronaLog( "Vertex code: %s\n\n", vertexCode.c_str() );
 		for (auto && iter = fragmentDeclarations.rbegin(); iter != fragmentDeclarations.rend(); ++iter)
 		{
 			const char suffix[] = { '0' + iter->fValue->fIndex, 0 };
 
-			fragmentCode.replace( iter->fPosition + fragmentExtra, iter->fLength, (prefix1 + suffix) + (prefix2 + suffix) );
+			Replace( fragmentCode, iter->fPosition + fragmentExtra, iter->fLength, (prefix1 + suffix) + (prefix2 + suffix), fragmentIntervals );
 		}
-if (!fragmentDeclarations.empty()) CoronaLog( "Fragment code: %s\n\n", fragmentCode.c_str() );
 
 		if (toReplace)
 		{
-			size_t vertexPos = vertexCode.find( toReplace ); // TODO: verify these aren't in comments?
-			size_t fragmentPos = fragmentCode.find( toReplace );
+			size_t vertexPos = FindOutsideIntervals( vertexCode, toReplace, vertexIntervals, 0U );
+			size_t fragmentPos = FindOutsideIntervals( fragmentCode, toReplace, fragmentIntervals, 0U );
 
 			if (std::string::npos != vertexPos)
 			{
-				vertexCode.replace( vertexPos, strlen( toReplace ), replacement );
+				Replace( vertexCode, vertexPos, strlen( toReplace ), replacement, vertexIntervals );
 			}
 
 			if (std::string::npos != fragmentPos)
 			{
-				fragmentCode.replace( fragmentPos, strlen( toReplace ), replacement );
+				Replace( fragmentCode, fragmentPos, strlen( toReplace ), replacement, fragmentIntervals );
 			}
 		}
 
@@ -953,9 +992,10 @@ if (!fragmentDeclarations.empty()) CoronaLog( "Fragment code: %s\n\n", fragmentC
 
 	// Vertex shader.
 	Compile( shaderc_vertex_shader, vertexCode, maps, data.fVertexShader, vertexIntervals );
-
+if (!vertexDeclarations.empty()) CoronaLog( "Vertex code: %s\n\n", vertexCode.c_str() );
 	// Fragment shader.
 	Compile( shaderc_fragment_shader, fragmentCode, maps, data.fFragmentShader, fragmentIntervals );
+if (!fragmentDeclarations.empty()) CoronaLog( "Fragment code: %s\n\n", fragmentCode.c_str() );
 
 #else
 	// no need to compile, but reflection here...
