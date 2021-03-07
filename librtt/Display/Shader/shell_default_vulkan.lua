@@ -40,15 +40,15 @@ layout(set = 2, binding = 0) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3]
 
 // these may vary per batch, somewhat independently:
 layout(push_constant) uniform PushConstants {
-    vec4 TexelSize; // vector #1
-    vec2 MaskTranslation0; // vector #2
+    vec2 MaskTranslation0; // vector #1
     float TotalTime;
     int SamplerIndex;
-    vec2 MaskMatrix0[2]; // vector #3
-    vec2 MaskMatrix1[2]; // vector #4
-    vec2 MaskTranslation1; // vector #5
+    vec2 MaskMatrix0[2]; // vector #2
+    vec2 MaskMatrix1[2]; // vector #3
+    vec2 MaskTranslation1; // vector #4
     vec2 MaskTranslation2;
-    vec2 MaskMatrix2[2]; // vector #6
+    vec2 MaskMatrix2[2]; // vector #5
+    vec4 TexelSize; // vector #6
 
     PUSH_CONSTANTS_EXTRA
 
@@ -69,10 +69,10 @@ layout(push_constant) uniform PushConstants {
 #define CoronaTotalTime pc.TotalTime
 #define CoronaContentScale ubo.ContentScale
 #define CoronaDeltaTime ubo.DeltaTime
-#define u_FillSampler0 u_Samplers[0]
-#define u_FillSampler1 u_Samplers[1]
 
 // some built-ins use these raw names directly:
+#define u_FillSampler0 u_Samplers[0]
+#define u_FillSampler1 u_Samplers[1]
 #define u_ContentScale CoronaContentScale
 #define u_TexelSize CoronaTexelSize
 #define u_TotalTime CoronaTotalTime
@@ -160,11 +160,11 @@ layout(set = 2, binding = 0) uniform sampler2D u_Samplers[MAX_FILL_SAMPLERS + 3]
 
 // cf. vertex
 layout(push_constant) uniform PushConstants {
-    vec4 TexelSize;
     vec2 Unused;
     float TotalTime;
     int SamplerIndex;
     vec4 UnusedRows[4];
+    vec4 TexelSize;
 
     PUSH_CONSTANTS_EXTRA
 } pc;

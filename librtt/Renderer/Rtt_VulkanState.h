@@ -135,6 +135,8 @@ class VulkanState
 			VkPhysicalDeviceProperties properties;
 		};
 
+		const DeviceDetails & GetDeviceDetails() const { return fDeviceDetails; }
+
 	public:
 		struct NewSurfaceCallback {
 			VkSurfaceKHR (*make)( VkInstance, void *, const VkAllocationCallbacks * );
