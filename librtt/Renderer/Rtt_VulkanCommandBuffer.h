@@ -26,7 +26,8 @@ class VulkanFrameBufferObject;
 class VulkanProgram;
 class VulkanRenderer;
 class VulkanState;
-struct DescriptorLists;
+struct Descriptor;
+struct BufferDescriptor;
 struct TimeTransform;
 
 // cf. shell_default_vulkan:
@@ -61,8 +62,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		virtual void Initialize();
 		virtual void Denitialize();
 		virtual void ClearUserUniforms();
-
-		bool PrepareTexturesPool( VulkanState * state );
 
 	private:
 		void PopFrameBufferObject();
@@ -120,7 +119,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		VkResult GetExecuteResult() const { return fExecuteResult; }
 		
 		void BeginFrame();
-		void BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists );
+		void BeginRecording( VkCommandBuffer commandBuffer, Descriptor ** descs );
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
 		bool PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & imageInfo, PushConstantState & pushConstants );
 
@@ -156,7 +155,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		void WriteUniform( Uniform* uniform );
 		U8 * PointToUniform( U32 index, size_t offset );
 
-		DescriptorLists & ListsForIndex( U32 index );
+		BufferDescriptor & BufferForIndex( U32 index );
 
 		UniformUpdate fUniformUpdates[Uniform::kNumBuiltInVariables];
 
@@ -178,7 +177,7 @@ class VulkanCommandBuffer : public CommandBuffer
 
 		// non-owned, retained only for frame:
 		// (some of this could go on the stack)
-		DescriptorLists * fLists;
+		Descriptor ** fDescriptors;
 		VkCommandBuffer fCommandBuffer;
 		VkPipeline fPipeline;
 

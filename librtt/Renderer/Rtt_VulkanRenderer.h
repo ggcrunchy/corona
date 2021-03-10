@@ -49,47 +49,53 @@ class VulkanState;
 
 // ----------------------------------------------------------------------------
 
-struct DynamicUniformData {
-	DynamicUniformData();
-	~DynamicUniformData();
+struct Descriptor {
+	enum Index { kUniforms, kUserData, kTexture };
 
-	VulkanBufferData * fBufferData;
-	void * fMapped;
-};
+	Descriptor( VkDescriptorSetLayout setLayout );
 
-struct DescriptorLists {
-	enum ListIndex { kUniforms, kUserData, kTexture };
-
-	DescriptorLists( VulkanState * state, VkDescriptorSetLayout setLayout, U32 count, size_t size );
-	DescriptorLists( VkDescriptorSetLayout setLayout, bool resetPools = false );
-
-	bool NoBuffers() const { return ~0U == fBufferIndex; }
-	bool IsBufferFull() const { return fOffset == fBufferSize; }
-	bool AddBuffer( VulkanState * state );
-	bool AddPool( VulkanState * state, VkDescriptorType type, U32 descriptorCount, U32 maxSets, VkDescriptorPoolCreateFlags flags = 0 );
-	bool EnsureAvailability( VulkanState * state );
-	bool PreparePool( VulkanState * state );
-	void Reset( VkDevice device );
-	void SetWorkspace( void * workspace );
-	void Wipe( VkDevice device, const VkAllocationCallbacks * allocator );
+	virtual void Reset( VkDevice device ) = 0;
+	virtual void Wipe( VkDevice device, const VkAllocationCallbacks * allocator ) = 0;
 
 	static bool IsMaskPushConstant( int index );
-	static bool IsPushConstant( int index, bool usePushConstants );
+	static bool IsPushConstant( int index, bool userDataPushConstants );
 	static bool IsUserData( int index );
 
-	std::vector< VkDescriptorSet > fSets;
-	std::vector< VkDescriptorPool > fPools;
-	std::vector< DynamicUniformData > fDynamicUniforms; // in normal scenarios, we should only ever use one of these...
 	VkDescriptorSetLayout fSetLayout;
+	bool fDirty;
+};
+
+struct BufferDescriptor : public Descriptor {
+	BufferDescriptor( VulkanState * state, VkDescriptorPool pool, VkDescriptorSetLayout setLayout, VkDescriptorType type, size_t count, size_t size );
+
+	virtual void Reset( VkDevice device );
+	virtual void Wipe( VkDevice device, const VkAllocationCallbacks * allocator );
+
+	void SetWorkspace( void * workspace );
+	void TryToAddMemory( std::vector< VkMappedMemoryRange > & ranges );
+	void TryToAddDynamicOffset( uint32_t offsets[], size_t & count );
+
+	VkDescriptorSet fSet;
+	VkDescriptorType fType;
 	VkDeviceSize fDynamicAlignment;
-	U32 fBufferIndex; // ...i.e. index 0
-	U32 fBufferSize;
-	U32 fOffset;
+	VulkanBufferData * fBufferData;
+	void * fMapped;
 	U8 * fWorkspace;
+	U32 fOffset;
+	size_t fAtomSize;
+	size_t fBufferSize;
 	size_t fRawSize;
 	size_t fNonCoherentRawSize;
-	bool fDirty;
-	bool fResetPools;
+	bool fWritten;
+};
+
+struct TexturesDescriptor : public Descriptor {
+	TexturesDescriptor( VulkanState * state, VkDescriptorSetLayout setLayout );
+
+	virtual void Reset( VkDevice device );
+	virtual void Wipe( VkDevice device, const VkAllocationCallbacks * allocator );
+
+	VkDescriptorPool fPool;
 };
 
 class VulkanRenderer : public Renderer
@@ -174,9 +180,10 @@ class VulkanRenderer : public Renderer
 		FrameBufferObject * fPrimaryFBO;
 		std::vector< VkImage > fSwapchainImages;
 		std::vector< VkCommandBuffer > fCommandBuffers;
-		std::vector< DescriptorLists > fDescriptorLists;
+		std::vector< Descriptor * > fDescriptors;
 		std::map< PipelineKey, VkPipeline > fBuiltPipelines;
 		VkPipeline fFirstPipeline;
+		VkDescriptorPool fPool;
 		VkDescriptorSetLayout fUniformsLayout;
 		VkDescriptorSetLayout fUserDataLayout;
 		VkDescriptorSetLayout fTextureLayout;
