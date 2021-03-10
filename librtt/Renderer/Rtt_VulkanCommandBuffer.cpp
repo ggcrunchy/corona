@@ -150,7 +150,7 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	fImageAvailableSemaphore( VK_NULL_HANDLE ),
 	fRenderFinishedSemaphore( VK_NULL_HANDLE ),
 	fInFlight( VK_NULL_HANDLE ),
-	fLists( NULL ),
+	fDescriptors( NULL ),
 	fCommandBuffer( VK_NULL_HANDLE ),
 	fPipeline( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE )
@@ -271,15 +271,6 @@ VulkanCommandBuffer::ClearUserUniforms()
 	fUniformUpdates[Uniform::kUserData1].uniform = NULL;
 	fUniformUpdates[Uniform::kUserData2].uniform = NULL;
 	fUniformUpdates[Uniform::kUserData3].uniform = NULL;
-}
-
-bool 
-VulkanCommandBuffer::PrepareTexturesPool( VulkanState * state )
-{
-	const U32 arrayCount = 1024U; // TODO: is this how to allocate this? (maybe arrays are just too complex / wasteful for the common case)
-	const U32 descriptorCount = arrayCount * 5U; // 2 + 3 masks (TODO: but could be more flexible? e.g. already reflected in VulkanProgram)
-
-	return fLists[DescriptorLists::kTexture].AddPool( state, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorCount, arrayCount );
 }
 
 void
@@ -728,8 +719,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	VulkanUserData userData;
 	PushConstantState pushConstants;
 
-	fLists[DescriptorLists::kUniforms].SetWorkspace( &uniforms );
-	fLists[DescriptorLists::kUserData].SetWorkspace( &userData );
+	BufferForIndex( 0 ).SetWorkspace( &uniforms );
+	BufferForIndex( 1 ).SetWorkspace( &userData );
 
 	U32 numPasses = 1U + fOffscreenSequence.size();
 
@@ -875,7 +866,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				{
 					U32 unit = Read<U32>();
 					VulkanTexture* texture = Read<VulkanTexture*>();
-					texture->Bind( fLists[DescriptorLists::kTexture], descriptorImageInfo[unit] );
+					texture->Bind( /*fLists*/*fDescriptors[Descriptor::kTexture], descriptorImageInfo[unit] );
 
 					DEBUG_PRINT( "Bind Texture: texture=%p unit=%i Vulkan ID=%" PRIx64,
 									texture,
@@ -1075,7 +1066,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerScalar:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Real );
-					if (program->HavePushConstantUniforms() && DescriptorLists::IsPushConstant( index, true ))
+					if (program->HavePushConstantUniforms() && Descriptor::IsPushConstant( index, true ))
 					{
 						pushConstants.Write( location.fOffset, &value, sizeof( Real ) );
 					}
@@ -1090,7 +1081,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerVec2:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Vec2 );
-					if (program->HavePushConstantUniforms() && DescriptorLists::IsPushConstant( index, true ))
+					if (program->HavePushConstantUniforms() && Descriptor::IsPushConstant( index, true ))
 					{
 						pushConstants.Write( location.fOffset, &value, sizeof( Vec2 ) );
 					}
@@ -1105,7 +1096,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerVec3:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Vec3 );
-					if (program->HavePushConstantUniforms() && DescriptorLists::IsPushConstant( index, true ))
+					if (program->HavePushConstantUniforms() && Descriptor::IsPushConstant( index, true ))
 					{
 						pushConstants.Write( location.fOffset, &value, sizeof( Vec3 ) );
 					}
@@ -1120,7 +1111,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerVec4:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Vec4 );
-					if (program->HavePushConstantUniforms() && DescriptorLists::IsPushConstant( index, true ))
+					if (program->HavePushConstantUniforms() && Descriptor::IsPushConstant( index, true ))
 					{
 						pushConstants.Write( location.fOffset, &value, sizeof( Vec4 ) );
 					}
@@ -1152,7 +1143,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerMat4:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Mat4 );
-					if (program->HavePushConstantUniforms() && DescriptorLists::IsPushConstant( index, true ))
+					if (program->HavePushConstantUniforms() && Descriptor::IsPushConstant( index, true ))
 					{
 						pushConstants.Write( location.fOffset, &value, sizeof( Mat4 ) );
 					}
@@ -1283,7 +1274,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 					if (PrepareDraw( mode, descriptorImageInfo, pushConstants ))
 					{
-
 						// The first argument, offset, is currently unused. If support for non-
 						// VBO based indexed rendering is added later, an offset may be needed.
 
@@ -1423,23 +1413,24 @@ VkResult VulkanCommandBuffer::WaitAndAcquire( VkDevice device, VkSwapchainKHR sw
 void
 VulkanCommandBuffer::BeginFrame()
 {
-	fLists = NULL;
+	fDescriptors/*fLists*/ = NULL;
 	fCommandBuffer = VK_NULL_HANDLE;
 	fPipeline = VK_NULL_HANDLE;
 	fSwapchain = VK_NULL_HANDLE;
 }
 
-void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, DescriptorLists * lists )
+void
+VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descriptor ** descs )
 {
-	if (commandBuffer != VK_NULL_HANDLE && lists)
+	if (commandBuffer != VK_NULL_HANDLE && descs)
 	{
 		VkDevice device = fRenderer.GetState()->GetDevice();
 
-		// lists = ..., ubo, user data, textures, ...
+		// lists = ..., uniforms, user data, textures, ...
 	
-		lists[DescriptorLists::kUniforms].Reset( device );
-		lists[DescriptorLists::kUserData].Reset( device );
-		lists[DescriptorLists::kTexture].Reset( device );
+		descs[Descriptor::kUniforms]->Reset( device );
+		descs[Descriptor::kUserData]->Reset( device );
+		descs[Descriptor::kTexture]->Reset( device );
 
 		VkCommandBufferBeginInfo beginInfo = {};
 
@@ -1448,7 +1439,7 @@ void VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descrip
 		if (VK_SUCCESS == vkBeginCommandBuffer( commandBuffer, &beginInfo ))
 		{
 			fCommandBuffer = commandBuffer;
-			fLists = lists;
+			fDescriptors = descs;
 		}
 
 		else
@@ -1488,44 +1479,30 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 
 		std::vector< VkMappedMemoryRange > memoryRanges;
 
-		static_assert( DescriptorLists::kUniforms < DescriptorLists::kUserData, "UBOs in unexpected order" );
-		static_assert( DescriptorLists::kUserData < DescriptorLists::kTexture, "UBO / textures in unexpected order" );
+		static_assert( Descriptor::kUniforms < Descriptor::kUserData, "Uniforms / buffer in unexpected order" );
+		static_assert( Descriptor::kUserData < Descriptor::kTexture, "Buffer / textures in unexpected order" );
 
 		U32 first = 2U; // try to do better
 
 		for (U32 i = 0; i < 2; ++i)
 		{
-			if (fLists[i].fDirty)
+			if (fDescriptors[i]->fDirty)
 			{
 				if (i < first)
 				{
 					first = i;
 				}
 
-				DescriptorLists & lists = fLists[i];
+				BufferDescriptor & desc = BufferForIndex( i );
 
-				sets[nsets++] = lists.fSets[lists.fBufferIndex];
-				dynamicOffsets[count++] = /*0U;*/lists.fOffset;
-//if (!lists.fOffset)
-{
-				DynamicUniformData & uniforms = lists.fDynamicUniforms[lists.fBufferIndex];
+				sets[nsets++] = desc.fSet;
 
-				memcpy( static_cast< U8 * >( uniforms.fMapped ) + lists.fOffset, lists.fWorkspace, lists.fRawSize );
-			
-				VkMappedMemoryRange range = {};
-
-				range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-				range.memory = uniforms.fBufferData->GetMemory();
-				range.offset = lists.fOffset;
-				range.size = lists.fNonCoherentRawSize;
-
-				memoryRanges.push_back( range );
-}
-				lists.fOffset += U32( lists.fDynamicAlignment );
+				desc.TryToAddDynamicOffset( dynamicOffsets, count );
+				desc.TryToAddMemory( memoryRanges );
 			}
 		}
 
-		if (fLists[DescriptorLists::kTexture].fDirty)
+		if (fDescriptors[Descriptor::kTexture]->fDirty)
 		{
 			sets[nsets++] = AddTextureSet( descriptorImageInfo );
 		}
@@ -1539,10 +1516,10 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 				vkFlushMappedMemoryRanges( device, memoryRanges.size(), memoryRanges.data() );
 			}
 
-			if (2U == nsets && !fLists[DescriptorLists::kUserData].fDirty) // split?
+			if (2U == nsets && !fDescriptors[Descriptor::kUserData]->fDirty) // split?
 			{
 				Rtt_ASSERT( 0U == first );
-				Rtt_ASSERT( 1U == count );
+				Rtt_ASSERT( 0U == count );
 
 				vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0U, 1U, &sets[0], 1U, dynamicOffsets );
 				vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 2U, 1U, &sets[1], 0U, NULL );
@@ -1556,7 +1533,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 
 		for (int i = 0; i < 3; ++i)
 		{
-			fLists[i].fDirty = false;
+			fDescriptors[i]->fDirty = false;
 		}
 
 		if (pushConstants.IsValid())
@@ -1575,99 +1552,88 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 VkDescriptorSet VulkanCommandBuffer::AddTextureSet( const std::vector< VkDescriptorImageInfo > & imageInfo )
 {
 	VulkanState * state = fRenderer.GetState();
-	DescriptorLists & list = fLists[DescriptorLists::kTexture];
-
-	if (list.fPools.empty() && !PrepareTexturesPool( state ))
-	{
-		CoronaLog( "Failed to create initial descriptor texture pool!" );
-
-		return VK_NULL_HANDLE;
-	}
+	TexturesDescriptor & desc = *static_cast< TexturesDescriptor * >( fDescriptors[Descriptor::kTexture] );
 
 	VkDescriptorSetAllocateInfo allocInfo = {};
 	VkDescriptorSetLayout layout = fRenderer.GetTextureLayout();
 
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = desc.fPool;
 	allocInfo.descriptorSetCount = 1U;
 	allocInfo.pSetLayouts = &layout;
 				
 	VkDescriptorSet set = VK_NULL_HANDLE;
-	bool doRetry = false;
+	VkResult result = vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &set );
 
-	do {
-		allocInfo.descriptorPool = list.fPools.back();
-		VkResult result = vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &set );
+	if (VK_ERROR_OUT_OF_POOL_MEMORY == result)
+	{
+		CoronaLog( "Exhausted texture descriptors" );
 
-		if (VK_ERROR_OUT_OF_POOL_MEMORY == result)
+		return VK_NULL_HANDLE;
+	}
+
+	else if (VK_SUCCESS == result)
+	{
+		std::vector< VkWriteDescriptorSet > writes;
+
+		VkWriteDescriptorSet wds = {};
+
+		wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		wds.dstSet = set;
+
+		Rtt_ASSERT( imageInfo.size() <= 31 );
+
+		U32 inUse = 0U, previousMask = 0U;
+
+		for (size_t i = 0; i < imageInfo.size(); ++i)
 		{
-			Rtt_ASSERT( !doRetry ); // this should never happen
+			U32 currentMask = 1U << i;
 
-			doRetry = PrepareTexturesPool( state );
+			if (imageInfo[i].imageView != VK_NULL_HANDLE) // valid entry...
+			{
+				if (0U == (inUse & previousMask)) // ...but previous entry was not?
+				{
+					wds.dstArrayElement = i;
+					wds.pImageInfo = imageInfo.data() + i;
+
+					writes.push_back( wds );
+				}
+
+				inUse |= currentMask;
+
+				++writes.back().descriptorCount;
+			}
+
+			previousMask = currentMask;
 		}
+         
+		Rtt_ASSERT( inUse );
 
-		else if (VK_SUCCESS == result)
+		// If the images were only partially bound, but this is not supported by the hardware, populate
+		// the unoccupied slots with one of the valid entries.
+		// if (!ThatFeatureThatLetsUsSkipThis && (inUse + 1U != (1U << imageInfo.size()) - 1U)
 		{
-			std::vector< VkWriteDescriptorSet > writes;
-
-			VkWriteDescriptorSet wds = {};
-
-			wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			wds.dstSet = set;
-
-			Rtt_ASSERT( imageInfo.size() <= 31 );
-
-			U32 inUse = 0U, previousMask = 0U;
+			wds.descriptorCount = 1U;
+			wds.pImageInfo = writes.back().pImageInfo;
 
 			for (size_t i = 0; i < imageInfo.size(); ++i)
 			{
-				U32 currentMask = 1U << i;
+				U32 used = inUse & (1U << i);
 
-				if (imageInfo[i].imageView != VK_NULL_HANDLE) // valid entry...
+				if (!used)
 				{
-					if (0U == (inUse & previousMask)) // ...but previous entry was not?
-					{
-						wds.dstArrayElement = i;
-						wds.pImageInfo = imageInfo.data() + i;
+					wds.dstArrayElement = i;
 
-						writes.push_back( wds );
-					}
-
-					inUse |= currentMask;
-
-					++writes.back().descriptorCount;
-				}
-
-				previousMask = currentMask;
-			}
-         
-			Rtt_ASSERT( inUse );
-
-			// If the images were only partially bound, but this is not supported by the hardware, populate
-			// the unoccupied slots with one of the valid entries.
-			// if (!ThatFeatureThatLetsUsSkipThis && (inUse + 1U != (1U << imageInfo.size()) - 1U)
-			{
-				wds.descriptorCount = 1U;
-				wds.pImageInfo = writes.back().pImageInfo;
-
-				for (size_t i = 0; i < imageInfo.size(); ++i)
-				{
-					U32 used = inUse & (1U << i);
-
-					if (!used)
-					{
-						wds.dstArrayElement = i;
-
-						writes.push_back( wds );
-					}
+					writes.push_back( wds );
 				}
 			}
-
-			vkUpdateDescriptorSets( state->GetDevice(), writes.size(), writes.data(), 0U, NULL );
-
-			return set;
 		}
-	} while (doRetry);
+
+		vkUpdateDescriptorSets( state->GetDevice(), writes.size(), writes.data(), 0U, NULL );
+
+		return set;
+	}
 
 	CoronaLog( "Failed to allocate texture descriptor set!" );
 
@@ -1822,9 +1788,9 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 
 	if (isValid && location.IsValid())
 	{
-		if (DescriptorLists::IsPushConstant( index, vulkanProgram.HavePushConstantUniforms() ))
+		if (Descriptor::IsPushConstant( index, vulkanProgram.HavePushConstantUniforms() ))
 		{
-			if (DescriptorLists::IsMaskPushConstant( index ))
+			if (Descriptor::IsMaskPushConstant( index ))
 			{
 				VulkanProgram::Location translationLocation = vulkanProgram.GetTranslationLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
 
@@ -1867,7 +1833,7 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 	{
 		Uniform* uniform = update.uniform;
 
-		if (DescriptorLists::IsPushConstant( index, false ))
+		if (Descriptor::IsPushConstant( index, false ))
 		{
 			ApplyPushConstant( uniform, 0U, 0U, &vulkanProgram, index );
 		}
@@ -1901,17 +1867,18 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 
 U8 * VulkanCommandBuffer::PointToUniform( U32 index, size_t offset )
 {
-	DescriptorLists & lists = ListsForIndex( index );
-	bool ok = lists.EnsureAvailability( fRenderer.GetState() );
+	BufferDescriptor & desc = BufferForIndex( index );
 
-	lists.fDirty = true;
+	desc.fDirty = true;
 
-	return ok ? lists.fWorkspace + offset : NULL;
+	return desc.fWorkspace + offset;
 }
 
-DescriptorLists & VulkanCommandBuffer::ListsForIndex( U32 index )
+BufferDescriptor & VulkanCommandBuffer::BufferForIndex( U32 index )
 {
-	return DescriptorLists::IsUserData( index ) ? fLists[DescriptorLists::kUserData] : fLists[DescriptorLists::kUniforms];
+	Descriptor::Index descIndex = Descriptor::IsUserData( index ) ? Descriptor::kUserData : Descriptor::kUniforms;
+
+	return *static_cast< BufferDescriptor * >( fDescriptors[descIndex] );
 }
 
 void VulkanCommandBuffer::PushConstantState::Reset()

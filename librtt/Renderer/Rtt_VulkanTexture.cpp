@@ -181,11 +181,11 @@ VulkanTexture::Destroy()
 }
 
 void
-VulkanTexture::Bind( DescriptorLists & lists, VkDescriptorImageInfo & imageInfo )
+VulkanTexture::Bind( Descriptor & desc, VkDescriptorImageInfo & imageInfo )
 {
     if (imageInfo.imageView != fImageView)
     {
-        lists.fDirty = true;
+        /*lists*/desc.fDirty = true;
 
 	    imageInfo.imageView = fImageView;
 	    imageInfo.sampler = fSampler;
