@@ -70,6 +70,15 @@ Uniform::Uniform( Rtt_Allocator* allocator, DataType type )
 	Allocate();
 }
 
+// STEVE CHANGE
+Uniform::Uniform( DataType type )
+:	CPUResource( NULL ),
+	fType( type ),
+	fData( NULL )
+{
+}
+// /STEVE CHANGE
+
 Uniform::~Uniform()
 {
 	Deallocate();

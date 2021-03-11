@@ -62,6 +62,9 @@ class Uniform : public CPUResource
 
 	public:
 		Uniform( Rtt_Allocator* allocator, DataType type );
+	// STEVE CHANGE
+		Uniform( DataType type );
+	// /STEVE CHANGE
 		virtual ~Uniform();
 
 		virtual ResourceType GetType() const;

@@ -921,6 +921,9 @@
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanState.cpp">
       <Filter>librtt\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\librtt\Renderer\Rtt_ShaderCode.cpp">
+      <Filter>librtt\Renderer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\external\ALmixer\luaal.h">
@@ -1842,6 +1845,9 @@
       <Filter>librtt\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanState.h">
+      <Filter>librtt\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_ShaderCode.h">
       <Filter>librtt\Renderer</Filter>
     </ClInclude>
   </ItemGroup>

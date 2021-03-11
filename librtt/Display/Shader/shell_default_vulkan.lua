@@ -26,10 +26,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
 
 // 256 bytes:
 layout(set = 1, binding = 0) uniform UserDataObject {
-    mat4 UserData0;
-    mat4 UserData1;
-    mat4 UserData2;
-    mat4 UserData3;
+    mat4 Stub[4];
 } userDataObject;
 
 #define MAX_FILL_SAMPLERS 2
@@ -145,11 +142,8 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
 } ubo;
 
 // cf. vertex
-layout(set = 1, binding = 1) uniform UserDataObject {
-    mat4 UserData0;
-    mat4 UserData1;
-    mat4 UserData2;
-    mat4 UserData3;
+layout(set = 1, binding = 0) uniform UserDataObject {
+    mat4 Stub[4];
 } userDataObject;
 
 #define MAX_FILL_SAMPLERS 2

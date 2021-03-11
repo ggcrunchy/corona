@@ -42,6 +42,7 @@ namespace /*anonymous*/
 		kCommandApplyPushConstantVec2,
 		kCommandApplyPushConstantVec3,
 		kCommandApplyPushConstantVec4,
+		kCommandApplyPushConstantMat3,
 		kCommandApplyPushConstantMat4,
 		kCommandApplyPushConstantMaskTransform,
 		kCommandApplyUniformScalar,
@@ -54,6 +55,7 @@ namespace /*anonymous*/
 		kCommandApplyPushConstantFromPointerVec2,
 		kCommandApplyPushConstantFromPointerVec3,
 		kCommandApplyPushConstantFromPointerVec4,
+		kCommandApplyPushConstantFromPointerMat3,
 		kCommandApplyPushConstantFromPointerMat4,
 		kCommandApplyPushConstantFromPointerMaskTransform,
 		kCommandApplyUniformFromPointerScalar,
@@ -922,6 +924,19 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					DEBUG_PRINT( "Set Push Constant: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], offset );
 					CHECK_ERROR_AND_BREAK;
 				}
+				case kCommandApplyPushConstantMat3:
+				{
+					U32 offset = Read<U32>();
+					Mat3 value = Read<Mat3>();
+					for (int i = 0; i < 3; ++i)
+					{
+						pushConstants.Write( offset, &value.data[i * 3], sizeof( Vec3 ) );
+
+						fOffset += sizeof( float ) * 4;
+					}
+					DEBUG_PRINT_MATRIX( "Set Push Constant: value=", value.data, 9 );
+					CHECK_ERROR_AND_BREAK;
+				}
 				case kCommandApplyPushConstantMat4:
 				{
 					U32 offset = Read<U32>();
@@ -1041,6 +1056,22 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					DEBUG_PRINT( "Set Push Constant: value=(%f, %f, %f, %f) location=%i", value.data[0], value.data[1], value.data[2], value.data[3], location.fOffset );
 					CHECK_ERROR_AND_BREAK;
 				}
+				case kCommandApplyPushConstantFromPointerMat3:
+				{
+					READ_UNIFORM_DATA_WITH_PROGRAM( Mat3 );
+					if (location.IsValid())
+					{
+						U8 * data = PointToUniform( index, location.fOffset );
+						for (int i = 0; i < 3; ++i)
+						{
+							memcpy( data, &value.data[i * 3], sizeof( Vec3 ) );
+
+							data += sizeof( float ) * 4;
+						}
+					}
+					DEBUG_PRINT_MATRIX( "Set Push Constant: value=", value.data, 9 );
+					CHECK_ERROR_AND_BREAK;
+				}
 				case kCommandApplyPushConstantFromPointerMat4:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Mat4 );
@@ -1128,8 +1159,18 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandApplyUniformFromPointerMat3:
 				{
 					READ_UNIFORM_DATA_WITH_PROGRAM( Mat3 );
-					// TODO: push constants (currently invalidates policy)
-					if (location.IsValid())
+					if (program->HavePushConstantUniforms() && Descriptor::IsPushConstant( index, true ))
+					{
+						size_t offset = location.fOffset;
+
+						for (int i = 0; i < 3; ++i)
+						{
+							pushConstants.Write( offset, &value.data[i * 3], sizeof( Vec3 ) );
+
+							fOffset += sizeof( float ) * 4;
+						}
+					}
+					else if (location.IsValid())
 					{
 						U8 * data = PointToUniform( index, location.fOffset );
 						for (int i = 0; i < 3; ++i)
@@ -1744,6 +1785,8 @@ void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, s
 			command = program ? kCommandApplyPushConstantFromPointerVec3 : kCommandApplyPushConstantVec3; break;
 		case Uniform::kVec4:
 			command = program ? kCommandApplyPushConstantFromPointerVec4 : kCommandApplyPushConstantVec4; break;
+		case Uniform::kMat3:
+			command = program ? kCommandApplyPushConstantFromPointerMat3 : kCommandApplyPushConstantMat3; break;
 		case Uniform::kMat4:
 			command = program ? kCommandApplyPushConstantFromPointerMat4 : kCommandApplyPushConstantMat4; break;
 		default:
