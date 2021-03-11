@@ -54,21 +54,41 @@ Descriptor::IsUserData( int index )
 	return index >= Uniform::kUserData0;
 }
 
+BufferData::BufferData()
+:	fData( NULL ),
+	fMapped( NULL ),
+	fSet( VK_NULL_HANDLE )
+{
+}
+
+void
+BufferData::Wipe()
+{
+	if (fMapped)
+	{
+		Rtt_ASSERT( fData );
+
+		vkUnmapMemory( fData->GetDevice(), fData->GetMemory() );
+	}
+
+	Rtt_DELETE( fData );
+}
 
 BufferDescriptor::BufferDescriptor( VulkanState * state, VkDescriptorPool pool, VkDescriptorSetLayout setLayout, VkDescriptorType type, size_t count, size_t size )
 :	Descriptor( setLayout ),
-	fSet( VK_NULL_HANDLE ),
+	fLastSet( VK_NULL_HANDLE ),
 	fType( type ),
 	fDynamicAlignment( 0U ),
-	fBufferData( NULL ),
-	fMapped( NULL ),
 	fWorkspace( NULL ),
+	fIndex( 0U ),
 	fOffset( 0U ),
+	fLastOffset( 0U ),
 	fAtomSize( 0U ),
 	fBufferSize( 0U ),
 	fRawSize( size ),
 	fNonCoherentRawSize( size ),
-	fWritten( false )
+	fWritten( false ),
+	fMarkWritten( false )
 {
 	const VkPhysicalDeviceLimits & limits = state->GetProperties().limits;
 	VulkanBufferData bufferData( state->GetDevice(), state->GetAllocator() );
@@ -90,9 +110,11 @@ BufferDescriptor::BufferDescriptor( VulkanState * state, VkDescriptorPool pool, 
 		maxSize = limits.maxStorageBufferRange;
 	}
 
+	bool isDynamic = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC == type || VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC == type;
+
 	fDynamicAlignment = fRawSize;
 
-	if (alignment > 0U)
+	if (isDynamic && alignment > 0U)
 	{
 		fDynamicAlignment = (fDynamicAlignment + alignment - 1) & ~(alignment - 1);
 	}
@@ -105,61 +127,89 @@ BufferDescriptor::BufferDescriptor( VulkanState * state, VkDescriptorPool pool, 
 	{
 		fNonCoherentRawSize += limits.nonCoherentAtomSize - remainder;
 
-		Rtt_ASSERT( fNonCoherentRawSize <= fDynamicAlignment );
+		Rtt_ASSERT( !isDynamic || fNonCoherentRawSize <= fDynamicAlignment );
 	}
 
-	fBufferSize = std::min( U32( count * fDynamicAlignment ), maxSize );
+	fBufferSize = isDynamic ? U32( count * fDynamicAlignment ) : fRawSize;
+
+	U32 n = fBufferSize / maxSize + (fBufferSize % maxSize ? 1 : 0);
+
+	if (n > 1U)
+	{
+		fBufferSize = maxSize;
+	}
+
 // ^^ TODO: this is somewhat limiting for SSBO case
 
-	if (state->CreateBuffer( fBufferSize, usageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, bufferData ))
+	for (U32 i = 0; i < n; ++i)
 	{
-		fMapped = state->MapData( bufferData.GetMemory() );
-		fBufferData = bufferData.Extract( NULL );
-	}
+		if (state->CreateBuffer( fBufferSize, usageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, bufferData ))
+		{
+			BufferData buffer;
 
-	VkDescriptorSetAllocateInfo allocInfo = {};
+			buffer.fMapped = state->MapData( bufferData.GetMemory() );
+			buffer.fData = bufferData.Extract( NULL );
 
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = pool;
-	allocInfo.descriptorSetCount = 1U;
-	allocInfo.pSetLayouts = &fSetLayout;
+			VkDescriptorSetAllocateInfo allocInfo = {};
 
-	if (VK_SUCCESS == vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &fSet ))
-	{
-		VkWriteDescriptorSet descriptorWrite = {};
-		VkDescriptorBufferInfo bufferInfo = {};
+			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			allocInfo.descriptorPool = pool;
+			allocInfo.descriptorSetCount = 1U;
+			allocInfo.pSetLayouts = &fSetLayout;
 
-		bufferInfo.buffer = fBufferData->GetBuffer();
-		bufferInfo.range = fBufferSize;
+			if (VK_SUCCESS == vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &buffer.fSet ))
+			{
+				VkWriteDescriptorSet descriptorWrite = {};
+				VkDescriptorBufferInfo bufferInfo = {};
 
-		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite.descriptorCount = 1U;
-		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		descriptorWrite.dstSet = fSet;
-		descriptorWrite.pBufferInfo = &bufferInfo;
+				bufferInfo.buffer = buffer.fData->GetBuffer();
+				bufferInfo.range = fBufferSize;
 
-		vkUpdateDescriptorSets( state->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
+				descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				descriptorWrite.descriptorCount = 1U;
+				descriptorWrite.descriptorType = type;
+				descriptorWrite.dstSet = buffer.fSet;
+				descriptorWrite.pBufferInfo = &bufferInfo;
+
+				vkUpdateDescriptorSets( state->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
+
+				fBuffers.push_back( buffer );
+			}
+
+			else
+			{
+				buffer.Wipe();
+
+				CoronaLog( "Failed to allocate buffer descriptor" );
+			}
+		}
+
+		else
+		{
+			CoronaLog( "Failed to create buffer" );
+
+			break;
+		}
 	}
 }
 
 void
 BufferDescriptor::Reset( VkDevice )
 {
-	fOffset = 0U;
+	fLastSet = VK_NULL_HANDLE;
+	fIndex = fOffset = fLastOffset = 0U;
 	fDirty = fWritten = false;
 }
 
 void
-BufferDescriptor::Wipe( VkDevice device, const VkAllocationCallbacks * allocator )
+BufferDescriptor::Wipe( VkDevice, const VkAllocationCallbacks * )
 {
-	if (fMapped)
+	for (BufferData & buffer : fBuffers)
 	{
-		Rtt_ASSERT( fBufferData );
-
-		vkUnmapMemory( fBufferData->GetDevice(), fBufferData->GetMemory() );
+		buffer.Wipe();
 	}
 
-	Rtt_DELETE( fBufferData );
+	fBuffers.clear();
 }
 
 void
@@ -169,31 +219,54 @@ BufferDescriptor::SetWorkspace( void * workspace )
 }
 
 void
-BufferDescriptor::TryToAddMemory( std::vector< VkMappedMemoryRange > & ranges )
+BufferDescriptor::TryToAddMemory( std::vector< VkMappedMemoryRange > & ranges, VkDescriptorSet sets[], size_t & count )
 {
-	bool dynamicBuffer = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC == fType || VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC == fType;
-	bool normalBuffer = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER == fType || VK_DESCRIPTOR_TYPE_STORAGE_BUFFER == fType;
+	const BufferData & buffer = fBuffers[fIndex];
 
-	if (dynamicBuffer || (normalBuffer && !fWritten))
+	if (!fWritten)
 	{
-		memcpy( static_cast< U8 * >( fMapped ) + fOffset, fWorkspace, fRawSize );
+		bool dynamicBuffer = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC == fType || VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC == fType;
+
+		if (dynamicBuffer && fIndex == fBuffers.size())
+		{
+			CoronaLog( "Failed to add memory: buffer full!" );
+
+			return; // TODO: much more than this needs hardening
+		}
+
+		memcpy( static_cast< U8 * >( buffer.fMapped ) + fOffset, fWorkspace, fRawSize );
 			
 		VkMappedMemoryRange range = {};
 
+		bool isFull = fOffset + fNonCoherentRawSize >= fBufferSize;
+
 		range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-		range.memory = fBufferData->GetMemory();
-		range.offset = fOffset;
-		range.size = fNonCoherentRawSize;
+		range.memory = buffer.fData->GetMemory();
+		range.offset = fOffset; // TODO: must be multiple of atom size... how to handle if alignment disagrees?
+		range.size =  isFull ? VK_WHOLE_SIZE : fNonCoherentRawSize;
 
 		ranges.push_back( range );
 
-		fWritten = true;
+		fLastSet = buffer.fSet;
+		fLastOffset = fOffset;
 
 		if (dynamicBuffer)
 		{
-			fOffset += U32( fDynamicAlignment );
+			if (isFull)
+			{
+				fOffset = 0U;
+
+				++fIndex;
+			}
+
+			else
+			{
+				fOffset += U32( fDynamicAlignment );
+			}
 		}
 	}
+
+	sets[count++] = fWritten ? fLastSet : buffer.fSet;
 }
 	
 void
@@ -201,7 +274,7 @@ BufferDescriptor::TryToAddDynamicOffset( uint32_t offsets[], size_t & count )
 {
 	if (VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC == fType || VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC == fType)
 	{
-		offsets[count++] = fOffset;
+		offsets[count++] = fWritten ? fLastOffset : fOffset;
 	}
 }
 
@@ -268,12 +341,6 @@ TexturesDescriptor::Wipe( VkDevice device, const VkAllocationCallbacks * allocat
 {
 	WipeDescriptorPool( device, fPool, allocator );
 }
-
-
-
-
-
-
 
 VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 :   Super( allocator ),
@@ -451,7 +518,7 @@ CoronaLog( "ACQUIRE: %i", result );
 
 	if (canContinue)
 	{
-		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], fDescriptors/*Lists*/.data() + 3U * index );
+		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], fDescriptors.data() + 3U * index );
 	}
 
 	else
@@ -540,27 +607,24 @@ VulkanRenderer::BuildUpSwapchain( VkSwapchainKHR swapchain )
 	fCommandBuffers.resize( imageCount );
 	fSwapchainImages.resize( imageCount );
 
-	fDescriptors/*Lists*/.clear();
+	fDescriptors.clear();
 
 	VulkanState * state = GetState();
 
-	VkDescriptorPoolSize sizes[2];
+	VkDescriptorPoolSize size;
 
-	sizes[0].descriptorCount = 2U;
-	sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	size.descriptorCount = imageCount * 64U;
+	size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 
-	sizes[1].descriptorCount = 2U;
-	sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-
-	fPool = AddPool( state, sizes, 2, imageCount * 2U );
+	fPool = AddPool( state, &size, 1U, imageCount * 80U ); // TODO: wild guess this many uniform buffers can satisfy 256 "render targets" / 1024 uniform blocks, cf. below
 
 	for (uint32_t i = 0; i < imageCount; ++i)
 	{
 		static_assert( Descriptor::kUniforms < Descriptor::kUserData, "Uniforms / buffer in unexpected order" );
 		static_assert( Descriptor::kUserData < Descriptor::kTexture, "Buffer / textures in unexpected order" );
 
-		fDescriptors.push_back( Rtt_NEW( NULL, BufferDescriptor( state, fPool, fUniformsLayout, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1U, sizeof( VulkanUniforms ) ) ) );
-		fDescriptors.push_back( Rtt_NEW( NULL, BufferDescriptor( state, fPool, fUserDataLayout, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024U, sizeof( VulkanUserData ) ) ) );
+		fDescriptors.push_back( Rtt_NEW( NULL, BufferDescriptor( state, fPool, fUniformsLayout, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256U, sizeof( VulkanUniforms ) ) ) );
+		fDescriptors.push_back( Rtt_NEW( NULL, BufferDescriptor( state, fPool, fUserDataLayout, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024U, sizeof( VulkanUserData ) ) ) );
 		fDescriptors.push_back( Rtt_NEW( NULL, TexturesDescriptor( state, fTextureLayout ) ) );
 	}
 
