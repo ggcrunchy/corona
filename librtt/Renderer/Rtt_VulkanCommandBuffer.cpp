@@ -822,6 +822,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 						geometry->Bind( fRenderer, fCommandBuffer, false );
 					}
 
+					BufferForIndex( 0 ).ResetMark();
+
 					DEBUG_PRINT( "BEGIN RENDER PASS " );
 					CHECK_ERROR_AND_BREAK;
 				}
@@ -1432,6 +1434,7 @@ VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descriptor *
 		descs[Descriptor::kUserData]->Reset( device );
 		descs[Descriptor::kTexture]->Reset( device );
 
+
 		VkCommandBufferBeginInfo beginInfo = {};
 
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1440,6 +1443,8 @@ VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descriptor *
 		{
 			fCommandBuffer = commandBuffer;
 			fDescriptors = descs;
+
+			BufferForIndex( 0 ).AllowMark();
 		}
 
 		else
@@ -1495,10 +1500,9 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 
 				BufferDescriptor & desc = BufferForIndex( i );
 
-				sets[nsets++] = desc.fSet;
-
 				desc.TryToAddDynamicOffset( dynamicOffsets, count );
-				desc.TryToAddMemory( memoryRanges );
+				desc.TryToAddMemory( memoryRanges, sets, nsets );
+				desc.TryToMark();
 			}
 		}
 
@@ -1511,7 +1515,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 
 		if (nsets > 0U)
 		{
-			if (count)
+			if (!memoryRanges.empty())
 			{
 				vkFlushMappedMemoryRanges( device, memoryRanges.size(), memoryRanges.data() );
 			}
@@ -1519,7 +1523,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 			if (2U == nsets && !fDescriptors[Descriptor::kUserData]->fDirty) // split?
 			{
 				Rtt_ASSERT( 0U == first );
-				Rtt_ASSERT( 0U == count );
+				Rtt_ASSERT( 1U == count );
 
 				vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0U, 1U, &sets[0], 1U, dynamicOffsets );
 				vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 2U, 1U, &sets[1], 0U, NULL );

@@ -65,28 +65,44 @@ struct Descriptor {
 	bool fDirty;
 };
 
+struct BufferData {
+	BufferData();
+
+	void Wipe();
+
+	VkDescriptorSet fSet;
+	VulkanBufferData * fData;
+	void * fMapped;
+};
+
 struct BufferDescriptor : public Descriptor {
 	BufferDescriptor( VulkanState * state, VkDescriptorPool pool, VkDescriptorSetLayout setLayout, VkDescriptorType type, size_t count, size_t size );
+
+	void AllowMark() { fMarkWritten = true; }
+	void ResetMark() { fWritten = false; }
+	void TryToMark() { fWritten = fMarkWritten; }
 
 	virtual void Reset( VkDevice device );
 	virtual void Wipe( VkDevice device, const VkAllocationCallbacks * allocator );
 
 	void SetWorkspace( void * workspace );
-	void TryToAddMemory( std::vector< VkMappedMemoryRange > & ranges );
+	void TryToAddMemory( std::vector< VkMappedMemoryRange > & ranges, VkDescriptorSet sets[], size_t & count );
 	void TryToAddDynamicOffset( uint32_t offsets[], size_t & count );
 
-	VkDescriptorSet fSet;
+	std::vector< BufferData > fBuffers;
+	VkDescriptorSet fLastSet;
 	VkDescriptorType fType;
 	VkDeviceSize fDynamicAlignment;
-	VulkanBufferData * fBufferData;
-	void * fMapped;
 	U8 * fWorkspace;
+	U32 fIndex;
 	U32 fOffset;
+	U32 fLastOffset;
 	size_t fAtomSize;
 	size_t fBufferSize;
 	size_t fRawSize;
 	size_t fNonCoherentRawSize;
 	bool fWritten;
+	bool fMarkWritten;
 };
 
 struct TexturesDescriptor : public Descriptor {
