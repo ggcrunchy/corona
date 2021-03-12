@@ -62,7 +62,7 @@ struct Descriptor {
 	static bool IsUserData( int index );
 
 	VkDescriptorSetLayout fSetLayout;
-	bool fDirty;
+	U32 fDirty;
 };
 
 struct BufferData {
@@ -79,8 +79,14 @@ struct BufferDescriptor : public Descriptor {
 	BufferDescriptor( VulkanState * state, VkDescriptorPool pool, VkDescriptorSetLayout setLayout, VkDescriptorType type, size_t count, size_t size );
 
 	void AllowMark() { fMarkWritten = true; }
-	void ResetMark() { fWritten = false; }
-	void TryToMark() { fWritten = fMarkWritten; }
+	void ResetMark() { fWritten = 0U; }
+	void TryToMark()
+	{
+		if (fMarkWritten)
+		{
+			fWritten |= fDirty;
+		}
+	}
 
 	virtual void Reset( VkDevice device );
 	virtual void Wipe( VkDevice device, const VkAllocationCallbacks * allocator );
@@ -101,7 +107,7 @@ struct BufferDescriptor : public Descriptor {
 	size_t fBufferSize;
 	size_t fRawSize;
 	size_t fNonCoherentRawSize;
-	bool fWritten;
+	U32 fWritten;
 	bool fMarkWritten;
 };
 

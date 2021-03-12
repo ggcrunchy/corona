@@ -185,7 +185,7 @@ VulkanTexture::Bind( Descriptor & desc, VkDescriptorImageInfo & imageInfo )
 {
     if (imageInfo.imageView != fImageView)
     {
-        /*lists*/desc.fDirty = true;
+        desc.fDirty = true;
 
 	    imageInfo.imageView = fImageView;
 	    imageInfo.sampler = fSampler;

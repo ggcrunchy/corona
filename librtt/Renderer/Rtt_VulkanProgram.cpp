@@ -756,7 +756,7 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 					positions[i].fValue = &values[i];
 				}
 
-				auto result = SearchForFreeRows( values, positions, 16 ); // four userdata matrices
+				auto result = SearchForFreeRows( values, positions, 16U ); // four userdata matrices
 
 				std::sort( positions, positions + 4 ); // as above
 
@@ -767,7 +767,7 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 			}
 		}
 
-		const char * userDataMarker = canUsePushConstants ? "PUSH_CONSTANTS_EXTRA" : "mat4 Stub[4]";
+		const char * userDataMarker = canUsePushConstants ? "PUSH_CONSTANTS_EXTRA" : "mat4 Stub[4];";
 		std::string userDataGroup( canUsePushConstants ? " pc" : " userDataObject" );
 
 		std::string extra;
@@ -799,9 +799,15 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 				// error!
 			}
 
-			epos += strlen( userDataMarker );
+			if (canUsePushConstants)
+			{
+				vertexExtra = vertexCode.Insert( epos + strlen( userDataMarker ), extra );
+			}
 
-			vertexExtra = canUsePushConstants ? vertexCode.Insert( epos, extra ) : vertexCode.Replace( epos, strlen( userDataMarker ), extra );
+			else
+			{
+				vertexExtra = vertexCode.Replace( epos, strlen( userDataMarker ), extra );
+			}
 		}
 
 		if (!fragmentDeclarations.empty())
@@ -813,9 +819,16 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 				// error!
 			}
 
-			epos += strlen( userDataMarker );
+			if (canUsePushConstants)
+			{
+				fragmentExtra = fragmentCode.Insert( epos + strlen( userDataMarker ), extra );
+			}
 
-			fragmentExtra = canUsePushConstants ? fragmentCode.Insert( epos, extra ) : fragmentCode.Replace( epos, strlen( userDataMarker ), extra );
+			else
+			{
+				fragmentExtra = fragmentCode.Replace( epos, strlen( userDataMarker ), extra );
+			}
+
 			fFragmentConstants = canUsePushConstants;
 		}
 
@@ -851,7 +864,7 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 			}
 		}
 
-		fPushConstantUniforms = true;
+		fPushConstantUniforms = canUsePushConstants;
 	}
 
 	// Vertex shader.

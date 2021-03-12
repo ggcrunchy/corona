@@ -29,7 +29,7 @@ namespace Rtt
 
 Descriptor::Descriptor(  VkDescriptorSetLayout setLayout )
 :	fSetLayout( setLayout ),
-	fDirty( false )
+	fDirty( 0U )
 {
 }
 
@@ -87,7 +87,7 @@ BufferDescriptor::BufferDescriptor( VulkanState * state, VkDescriptorPool pool, 
 	fBufferSize( 0U ),
 	fRawSize( size ),
 	fNonCoherentRawSize( size ),
-	fWritten( false ),
+	fWritten( 0U ),
 	fMarkWritten( false )
 {
 	const VkPhysicalDeviceLimits & limits = state->GetProperties().limits;
@@ -198,7 +198,7 @@ BufferDescriptor::Reset( VkDevice )
 {
 	fLastSet = VK_NULL_HANDLE;
 	fIndex = fOffset = fLastOffset = 0U;
-	fDirty = fWritten = false;
+	fDirty = fWritten = 0U;
 }
 
 void
@@ -222,8 +222,9 @@ void
 BufferDescriptor::TryToAddMemory( std::vector< VkMappedMemoryRange > & ranges, VkDescriptorSet sets[], size_t & count )
 {
 	const BufferData & buffer = fBuffers[fIndex];
+	bool allWritten = (fWritten & fDirty) == fDirty;
 
-	if (!fWritten)
+	if (!allWritten)
 	{
 		bool dynamicBuffer = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC == fType || VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC == fType;
 
@@ -266,7 +267,7 @@ BufferDescriptor::TryToAddMemory( std::vector< VkMappedMemoryRange > & ranges, V
 		}
 	}
 
-	sets[count++] = fWritten ? fLastSet : buffer.fSet;
+	sets[count++] = allWritten ? fLastSet : buffer.fSet;
 }
 	
 void
@@ -274,7 +275,7 @@ BufferDescriptor::TryToAddDynamicOffset( uint32_t offsets[], size_t & count )
 {
 	if (VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC == fType || VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC == fType)
 	{
-		offsets[count++] = fWritten ? fLastOffset : fOffset;
+		offsets[count++] = (fWritten & fDirty) == fDirty ? fLastOffset : fOffset;
 	}
 }
 
@@ -323,7 +324,7 @@ TexturesDescriptor::Reset( VkDevice device )
 {
 	vkResetDescriptorPool( device, fPool, 0 );
 
-	fDirty = false;
+	fDirty = 0U;
 }
 
 static void
