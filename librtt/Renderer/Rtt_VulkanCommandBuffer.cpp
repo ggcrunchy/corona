@@ -721,8 +721,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	VulkanUserData userData;
 	PushConstantState pushConstants;
 
-	BufferForIndex( 0 ).SetWorkspace( &uniforms );
-	BufferForIndex( 1 ).SetWorkspace( &userData );
+	Buffer( 0 ).SetWorkspace( &uniforms );
+	Buffer( 1 ).SetWorkspace( &userData );
 
 	U32 numPasses = 1U + fOffscreenSequence.size();
 
@@ -824,7 +824,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 						geometry->Bind( fRenderer, fCommandBuffer, false );
 					}
 
-					BufferForIndex( 0 ).ResetMark();
+					Buffer( 0 ).ResetMark();
 
 					DEBUG_PRINT( "BEGIN RENDER PASS " );
 					CHECK_ERROR_AND_BREAK;
@@ -870,7 +870,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				{
 					U32 unit = Read<U32>();
 					VulkanTexture* texture = Read<VulkanTexture*>();
-					texture->Bind( /*fLists*/*fDescriptors[Descriptor::kTexture], descriptorImageInfo[unit] );
+					texture->Bind( *fDescriptors[Descriptor::kTexture], descriptorImageInfo[unit] );
 
 					DEBUG_PRINT( "Bind Texture: texture=%p unit=%i Vulkan ID=%" PRIx64,
 									texture,
@@ -932,7 +932,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					{
 						pushConstants.Write( offset, &value.data[i * 3], sizeof( Vec3 ) );
 
-						fOffset += sizeof( float ) * 4;
+						offset += sizeof( float ) * 4;
 					}
 					DEBUG_PRINT_MATRIX( "Set Push Constant: value=", value.data, 9 );
 					CHECK_ERROR_AND_BREAK;
@@ -1167,7 +1167,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 						{
 							pushConstants.Write( offset, &value.data[i * 3], sizeof( Vec3 ) );
 
-							fOffset += sizeof( float ) * 4;
+							offset += sizeof( float ) * 4;
 						}
 					}
 					else if (location.IsValid())
@@ -1456,7 +1456,7 @@ VkResult VulkanCommandBuffer::WaitAndAcquire( VkDevice device, VkSwapchainKHR sw
 void
 VulkanCommandBuffer::BeginFrame()
 {
-	fDescriptors/*fLists*/ = NULL;
+	fDescriptors = NULL;
 	fCommandBuffer = VK_NULL_HANDLE;
 	fPipeline = VK_NULL_HANDLE;
 	fSwapchain = VK_NULL_HANDLE;
@@ -1475,7 +1475,6 @@ VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descriptor *
 		descs[Descriptor::kUserData]->Reset( device );
 		descs[Descriptor::kTexture]->Reset( device );
 
-
 		VkCommandBufferBeginInfo beginInfo = {};
 
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1485,7 +1484,7 @@ VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descriptor *
 			fCommandBuffer = commandBuffer;
 			fDescriptors = descs;
 
-			BufferForIndex( 0 ).AllowMark();
+			Buffer( 0 ).AllowMark();
 		}
 
 		else
@@ -1532,14 +1531,14 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 
 		for (U32 i = 0; i < 2; ++i)
 		{
-			if (fDescriptors[i]->fDirty)
+			BufferDescriptor & desc = Buffer( i );
+
+			if (desc.fDirty)
 			{
 				if (i < first)
 				{
 					first = i;
 				}
-
-				BufferDescriptor & desc = BufferForIndex( i );
 
 				desc.TryToAddDynamicOffset( dynamicOffsets, count );
 				desc.TryToAddMemory( memoryRanges, sets, nsets );
@@ -1578,7 +1577,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 
 		for (int i = 0; i < 3; ++i)
 		{
-			fDescriptors[i]->fDirty = false;
+			fDescriptors[i]->fDirty = 0U;
 		}
 
 		if (pushConstants.IsValid())
@@ -1732,12 +1731,14 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 	}
 }
 
-void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, size_t translationOffset, VulkanProgram * program, U32 index )
+void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, const size_t * translationOffset, VulkanProgram * program, U32 index )
 {
 	Uniform::DataType dataType = uniform->GetDataType();
 
-	if ( Uniform::kMat3 == dataType ) // n.b. at the moment this is only valid for mask transforms
+	if ( translationOffset )
 	{
+		Rtt_ASSERT( Uniform::kMat3 == dataType );
+
 		// Mindful of the difficulties mentioned re. kVec3 in https://stackoverflow.com/questions/38172696/should-i-ever-use-a-vec3-inside-of-a-uniform-buffer-or-shader-storage-buffer-o,
 		// mask matrices are decomposed as a vec2[2] and vec2. Three components are always constant and thus omitted.
 		// The vec2 array avoids consuming two vectors, cf. https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL).
@@ -1763,7 +1764,7 @@ void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, s
 			WRITE_COMMAND(kCommandApplyPushConstantMaskTransform);
 			Write<U32>(offset);
 			Write<Vec4>(maskMatrix);
-			Write<U32>(translationOffset);
+			Write<U32>(*translationOffset);
 		}
 
 		Vec2 maskTranslation = { src[6], src[7] };
@@ -1841,12 +1842,12 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 			{
 				VulkanProgram::Location translationLocation = vulkanProgram.GetTranslationLocation( Uniform::kViewProjectionMatrix + index, fCurrentPrepVersion );
 
-				ApplyPushConstant( uniform, location.fOffset, translationLocation.fOffset );
+				ApplyPushConstant( uniform, location.fOffset, &translationLocation.fOffset );
 			}
 
 			else
 			{
-				ApplyPushConstant( uniform, location.fOffset, 0U );
+				ApplyPushConstant( uniform, location.fOffset, NULL );
 			}
 		}
 
@@ -1882,7 +1883,9 @@ void VulkanCommandBuffer::ApplyUniform( VulkanProgram & vulkanProgram, U32 index
 
 		if (Descriptor::IsPushConstant( index, false ))
 		{
-			ApplyPushConstant( uniform, 0U, 0U, &vulkanProgram, index );
+			const U32 translationOffset = 0U; // used only to check if mask constant
+
+			ApplyPushConstant( uniform, 0U, Descriptor::IsMaskPushConstant( index ) ? &translationOffset : NULL, &vulkanProgram, index );
 		}
 
 		else
@@ -1916,16 +1919,21 @@ U8 * VulkanCommandBuffer::PointToUniform( U32 index, size_t offset )
 {
 	BufferDescriptor & desc = BufferForIndex( index );
 
-	desc.fDirty = true;
+	desc.fDirty |= 1U << index;
 
 	return desc.fWorkspace + offset;
+}
+
+BufferDescriptor & VulkanCommandBuffer::Buffer( U32 index )
+{
+	return *static_cast< BufferDescriptor * >( fDescriptors[index] );
 }
 
 BufferDescriptor & VulkanCommandBuffer::BufferForIndex( U32 index )
 {
 	Descriptor::Index descIndex = Descriptor::IsUserData( index ) ? Descriptor::kUserData : Descriptor::kUniforms;
 
-	return *static_cast< BufferDescriptor * >( fDescriptors[descIndex] );
+	return Buffer( descIndex );
 }
 
 void VulkanCommandBuffer::PushConstantState::Reset()
