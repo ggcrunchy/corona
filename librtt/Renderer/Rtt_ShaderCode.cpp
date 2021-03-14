@@ -8,6 +8,7 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #include "Renderer/Rtt_ShaderCode.h"
+#include <algorithm>
 
 // ----------------------------------------------------------------------------
 
@@ -51,6 +52,46 @@ ShaderCode::Find( const char * what, size_t offset ) const
 			offset = pos + strlen( what );
 		}
 	}
+}
+
+size_t
+ShaderCode::Skip( size_t offset, int (*pred)( int ) ) const
+{
+	const char * str = fCode.c_str();
+	Interval cur;
+
+	for (size_t index = 0U, pos = offset; pos < fCode.size(); )
+	{
+		if (pred( str[pos] ))
+		{
+			for (; index < fIntervals.size(); ++index)
+			{
+				if (pos < fIntervals[index].second)
+				{
+					cur = fIntervals[index];
+
+					break;
+				}
+			}
+
+			if (pos >= cur.first && pos <= cur.second)
+			{
+				pos = cur.second + 1;
+			}
+
+			else
+			{
+				return pos;
+			}
+		}
+
+		else
+		{
+			++pos;
+		}
+	}
+
+	return std::string::npos;
 }
 
 int
@@ -130,7 +171,7 @@ ShaderCode::GatherIntervals()
 		{
 			offset = endPos + strlen( "*/" );
 
-			fIntervals.push_back( std::make_pair( beginPos, offset - 1U ) );
+			fIntervals.push_back( Interval( beginPos, offset - 1U ) );
 		}
 	}
 
@@ -143,7 +184,7 @@ ShaderCode::GatherIntervals()
 
 		if (std::string::npos == beginPos)
 		{
-			return;
+			break;
 		}
 
 		else
@@ -152,19 +193,21 @@ ShaderCode::GatherIntervals()
 
 			if (std::string::npos == endPos)
 			{
-				fIntervals.push_back( std::make_pair( beginPos, fCode.size() ) );
+				fIntervals.push_back( Interval( beginPos, fCode.size() ) );
 
-				return;
+				break;
 			}
 
 			else
 			{
 				offset = endPos + strlen( "\n" );
 
-				fIntervals.push_back( std::make_pair( beginPos, offset - 1U ) );
+				fIntervals.push_back( Interval( beginPos, offset - 1U ) );
 			}
 		}
 	}
+
+	std::sort( fIntervals.begin(), fIntervals.end() );
 }
 
 // ----------------------------------------------------------------------------
