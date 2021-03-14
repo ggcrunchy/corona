@@ -56,7 +56,7 @@ namespace Rtt
 
 VulkanProgram::VulkanProgram( VulkanState * state )
 :	fState( state ),
-	fFragmentConstants( false ),
+	fPushConstantStages( 0U ),
 	fPushConstantUniforms( false )
 {
 	for( U32 i = 0; i < Program::kNumVersions; ++i )
@@ -221,7 +221,8 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 		if (NoLeadingCharacters( code.GetString(), pos ))
 		{
-			size_t cpos = code.Find( ";", pos + strlen( "uniform " ) );
+			size_t pastUniformPos = pos + strlen( "uniform " );
+			size_t cpos = code.Find( ";", pastUniformPos );
 
 			if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
 			{
@@ -230,74 +231,161 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 				return result;
 			}
 
-			char precision[16], type[16];
-			int index;
+			pastUniformPos = code.Skip( pastUniformPos, isalpha );
 
-			if (sscanf( code.GetCStr() + pos, "uniform %15s %15s u_UserData%1i", precision, type, &index ) < 3)
+			if (std::string::npos == pastUniformPos || pastUniformPos > cpos)
 			{
-				CoronaLog( "Uniform in shader was ill-formed" );
+				CoronaLog( "Missing type (and optional precision) after `uniform`" );
 
 				return result;
 			}
 
-			if (index < 0 || index > 3)
+			char precision[16];
+
+			if (sscanf( code.GetCStr() + pastUniformPos, "P_%15s ", precision ) == 1)
 			{
-				CoronaLog( "Invalid uniform userdata `%i`", index );
+				const char * options[] = { "COLOR", "DEFAULT", "NORMAL", "POSITION", "RANDOM", "UV", NULL }, * choice = NULL;
 
-				return result;
-			}
-
-			U32 componentCount = 1U;
-
-			if (strcmp( type, "float" ) != 0)
-			{
-				Uniform::DataType dataType = Uniform::DataTypeForString( type );
-
-				if (Uniform::kScalar == dataType)
+				for (int i = 0; options[i] && !choice; ++i)
 				{
-					CoronaLog( "Ill-formed uniform type" );
+					if (strcmp( precision, options[i] ) == 0)
+					{
+						choice = options[i];
+					}
+				}
 
-					return result;
+				if (choice)
+				{
+					pastUniformPos += strlen( "P_" ) + strlen( choice ) + 1;
 				}
 
 				else
 				{
-					componentCount = Uniform( dataType ).GetNumValues();
+					CoronaLog( "Invalid precision" );
+
+					return result;
 				}
 			}
 
-			VkShaderStageFlagBits stage = isVertexSource ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT;
+			char punct = '\0';
 
-			if (0 == values[index].fStages)
-			{
-				values[index].fComponentCount = componentCount;
-			}
+			do {
+				U32 componentCount = 1U;
+				char type[16];
+
+				if ('\0' == punct)
+				{
+					pastUniformPos = code.Skip( pastUniformPos, isalpha );
+
+					if (std::string::npos == pastUniformPos || pastUniformPos > cpos)
+					{
+						CoronaLog( "Missing type after `uniform`" );
+
+						return result;
+					}
+
+					if (sscanf( code.GetCStr() + pastUniformPos, "%15s ", type ) == 0)
+					{
+						CoronaLog( "Uniform type in shader was ill-formed" );
+
+						return result;
+					}
+
+					else if (strcmp( type, "float" ) != 0)
+					{
+						Uniform::DataType dataType = Uniform::DataTypeForString( type );
+
+						if (Uniform::kScalar == dataType)
+						{
+							CoronaLog( "Invalid uniform type" );
+
+							return result;
+						}
+
+						else
+						{
+							componentCount = Uniform( dataType ).GetNumValues();
+						}
+					}
+
+					pastUniformPos += strlen( type ) + 1;
+				}
+
+				pastUniformPos = code.Skip( pastUniformPos, isalpha );
+
+				if (std::string::npos == pastUniformPos || pastUniformPos > cpos)
+				{
+					CoronaLog( "Missing `u_UserData?` after `uniform`" );
+
+					return result;
+				}
+
+				int index;
+
+				if (sscanf( code.GetCStr() + pastUniformPos, "u_UserData%1i ", &index ) == 0)
+				{
+					CoronaLog( "`u_UserData?` in shader was ill-formed" );
+				}
+
+				if (index < 0 || index > 3)
+				{
+					CoronaLog( "Invalid uniform userdata `%i`", index );
+
+					return result;
+				}
+
+				pastUniformPos += strlen( "u_UserData?" );
+
+				pastUniformPos = code.Skip( pastUniformPos, ispunct );
+
+				Rtt_ASSERT( std::string::npos != pastUniformPos && pastUniformPos <= cpos );
+
+				punct = code.GetCStr()[pastUniformPos++];
+
+				if (punct != ',' && punct != ';')
+				{
+					CoronaLog( "Expected ',' or ';' after declaration" );
+
+					return result;
+				}
+
+				VkShaderStageFlagBits stage = isVertexSource ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT;
+
+				if (0 == values[index].fStages)
+				{
+					values[index].fComponentCount = componentCount;
+				}
 	
-			else if (values[index].fStages & stage)
-			{
-				CoronaLog( "Uniform userdata `%i` already defined in %s stage", index, isVertexSource ? "vertex" : "kernel" );
+				else if (values[index].fStages & stage)
+				{
+					CoronaLog( "Uniform userdata `%i` already defined in %s stage", index, isVertexSource ? "vertex" : "fragment" );
 
-				return result;
-			}
+					return result;
+				}
 
-			else if (values[index].fComponentCount != componentCount)
-			{
-				Rtt_ASSERT( !isVertexSource );
+				else if (values[index].fComponentCount != componentCount)
+				{
+					Rtt_ASSERT( !isVertexSource );
 
-				CoronaLog( "Uniform userdata `%i` definition differs between vertex and fragment stages", index );
+					CoronaLog( "Uniform userdata `%i` definition differs between vertex and fragment stages", index );
 
-				return result;
-			}
+					return result;
+				}
 
-			values[index].fStages |= stage;
+				values[index].fStages |= stage;
 
-			UserdataDeclaration declaration;
+				UserdataDeclaration declaration = {};
 
-			declaration.fValue = &values[index];
-			declaration.fPosition = pos;
-			declaration.fLength = cpos - pos + 1; // include semi-colon as well
+				declaration.fValue = &values[index];
+				declaration.fPosition = pos;
 
-			declarations.push_back( declaration );
+				if (';' == punct) // last on line?
+				{
+					declaration.fLength = cpos - pos + 1; // include semi-colon as well
+				}
+
+				declarations.push_back( declaration );
+			} while (';' != punct);
 		}
 
 		offset = pos + 1U;
@@ -430,6 +518,18 @@ VulkanProgram::Compile( int ikind, ShaderCode & code, Maps & maps, VkShaderModul
 				std::string name = comp.get_member_name( buffer.base_type_id, br.index );
 
 				maps.buffer_values.insert( std::make_pair( name, Maps::BufferValue( br.offset, br.range, false ) ) );
+			}
+
+			switch (kind)
+			{
+				case shaderc_vertex_shader:
+					fPushConstantStages |= VK_SHADER_STAGE_VERTEX_BIT;
+					break;
+				case shaderc_fragment_shader:
+					fPushConstantStages |= VK_SHADER_STAGE_FRAGMENT_BIT;
+					break;
+				default:
+					break;
 			}
 		}
 
@@ -681,8 +781,6 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 
 	if (!vertexDeclarations.empty() || !fragmentDeclarations.empty())
 	{
-		// TODO: still valid?
-
 		for (int i = 0; i < 4; ++i)
 		{
 			values[i].fIndex = i;
@@ -828,8 +926,6 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 			{
 				fragmentExtra = fragmentCode.Replace( epos, strlen( userDataMarker ), extra );
 			}
-
-			fFragmentConstants = canUsePushConstants;
 		}
 
 		std::string prefix1( "#define u_UserData" ), prefix2 = userDataGroup + ".UserData";
@@ -837,15 +933,33 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 		for (auto && iter = vertexDeclarations.rbegin(); iter != vertexDeclarations.rend(); ++iter)
 		{
 			const char suffix[] = { '0' + iter->fValue->fIndex, 0 };
+			std::string declaration = (prefix1 + suffix) + (prefix2 + suffix);
 
-			vertexCode.Replace( iter->fPosition + vertexExtra, iter->fLength, (prefix1 + suffix) + (prefix2 + suffix) );
+			if (iter->fLength)
+			{
+				vertexCode.Replace( iter->fPosition + vertexExtra, iter->fLength, declaration );
+			}
+
+			else
+			{
+				vertexCode.Insert( iter->fPosition + vertexExtra, declaration + '\n' );
+			}
 		}
 
 		for (auto && iter = fragmentDeclarations.rbegin(); iter != fragmentDeclarations.rend(); ++iter)
 		{
 			const char suffix[] = { '0' + iter->fValue->fIndex, 0 };
+			std::string declaration = (prefix1 + suffix) + (prefix2 + suffix);
 
-			fragmentCode.Replace( iter->fPosition + fragmentExtra, iter->fLength, (prefix1 + suffix) + (prefix2 + suffix) );
+			if (iter->fLength)
+			{
+				fragmentCode.Replace( iter->fPosition + fragmentExtra, iter->fLength, declaration );
+			}
+
+			else
+			{
+				fragmentCode.Insert( iter->fPosition + fragmentExtra, declaration + '\n' );
+			}
 		}
 
 		if (toReplace)

@@ -101,7 +101,7 @@ class VulkanProgram : public GPUResource
 			return fData[version].IsValid();
 		}
 
-		bool HaveFragmentConstants() const { return fFragmentConstants; }
+		U32 GetPushConstantStages() const { return fPushConstantStages; }
 		bool HavePushConstantUniforms() const { return fPushConstantUniforms; }
 
 	private:
@@ -213,8 +213,8 @@ class VulkanProgram : public GPUResource
 		VulkanState * fState;
 		VersionData fData[Program::kNumVersions];
 		CPUResource* fResource;
+		U32 fPushConstantStages;
 		bool fPushConstantUniforms;
-		bool fFragmentConstants;
 
 		static U32 sID;
 

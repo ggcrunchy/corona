@@ -26,13 +26,25 @@ class ShaderCode
 	public:
 		typedef ShaderCode Self;
 
-		typedef std::pair< size_t, size_t > Interval;
+	public:
+		struct Interval {
+			Interval( size_t lower = 0U, size_t upper = 0U )
+			:	first( lower ),
+				second( upper )
+			{
+			}
+
+			bool operator < (const Interval & other) const { return first < other.first; }
+
+			size_t first, second;
+		};
 
 	public:
 		void SetSources( const char * sources[], size_t count );
 
 	public:
 		size_t Find( const char * what, size_t offset ) const;
+		size_t Skip( size_t offset, int (*pred)( int ) ) const;
 
 		int Insert( size_t pos, const std::string & insertion );
 		int Replace( size_t pos, size_t count, const std::string & replacement );

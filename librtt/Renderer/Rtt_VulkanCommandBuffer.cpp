@@ -884,9 +884,9 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					VulkanProgram* program = Read<VulkanProgram*>();
 					program->Bind( fRenderer, fCurrentDrawVersion );
 
-					if (program->HaveFragmentConstants() && Program::Version::kWireframe != fCurrentDrawVersion)
+					if (Program::Version::kWireframe != fCurrentDrawVersion)
 					{
-						pushConstants.UseFragmentStage();
+						pushConstants.SetStages( program->GetPushConstantStages() );
 					}
 
 					DEBUG_PRINT( "Bind Program: program=%p version=%i", program, fCurrentDrawVersion );
@@ -1940,7 +1940,7 @@ void VulkanCommandBuffer::PushConstantState::Reset()
 {
 	upperOffset = 0U;
 	lowerOffset = 1U;
-	stages = VK_SHADER_STAGE_VERTEX_BIT;
+	stages = 0U;
 }
 
 void VulkanCommandBuffer::PushConstantState::Write( U32 offset, const void * src, size_t size )

@@ -100,7 +100,7 @@ class VulkanCommandBuffer : public CommandBuffer
 			}
 
 			void Reset();
-			void UseFragmentStage() { stages |= VK_SHADER_STAGE_FRAGMENT_BIT; } // TODO: if using sampler index or "small userdata"...
+			void SetStages( U32 newStages ) { stages = newStages; }
 			void Write( U32 offset, const void * src, size_t size );
 
 			float * GetData( U32 offset );
