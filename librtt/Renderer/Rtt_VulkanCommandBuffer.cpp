@@ -18,6 +18,7 @@
 #include "Renderer/Rtt_VulkanRenderer.h"
 #include "Display/Rtt_ShaderResource.h"
 
+#include <algorithm>
 #include <cinttypes> // https://stackoverflow.com/questions/8132399/how-to-printf-uint64-t-fails-with-spurious-trailing-in-format#comment9979590_8132440
 #include <limits>
 
@@ -35,6 +36,7 @@ namespace /*anonymous*/
 		kCommandBeginRenderPass,
 		kCommandBindGeometry,
 		kCommandFetchGeometry,
+		kCommandFetchTextures,
 		kCommandFetchRenderState,
 		kCommandBindTexture,
 		kCommandBindProgram,
@@ -161,6 +163,11 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	{
 		fUniformUpdates[i].uniform = NULL;
 		fUniformUpdates[i].timestamp = 0;
+	}
+
+	for (U32 i = 0; i < kNumTextures; ++i)
+	{
+		fCurrentTextures[i] = NULL;
 	}
 
 	ClearExecuteResult();
@@ -291,6 +298,8 @@ VulkanCommandBuffer::PopFrameBufferObject()
 		entry.fBuffer = fBuffer;
 		entry.fBytesAllocated = fBytesAllocated;
 		entry.fNumCommands = fNumCommands;
+		entry.fHeight = fFBOStack.size();
+		entry.fOrder = fOffscreenSequence.size();
 
 		fOffscreenSequence.push_back( entry );
 
@@ -305,6 +314,8 @@ VulkanCommandBuffer::PopFrameBufferObject()
 
 			Write< GPUResource * >( fCurrentGeometry->GetGPUResource() );
 		}
+
+		RecordTextures();
 	}
 }
 
@@ -384,6 +395,8 @@ VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 	WRITE_COMMAND( kCommandBindTexture );
 	Write<U32>( unit );
 	Write<GPUResource*>( texture->GetGPUResource() );
+
+	fCurrentTextures[unit] = texture;
 }
 
 void 
@@ -649,6 +662,8 @@ VulkanCommandBuffer::WillRender()
 
 			Write< GPUResource * >( fCurrentGeometry->GetGPUResource() );
 		}
+
+		RecordTextures();
 	}
 
 	WRITE_COMMAND( kCommandBeginRenderPass );
@@ -706,16 +721,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	std::vector< VulkanGeometry * > geometryList;
 
 	//GL_CHECK_ERROR();
-	std::vector< VkDescriptorImageInfo > descriptorImageInfo( 5U, VkDescriptorImageInfo{} );
-	std::vector< VkClearValue > clearValues;
-	VkViewport viewport;
-
-	viewport.minDepth = 0.f;
-	viewport.maxDepth = 1.f;
-
-	VkRenderPassBeginInfo renderPassBeginInfo = {};
-
-	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 
 	VulkanUniforms uniforms;
 	VulkanUserData userData;
@@ -723,6 +728,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	Buffer( 0 ).SetWorkspace( &uniforms );
 	Buffer( 1 ).SetWorkspace( &userData );
+
+	std::sort( fOffscreenSequence.begin(), fOffscreenSequence.end() );
 
 	U32 numPasses = 1U + fOffscreenSequence.size();
 
@@ -763,8 +770,20 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			fOffscreenSequence.pop_back();
 		}
 
+		std::vector< VkDescriptorImageInfo > descriptorImageInfo( kNumTextures, VkDescriptorImageInfo{} );
+		std::vector< VkClearValue > clearValues;
+		VkViewport viewport;
+
+		viewport.minDepth = 0.f;
+		viewport.maxDepth = 1.f;
+
+		VkRenderPassBeginInfo renderPassBeginInfo = {};
+
+		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+
 		VulkanGeometry * geometry = NULL;
 		VulkanFrameBufferObject * fbo = NULL;
+		U32 stages = 0U;
 
 		for( U32 i = 0; i < fNumCommands; ++i )
 		{
@@ -854,6 +873,21 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					DEBUG_PRINT( "Fetch Geometry %p", geometry );
 					CHECK_ERROR_AND_BREAK;
 				}
+				case kCommandFetchTextures:
+				{
+					for (U32 i = 0; i < kNumTextures; ++i)
+					{		
+						VulkanTexture * texture = Read<VulkanTexture *>();
+
+						if (texture)
+						{
+							texture->Bind( *fDescriptors[Descriptor::kTexture], descriptorImageInfo[i] );
+						}
+					}
+
+					DEBUG_PRINT( "Fetch Textures" );
+					CHECK_ERROR_AND_BREAK;
+				}
 				case kCommandFetchRenderState:
 				{
 					VkPipelineColorBlendAttachmentState state = Read<VkPipelineColorBlendAttachmentState>();
@@ -884,10 +918,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					VulkanProgram* program = Read<VulkanProgram*>();
 					program->Bind( fRenderer, fCurrentDrawVersion );
 
-					if (Program::Version::kWireframe != fCurrentDrawVersion)
-					{
-						pushConstants.SetStages( program->GetPushConstantStages() );
-					}
+					stages = Program::Version::kWireframe != fCurrentDrawVersion ? program->GetPushConstantStages() : 0U;
 
 					DEBUG_PRINT( "Bind Program: program=%p version=%i", program, fCurrentDrawVersion );
 					CHECK_ERROR_AND_BREAK;
@@ -1302,7 +1333,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					U32 offset = Read<U32>();
 					U32 count = Read<U32>();
 
-					if (PrepareDraw( mode, descriptorImageInfo, pushConstants ))
+					if (PrepareDraw( mode, descriptorImageInfo, pushConstants, stages ))
 					{
 						vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
 					}
@@ -1315,7 +1346,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
 					U32 count = Read<U32>();
 
-					if (PrepareDraw( mode, descriptorImageInfo, pushConstants ))
+					if (PrepareDraw( mode, descriptorImageInfo, pushConstants, stages ))
 					{
 						// The first argument, offset, is currently unused. If support for non-
 						// VBO based indexed rendering is added later, an offset may be needed.
@@ -1494,7 +1525,7 @@ VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descriptor *
 	}
 }
 
-bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & descriptorImageInfo, PushConstantState & pushConstants )
+bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & descriptorImageInfo, PushConstantState & pushConstants, U32 stages )
 {
 	bool canDraw = fCommandBuffer != VK_NULL_HANDLE;
 
@@ -1584,7 +1615,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 		{
 			U32 offset = pushConstants.Offset(), size = pushConstants.Range();
 
-			vkCmdPushConstants( fCommandBuffer, pipelineLayout, pushConstants.Stages(), offset, size, pushConstants.GetData( offset ) );
+			vkCmdPushConstants( fCommandBuffer, pipelineLayout, stages, offset, size, pushConstants.GetData( offset ) );
 
 			pushConstants.Reset();
 		}
@@ -1682,6 +1713,31 @@ VkDescriptorSet VulkanCommandBuffer::AddTextureSet( const std::vector< VkDescrip
 	CoronaLog( "Failed to allocate texture descriptor set!" );
 
 	return VK_NULL_HANDLE;
+}
+
+void VulkanCommandBuffer::RecordTextures()
+{
+	bool hasTextures = false;
+
+	for (U32 i = 0; i < kNumTextures; ++i)
+	{
+		if (fCurrentTextures[i])
+		{
+			hasTextures = true;
+		}
+	}
+
+	if (hasTextures)
+	{
+		WRITE_COMMAND( kCommandFetchTextures );
+
+		for (U32 i = 0; i < kNumTextures; ++i)
+		{
+			GPUResource * texture = fCurrentTextures[i] ? fCurrentTextures[i]->GetGPUResource() : NULL;
+
+			Write< GPUResource * >( texture );
+		}
+	}
 }
 
 template <typename T>
@@ -1940,7 +1996,6 @@ void VulkanCommandBuffer::PushConstantState::Reset()
 {
 	upperOffset = 0U;
 	lowerOffset = 1U;
-	stages = 0U;
 }
 
 void VulkanCommandBuffer::PushConstantState::Write( U32 offset, const void * src, size_t size )
@@ -1974,6 +2029,19 @@ float * VulkanCommandBuffer::PushConstantState::GetData( U32 offset )
 	U8 * bytes = reinterpret_cast< U8 * >( fData );
 
 	return reinterpret_cast< float * >( bytes + offset );
+}
+
+bool VulkanCommandBuffer::OffscreenNode::operator < (const OffscreenNode & other) const
+{
+	if (fHeight == other.fHeight)
+	{
+		return fOrder < other.fOrder;	// follow sequence as is
+	}
+
+	else
+	{
+		return fHeight > other.fHeight; // lower heights depend on upper ones
+	}
 }
 
 // ----------------------------------------------------------------------------
