@@ -2035,13 +2035,15 @@ bool VulkanCommandBuffer::OffscreenNode::operator < (const OffscreenNode & other
 {
 	if (fHeight == other.fHeight)
 	{
-		return fOrder < other.fOrder;	// follow sequence as is
+		return fOrder > other.fOrder;	// follow sequence as is
 	}
 
 	else
 	{
-		return fHeight > other.fHeight; // lower heights depend on upper ones
+		return fHeight < other.fHeight; // lower heights depend on upper ones
 	}
+
+	// we pull these off in reverse, thus the backward operations
 }
 
 // ----------------------------------------------------------------------------

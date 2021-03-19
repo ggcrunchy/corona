@@ -191,44 +191,6 @@ VulkanTexture::Bind( Descriptor & desc, VkDescriptorImageInfo & imageInfo )
 	    imageInfo.sampler = fSampler;
 	    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
-/*
-	VkWriteDescriptorSet descriptorWrite = {};
-
-	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.descriptorCount = 1U;
-	descriptorWrite.pImageInfo = &imageInfo;
-    */
-	if (true) // !fState->GetFeatures().shaderSampledImageArrayDynamicIndexing) // TODO: no indexing... this will presumably occur before binding
-	{
-/*		VkDescriptorSet set = commandBuffer.AddTexture( unit, fImageView );
-
-		if (set != VK_NULL_HANDLE)
-		{
-			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			descriptorWrite.dstArrayElement = unit;
-			descriptorWrite.dstSet = set;
-         
-			vkUpdateDescriptorSets( fState->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
-		}*/
-	}
-
-	else // TODO: do one bind at start of frame, update here?
-	{
-/*
-		VkWriteDescriptorSet write2 = descriptorWrite;
-
-		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-		write2.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-//		write2.dstArrayElement = unit + offset;
-		write2.dstBinding = 1U;
-//		write2.dstSet = set;
-		// TODO: does these both use imageInfo?
-
-		VkWriteDescriptorSet writes[] = { descriptorWrite, write2 };
-
-		vkUpdateDescriptorSets( fState->GetDevice(), 2U, writes, 0U, NULL );
-*/
-	}
 }
 
 void
@@ -519,8 +481,7 @@ VulkanTexture::GetVulkanFormat( Texture::Format format, VkComponentMapping & map
             break;
 		case Texture::kARGB: // cf. GLTexture
 		case Texture::kBGRA:
-            mapping.r = VK_COMPONENT_SWIZZLE_B;
-            mapping.b = VK_COMPONENT_SWIZZLE_R;
+            vulkanFormat = VK_FORMAT_B8G8R8A8_UNORM; // we need this for FBOs, so no swizzling
 
             break;
 		case Texture::kABGR:
@@ -535,86 +496,6 @@ VulkanTexture::GetVulkanFormat( Texture::Format format, VkComponentMapping & map
 
     return vulkanFormat;
 }
-
-/*
-void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels) {
-    // Check if image format supports linear blitting
-    VkFormatProperties formatProperties;
-    vkGetPhysicalDeviceFormatProperties(physicalDevice, imageFormat, &formatProperties);
-
-    if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
-        throw std::runtime_error("texture image format does not support linear blitting!");
-    }
-
-    int32_t mipWidth = texWidth;
-    int32_t mipHeight = texHeight;
-
-    for (uint32_t i = 1; i < mipLevels; i++) {
-        barrier.subresourceRange.baseMipLevel = i - 1;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
-        vkCmdPipelineBarrier(commandBuffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier);
-
-        VkImageBlit blit = {};
-        blit.srcOffsets[0] = {0, 0, 0};
-        blit.srcOffsets[1] = {mipWidth, mipHeight, 1};
-        blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        blit.srcSubresource.mipLevel = i - 1;
-        blit.srcSubresource.baseArrayLayer = 0;
-        blit.srcSubresource.layerCount = 1;
-        blit.dstOffsets[0] = {0, 0, 0};
-        blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
-        blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        blit.dstSubresource.mipLevel = i;
-        blit.dstSubresource.baseArrayLayer = 0;
-        blit.dstSubresource.layerCount = 1;
-
-        vkCmdBlitImage(commandBuffer,
-            image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            1, &blit,
-            VK_FILTER_LINEAR);
-
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        vkCmdPipelineBarrier(commandBuffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier);
-
-        if (mipWidth > 1) mipWidth /= 2;
-        if (mipHeight > 1) mipHeight /= 2;
-    }
-}
-*/
-
-/*
-    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
-        for (VkFormat format : candidates) {
-            VkFormatProperties props;
-            vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
-
-            if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
-                return format;
-            } else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
-                return format;
-            }
-        }
-
-        throw std::runtime_error("failed to find supported format!");
-    }
-*/
 
 // ----------------------------------------------------------------------------
 
