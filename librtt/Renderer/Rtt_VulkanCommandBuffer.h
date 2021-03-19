@@ -100,31 +100,31 @@ class VulkanCommandBuffer : public CommandBuffer
 			}
 
 			void Reset();
-			void SetStages( U32 newStages ) { stages = newStages; }
 			void Write( U32 offset, const void * src, size_t size );
 
 			float * GetData( U32 offset );
 			bool IsValid() const { return lowerOffset <= upperOffset; }
 			U32 Offset() const { return lowerOffset; }
 			U32 Range() const { return IsValid() ? upperOffset - lowerOffset + 4U * sizeof( float ) : 0U; }
-			U32 Stages() const { return stages; }
 
 			U32 lowerOffset;
 			U32 upperOffset;
-			U32 stages;
 		};
 
 	public:
+		enum { kNumTextures = 5 };
+
 		VkResult WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain, uint32_t & index );
 		VkResult GetExecuteResult() const { return fExecuteResult; }
 		
 		void BeginFrame();
 		void BeginRecording( VkCommandBuffer commandBuffer, Descriptor ** descs );
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
-		bool PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & imageInfo, PushConstantState & pushConstants );
+		bool PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & imageInfo, PushConstantState & pushConstants, U32 stages );
 
 	public:
 		VkDescriptorSet AddTextureSet( const std::vector< VkDescriptorImageInfo > & imageInfo );
+		void RecordTextures();
 
 	private:
 		virtual void InitializeFBO();
@@ -194,11 +194,16 @@ class VulkanCommandBuffer : public CommandBuffer
 			U8 * fBuffer;
 			U32 fBytesAllocated;
 			U32 fNumCommands;
+			U16 fHeight;
+			U16 fOrder;
+
+			bool operator < (const OffscreenNode & other) const;
 		};
 
 		std::vector< FBONode > fFBOStack;
 		std::vector< OffscreenNode > fOffscreenSequence;
 		Geometry * fCurrentGeometry;
+		Texture * fCurrentTextures[kNumTextures];
 //		dynamic uniform buffers - as a list?
 		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;
