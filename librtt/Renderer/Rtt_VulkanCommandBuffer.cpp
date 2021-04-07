@@ -30,6 +30,7 @@ namespace /*anonymous*/
 {
 	enum Command
 	{
+		kCommandBeginCapture,
 		kCommandBindImageIndex,
 		kCommandBindFrameBufferObject,
 		kCommandUnBindFrameBufferObject,
@@ -287,6 +288,8 @@ VulkanCommandBuffer::PopFrameBufferObject()
 {
 	WRITE_COMMAND( kCommandUnBindFrameBufferObject );
 
+	Rtt_ASSERT( !fFBOStack.empty() );
+
 	FBONode back = fFBOStack.back();
 
 	fFBOStack.pop_back();
@@ -313,6 +316,11 @@ VulkanCommandBuffer::PopFrameBufferObject()
 			WRITE_COMMAND( kCommandFetchGeometry );
 
 			Write< GPUResource * >( fCurrentGeometry->GetGPUResource() );
+		}
+
+		if (fProgram)
+		{
+			EmitProgram( fProgram, fCurrentPrepVersion );
 		}
 
 		RecordTextures();
@@ -354,11 +362,17 @@ VulkanCommandBuffer::PushFrameBufferObject( FrameBufferObject * fbo )
 
 		if (fProgram)
 		{
-			WRITE_COMMAND( kCommandBindProgram );
-			Write<Program::Version>( fCurrentPrepVersion );
-			Write<GPUResource*>( fProgram->GetGPUResource() );
+			EmitProgram( fProgram, fCurrentPrepVersion );
 		}
 	}
+}
+
+void
+VulkanCommandBuffer::EmitProgram( Program * program, Program::Version version )
+{
+	WRITE_COMMAND( kCommandBindProgram );
+	Write<Program::Version>( version );
+	Write<GPUResource*>( program->GetGPUResource() );
 }
 
 void
@@ -371,7 +385,10 @@ VulkanCommandBuffer::BindFrameBufferObject( FrameBufferObject* fbo )
 		(height >= 2U && fbo == fFBOStack[height - 2U].fFBO) // was this the previous framebuffer?
 	)
 	{
-		PopFrameBufferObject();
+		if (height > 0U) // ignore end-of-frame NULL fbo during capture
+		{
+			PopFrameBufferObject();
+		}
 	}
 
 	else
@@ -402,9 +419,7 @@ VulkanCommandBuffer::BindTexture( Texture* texture, U32 unit )
 void 
 VulkanCommandBuffer::BindProgram( Program* program, Program::Version version )
 {
-	WRITE_COMMAND( kCommandBindProgram );
-	Write<Program::Version>( version );
-	Write<GPUResource*>( program->GetGPUResource() );
+	EmitProgram( program, version );
 
 	fCurrentPrepVersion = version;
 	fProgram = program;
@@ -669,8 +684,8 @@ VulkanCommandBuffer::WillRender()
 	WRITE_COMMAND( kCommandBeginRenderPass );
 }
 
-static bool
-AddGeometryToList( std::vector< VulkanGeometry * > & list, VulkanGeometry * geometry )
+bool
+AddToGeometryList( std::vector< VulkanGeometry * > & list, VulkanGeometry * geometry )
 {
 	for (VulkanGeometry * vg : list)
 	{
@@ -720,8 +735,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	std::vector< VulkanGeometry * > geometryList;
 
-	//GL_CHECK_ERROR();
-
 	VulkanUniforms uniforms;
 	VulkanUserData userData;
 	PushConstantState pushConstants;
@@ -747,9 +760,9 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	{
 		fRenderer.ResetPipelineInfo();
 
-		bool isSwapchainPass = fOffscreenSequence.empty();
+		bool isPrimaryPass = fOffscreenSequence.empty(), isCapture = false;
 
-		if (isSwapchainPass)
+		if (isPrimaryPass)
 		{
 			// Reset the offset pointer to the start of the buffer.
 			// This is safe to do here, as preparation work is done
@@ -780,7 +793,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 		VkRenderPassBeginInfo renderPassBeginInfo = {};
 
 		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-
+		
 		VulkanGeometry * geometry = NULL;
 		VulkanFrameBufferObject * fbo = NULL;
 		U32 stages = 0U;
@@ -789,12 +802,22 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 		{
 			Command command = Read<Command>();
 
-	// printf( "GLCommandBuffer::Execute [%d/%d] %d\n", i, fNumCommands, command );
 			Rtt_ASSERT( command < kNumCommands );
 			switch( command )
 			{
+				case kCommandBeginCapture:
+				{
+					Rtt_ASSERT( ~0U == imageIndex );
+
+					isCapture = true;
+
+					DEBUG_PRINT( "Begin Capture" );
+					CHECK_ERROR_AND_BREAK;
+				}
 				case kCommandBindImageIndex:
 				{
+					Rtt_ASSERT( !isCapture );
+
 					imageIndex = Read<uint32_t>();
 
 					DEBUG_PRINT( "Image index %i", imageIndex );
@@ -806,7 +829,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 					clearValues.clear();
 				
-					DEBUG_PRINT( "Bind FrameBufferObject, %p", fbo );/*: Vulkan ID=%" PRIx64 ", Vulkan Texture ID, if any: %" PRIx64,
+					DEBUG_PRINT( "Bind FrameBufferObject, %p (texture = %p)", fbo, fbo->GetTextureName() );/*: Vulkan ID=%" PRIx64 ", Vulkan Texture ID, if any: %" PRIx64,
 									fbo->,
 									fbo->GetTextureName() );*/
 					CHECK_ERROR_AND_BREAK;
@@ -826,8 +849,24 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				{
 					Rtt_ASSERT( fbo );
 
-					uint32_t index = isSwapchainPass ? imageIndex : clearValues.empty();// with the swapchain, choose the appropriate image; else use the buffer / pass
-																						// for the desired clear behavior
+					uint32_t index;
+					
+					if (isPrimaryPass)
+					{
+						index = !isCapture ? imageIndex : 0U;
+					}
+						
+					else
+					{
+						index = clearValues.empty(); // use the buffer / pass for the desired clear behavior
+
+						VulkanTexture * texture = static_cast< VulkanTexture * >( fbo->GetTextureName() );
+
+						texture->Toggle();
+						fbo->BeginOffscreenPass( fRenderer, fCommandBuffer, clearValues.empty() );
+
+						DEBUG_PRINT( "Offscreen pass: %s", (int)clearValues.empty() ? "load" : "clear" );
+					}
 
 					fbo->Bind( fRenderer, index, renderPassBeginInfo );
 
@@ -852,7 +891,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				{
 					geometry = Read<VulkanGeometry*>();
 
-					if (AddGeometryToList( geometryList, geometry ))
+					if (AddToGeometryList( geometryList, geometry ))
 					{
 						geometry->Bind( fRenderer, fCommandBuffer, true );
 					}
@@ -865,7 +904,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				{
 					geometry = Read<VulkanGeometry*>();
 
-					if (AddGeometryToList( geometryList, geometry ))
+					if (AddToGeometryList( geometryList, geometry ))
 					{
 						geometry->Bind( fRenderer, fCommandBuffer, true );
 					}
@@ -1269,7 +1308,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					int width = Read<int>();
 					int height = Read<int>();
 
-					if (!isSwapchainPass)
+					if (!isPrimaryPass)
 					{
 						y = -(y + height); // undo -height - y
 						height = -height;  // undo -height
@@ -1363,6 +1402,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					break;
 			}
 		}
+
+		if (!isPrimaryPass)
+		{
+			Rtt_DELETE( fBuffer );
+		}
 	}
 
 	fBytesUsed = 0;
@@ -1380,8 +1424,9 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 //	VULKAN_CHECK_ERROR();
 	const VulkanState * state = fRenderer.GetState();
 	VkResult endResult = VK_SUCCESS, submitResult = VK_SUCCESS;
+	bool usingSwapchainImage = ~0U != imageIndex;
 	bool okok=false;
-	if (fCommandBuffer != VK_NULL_HANDLE && fSwapchain != VK_NULL_HANDLE)
+	if (fCommandBuffer != VK_NULL_HANDLE)
 	{okok=true;
 		endResult = vkEndCommandBuffer( fCommandBuffer );
 
@@ -1393,21 +1438,26 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submitInfo.commandBufferCount = 1U;
 			submitInfo.pCommandBuffers = &fCommandBuffer;
-			submitInfo.pSignalSemaphores = &fRenderFinishedSemaphore;
-			submitInfo.pWaitDstStageMask = &waitStage;
-			submitInfo.pWaitSemaphores = &fImageAvailableSemaphore;
-			submitInfo.signalSemaphoreCount = 1U;
-			submitInfo.waitSemaphoreCount = 1U;
+
+			if (usingSwapchainImage)
+			{
+				submitInfo.pSignalSemaphores = &fRenderFinishedSemaphore;
+				submitInfo.pWaitDstStageMask = &waitStage;
+				submitInfo.pWaitSemaphores = &fImageAvailableSemaphore;
+				submitInfo.signalSemaphoreCount = 1U;
+				submitInfo.waitSemaphoreCount = 1U;
+			}
 
 			vkResetFences( state->GetDevice(), 1U, &fInFlight );
 
 			submitResult = vkQueueSubmit( state->GetGraphicsQueue(), 1U, &submitInfo, fInFlight );
 		}
 	}
-			if (true)//VK_SUCCESS == submitResult)
+
+			if (usingSwapchainImage && fSwapchain != VK_NULL_HANDLE)//VK_SUCCESS == submitResult)
 			{
 				VkPresentInfoKHR presentInfo = {};
-CoronaLog("PRESENTING");
+
 				presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 				presentInfo.pImageIndices = &imageIndex;
 				presentInfo.pSwapchains = &fSwapchain;
@@ -1433,11 +1483,21 @@ CoronaLog("MUTTER: %i", presentResult);
 
 			else
 			{
-				CoronaLog( "Failed to submit draw command buffer!" );
+				if (usingSwapchainImage)
+				{
+					CoronaLog("Failed to submit draw command buffer!");
+				}
 
 				fExecuteResult = submitResult;
 			}
 	//	}
+
+		if (!usingSwapchainImage)
+		{
+			vkWaitForFences( state->GetDevice(), 1U, &fInFlight, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+
+			DEBUG_PRINT( "Wait for fences" );
+		}
 
 		if (endResult != VK_SUCCESS)//else
 		{
@@ -1447,12 +1507,7 @@ CoronaLog("MUTTER: %i", presentResult);
 		}
 //	}
 
-	for (OffscreenNode & node : fOffscreenSequence)
-	{
-		Rtt_DELETE( node.fBuffer );
-	}
-
-	fOffscreenSequence.clear();
+	Rtt_ASSERT( fOffscreenSequence.empty() );
 
 	if (!okok)//else
 	{
@@ -1460,6 +1515,23 @@ CoronaLog("MUTTER: %i", presentResult);
 	}
 
 	return fElapsedTimeGPU;
+}
+
+VkResult VulkanCommandBuffer::Wait( VkDevice device )
+{
+	if (fInFlight != VK_NULL_HANDLE)
+	{
+		vkWaitForFences( device, 1U, &fInFlight, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+		
+		WRITE_COMMAND( kCommandBeginCapture );
+
+		return VK_SUCCESS;
+	}
+
+	else
+	{
+		return VK_ERROR_INITIALIZATION_FAILED;
+	}
 }
 
 VkResult VulkanCommandBuffer::WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain, uint32_t & index )
@@ -1514,6 +1586,13 @@ VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descriptor *
 		{
 			fCommandBuffer = commandBuffer;
 			fDescriptors = descs;
+			fProgram = NULL;
+			fCurrentGeometry = NULL;
+
+			for (int i = 0; i < kNumTextures; ++i)
+			{
+				fCurrentTextures[i] = NULL;
+			}
 
 			Buffer( 0 ).AllowMark();
 		}
