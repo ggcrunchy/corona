@@ -27,6 +27,10 @@
 #include "Core/Rtt_Types.h"
 #include "Renderer/Rtt_MCPUResourceObserver.h"
 
+// STEVE CHANGE
+#include "Rtt_GPUStream.h"
+// /STEVE CHANGE
+
 #define ENABLE_DEBUG_PRINT	0
 
 #include <limits>
@@ -141,7 +145,7 @@ Renderer::Renderer( Rtt_Allocator* allocator )
 	fScissorEnabled( false ),
 	fMultisampleEnabled( false ),
 	fFrameBufferObject( NULL ),
-	fInsertionLimit( std::numeric_limits<U32>::max() ),
+	fInsertionLimit( (std::numeric_limits<U32>::max)() ), // <- STEVE CHANGE
 // STEVE CHANGE
 	fRenderDataCount( 0 ),
 	fVertexOffset( 0 ),
@@ -181,7 +185,7 @@ Renderer::Initialize()
 }
 
 void 
-Renderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY )
+Renderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY, bool ) // <- STEVE CHANGE
 {
 	fContentScaleX = contentScaleX;
 	fContentScaleY = contentScaleY;
@@ -239,6 +243,17 @@ void
 Renderer::BeginDrawing()
 {
 	fBackCommandBuffer->WillRender();
+}
+
+
+void
+Renderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bitmap, S32 x_in_pixels, S32 y_in_pixels, S32 w_in_pixels, S32 h_in_pixels )
+{
+	stream.CaptureFrameBuffer( bitmap,
+		x_in_pixels,
+		y_in_pixels,
+		w_in_pixels,
+		h_in_pixels );
 }
 // /STEVE CHANGE
 

@@ -130,8 +130,9 @@ class VulkanRenderer : public Renderer
 		VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state );
 		virtual ~VulkanRenderer();
 
-		virtual void BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY );
+		virtual void BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY, bool isCapture );
 		virtual void EndFrame();
+		virtual void CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bitmap, S32 x_in_pixels, S32 y_in_pixels, S32 w_in_pixels, S32 h_in_pixels );
 
 	public:
 		VkSwapchainKHR MakeSwapchain();
@@ -155,6 +156,7 @@ class VulkanRenderer : public Renderer
 		void SetBindingDescriptions( U32 id, const std::vector< VkVertexInputBindingDescription > & descriptions );
 		void SetBlendEquations( VkBlendOp color, VkBlendOp alpha );
 		void SetBlendFactors( VkBlendFactor srcColor, VkBlendFactor srcAlpha, VkBlendFactor dstColor, VkBlendFactor dstAlpha );
+		void SetMultisample( VkSampleCountFlagBits sampleCount );
 		void SetPrimitiveTopology( VkPrimitiveTopology topology );
 		void SetRenderPass( U32 id, VkRenderPass renderPass );
 		void SetShaderStages( U32 id, const std::vector< VkPipelineShaderStageCreateInfo > & stages );
@@ -174,7 +176,7 @@ class VulkanRenderer : public Renderer
 
 	private:
 		struct PipelineCreateInfo {
-			PipelineCreateInfo( VulkanState * state );
+			PipelineCreateInfo();
 
 			std::vector< VkPipelineColorBlendAttachmentState > fColorBlendAttachments;
 			std::vector< VkPipelineShaderStageCreateInfo > fShaderStages;

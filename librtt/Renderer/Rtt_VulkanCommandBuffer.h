@@ -67,6 +67,8 @@ class VulkanCommandBuffer : public CommandBuffer
 		void PopFrameBufferObject();
 		void PushFrameBufferObject( FrameBufferObject * fbo );
 
+		void EmitProgram( Program* program, Program::Version version );
+
 	public:
 		// Generate the appropriate buffered Vulkan commands to accomplish the
 		// specified state changes.
@@ -74,7 +76,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		virtual void BindGeometry( Geometry* geometry );
 		virtual void BindTexture( Texture* texture, U32 unit );
 		virtual void BindUniform( Uniform* uniform, U32 unit );
-		virtual void BindProgram( Program* program, Program::Version version);
+		virtual void BindProgram( Program* program, Program::Version version );
 		virtual void SetBlendEnabled( bool enabled );
 		virtual void SetBlendFunction( const BlendMode& mode );
 		virtual void SetBlendEquation( RenderTypes::BlendEquation mode );
@@ -114,6 +116,7 @@ class VulkanCommandBuffer : public CommandBuffer
 	public:
 		enum { kNumTextures = 5 };
 
+		VkResult Wait( VkDevice device );
 		VkResult WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain, uint32_t & index );
 		VkResult GetExecuteResult() const { return fExecuteResult; }
 		

@@ -712,7 +712,7 @@ Display::Capture( DisplayObject *object,
 		}
 	}
 
-	fRenderer->BeginFrame( 0.1f, 0.1f, GetSx(), GetSy() );
+	fRenderer->BeginFrame( 0.1f, 0.1f, GetSx(), GetSy(), true ); // <- STEVE CHANGE
 
 	////////////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////
@@ -965,11 +965,15 @@ Display::Capture( DisplayObject *object,
 		BufferBitmap *bitmap = static_cast< BufferBitmap * >( tex->GetBitmap() );
 
 		// This function requires coordinates in pixels.
+		// STEVE CHANGE
+		/*
 		fStream->CaptureFrameBuffer( *bitmap,
 										x_in_pixels,
 										y_in_pixels,
 										w_in_pixels,
-										h_in_pixels );
+										h_in_pixels );*/
+		fRenderer->CaptureFrameBuffer( *fStream, *bitmap, x_in_pixels, y_in_pixels, w_in_pixels, h_in_pixels );
+		// /STEVE CHANGE
 
 		if( output_file_will_be_png_format )
 		{

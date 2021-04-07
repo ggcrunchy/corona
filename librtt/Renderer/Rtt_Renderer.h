@@ -34,6 +34,10 @@ class FrameBufferObject;
 class GeometryPool;
 class Texture;
 class Uniform;
+// STEVE CHANGE
+class RenderingStream;
+class BufferBitmap;
+// /STEVE CHANGE
 
 // ----------------------------------------------------------------------------
 
@@ -54,13 +58,15 @@ class Renderer
 		// Perform any per-frame preparation. Total time is the time in seconds
 		// since the start of the application. Delta time is the amount of time
 		// in seconds it took to complete the previous frame.
-		virtual void BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY );
+		virtual void BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY, bool isCapture = false ); // <- STEVE CHANGE
 
 		// Perform any per-frame finalization.
 		virtual void EndFrame();
 
 		// STEVE CHANGE
 		void BeginDrawing();
+
+		virtual void CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bitmap, S32 x_in_pixels, S32 y_in_pixels, S32 w_in_pixels, S32 h_in_pixels );
 		// /STEVE CHANGE
 
 		// Get the current view and projection matrices. These 4x4 matrices are

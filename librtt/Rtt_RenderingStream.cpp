@@ -426,7 +426,7 @@ RenderingStream::ScreenWidth() const
 	S32 result = Rtt_RealToInt(Rtt_RealDiv(Rtt_IntToReal(ContentWidth()) + margins, GetSx()) + Rtt_REAL_HALF);
 
 	// TODO: Does this account for Alignment? Let's assert for now:
-	Rtt_ASSERT( DeviceWidth() == result );
+//	Rtt_ASSERT( DeviceWidth() == result );
 
 	return result;
 }
@@ -440,7 +440,7 @@ RenderingStream::ScreenHeight() const
 	S32 result = Rtt_RealToInt(Rtt_RealDiv(Rtt_IntToReal(ContentHeight()) + margins, GetSy()) + Rtt_REAL_HALF);
 
 	// TODO: Does this account for Alignment? Let's assert for now:
-	Rtt_ASSERT( DeviceHeight() == result );
+//	Rtt_ASSERT( DeviceHeight() == result );
 
 	return result;
 }

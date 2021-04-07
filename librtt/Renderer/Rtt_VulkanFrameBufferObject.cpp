@@ -36,7 +36,6 @@ PrepareAttachmentDescription( VkFormat format )
 	VkAttachmentDescription attachment = {};
 	
 	attachment.format = format;
-    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -68,7 +67,7 @@ RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions 
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	}
 
-	AddAttachment( colorAttachment, options.isResolve ? fResolveReferences : fColorReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, options.finalLayout );
+	AddAttachment( colorAttachment, options.isResolve ? fResolveReferences : fColorReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, options.finalLayout, options.sameLayout );
 }
 
 void
@@ -76,7 +75,7 @@ RenderPassBuilder::AddDepthStencilAttachment( VkFormat format, const AttachmentO
 {
 	VkAttachmentDescription depthAttachment = PrepareAttachmentDescription( format );
 
-	AddAttachment( depthAttachment, fDepthStencilReferences, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
+	AddAttachment( depthAttachment, fDepthStencilReferences, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, false );
 }
 
 void
@@ -128,7 +127,7 @@ RenderPassBuilder::GetKey( RenderPassKey & key ) const
 
 	std::vector< U8 > contents(
 		2U + // counts
-		descriptionCount * 4U + // descriptions
+		descriptionCount * 5U + // descriptions
 		dependencyCount * sizeof( VkSubpassDependency ) // dependencies
 	);
 
@@ -142,6 +141,7 @@ RenderPassBuilder::GetKey( RenderPassKey & key ) const
 		contents[index++] = U8( desc.format );
 		contents[index++] = U8( (desc.loadOp & 0x0F) | ((desc.storeOp << 4U) & 0xF0) );
 		contents[index++] = U8( desc.samples );
+		contents[index++] = U8( desc.initialLayout );
 
 		if (desc.finalLayout != VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) // non-byte extension enum
 		{
@@ -165,29 +165,33 @@ RenderPassBuilder::GetKey( RenderPassKey & key ) const
 }
 
 void
-RenderPassBuilder::ReplaceClearsWithLoads()
+RenderPassBuilder::AddReadAfterWriteStages()
 {
 	for (VkSubpassDependency & dependency : fDependencies)
 	{
 		if (VK_SUBPASS_EXTERNAL == dependency.srcSubpass)
 		{
-			dependency.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+			dependency.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			dependency.srcAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		}
 	}
+}
 
+void
+RenderPassBuilder::ReplaceClearsWithLoads()
+{
 	for (VkAttachmentDescription & desc : fDescriptions)
 	{
 		if (VK_ATTACHMENT_LOAD_OP_CLEAR == desc.loadOp)
 		{
 			desc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			desc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			desc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		}
 	}
 }
 
 void
-RenderPassBuilder::AddAttachment( VkAttachmentDescription & description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, VkImageLayout finalLayout )
+RenderPassBuilder::AddAttachment( VkAttachmentDescription & description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, VkImageLayout finalLayout, bool sameLayout )
 {
 	VkAttachmentReference attachmentRef = {};
 
@@ -196,7 +200,12 @@ RenderPassBuilder::AddAttachment( VkAttachmentDescription & description, std::ve
 
 	references.push_back( attachmentRef );
 
-	description.finalLayout = VK_IMAGE_LAYOUT_UNDEFINED == finalLayout ? layout : finalLayout;
+	if (sameLayout)
+	{
+		description.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	}
+
+	description.finalLayout = finalLayout;
 	description.samples = description.samples;
 
 	fDescriptions.push_back( description );
@@ -243,27 +252,32 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 {
 	Rtt_ASSERT( CPUResource::kFrameBufferObject == resource->GetType() );
 	FrameBufferObject * fbo = static_cast< FrameBufferObject * >( resource );
-	Texture * texture = fbo->GetTexture();
 
-	fExtent.width = texture->GetWidth();
-	fExtent.height = texture->GetHeight();
+	fTexture = fbo->GetTexture();
+
+	fExtent.width = fTexture->GetWidth();
+	fExtent.height = fTexture->GetHeight();
 
 	CleanUpImageData();
 
-	bool isSwapchain = Texture::kNumFilters == texture->GetFilter(), mustClear = true, wantMultisampleResources = isSwapchain;
+	bool isSwapchain = Texture::kNumFilters == fTexture->GetFilter(), wantMultisampleResources = isSwapchain;
 	auto ci = fRenderer.GetState()->GetCommonInfo();
 	VkComponentMapping mapping = {};
-	VkFormat format = isSwapchain ? ci.state->GetSwapchainDetails().fFormat.format : VulkanTexture::GetVulkanFormat( texture->GetFormat(), mapping );
+	VkFormat format = isSwapchain ? ci.state->GetSwapchainDetails().fFormat.format : VulkanTexture::GetVulkanFormat( fTexture->GetFormat(), mapping );
 
 	RenderPassBuilder builder;
 
+	fMustClear = true;
+	fSampleCount = VK_SAMPLE_COUNT_1_BIT;
+
 	if (wantMultisampleResources)
 	{
-		VkSampleCountFlagBits sampleCount = VkSampleCountFlagBits( ci.state->GetSampleCountFlags() );
+		fSampleCount = VkSampleCountFlagBits( ci.state->GetSampleCountFlags() );
+
 		VulkanTexture::ImageData color = VulkanTexture::CreateImage(
 			ci.state,
 			fExtent.width, fExtent.height, 1U,
-			sampleCount,
+			fSampleCount,
 			format,
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -271,21 +285,21 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 		);
 		VkImageView colorView = VulkanTexture::CreateImageView( ci.state, color.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
-		VulkanTexture::TransitionImageLayout( ci.state, color.fImage, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1U );
-
 		fImages.push_back( color.fImage );
 		fMemory.push_back( color.fMemory );
 		fImageViews.push_back( colorView );
 
 		RenderPassBuilder::AttachmentOptions options;
 
-		options.samples = sampleCount;
+		options.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		options.samples = fSampleCount;
 
 		builder.AddColorAttachment( format, options );
 	}
 
 	RenderPassBuilder::AttachmentOptions finalResultOptions;
-
+	
+	VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( fTexture->GetGPUResource() );
 	size_t currentSize = fImageViews.size();
 
 	if (isSwapchain)
@@ -296,48 +310,77 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 			fImageViews.push_back( swapchainView );
 		}
+
+		finalResultOptions.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	}
 	
 	else
 	{
-		VulkanTexture * vulkanTexture = static_cast< VulkanTexture * >( texture->GetGPUResource() );
-
 		fImageViews.push_back( vulkanTexture->GetImageView() );
 
-		VkSubpassDependency srcDependency;
+		vulkanTexture->Toggle();
 
-		srcDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-		srcDependency.dstSubpass = 0;
-		srcDependency.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		srcDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		srcDependency.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		srcDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		srcDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+		VkImageView otherView = vulkanTexture->GetImageView();
 
-		builder.AddSubpassDependency( srcDependency );
+		if (fImageViews.back() != otherView)
+		{
+			fImageViews.push_back( otherView );
 
-		VkSubpassDependency dstDependency;
+			vulkanTexture->Toggle();
+		}
 
-		dstDependency.srcSubpass = 0;
-		dstDependency.dstSubpass = VK_SUBPASS_EXTERNAL;
-		dstDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dstDependency.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		dstDependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		dstDependency.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		dstDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+		fMustClear = fbo->GetMustClear();
 
-		builder.AddSubpassDependency( dstDependency );
+	//	if (fMustClear)
+		{
+			VkSubpassDependency srcDependency;
 
-		mustClear = fbo->GetMustClear();
+			srcDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+			srcDependency.dstSubpass = 0;
+			srcDependency.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			srcDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			srcDependency.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			srcDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			srcDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+			builder.AddSubpassDependency( srcDependency );
+
+			VkSubpassDependency dstDependency;
+
+			dstDependency.srcSubpass = 0;
+			dstDependency.dstSubpass = VK_SUBPASS_EXTERNAL;
+			dstDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			dstDependency.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			dstDependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			dstDependency.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			dstDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+			builder.AddSubpassDependency( dstDependency );
+		}
+
+		if (true)//fMustClear)
+		{
+			finalResultOptions.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		}
+
+		else
+		{
+			finalResultOptions.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		//	finalResultOptions.sameLayout = true;
+		}
 	}
 
-	finalResultOptions.finalLayout = isSwapchain ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	finalResultOptions.isResolve = wantMultisampleResources;
 	finalResultOptions.isResult = true;
 
 	builder.AddColorAttachment( format, finalResultOptions );
 
-	size_t passCount = mustClear ? 1 : 2;
+	size_t passCount = fMustClear ? 1 : 2;
+
+	if (!isSwapchain)
+	{
+	//	builder.AddReadAfterWriteStages();
+	}
 
 	for (size_t i = 0; i < passCount; ++i)
 	{
@@ -370,10 +413,12 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 			createFramebufferInfo.attachmentCount = currentSize + 1; // n.b. ignore "extra" image views, cf. note a few lines below
 			createFramebufferInfo.height = fExtent.height;
 			createFramebufferInfo.layers = 1U;
-			createFramebufferInfo.pAttachments = fImageViews.data();
+			createFramebufferInfo.pAttachments = fImageViews.data() + vulkanTexture->GetIndex();
 			createFramebufferInfo.width = fExtent.width;
 	// TODO: look into VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT...
 			VkFramebuffer framebuffer = VK_NULL_HANDLE;
+
+			vulkanTexture->Toggle();
 
 			if (VK_SUCCESS == vkCreateFramebuffer( ci.device, &createFramebufferInfo, ci.allocator, &framebuffer ))
 			{
@@ -395,11 +440,13 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 				// TODO?
 			}
 		}
+
+		// todo? set to 1 on second pass for load op version?
 	}
 
 	if (!isSwapchain)
 	{
-		fImageViews.pop_back(); // owned by texture
+		fImageViews.clear(); // owned by texture
 	}
 }
 
@@ -412,15 +459,54 @@ VulkanFrameBufferObject::Destroy()
 void
 VulkanFrameBufferObject::Bind( VulkanRenderer & renderer, uint32_t index, VkRenderPassBeginInfo & passBeginInfo )
 {
-	passBeginInfo.framebuffer = fFramebuffers[index];
-	passBeginInfo.renderArea.extent = fExtent;
-
 	uint32_t passIndex = fRenderPassData[1] ? index : 0;
 	const RenderPassData * renderPassData = fRenderPassData[passIndex];
 
 	passBeginInfo.renderPass = renderPassData->fPass;
 
+	fRenderer.SetMultisample( fSampleCount );
 	fRenderer.SetRenderPass( renderPassData->fID, renderPassData->fPass );
+
+	VulkanTexture * texture = static_cast< VulkanTexture * >( GetTextureName() );
+	U32 count = texture->GetImageCount();
+
+	if (count)
+	{
+		index = passIndex * count + texture->GetIndex();
+	}
+
+	passBeginInfo.framebuffer = fFramebuffers[index];
+	passBeginInfo.renderArea.extent = fExtent;
+}
+
+void
+VulkanFrameBufferObject::BeginOffscreenPass( VulkanRenderer & renderer, VkCommandBuffer commandBuffer, bool load )
+{
+	if (load)
+	{
+		VulkanTexture * texture = static_cast< VulkanTexture * >( this->GetTextureName() );
+		VkImageMemoryBarrier barrier = {};
+
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.image = texture->GetImage();
+		barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.layerCount = 1U;
+		barrier.subresourceRange.levelCount = 1U;
+
+		vkCmdPipelineBarrier(
+			commandBuffer,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			0, 0U, NULL, 0U, NULL,
+			1U, &barrier
+		);
+	}
 }
 
 void
