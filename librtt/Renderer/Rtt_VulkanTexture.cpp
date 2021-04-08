@@ -178,7 +178,17 @@ VulkanTexture::Update( CPUResource* resource )
 	Rtt_ASSERT( CPUResource::kTexture == resource->GetType() );
 	Texture* texture = static_cast<Texture*>( resource );
 
-    // TODO? (e.g. external textures)
+    if (!texture->IsTarget())
+    {
+        VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
+
+        if (fState->CreateBuffer( texture->GetSizeInBytes(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData ))
+        {
+            Load( texture, GetFormat(), bufferData, 1U );
+        }
+    }
+    
+    texture->ReleaseData();
 }
 
 void 

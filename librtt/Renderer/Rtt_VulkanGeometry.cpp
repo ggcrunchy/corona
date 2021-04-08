@@ -130,15 +130,8 @@ VulkanGeometry::Destroy()
 }
 
 void 
-VulkanGeometry::Bind( VulkanRenderer & renderer, VkCommandBuffer commandBuffer, bool populate )
+VulkanGeometry::Bind( VulkanRenderer & renderer, VkCommandBuffer commandBuffer )
 {
-	if (populate && fResource && fResource->GetVerticesUsed())
-	{
-		Rtt_ASSERT( fMappedVertices );
-
-		memcpy( fMappedVertices, fResource->GetVertexData(), fResource->GetVerticesUsed() * sizeof( Geometry::Vertex ) );
-	}
-
 	U32 bindingID = 0U; // n.b. for future use?
 
 	VkVertexInputBindingDescription description;
@@ -161,6 +154,17 @@ VulkanGeometry::Bind( VulkanRenderer & renderer, VkCommandBuffer commandBuffer, 
 	if (fIndexBufferData != VK_NULL_HANDLE)
 	{
 		vkCmdBindIndexBuffer( commandBuffer, fIndexBufferData->GetBuffer(), 0U, VK_INDEX_TYPE_UINT16 );
+	}
+}
+
+void
+VulkanGeometry::Populate()
+{
+	if (fResource && fResource->GetVerticesUsed())
+	{
+		Rtt_ASSERT( fMappedVertices );
+
+		memcpy( fMappedVertices, fResource->GetVertexData(), fResource->GetVerticesUsed() * sizeof( Geometry::Vertex ) );
 	}
 }
 
