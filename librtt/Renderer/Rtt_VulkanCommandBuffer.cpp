@@ -116,8 +116,8 @@ namespace /*anonymous*/
 
 	// Ensure command count is incremented
 	#define WRITE_COMMAND( command ) Write<Command>( command ); ++fNumCommands;
-#define ENABLE_DEBUG_PRINT 1
-	// Used to validate that the appropriate OpenGL commands
+#define ENABLE_DEBUG_PRINT 0
+	// Used to validate that the appropriate Vulkan commands
 	// are being generated and that their arguments are correct
 	#if ENABLE_DEBUG_PRINT 
 		#define DEBUG_PRINT( ... ) Rtt_LogException( __VA_ARGS__ ); Rtt_LogException("\n");
@@ -879,7 +879,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 					if (geometry)
 					{
-						geometry->Bind( fRenderer, fCommandBuffer, false );
+						geometry->Bind( fRenderer, fCommandBuffer );
 					}
 
 					Buffer( 0 ).ResetMark();
@@ -887,30 +887,26 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					DEBUG_PRINT( "BEGIN RENDER PASS " );
 					CHECK_ERROR_AND_BREAK;
 				}
-				case kCommandBindGeometry:
+				case kCommandBindGeometry: // fallthrough
+				case kCommandFetchGeometry:
 				{
-					geometry = Read<VulkanGeometry*>();
+					VulkanGeometry * vg = Read<VulkanGeometry*>();
 
-					if (AddToGeometryList( geometryList, geometry ))
+					if (AddToGeometryList( geometryList, vg ))
 					{
-						geometry->Bind( fRenderer, fCommandBuffer, true );
+						vg->Populate();
 					}
 
-					DEBUG_PRINT( "Bind Geometry %p", geometry );
-					CHECK_ERROR_AND_BREAK;
-
-				}
-				case kCommandFetchGeometry: // TODO: only differs in debug output, should eventually just replace with Bind?
-				{
-					geometry = Read<VulkanGeometry*>();
-
-					if (AddToGeometryList( geometryList, geometry ))
+					if (vg != geometry)
 					{
-						geometry->Bind( fRenderer, fCommandBuffer, true );
+						vg->Bind( fRenderer, fCommandBuffer );
+
+						geometry = vg;
 					}
 
-					DEBUG_PRINT( "Fetch Geometry %p", geometry );
+					DEBUG_PRINT( "%s Geometry %p", kCommandBindGeometry == command ? "Bind" : "Fetch", geometry );
 					CHECK_ERROR_AND_BREAK;
+
 				}
 				case kCommandFetchTextures:
 				{
@@ -1874,10 +1870,10 @@ void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, c
 	{
 		Rtt_ASSERT( Uniform::kMat3 == dataType );
 
-		// Mindful of the difficulties mentioned re. kVec3 in https://stackoverflow.com/questions/38172696/should-i-ever-use-a-vec3-inside-of-a-uniform-buffer-or-shader-storage-buffer-o,
-		// mask matrices are decomposed as a vec2[2] and vec2. Three components are always constant and thus omitted.
+		// Mindful of the troubles described in https://stackoverflow.com/questions/38172696/should-i-ever-use-a-vec3-inside-of-a-uniform-buffer-or-shader-storage-buffer-o,
+		// each mask matrix is represented as a vec2[2] and vec2. (Three components are never used and thus omitted.)
 		// The vec2 array avoids consuming two vectors, cf. https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL).
-		// The two elements should be columns, to allow mat2(vec[0], vec[1]) on the shader side.
+		// The elements are columns, to allow mat2(vec[0], vec[1]) on the shader side.
 		float * src = reinterpret_cast< float * >( uniform->GetData() );
 		Vec4 maskMatrix = {
 			src[0], // row 1, col 1

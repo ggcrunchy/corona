@@ -55,7 +55,8 @@ class VulkanGeometry : public GPUResource
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 
-		void Bind( VulkanRenderer & renderer, VkCommandBuffer commandBuffer, bool populate );
+		void Bind( VulkanRenderer & renderer, VkCommandBuffer commandBuffer );
+		void Populate();
 
 	private:
 		VulkanBufferData * CreateBufferOnGPU( VkDeviceSize bufferSize, VkBufferUsageFlags usage );
