@@ -242,7 +242,14 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 	auto multisampleTestResult = FetchMultisampleFormat();
 
 	// STEVE CHANGE
-	if (!fVulkanState)
+	if (fVulkanState)
+	{
+		fRendererVersion.SetString("OpenGL 4.6"); // TODO? pull in actual Vulkan state...
+		fRendererVersion.SetMajorNumber(4);
+		fRendererVersion.SetMinorNumber(6);
+	}
+
+	else
 	{
 	// /STEVE CHANGE
 
