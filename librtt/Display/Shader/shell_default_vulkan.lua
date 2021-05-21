@@ -128,6 +128,7 @@ void main()
     #endif
 
     gl_Position = ubo.ViewProjectionMatrix * vec4( position, 0.0, 1.0 );
+    gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0; // http://anki3d.org/vulkan-coordinate-system/
 }
 ]]
 

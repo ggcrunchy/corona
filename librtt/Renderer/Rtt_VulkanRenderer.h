@@ -173,6 +173,7 @@ class VulkanRenderer : public Renderer
 	private:
 		void InitializePipelineState();
 		void RestartWorkingPipeline();
+		void WipeDescriptors();
 
 	private:
 		struct PipelineCreateInfo {

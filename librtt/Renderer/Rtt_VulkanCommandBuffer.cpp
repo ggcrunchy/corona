@@ -116,7 +116,7 @@ namespace /*anonymous*/
 
 	// Ensure command count is incremented
 	#define WRITE_COMMAND( command ) Write<Command>( command ); ++fNumCommands;
-#define ENABLE_DEBUG_PRINT 0
+#define ENABLE_DEBUG_PRINT 1
 	// Used to validate that the appropriate Vulkan commands
 	// are being generated and that their arguments are correct
 	#if ENABLE_DEBUG_PRINT 
@@ -865,7 +865,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 						texture->Toggle();
 						fbo->BeginOffscreenPass( fRenderer, fCommandBuffer, clearValues.empty() );
 
-						DEBUG_PRINT( "Offscreen pass: %s", (int)clearValues.empty() ? "load" : "clear" );
+						DEBUG_PRINT( "Offscreen pass: %s", clearValues.empty() ? "load" : "clear" );
 					}
 
 					fbo->Bind( fRenderer, index, renderPassBeginInfo );
@@ -1421,9 +1421,9 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	const VulkanState * state = fRenderer.GetState();
 	VkResult endResult = VK_SUCCESS, submitResult = VK_SUCCESS;
 	bool usingSwapchainImage = ~0U != imageIndex;
-	bool okok=false;
+
 	if (fCommandBuffer != VK_NULL_HANDLE)
-	{okok=true;
+	{
 		endResult = vkEndCommandBuffer( fCommandBuffer );
 
 		if (VK_SUCCESS == endResult)
@@ -1450,65 +1450,59 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 		}
 	}
 
-			if (usingSwapchainImage && fSwapchain != VK_NULL_HANDLE)//VK_SUCCESS == submitResult)
-			{
-				VkPresentInfoKHR presentInfo = {};
+	if (usingSwapchainImage && fSwapchain != VK_NULL_HANDLE)
+	{
+		VkPresentInfoKHR presentInfo = {};
 
-				presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-				presentInfo.pImageIndices = &imageIndex;
-				presentInfo.pSwapchains = &fSwapchain;
-				presentInfo.pWaitSemaphores = &fRenderFinishedSemaphore;
-				presentInfo.swapchainCount = 1U;
-				presentInfo.waitSemaphoreCount = 1U;
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		presentInfo.pImageIndices = &imageIndex;
+		presentInfo.pSwapchains = &fSwapchain;
+		presentInfo.pWaitSemaphores = &fRenderFinishedSemaphore;
+		presentInfo.swapchainCount = 1U;
+		presentInfo.waitSemaphoreCount = 1U;
 
-				VkResult presentResult = vkQueuePresentKHR( state->GetPresentQueue(), &presentInfo );
+		VkResult presentResult = vkQueuePresentKHR( state->GetPresentQueue(), &presentInfo );
 
-				if (VK_ERROR_OUT_OF_DATE_KHR == presentResult || VK_SUBOPTIMAL_KHR == presentResult) // || framebufferResized)
-				{
-CoronaLog("MUTTER: %i", presentResult);
-				//    framebufferResized = false;
-				}
-
-				else if (presentResult != VK_SUCCESS)
-				{
-					CoronaLog( "Failed to present swap chain image!" );
-				}
-
-				fExecuteResult = presentResult;
-			}
-
-			else
-			{
-				if (usingSwapchainImage)
-				{
-					CoronaLog("Failed to submit draw command buffer!");
-				}
-
-				fExecuteResult = submitResult;
-			}
-	//	}
-
-		if (!usingSwapchainImage)
+		if (VK_ERROR_OUT_OF_DATE_KHR == presentResult || VK_SUBOPTIMAL_KHR == presentResult)
 		{
-			vkWaitForFences( state->GetDevice(), 1U, &fInFlight, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+			fRenderer.RecreateSwapchain();
 
-			DEBUG_PRINT( "Wait for fences" );
+			presentResult = VK_SUCCESS;
 		}
 
-		if (endResult != VK_SUCCESS)//else
+		else if (presentResult != VK_SUCCESS)
 		{
-			CoronaLog( "Failed to record command buffer!" );
-
-			fExecuteResult = endResult;
+			CoronaLog( "Failed to present swap chain image!" );
 		}
-//	}
+
+		fExecuteResult = presentResult;
+	}
+
+	else
+	{
+		if (usingSwapchainImage)
+		{
+			CoronaLog( "Failed to submit draw command buffer!" );
+		}
+
+		fExecuteResult = submitResult;
+	}
+
+	if (!usingSwapchainImage)
+	{
+		vkWaitForFences( state->GetDevice(), 1U, &fInFlight, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+
+		DEBUG_PRINT( "Wait for fences" );
+	}
+
+	if (endResult != VK_SUCCESS)
+	{
+		CoronaLog( "Failed to record command buffer!" );
+
+		fExecuteResult = endResult;
+	}
 
 	Rtt_ASSERT( fOffscreenSequence.empty() );
-
-	if (!okok)//else
-	{
-		fExecuteResult = VK_ERROR_INITIALIZATION_FAILED;
-	}
 
 	return fElapsedTimeGPU;
 }

@@ -440,17 +440,11 @@ VulkanRenderer::~VulkanRenderer()
 
 	TearDownSwapchain();
 
-	Rtt_DELETE( fPrimaryFBO );
 	Rtt_DELETE( fSwapchainTexture );
 
+	WipeDescriptors();
+
 	auto ci = GetState()->GetCommonInfo();
-
-	for (Descriptor * desc : fDescriptors)
-	{
-		desc->Wipe( ci.device, ci.allocator );
-
-		Rtt_DELETE( desc );
-	}
 
 	WipeDescriptorPool( ci.device, fPool, ci.allocator );
 
@@ -539,6 +533,7 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 			// TODO: should we then try again?
 			// or can we just do that straight out?
 				// if an acquire fails, then what????
+			RecreateSwapchain();
 			CoronaLog( "Out of date" );
 		}
 	
@@ -740,8 +735,6 @@ VulkanRenderer::BuildUpSwapchain( VkSwapchainKHR swapchain )
 	fCommandBuffers.resize( imageCount + 1U );
 	fSwapchainImages.resize( imageCount );
 
-	fDescriptors.clear();
-
 	VulkanState * state = GetState();
 
 	VkDescriptorPoolSize size;
@@ -786,30 +779,35 @@ VulkanRenderer::RecreateSwapchain()
 {
 	vkQueueWaitIdle( fState->GetGraphicsQueue() );
 
+	VulkanState::UpdateSwapchainDetails( *fState );
+
 	VkSwapchainKHR newSwapchain = MakeSwapchain();
 
 	TearDownSwapchain();
+	WipeDescriptorPool( fState->GetDevice(), fPool, fState->GetAllocator() );
 
 	if (newSwapchain != VK_NULL_HANDLE )
 	{
 		BuildUpSwapchain( newSwapchain );
 	}
+
+	fPrimaryFBO = Rtt_NEW( fAllocator, FrameBufferObject( fAllocator, fSwapchainTexture ) );
 }
 
 void
 VulkanRenderer::TearDownSwapchain()
 {
-	// TODO: tell frame buffers they're invalid, e.g. iterate list
-
     auto ci = fState->GetCommonInfo();
 
 	vkDestroySwapchainKHR( ci.device, fState->GetSwapchain(), ci.allocator );
 
-	// TODO: lots more stuff...
+	WipeDescriptors();
 
 	vkFreeCommandBuffers( ci.device, fState->GetCommandPool(), fCommandBuffers.size(), fCommandBuffers.data() );
 
     fState->SetSwapchain( VK_NULL_HANDLE );
+
+	Rtt_DELETE( fPrimaryFBO );
 }
 
 const size_t kFinalBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
@@ -1154,6 +1152,21 @@ void
 VulkanRenderer::RestartWorkingPipeline()
 {
     new (&fPipelineCreateInfo) PipelineCreateInfo;
+}
+
+void
+VulkanRenderer::WipeDescriptors()
+{
+	auto ci = GetState()->GetCommonInfo();
+
+	for (Descriptor * desc : fDescriptors)
+	{
+		desc->Wipe( ci.device, ci.allocator );
+
+		Rtt_DELETE( desc );
+	}
+
+	fDescriptors.clear();
 }
 
 VulkanRenderer::PipelineCreateInfo::PipelineCreateInfo()

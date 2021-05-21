@@ -973,9 +973,22 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state )
 		}
 	}
 
+	SwapchainDetails & details = state.fSwapchainDetails;
+
+	details.fFormat = format;
+	details.fPresentMode = mode;
+
+	UpdateSwapchainDetails( state );
+
+	return true;
+}
+
+void
+VulkanState::UpdateSwapchainDetails( VulkanState & state )
+{
 	VkSurfaceCapabilitiesKHR capabilities;
 
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR( device, surface, &capabilities );
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR( state.GetPhysicalDevice(), state.GetSurface(), &capabilities );
 
 	uint32_t imageCount = capabilities.minImageCount + 1U;
 
@@ -988,11 +1001,7 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state )
 
 	details.fImageCount = imageCount;
     details.fExtent = capabilities.currentExtent;
-	details.fFormat = format;
-	details.fPresentMode = mode;
 	details.fTransformFlagBits = capabilities.currentTransform;
-
-	return true;
 }
 
 // ----------------------------------------------------------------------------
