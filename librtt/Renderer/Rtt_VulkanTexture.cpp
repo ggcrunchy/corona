@@ -113,7 +113,7 @@ VulkanTexture::Create( CPUResource* resource )
                 1U, // mip levels
                 VK_SAMPLE_COUNT_1_BIT,
                 format,
-                VK_IMAGE_TILING_OPTIMAL, // might not want if frequently changed?
+                VK_IMAGE_TILING_OPTIMAL,
                 usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
             );
 
@@ -285,7 +285,7 @@ VulkanTexture::Load( Texture * texture, VkFormat format, const VulkanBufferData 
         // generateMipmaps(textureImage, format, texWidth, texHeight, mipLevels);
              
         barrier.subresourceRange.baseMipLevel = mipLevels - 1U;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; // todo: if we forgo a staging buffer, is this GENERAL or something?
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -311,7 +311,7 @@ HasStencilComponent( VkFormat format )
 }
 
 bool
-VulkanTexture::TransitionImageLayout( VulkanState * state, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels )
+VulkanTexture::TransitionImageLayout( VulkanState * state, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, VkCommandBuffer commandBuffer )
 {
     VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 
@@ -325,7 +325,13 @@ VulkanTexture::TransitionImageLayout( VulkanState * state, VkImage image, VkForm
         }
     }
 
-    VkCommandBuffer commandBuffer = state->BeginSingleTimeCommands();
+    bool haveCommandBuffer = VK_NULL_HANDLE != commandBuffer;
+
+    if (!haveCommandBuffer)
+    {
+        commandBuffer = state->BeginSingleTimeCommands();
+    }
+
     VkImageMemoryBarrier barrier = PrepareBarrier( image, aspectFlags, mipLevels );
 
     barrier.oldLayout = oldLayout;
@@ -341,9 +347,19 @@ VulkanTexture::TransitionImageLayout( VulkanState * state, VkImage image, VkForm
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
         break;
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+        barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+        break;
     case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
         barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
         sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+
+        break;
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 
         break;
     case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
@@ -357,6 +373,11 @@ VulkanTexture::TransitionImageLayout( VulkanState * state, VkImage image, VkForm
 
     switch (newLayout)
     {
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+        break;
     case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -391,7 +412,10 @@ VulkanTexture::TransitionImageLayout( VulkanState * state, VkImage image, VkForm
         1U, &barrier // image memory
     );
 
-    state->EndSingleTimeCommands(commandBuffer);
+    if (!haveCommandBuffer)
+    {
+        state->EndSingleTimeCommands( commandBuffer );
+    }
 
     return true;
 }

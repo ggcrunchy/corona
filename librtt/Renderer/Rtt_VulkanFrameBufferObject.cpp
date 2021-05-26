@@ -304,7 +304,9 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 	if (isSwapchain)
 	{
-		for (VkImage swapchainImage : fRenderer.GetSwapchainImages())
+		auto & swapchainImages = fRenderer.GetSwapchainImages();
+
+		for (VkImage swapchainImage : swapchainImages)
 		{
 			VkImageView swapchainView = VulkanTexture::CreateImageView( ci.state, swapchainImage, format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 

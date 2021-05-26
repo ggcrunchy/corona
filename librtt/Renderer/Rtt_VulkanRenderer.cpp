@@ -17,6 +17,7 @@
 #include "Renderer/Rtt_VulkanTexture.h"
 #include "Renderer/Rtt_CPUResource.h"
 #include "Renderer/Rtt_FrameBufferObject.h"
+#include "Display/Rtt_BufferBitmap.h"
 #include "Core/Rtt_Assert.h"
 #include "CoronaLog.h"
 
@@ -348,12 +349,14 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	fState( state ),
     fSwapchainTexture( NULL ),
 	fPrimaryFBO( NULL ),
+	fCaptureFBO( NULL ),
 	fFirstPipeline( VK_NULL_HANDLE ),
 	fPool( VK_NULL_HANDLE ),
 	fUniformsLayout( VK_NULL_HANDLE ),
 	fUserDataLayout( VK_NULL_HANDLE ),
 	fTextureLayout( VK_NULL_HANDLE ),
-	fPipelineLayout( VK_NULL_HANDLE )
+	fPipelineLayout( VK_NULL_HANDLE ),
+	fCaptureFence( VK_NULL_HANDLE )
 {
 	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
 	fBackCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
@@ -527,20 +530,7 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 
 	else
 	{
-		if (VK_ERROR_OUT_OF_DATE_KHR == result)
-		{
-		//	fState->RebuildSwapChain();
-			// TODO: should we then try again?
-			// or can we just do that straight out?
-				// if an acquire fails, then what????
-			RecreateSwapchain();
-			CoronaLog( "Out of date" );
-		}
-	
-		else
-		{
-			CoronaLog( "Failed to acquire swap chain image!" );
-		}
+		CoronaLog( "Failed to acquire swap chain image!" ); // TODO: is it possible to arrive here out-of-date?
 	}
 
 	vulkanCommandBuffer->ClearExecuteResult();
@@ -552,131 +542,60 @@ VulkanRenderer::EndFrame()
 	Super::EndFrame();
 
 	SetFrameBufferObject(NULL);
-	// TODO: this always precedes Swap(), so hook up resources for Create() / Update()
-	// yank them in Execute()
 }
 
 void
 VulkanRenderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bitmap, S32 x_in_pixels, S32 y_in_pixels, S32 w_in_pixels, S32 h_in_pixels )
 {
-	// TODO
+	// adapted from https://community.khronos.org/t/readpixels-on-vulkan/6797
 
-	// https://community.khronos.org/t/readpixels-on-vulkan/6797
+	VulkanState * state = GetState();
 
-	/*
+	VulkanBufferData bufferData( state->GetDevice(), state->GetAllocator() );
+
+	size_t size = bitmap.Width() * bitmap.Height() * 4U;
+    bool ok = state->CreateBuffer( size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
+
+	vkWaitForFences( state->GetDevice(), 1U, &fCaptureFence, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+
+	VulkanTexture * texture = static_cast< VulkanTexture * >( fCaptureFBO->GetTextureName() );
+	VkImage image = texture->GetImage();
+	VkCommandBuffer commandBuffer = state->BeginSingleTimeCommands();
+
+	VulkanTexture::TransitionImageLayout( state, image, texture->GetFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0U, commandBuffer );
+
+	VkBufferImageCopy region = {};
 	
-	
-	renderpass etc. etc.):
+	// TODO: do we need to handle scaling?
+	region.bufferRowLength = w_in_pixels;
+	region.bufferImageHeight = h_in_pixels;
+	region.imageExtent.width = w_in_pixels;
+	region.imageExtent.height = h_in_pixels;
+	region.imageExtent.depth = 1U;
+	region.imageOffset.x = x_in_pixels;
+	region.imageOffset.y = y_in_pixels;
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.layerCount = 1U;
 
+	vkCmdCopyImageToBuffer( commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bufferData.GetBuffer(), 1U, &region );
 
-	VkImage imageSource;
-	VkImageCreateInfo isci{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, nullptr, VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT, VK_IMAGE_TYPE_2D, VK_FORMAT_R8G8B8A8_UINT, {width,height, 1},
-	                   1, 1, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_SHARING_MODE_EXCLUSIVE, 1, &queueFamily };
-	VkResult errorCode = vkCreateImage( device, &isci, nullptr, &imageSource ); RESULT_HANDLER( errorCode, "vkCreateImage" );
+	VulkanTexture::TransitionImageLayout( state, image, texture->GetFormat(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0U, commandBuffer );
 
-	VkMemoryRequirements ismr;
-	vkGetImageMemoryRequirements( device, imageSource, &ismr );
+	state->EndSingleTimeCommands( commandBuffer );
 
-	uint32_t memoryType = 0; bool found = false;
-	for( uint32_t i = 0; i < 32; ++i ){
-		if(  ( ismr.memoryTypeBits & (0x1 << i) )  &&  physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT  ){
-				memoryType = i; found = true; break;
-		}
-	}
-	if( !found ) throw "Can't find compatible mappable memory for image";
+	void * data = NULL;
+	VkDevice device = state->GetDevice();
+	VkResult errorCode = vkMapMemory( device, bufferData.GetMemory(), 0, VK_WHOLE_SIZE, 0, &data );
 
-	VkDeviceMemory memorySource;
-	VkMemoryAllocateInfo memoryInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, nullptr, ismr.size, memoryType };
-	errorCode = vkAllocateMemory( device, &memoryInfo, nullptr, &memorySource ); RESULT_HANDLER( errorCode, "vkAllocateMemory" );
-	errorCode = vkBindImageMemory( device, imageSource, memorySource, 0 ); RESULT_HANDLER( errorCode, "vkBindImageMemory" );
+	memcpy( bitmap.WriteAccess(), data, size ); // TODO: swizzle here? (from BGRA to RGBA...)
 
-	VkImageView imageSourceView;
-	VkImageViewCreateInfo isvci{  VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, nullptr, 0, imageSource, VK_IMAGE_VIEW_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM,
-	                              { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY },
-	                              { VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS }  };
-	errorCode = vkCreateImageView( device, &isvci, nullptr, &imageSourceView ); RESULT_HANDLER( errorCode, "vkCreateImageView" );
+	vkUnmapMemory( device, bufferData.GetMemory() );
 
-	VkFramebuffer framebufferSource;
-	VkFramebufferCreateInfo fsci{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, renderPass, 1, &imageSourceView, width, height, 1 };
-	errorCode = vkCreateFramebuffer( device, &fsci, nullptr, &framebufferSource ); RESULT_HANDLER( errorCode, "vkCreateFramebuffer" );
+	CoronaLog( "Wait for fences" );
 
+	// TODO: do we need to guard the FBO memory?
 
-	VkCommandBuffer renderCommandBuffer;
-	VkCommandBufferAllocateInfo rcbai{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, nullptr, commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1 };
-	errorCode = vkAllocateCommandBuffers( device, &rcbai, &renderCommandBuffer ); RESULT_HANDLER( errorCode, "vkAllocateCommandBuffers" );
-
-	beginCommandBuffer( renderCommandBuffer );
-		VkImageMemoryBarrier predrawBarrier{  VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, nullptr, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-		                                      VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, imageSource, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }  };
-		vkCmdPipelineBarrier( renderCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &predrawBarrier );
-
-		VkRenderPassBeginInfo rpbi{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, nullptr, renderPass, framebufferSource, {{0,0}, {width,height}}, 1, &clearColor };
-		vkCmdBeginRenderPass( renderCommandBuffer, &rpbi, VK_SUBPASS_CONTENTS_INLINE );
-
-		vkCmdBindPipeline( renderCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
-		vkCmdBindDescriptorSets( renderCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr );
-		VkDeviceSize offsets[] = {0};
-		vkCmdBindVertexBuffers( renderCommandBuffer, vertexBufferBinding, 1, &vertexBuffer, offsets );
-
-		VkViewport viewport{ 0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f };
-		vkCmdSetViewport( renderCommandBuffer, 0, 1, &viewport );
-		VkRect2D scissor{ {0, 0}, {width, height} };
-		vkCmdSetScissor( renderCommandBuffer, 0, 1, &scissor );
-
-		vkCmdDraw( renderCommandBuffer, triangle.size(), 1, 0, 0 );
-
-		vkCmdEndRenderPass( renderCommandBuffer );
-
-		VkImageMemoryBarrier premapBarrier{  VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, nullptr, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_HOST_READ_BIT | VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-		                                      VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, imageSource, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }  };
-		vkCmdPipelineBarrier( renderCommandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &premapBarrier );
-	endCommandBuffer( renderCommandBuffer );
-
-	vkDeviceWaitIdle( device );
-	VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO, nullptr, 0, nullptr, nullptr, 1, &renderCommandBuffer, 0, nullptr };
-	errorCode = vkQueueSubmit( queue, 1, &submit, VK_NULL_HANDLE ); RESULT_HANDLER( errorCode, "vkQueueSubmit" );
-	vkQueueWaitIdle( queue );
-
-	void* data;
-	errorCode = vkMapMemory( device, memorySource, 0, VK_WHOLE_SIZE, 0, &data ); RESULT_HANDLER( errorCode, "vkMapMemory" );
-	std::ofstream ofs( "out.raw", std::ostream::binary );
-	ofs.write( (char*)data, width * height * 4 );
-	vkUnmapMemory( device, memorySource );
-
-	vkDestroyFramebuffer( device, framebufferSource, nullptr );
-	vkDestroyImageView( device, imageSourceView, nullptr );
-	vkFreeMemory( device, memorySource, nullptr );
-	vkDestroyImage( device, imageSource, nullptr );
-	*/
-
-	/*
-	* 
-	* Please don’t use VK_IMAGE_TILING_LINEAR or HOST_VISIBLE unless absolutely required, as there will be performance hits depending on the GPU.
-
-For the use-case of “readpixels” it is much better to keep the framebuffer images “fast” with VK_IMAGE_TILING_OPTIMAL and not in CPU-memory (HOST_VISIBLE).
-
-Just like when working with PBOs in OpenGL, use a separate “staging” image or buffer (which is host visible for mapping) that you copy your “fast” render
-framebuffer image into. That way the actual rendering is not affected by non-optimal formats/memory type, and that is where you will access the memory
-fore-most. The cost to copy the data and potentially transform the format will not be as bad, as the permanent hit you get when rendering.
-	* 
-	* 
-	* 
-	* 
-	* 
-	* 
-	* 
-	* 
-	* Yeah, there is an error in the example. Definitely don’t want host allocated mamory.
-Bad: propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-right: propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-
-
-	this here won’t work correctly, as it will return “true” if one of the bits is set, not both
-propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-
-	for both bits need
-(propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) == (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-	*/
+	PrepareCapture( NULL, VK_NULL_HANDLE );
 }
 
 VkSwapchainKHR
@@ -1103,6 +1022,14 @@ VulkanRenderer::ResetPipelineInfo()
 	RestartWorkingPipeline();
 }
 
+
+void
+VulkanRenderer::PrepareCapture( VulkanFrameBufferObject * fbo, VkFence fence )
+{
+	fCaptureFBO = fbo;
+	fCaptureFence = fence;
+}
+
 GPUResource* 
 VulkanRenderer::Create( const CPUResource* resource )
 {
@@ -1120,10 +1047,6 @@ VulkanRenderer::Create( const CPUResource* resource )
 void
 VulkanRenderer::InitializePipelineState()
 {
-/*
-	glDisable( GL_SCISSOR_TEST );
-	// based on framebuffers, looks like we do NOT want this, but rather a full-screen scissor as default
-*/
 	PackedPipeline packedPipeline = {};
 
 	// TODO: this should be fleshed out with defaults
