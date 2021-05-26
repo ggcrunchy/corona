@@ -45,6 +45,7 @@ class CPUResource;
 class FrameBufferObject;
 class Texture;
 class VulkanBufferData;
+class VulkanFrameBufferObject;
 class VulkanState;
 
 // ----------------------------------------------------------------------------
@@ -166,6 +167,9 @@ class VulkanRenderer : public Renderer
 		void ResetPipelineInfo();
 		VkPipelineColorBlendAttachmentState & GetColorBlendState() { return fColorBlendState; }
 
+	public:
+		void PrepareCapture( VulkanFrameBufferObject * fbo, VkFence fence );
+
 	protected:
 		// Create an OpenGL resource appropriate for the given CPUResource.
 		virtual GPUResource* Create( const CPUResource* resource );
@@ -203,6 +207,7 @@ class VulkanRenderer : public Renderer
 		VulkanState * fState;
 		Texture * fSwapchainTexture;
 		FrameBufferObject * fPrimaryFBO;
+		VulkanFrameBufferObject * fCaptureFBO; // not owned by renderer
 		std::vector< VkImage > fSwapchainImages;
 		std::vector< VkCommandBuffer > fCommandBuffers;
 		std::vector< Descriptor * > fDescriptors;
@@ -213,6 +218,7 @@ class VulkanRenderer : public Renderer
 		VkDescriptorSetLayout fUserDataLayout;
 		VkDescriptorSetLayout fTextureLayout;
 		VkPipelineLayout fPipelineLayout;
+		VkFence fCaptureFence; // not owned by renderer
 		PipelineCreateInfo fPipelineCreateInfo;
 		PipelineKey fDefaultKey;
 		PipelineKey fWorkingKey;

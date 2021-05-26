@@ -828,6 +828,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					fbo = Read<VulkanFrameBufferObject*>();
 
 					clearValues.clear();
+
+					if (isCapture)
+					{
+						fRenderer.PrepareCapture( fbo, fInFlight );
+					}
 				
 					DEBUG_PRINT( "Bind FrameBufferObject, %p (texture = %p)", fbo, fbo->GetTextureName() );/*: Vulkan ID=%" PRIx64 ", Vulkan Texture ID, if any: %" PRIx64,
 									fbo->,
@@ -1486,13 +1491,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 		}
 
 		fExecuteResult = submitResult;
-	}
-
-	if (!usingSwapchainImage)
-	{
-		vkWaitForFences( state->GetDevice(), 1U, &fInFlight, VK_TRUE, std::numeric_limits< uint64_t >::max() );
-
-		DEBUG_PRINT( "Wait for fences" );
 	}
 
 	if (endResult != VK_SUCCESS)
