@@ -130,6 +130,9 @@ class VulkanState
 		void StageData( VkDeviceMemory stagingMemory, const void * data, VkDeviceSize count, VkDeviceSize offset = 0U );
 
 	public:
+		void WaitOnFence( VkFence fence );
+
+	public:
 		struct DeviceDetails {
 			Features features;
 			VkPhysicalDeviceProperties properties;

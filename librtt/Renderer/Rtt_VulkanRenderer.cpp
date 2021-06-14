@@ -503,14 +503,14 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 	{
 		if (isCapture)
 		{
-			result = vulkanCommandBuffer->Wait( fState->GetDevice() );
+			result = vulkanCommandBuffer->Wait( fState );
 
 			index = fCommandBuffers.size() - 1U;
 		}
 
 		else
 		{
-			result = vulkanCommandBuffer->WaitAndAcquire( fState->GetDevice(), swapchain, index );
+			result = vulkanCommandBuffer->WaitAndAcquire( fState, swapchain, index );
 		}
 
 		canContinue = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
@@ -556,7 +556,11 @@ VulkanRenderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bit
 	size_t size = bitmap.Width() * bitmap.Height() * 4U;
     bool ok = state->CreateBuffer( size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
 
-	vkWaitForFences( state->GetDevice(), 1U, &fCaptureFence, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+	void * data = NULL;
+	VkDevice device = state->GetDevice();
+	VkResult errorCode = vkMapMemory( device, bufferData.GetMemory(), 0, VK_WHOLE_SIZE, 0, (void **)&data );
+
+	state->WaitOnFence( fCaptureFence );
 
 	VulkanTexture * texture = static_cast< VulkanTexture * >( fCaptureFBO->GetTextureName() );
 	VkImage image = texture->GetImage();
@@ -566,7 +570,6 @@ VulkanRenderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bit
 
 	VkBufferImageCopy region = {};
 	
-	// TODO: do we need to handle scaling?
 	region.bufferRowLength = w_in_pixels;
 	region.bufferImageHeight = h_in_pixels;
 	region.imageExtent.width = w_in_pixels;
@@ -577,23 +580,64 @@ VulkanRenderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bit
 	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	region.imageSubresource.layerCount = 1U;
 
+/*
+	If CaptureFrameBuffer in Rtt_GPUStream is any indication, we don't need to account for scaling; however, if this is a wrong
+	assessment, we could make an intermediate object backed by the very buffer that follows and then blit to it like so:
+
+	VkImageBlit b;
+	VKAPI_ATTR void VKAPI_CALL vkCmdBlitImage(
+		VkCommandBuffer                             commandBuffer,
+		VkImage                                     srcImage,
+		VkImageLayout                               srcImageLayout,
+		VkImage                                     dstImage,
+		VkImageLayout                               dstImageLayout,
+		uint32_t                                    regionCount,
+		const VkImageBlit*                          pRegions,
+		VkFilter                                    filter);
+
+	Actually, this might obviate the swizzling that follows and be more robust against differing formats.
+*/
 	vkCmdCopyImageToBuffer( commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bufferData.GetBuffer(), 1U, &region );
 
 	VulkanTexture::TransitionImageLayout( state, image, texture->GetFormat(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0U, commandBuffer );
 
 	state->EndSingleTimeCommands( commandBuffer );
 
-	void * data = NULL;
-	VkDevice device = state->GetDevice();
-	VkResult errorCode = vkMapMemory( device, bufferData.GetMemory(), 0, VK_WHOLE_SIZE, 0, &data );
+	uint8_t * bits = (uint8_t *)bitmap.WriteAccess();
+	uint8_t * dataBytes = (uint8_t *)data;
 
-	memcpy( bitmap.WriteAccess(), data, size ); // TODO: swizzle here? (from BGRA to RGBA...)
+	for (U32 y = 0; y < bitmap.Height(); ++y)
+	{
+		uint8_t * line = (uint8_t *)bits + y * bitmap.Width() * 4U;
+
+		for (U32 x = 0; x < bitmap.Width(); ++x)
+		{
+			line[0] = dataBytes[3];
+			line[1] = dataBytes[2];
+			line[2] = dataBytes[1];
+			line[3] = dataBytes[0];
+
+			dataBytes += 4;
+			line += 4;
+		}
+	}
 
 	vkUnmapMemory( device, bufferData.GetMemory() );
 
 	CoronaLog( "Wait for fences" );
 
 	// TODO: do we need to guard the FBO memory?
+
+	PrepareCapture( NULL, VK_NULL_HANDLE );
+}
+
+void
+VulkanRenderer::EndCapture()
+{
+	if (VK_NULL_HANDLE != fCaptureFence)
+	{
+		fState->WaitOnFence( fCaptureFence );
+	}
 
 	PrepareCapture( NULL, VK_NULL_HANDLE );
 }

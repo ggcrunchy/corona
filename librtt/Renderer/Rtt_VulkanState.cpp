@@ -282,7 +282,7 @@ VulkanState::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
 
 		if (VK_SUCCESS == vkQueueSubmit( fGraphicsQueue, 1U, &submitInfo, fence ))
 		{
-			vkWaitForFences( fDevice, 1U, &fence, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+			WaitOnFence( fence );
 		}
 
 		vkDestroyFence( fDevice, fence, fAllocator );
@@ -321,6 +321,14 @@ VulkanState::StageData( VkDeviceMemory stagingMemory, const void * data, VkDevic
 
 	memcpy( mapping, data, static_cast< size_t >( count ) );
     vkUnmapMemory( fDevice, stagingMemory );
+}
+
+void
+VulkanState::WaitOnFence( VkFence fence )
+{
+	Rtt_ASSERT( VK_NULL_HANDLE != fence );
+
+	vkWaitForFences( fDevice, 1U, &fence, VK_TRUE, std::numeric_limits< uint64_t >::max() );
 }
 
 bool
