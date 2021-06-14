@@ -116,8 +116,8 @@ class VulkanCommandBuffer : public CommandBuffer
 	public:
 		enum { kNumTextures = 5 };
 
-		VkResult Wait( VkDevice device );
-		VkResult WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain, uint32_t & index );
+		VkResult Wait( VulkanState * state );
+		VkResult WaitAndAcquire( VulkanState * state, VkSwapchainKHR swapchain, uint32_t & index );
 		VkResult GetExecuteResult() const { return fExecuteResult; }
 		
 		void BeginFrame();

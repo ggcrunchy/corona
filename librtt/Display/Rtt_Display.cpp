@@ -1030,6 +1030,10 @@ Display::Capture( DisplayObject *object,
 
 #	endif // ENABLE_DEBUG_PRINT
 
+	// STEVE CHANGE
+	fRenderer->EndCapture();
+	// /STEVE CHANGE
+
 	Rtt_DELETE( fbo );
 
 	// If object was just created this will draw it to main scene as well, not only to FBO

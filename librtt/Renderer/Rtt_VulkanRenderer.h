@@ -134,6 +134,7 @@ class VulkanRenderer : public Renderer
 		virtual void BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY, bool isCapture );
 		virtual void EndFrame();
 		virtual void CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bitmap, S32 x_in_pixels, S32 y_in_pixels, S32 w_in_pixels, S32 h_in_pixels );
+		virtual void EndCapture();
 
 	public:
 		VkSwapchainKHR MakeSwapchain();

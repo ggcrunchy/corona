@@ -1309,7 +1309,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					int width = Read<int>();
 					int height = Read<int>();
 
-					if (!isPrimaryPass)
+					if (!isPrimaryPass || isCapture)
 					{
 						y = -(y + height); // undo -height - y
 						height = -height;  // undo -height
@@ -1505,11 +1505,11 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	return fElapsedTimeGPU;
 }
 
-VkResult VulkanCommandBuffer::Wait( VkDevice device )
+VkResult VulkanCommandBuffer::Wait( VulkanState * state )
 {
 	if (fInFlight != VK_NULL_HANDLE)
 	{
-		vkWaitForFences( device, 1U, &fInFlight, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+		state->WaitOnFence( fInFlight );
 		
 		WRITE_COMMAND( kCommandBeginCapture );
 
@@ -1522,15 +1522,15 @@ VkResult VulkanCommandBuffer::Wait( VkDevice device )
 	}
 }
 
-VkResult VulkanCommandBuffer::WaitAndAcquire( VkDevice device, VkSwapchainKHR swapchain, uint32_t & index )
+VkResult VulkanCommandBuffer::WaitAndAcquire( VulkanState * state, VkSwapchainKHR swapchain, uint32_t & index )
 {
 	if (fInFlight != VK_NULL_HANDLE)
 	{
-		vkWaitForFences( device, 1U, &fInFlight, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+		state->WaitOnFence( fInFlight );
 
 		fSwapchain = swapchain;
 
-		VkResult result = vkAcquireNextImageKHR( device, swapchain, std::numeric_limits< uint64_t >::max(), fImageAvailableSemaphore, VK_NULL_HANDLE, &index );
+		VkResult result = vkAcquireNextImageKHR( state->GetDevice(), swapchain, std::numeric_limits< uint64_t >::max(), fImageAvailableSemaphore, VK_NULL_HANDLE, &index );
 
 		WRITE_COMMAND( kCommandBindImageIndex );
 		Write<uint32_t>(index);
