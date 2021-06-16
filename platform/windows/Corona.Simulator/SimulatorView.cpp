@@ -1844,7 +1844,14 @@ void CSimulatorView::StopSimulation()
 	// Terminate the Corona runtime.
 	Interop::SimulatorRuntimeEnvironment::Destroy(mRuntimeEnvironmentPointer);
 	mRuntimeEnvironmentPointer = nullptr;
+// STEVE CHANGE
+	RECT bounds;
 
+	mCoronaContainerControl.GetWindowRect(&bounds);
+
+	mCoronaContainerControl.DestroyWindow();
+	mCoronaContainerControl.Create(nullptr, WS_CHILD | WS_VISIBLE, bounds, this);
+// /STEVE CHANGE
 	// Hide the Corona control and show its black container without any text.
 	mCoronaContainerControl.SetWindowTextW(L"");
 	mCoronaContainerControl.GetCoronaControl().ShowWindow(SW_HIDE);
