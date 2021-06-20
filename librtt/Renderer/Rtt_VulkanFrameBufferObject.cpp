@@ -479,6 +479,8 @@ VulkanFrameBufferObject::Bind( VulkanRenderer & renderer, uint32_t index, VkRend
 
 	passBeginInfo.framebuffer = fFramebuffers[index];
 	passBeginInfo.renderArea.extent = fExtent;
+
+	texture->SetUpdated( true );
 }
 
 void

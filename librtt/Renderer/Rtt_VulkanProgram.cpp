@@ -57,7 +57,8 @@ namespace Rtt
 VulkanProgram::VulkanProgram( VulkanState * state )
 :	fState( state ),
 	fPushConstantStages( 0U ),
-	fPushConstantUniforms( false )
+	fPushConstantUniforms( false ),
+	fVertexTextures( false )
 {
 	for( U32 i = 0; i < Program::kNumVersions; ++i )
 	{
@@ -110,7 +111,7 @@ VulkanProgram::Destroy()
 }
 
 void
-VulkanProgram::Bind( VulkanRenderer & renderer, Program::Version version )
+VulkanProgram::Bind( VulkanRenderer & renderer, Program::Version version, bool & haveVertexTextures )
 {
 	VersionData& data = fData[version];
 	
@@ -170,6 +171,8 @@ VulkanProgram::Bind( VulkanRenderer & renderer, Program::Version version )
 	stages.push_back( shaderStageInfo );
 
 	renderer.SetShaderStages( data.fShadersID, stages );
+
+	haveVertexTextures = HaveVertexTextures();
 }
 
 U32 VulkanProgram::sID;
@@ -983,10 +986,18 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 
 	// Vertex shader.
 	Compile( shaderc_vertex_shader, vertexCode, maps, data.fVertexShader );
-if (!vertexDeclarations.empty()) CoronaLog( "Vertex code: %s\n\n", vertexCode.GetCStr() );
+if (!vertexDeclarations.empty()) CoronaLog( "Vertex code: %s\n\n", vertexCode.GetCStr() ); // <- TODO: this is just debugging
 	// Fragment shader.
 	Compile( shaderc_fragment_shader, fragmentCode, maps, data.fFragmentShader );
-if (!fragmentDeclarations.empty()) CoronaLog( "Fragment code: %s\n\n", fragmentCode.GetCStr() );
+if (!fragmentDeclarations.empty()) CoronaLog( "Fragment code: %s\n\n", fragmentCode.GetCStr() ); // <- TODO: ditto
+
+	for (auto && iter : maps.samplers)
+	{
+		if (iter.second.fStages & (1 << shaderc_vertex_shader))
+		{
+			fVertexTextures = true;
+		}
+	}
 
 #else
 	// no need to compile, but reflection here...

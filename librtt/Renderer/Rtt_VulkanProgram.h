@@ -52,7 +52,7 @@ class VulkanProgram : public GPUResource
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
 		
-		void Bind( VulkanRenderer & renderer, Program::Version version );
+		void Bind( VulkanRenderer & renderer, Program::Version version, bool & haveVertexTextures );
 
 		struct Location {
 			Location( size_t offset = 0U, size_t range = 0U, bool isUniform = false )
@@ -103,6 +103,7 @@ class VulkanProgram : public GPUResource
 
 		U32 GetPushConstantStages() const { return fPushConstantStages; }
 		bool HavePushConstantUniforms() const { return fPushConstantUniforms; }
+		bool HaveVertexTextures() const { return fVertexTextures; }
 
 	private:
 		// To make custom shader code work seamlessly with masking, multiple
@@ -215,6 +216,7 @@ class VulkanProgram : public GPUResource
 		CPUResource* fResource;
 		U32 fPushConstantStages;
 		bool fPushConstantUniforms;
+		bool fVertexTextures;
 
 		static U32 sID;
 

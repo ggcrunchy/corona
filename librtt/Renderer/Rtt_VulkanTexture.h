@@ -55,6 +55,9 @@ class VulkanTexture : public GPUResource
 		VkFormat GetFormat() const { return fFormat; }
 		uint32_t GetIndex() const { return fToggled ? 1 : 0; }
 		size_t GetImageCount() const { return fData.size(); }
+		bool GetUpdated() const { return fUpdated;  }
+
+		void SetUpdated( bool newValue ) { fUpdated = newValue; }
 
 	public:
 		struct ImageData {
@@ -81,6 +84,7 @@ class VulkanTexture : public GPUResource
 		VkFormat fFormat;
 //		uint32_t fMipLevels;
 		bool fToggled;
+		bool fUpdated;
 };
 
 // ----------------------------------------------------------------------------

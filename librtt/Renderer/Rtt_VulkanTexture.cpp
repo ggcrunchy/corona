@@ -62,7 +62,8 @@ VulkanTexture::VulkanTexture( VulkanState * state )
 :	fState( state ),
     fSampler( VK_NULL_HANDLE ),
     fFormat( VK_FORMAT_UNDEFINED ),
-    fToggled( false )
+    fToggled( false ),
+    fUpdated( true )
 {
 }
 
@@ -186,6 +187,8 @@ VulkanTexture::Update( CPUResource* resource )
         {
             Load( texture, GetFormat(), bufferData, 1U );
         }
+
+        SetUpdated( true );
     }
     
     texture->ReleaseData();
@@ -214,6 +217,13 @@ VulkanTexture::Bind( Descriptor & desc, VkDescriptorImageInfo & imageInfo )
     if (imageInfo.imageView != view)
     {
         desc.fDirty = true;
+
+        if (GetUpdated())
+        {
+            desc.fAnyUpdated = true;
+        }
+
+        SetUpdated( false );
 
 	    imageInfo.imageView = view;
 	    imageInfo.sampler = fSampler;

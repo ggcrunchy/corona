@@ -760,7 +760,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	{
 		fRenderer.ResetPipelineInfo();
 
-		bool isPrimaryPass = fOffscreenSequence.empty(), isCapture = false;
+		bool isPrimaryPass = fOffscreenSequence.empty(), isCapture = false, haveVertexTextures = false;
 
 		if (isPrimaryPass)
 		{
@@ -956,7 +956,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				{
 					fCurrentDrawVersion = Read<Program::Version>();
 					VulkanProgram* program = Read<VulkanProgram*>();
-					program->Bind( fRenderer, fCurrentDrawVersion );
+					program->Bind( fRenderer, fCurrentDrawVersion, haveVertexTextures );
 
 					stages = Program::Version::kWireframe != fCurrentDrawVersion ? program->GetPushConstantStages() : 0U;
 
@@ -1373,8 +1373,10 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					U32 offset = Read<U32>();
 					U32 count = Read<U32>();
 
-					if (PrepareDraw( mode, descriptorImageInfo, pushConstants, stages ))
+					if (PrepareDraw( mode, descriptorImageInfo, pushConstants, stages, haveVertexTextures ))
 					{
+						haveVertexTextures = false;
+
 						vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
 					}
 
@@ -1386,8 +1388,9 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
 					U32 count = Read<U32>();
 
-					if (PrepareDraw( mode, descriptorImageInfo, pushConstants, stages ))
+					if (PrepareDraw( mode, descriptorImageInfo, pushConstants, stages, haveVertexTextures ))
 					{
+						haveVertexTextures = false;
 						// The first argument, offset, is currently unused. If support for non-
 						// VBO based indexed rendering is added later, an offset may be needed.
 
@@ -1592,7 +1595,7 @@ VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descriptor *
 	}
 }
 
-bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & descriptorImageInfo, PushConstantState & pushConstants, U32 stages )
+bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & descriptorImageInfo, PushConstantState & pushConstants, U32 stages, bool haveVertexTextures )
 {
 	bool canDraw = fCommandBuffer != VK_NULL_HANDLE;
 
@@ -1647,6 +1650,18 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 		if (fDescriptors[Descriptor::kTexture]->fDirty)
 		{
 			sets[nsets++] = AddTextureSet( descriptorImageInfo );
+
+			if (haveVertexTextures && fDescriptors[Descriptor::kTexture]->fAnyUpdated)
+			{
+				vkCmdPipelineBarrier(
+					fCommandBuffer,
+					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+					VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+					0, 0U, NULL, 0U, NULL, 0U, NULL
+				);
+			}
+
+			fDescriptors[Descriptor::kTexture]->fAnyUpdated = false;
 		}
 
 		VkPipelineLayout pipelineLayout = fRenderer.GetPipelineLayout();

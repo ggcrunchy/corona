@@ -64,6 +64,7 @@ struct Descriptor {
 
 	VkDescriptorSetLayout fSetLayout;
 	U32 fDirty;
+	bool fAnyUpdated;
 };
 
 struct BufferData {
