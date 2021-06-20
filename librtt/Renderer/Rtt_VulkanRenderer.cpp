@@ -30,7 +30,8 @@ namespace Rtt
 
 Descriptor::Descriptor(  VkDescriptorSetLayout setLayout )
 :	fSetLayout( setLayout ),
-	fDirty( 0U )
+	fDirty( 0U ),
+	fAnyUpdated( false )
 {
 }
 
@@ -200,6 +201,7 @@ BufferDescriptor::Reset( VkDevice )
 	fLastSet = VK_NULL_HANDLE;
 	fIndex = fOffset = fLastOffset = 0U;
 	fDirty = fWritten = 0U;
+	fAnyUpdated = false;
 }
 
 void
