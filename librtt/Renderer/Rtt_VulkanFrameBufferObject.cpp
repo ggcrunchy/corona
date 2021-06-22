@@ -352,7 +352,7 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 			dstDependency.srcSubpass = 0;
 			dstDependency.dstSubpass = VK_SUBPASS_EXTERNAL;
 			dstDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			dstDependency.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			dstDependency.dstStageMask = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 			dstDependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			dstDependency.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 			dstDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
@@ -479,8 +479,6 @@ VulkanFrameBufferObject::Bind( VulkanRenderer & renderer, uint32_t index, VkRend
 
 	passBeginInfo.framebuffer = fFramebuffers[index];
 	passBeginInfo.renderArea.extent = fExtent;
-
-	texture->SetUpdated( true );
 }
 
 void

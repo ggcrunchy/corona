@@ -97,6 +97,8 @@ varying P_DEFAULT vec4 v_UserData;
 
 P_POSITION vec2 VertexKernel( P_POSITION vec2 position );
 
+#define texture2DLod textureLod
+
 void main()
 {
 	// "varying" are only meant as OUTPUT variables. ie: Write-only variables

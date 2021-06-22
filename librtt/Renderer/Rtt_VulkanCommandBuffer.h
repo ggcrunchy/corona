@@ -123,7 +123,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		void BeginFrame();
 		void BeginRecording( VkCommandBuffer commandBuffer, Descriptor ** descs );
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
-		bool PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & imageInfo, PushConstantState & pushConstants, U32 stages, bool haveVertexTextures );
+		bool PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & imageInfo, PushConstantState & pushConstants, U32 stages );
 
 	public:
 		VkDescriptorSet AddTextureSet( const std::vector< VkDescriptorImageInfo > & imageInfo );

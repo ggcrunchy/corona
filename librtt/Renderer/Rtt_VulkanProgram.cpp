@@ -57,8 +57,7 @@ namespace Rtt
 VulkanProgram::VulkanProgram( VulkanState * state )
 :	fState( state ),
 	fPushConstantStages( 0U ),
-	fPushConstantUniforms( false ),
-	fVertexTextures( false )
+	fPushConstantUniforms( false )
 {
 	for( U32 i = 0; i < Program::kNumVersions; ++i )
 	{
@@ -111,7 +110,7 @@ VulkanProgram::Destroy()
 }
 
 void
-VulkanProgram::Bind( VulkanRenderer & renderer, Program::Version version, bool & haveVertexTextures )
+VulkanProgram::Bind( VulkanRenderer & renderer, Program::Version version )
 {
 	VersionData& data = fData[version];
 	
@@ -171,8 +170,6 @@ VulkanProgram::Bind( VulkanRenderer & renderer, Program::Version version, bool &
 	stages.push_back( shaderStageInfo );
 
 	renderer.SetShaderStages( data.fShadersID, stages );
-
-	haveVertexTextures = HaveVertexTextures();
 }
 
 U32 VulkanProgram::sID;
@@ -398,6 +395,99 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 }
 
 void
+VulkanProgram::ReplaceSamplers( bool isVertexSource, ShaderCode & code )
+{
+	// in OpenGL (2.*) we can declare samplers in the vertex kernel that get picked up as bindings 0, 1, etc.
+	// Vulkan assumes a later GLSL that's more stringent about layout and allocation; we can salvage the old
+	// behavior by making those declarations synonyms for the stock samplers
+	// TODO: figure out if this is well-defined behavior
+
+	if (isVertexSource)
+	{
+		struct Sampler {
+			char name[64];
+			size_t count;
+			size_t pos;
+		};
+
+		std::vector< Sampler > samplerStack;
+		size_t offset = 0U;
+
+		while (true)
+		{
+			Sampler s;
+
+			s.pos = code.Find( "uniform ", offset );
+
+			if (std::string::npos == s.pos)
+			{
+				break;
+			}
+
+			offset = s.pos + strlen( "uniform " );
+
+			if (NoLeadingCharacters( code.GetString(), s.pos ))
+			{
+				size_t cpos = code.Find( ";", offset );
+
+				if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
+				{
+					CoronaLog( "`uniform` never followed by a semi-colon" );
+
+					return;
+				}
+
+				size_t spos = code.Find( "sampler2D", offset );
+
+				if (std::string::npos == spos)	// none left to replace?
+				{
+					return;
+				}
+
+				else if (spos < cpos) // is this a sampler-type uniform?
+				{
+					size_t bpos = code.Find( "[", offset );
+
+					if (std::string::npos == bpos || cpos < bpos)	// not an array? (also rules out u_Samplers
+					{
+						if (sscanf( code.GetCStr() + s.pos, "uniform sampler2D %63s", s.name ) < 1)
+						{
+							CoronaLog( "Sampler in shader was ill-formed" );
+
+							return;
+						}
+
+						// TODO: see notes about varyings...
+
+						size_t len = strlen( s.name );
+
+						if (ispunct( s.name[len - 1] ))
+						{
+							s.name[len - 1] = '\0';
+						}
+
+						s.count = cpos - s.pos + 1;
+
+						samplerStack.push_back(s);
+					}
+				}
+			}
+		}
+
+		char buf[64];
+
+		size_t index = samplerStack.size();
+
+		for (auto && iter = samplerStack.rbegin(); iter != samplerStack.rend(); ++iter)
+		{
+			sprintf( buf, "#define %s u_FillSampler%i", iter->name, --index );
+
+			code.Replace( iter->pos, iter->count, buf );
+		}
+	}
+}
+
+void
 VulkanProgram::ReplaceVaryings( bool isVertexSource, ShaderCode & code, Maps & maps )
 {
 	struct Varying {
@@ -432,6 +522,7 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, ShaderCode & code, Maps & m
 
 			// TODO: validate: known precision, known type, identifier
 			// also, if we don't care about mobile we could forgo the type...
+			// could also be comma-separated, see GatherUniformUserData()
 
 			v.location = varyingLocation;
 
@@ -477,6 +568,7 @@ VulkanProgram::Compile( int ikind, ShaderCode & code, Maps & maps, VkShaderModul
 	const char * what = shaderc_vertex_shader == kind ? "vertex shader" : "fragment shader";
 	bool isVertexSource = 'v' == what[0];
 
+	ReplaceSamplers( isVertexSource, code );
 	ReplaceVaryings( isVertexSource, code, maps );
 
 	const std::string & codeStr = code.GetString();
@@ -990,14 +1082,6 @@ if (!vertexDeclarations.empty()) CoronaLog( "Vertex code: %s\n\n", vertexCode.Ge
 	// Fragment shader.
 	Compile( shaderc_fragment_shader, fragmentCode, maps, data.fFragmentShader );
 if (!fragmentDeclarations.empty()) CoronaLog( "Fragment code: %s\n\n", fragmentCode.GetCStr() ); // <- TODO: ditto
-
-	for (auto && iter : maps.samplers)
-	{
-		if (iter.second.fStages & (1 << shaderc_vertex_shader))
-		{
-			fVertexTextures = true;
-		}
-	}
 
 #else
 	// no need to compile, but reflection here...
