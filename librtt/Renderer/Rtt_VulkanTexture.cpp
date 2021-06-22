@@ -62,8 +62,7 @@ VulkanTexture::VulkanTexture( VulkanState * state )
 :	fState( state ),
     fSampler( VK_NULL_HANDLE ),
     fFormat( VK_FORMAT_UNDEFINED ),
-    fToggled( false ),
-    fUpdated( true )
+    fToggled( false )
 {
 }
 
@@ -187,8 +186,6 @@ VulkanTexture::Update( CPUResource* resource )
         {
             Load( texture, GetFormat(), bufferData, 1U );
         }
-
-        SetUpdated( true );
     }
     
     texture->ReleaseData();
@@ -217,13 +214,6 @@ VulkanTexture::Bind( Descriptor & desc, VkDescriptorImageInfo & imageInfo )
     if (imageInfo.imageView != view)
     {
         desc.fDirty = true;
-
-        if (GetUpdated())
-        {
-            desc.fAnyUpdated = true;
-        }
-
-        SetUpdated( false );
 
 	    imageInfo.imageView = view;
 	    imageInfo.sampler = fSampler;
@@ -302,7 +292,9 @@ VulkanTexture::Load( Texture * texture, VkFormat format, const VulkanBufferData 
 
         vkCmdPipelineBarrier(
             commandBuffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            0,
             0U, NULL,
             0U, NULL,
             1U, &barrier
