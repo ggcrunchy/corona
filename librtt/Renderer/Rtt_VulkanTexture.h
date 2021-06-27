@@ -12,7 +12,7 @@
 
 #include "Renderer/Rtt_GPUResource.h"
 #include "Renderer/Rtt_Texture.h"
-#include <vulkan/vulkan.h>
+#include "Renderer/Rtt_VulkanIncludes.h"
 #include <utility>
 #include <vector>
 

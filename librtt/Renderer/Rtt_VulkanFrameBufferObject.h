@@ -12,9 +12,9 @@
 
 #include "Renderer/Rtt_GPUResource.h"
 #include "Renderer/Rtt_Texture.h"
+#include "Renderer/Rtt_VulkanIncludes.h"
 
 #include <vector>
-#include <vulkan/vulkan.h>
 
 // ----------------------------------------------------------------------------
 

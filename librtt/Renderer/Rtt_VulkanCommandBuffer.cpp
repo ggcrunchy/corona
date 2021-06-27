@@ -152,11 +152,6 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 //	fTimerQueryIndex( 0 ),
 	fElapsedTimeGPU( 0.0f ),
 	fRenderer( renderer ),
-	fImageAvailableSemaphore( VK_NULL_HANDLE ),
-	fRenderFinishedSemaphore( VK_NULL_HANDLE ),
-	fInFlight( VK_NULL_HANDLE ),
-	fDescriptors( NULL ),
-	fCommandBuffer( VK_NULL_HANDLE ),
 	fPipeline( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE )
 {
@@ -172,43 +167,10 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 	}
 
 	ClearExecuteResult();
-
-	auto ci = fRenderer.GetState()->GetCommonInfo();
-	VkFenceCreateInfo createFenceInfo = {};
-
-    createFenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    createFenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-	vkCreateFence( ci.device, &createFenceInfo, ci.allocator, &fInFlight );
-
-	VkSemaphoreCreateInfo createSemaphoreInfo = {};
-
-	createSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-	vkCreateSemaphore( ci.device, &createSemaphoreInfo, ci.allocator, &fImageAvailableSemaphore );
-	vkCreateSemaphore( ci.device, &createSemaphoreInfo, ci.allocator, &fRenderFinishedSemaphore );
-
-	if ( VK_NULL_HANDLE == fInFlight || VK_NULL_HANDLE == fImageAvailableSemaphore || VK_NULL_HANDLE == fRenderFinishedSemaphore)
-	{
-		CoronaLog( "Failed to create some synchronziation objects!" );
-
-		vkDestroySemaphore( ci.device, fImageAvailableSemaphore, ci.allocator );
-		vkDestroySemaphore( ci.device, fRenderFinishedSemaphore, ci.allocator );
-		vkDestroyFence( ci.device, fInFlight, ci.allocator );
-
-		fImageAvailableSemaphore = VK_NULL_HANDLE;
-		fRenderFinishedSemaphore = VK_NULL_HANDLE;
-		fInFlight = VK_NULL_HANDLE;
-	}
 }
 
 VulkanCommandBuffer::~VulkanCommandBuffer()
 {
-	auto ci = fRenderer.GetState()->GetCommonInfo();
-
-	vkDestroyFence( ci.device, fInFlight, ci.allocator );
-	vkDestroySemaphore( ci.device, fImageAvailableSemaphore, ci.allocator );
-	vkDestroySemaphore( ci.device, fRenderFinishedSemaphore, ci.allocator );
 //	delete [] fTimerQueries;
 }
 
@@ -733,6 +695,55 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	}
 #endif
 
+	VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+	const VulkanState * state = fRenderer.GetState();
+	VkDevice device = state->GetDevice();
+
+	if (fFrameResources)
+	{
+		Rtt_ASSERT( fFrameResources->fCommands );
+
+		vkResetCommandPool( device, fFrameResources->fCommands, 0U );
+
+		VkCommandBufferAllocateInfo allocInfo = {};
+
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.commandBufferCount = 1U;
+		allocInfo.commandPool = fFrameResources->fCommands;
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+		if (VK_SUCCESS == vkAllocateCommandBuffers( device, &allocInfo, &commandBuffer ))
+		{
+			VkCommandBufferBeginInfo beginInfo = {};
+
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+			if (VK_SUCCESS == vkBeginCommandBuffer( commandBuffer, &beginInfo ))
+			{
+				fFrameResources->fUniforms->Reset( device );
+				fFrameResources->fUserData->Reset( device );
+				fFrameResources->fTextures->Reset( device );
+
+				fProgram = NULL;
+				fCurrentGeometry = NULL;
+
+				for (int i = 0; i < kNumTextures; ++i)
+				{
+					fCurrentTextures[i] = NULL;
+				}
+
+				Buffer( 0 ).AllowMark();
+			}
+
+			else
+			{
+				CoronaLog( "Failed to begin recording command buffer!" );
+
+				commandBuffer = VK_NULL_HANDLE;
+			}
+		}
+	}
+
 	std::vector< VulkanGeometry * > geometryList;
 
 	VulkanUniforms uniforms;
@@ -746,7 +757,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 	U32 numPasses = 1U + fOffscreenSequence.size();
 
-	if (VK_NULL_HANDLE == fCommandBuffer)
+	if (VK_NULL_HANDLE == commandBuffer)
 	{
 		numPasses = 0U;
 	}
@@ -831,7 +842,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 					if (isCapture)
 					{
-						fRenderer.PrepareCapture( fbo, fInFlight );
+						fRenderer.PrepareCapture( fbo, fFrameResources->fFence );
 					}
 				
 					DEBUG_PRINT( "Bind FrameBufferObject, %p (texture = %p)", fbo, fbo->GetTextureName() );/*: Vulkan ID=%" PRIx64 ", Vulkan Texture ID, if any: %" PRIx64,
@@ -843,7 +854,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				{
 					Rtt_ASSERT( renderPassBeginInfo.renderPass );
 
-					vkCmdEndRenderPass( fCommandBuffer );
+					vkCmdEndRenderPass( commandBuffer );
 
 					renderPassBeginInfo.renderPass = VK_NULL_HANDLE;
 
@@ -868,7 +879,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 						VulkanTexture * texture = static_cast< VulkanTexture * >( fbo->GetTextureName() );
 
 						texture->Toggle();
-						fbo->BeginOffscreenPass( fRenderer, fCommandBuffer, clearValues.empty() );
+						fbo->BeginOffscreenPass( fRenderer, commandBuffer, clearValues.empty() );
 
 						DEBUG_PRINT( "Offscreen pass: %s", clearValues.empty() ? "load" : "clear" );
 					}
@@ -878,13 +889,13 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					renderPassBeginInfo.clearValueCount = clearValues.size();
 					renderPassBeginInfo.pClearValues = clearValues.data();
 		
-					vkCmdBeginRenderPass( fCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
-					vkCmdSetViewport( fCommandBuffer, 0U, 1U, &viewport );
-					vkCmdSetScissor( fCommandBuffer, 0U, 1U, &renderPassBeginInfo.renderArea );
+					vkCmdBeginRenderPass( commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
+					vkCmdSetViewport( commandBuffer, 0U, 1U, &viewport );
+					vkCmdSetScissor( commandBuffer, 0U, 1U, &renderPassBeginInfo.renderArea );
 
 					if (geometry)
 					{
-						geometry->Bind( fRenderer, fCommandBuffer );
+						geometry->Bind( fRenderer, commandBuffer );
 					}
 
 					Buffer( 0 ).ResetMark();
@@ -904,7 +915,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 					if (vg != geometry)
 					{
-						vg->Bind( fRenderer, fCommandBuffer );
+						vg->Bind( fRenderer, commandBuffer );
 
 						geometry = vg;
 					}
@@ -921,7 +932,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 						if (texture)
 						{
-							texture->Bind( *fDescriptors[Descriptor::kTexture], descriptorImageInfo[i] );
+							texture->Bind( *fFrameResources->fTextures, descriptorImageInfo[i] );
 						}
 					}
 
@@ -944,7 +955,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				{
 					U32 unit = Read<U32>();
 					VulkanTexture* texture = Read<VulkanTexture*>();
-					texture->Bind( *fDescriptors[Descriptor::kTexture], descriptorImageInfo[unit] );
+					texture->Bind( *fFrameResources->fTextures, descriptorImageInfo[unit] );
 
 					DEBUG_PRINT( "Bind Texture: texture=%p unit=%i Vulkan ID=%" PRIx64,
 									texture,
@@ -1373,9 +1384,9 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					U32 offset = Read<U32>();
 					U32 count = Read<U32>();
 
-					if (PrepareDraw( mode, descriptorImageInfo, pushConstants, stages ))
+					if (PrepareDraw( commandBuffer, mode, descriptorImageInfo, pushConstants, stages ))
 					{
-						vkCmdDraw( fCommandBuffer, count, 1U, offset, 0U );
+						vkCmdDraw( commandBuffer, count, 1U, offset, 0U );
 					}
 
 					DEBUG_PRINT( "Draw: mode=%i, offset=%u, count=%u", mode, offset, count );
@@ -1386,12 +1397,12 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					VkPrimitiveTopology mode = Read<VkPrimitiveTopology>();
 					U32 count = Read<U32>();
 
-					if (PrepareDraw( mode, descriptorImageInfo, pushConstants, stages ))
+					if (PrepareDraw( commandBuffer, mode, descriptorImageInfo, pushConstants, stages ))
 					{
 						// The first argument, offset, is currently unused. If support for non-
 						// VBO based indexed rendering is added later, an offset may be needed.
 
-						vkCmdDrawIndexed( fCommandBuffer, count, 1U, 0U, 0U, 0U );
+						vkCmdDrawIndexed( commandBuffer, count, 1U, 0U, 0U, 0U );
 					}
 
 					DEBUG_PRINT( "Draw indexed: mode=%i, count=%u", mode, count );
@@ -1423,13 +1434,12 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	DEBUG_PRINT( "--End Rendering: VulkanCommandBuffer --\n" );
 
 //	VULKAN_CHECK_ERROR();
-	const VulkanState * state = fRenderer.GetState();
 	VkResult endResult = VK_SUCCESS, submitResult = VK_SUCCESS;
 	bool usingSwapchainImage = ~0U != imageIndex;
 
-	if (fCommandBuffer != VK_NULL_HANDLE)
+	if (VK_NULL_HANDLE != commandBuffer)
 	{
-		endResult = vkEndCommandBuffer( fCommandBuffer );
+		endResult = vkEndCommandBuffer( commandBuffer );
 
 		if (VK_SUCCESS == endResult)
 		{
@@ -1438,20 +1448,20 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submitInfo.commandBufferCount = 1U;
-			submitInfo.pCommandBuffers = &fCommandBuffer;
+			submitInfo.pCommandBuffers = &commandBuffer;
 
 			if (usingSwapchainImage)
 			{
-				submitInfo.pSignalSemaphores = &fRenderFinishedSemaphore;
+				submitInfo.pSignalSemaphores = &fFrameResources->fRenderFinished;
 				submitInfo.pWaitDstStageMask = &waitStage;
-				submitInfo.pWaitSemaphores = &fImageAvailableSemaphore;
+				submitInfo.pWaitSemaphores = &fFrameResources->fImageAvailable;
 				submitInfo.signalSemaphoreCount = 1U;
 				submitInfo.waitSemaphoreCount = 1U;
 			}
 
-			vkResetFences( state->GetDevice(), 1U, &fInFlight );
+			vkResetFences( state->GetDevice(), 1U, &fFrameResources->fFence );
 
-			submitResult = vkQueueSubmit( state->GetGraphicsQueue(), 1U, &submitInfo, fInFlight );
+			submitResult = vkQueueSubmit( state->GetGraphicsQueue(), 1U, &submitInfo, fFrameResources->fFence );
 		}
 	}
 
@@ -1462,7 +1472,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		presentInfo.pImageIndices = &imageIndex;
 		presentInfo.pSwapchains = &fSwapchain;
-		presentInfo.pWaitSemaphores = &fRenderFinishedSemaphore;
+		presentInfo.pWaitSemaphores = &fFrameResources->fRenderFinished;
 		presentInfo.swapchainCount = 1U;
 		presentInfo.waitSemaphoreCount = 1U;
 
@@ -1505,96 +1515,65 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	return fElapsedTimeGPU;
 }
 
-VkResult VulkanCommandBuffer::Wait( VulkanState * state )
+bool VulkanCommandBuffer::Wait( VulkanState * state, FrameResources * frameResources, VkSwapchainKHR swapchain )
 {
-	if (fInFlight != VK_NULL_HANDLE)
+	Rtt_ASSERT( NULL == fFrameResources );
+	Rtt_ASSERT( frameResources );
+
+	bool ok = VK_NULL_HANDLE != frameResources->fFence;
+
+	if (ok)
 	{
-		state->WaitOnFence( fInFlight );
+		state->WaitOnFence( frameResources->fFence );
 		
-		WRITE_COMMAND( kCommandBeginCapture );
+		if (VK_NULL_HANDLE != swapchain)
+		{
+			uint32_t index;
 
-		return VK_SUCCESS;
+			VkResult result = vkAcquireNextImageKHR( state->GetDevice(), swapchain, std::numeric_limits< uint64_t >::max(), frameResources->fImageAvailable, VK_NULL_HANDLE, &index );
+
+			ok = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
+
+			if (ok)
+			{
+				fSwapchain = swapchain;
+
+				WRITE_COMMAND( kCommandBindImageIndex );
+
+				Write<uint32_t>( index );
+			}
+
+			else
+			{
+				CoronaLog( "Failed to acquire swap chain image!" );
+			}
+		}
+
+		else
+		{
+			WRITE_COMMAND( kCommandBeginCapture );
+		}
+
+		if (ok)
+		{
+			fFrameResources = frameResources;
+		}
 	}
 
-	else
-	{
-		return VK_ERROR_INITIALIZATION_FAILED;
-	}
-}
-
-VkResult VulkanCommandBuffer::WaitAndAcquire( VulkanState * state, VkSwapchainKHR swapchain, uint32_t & index )
-{
-	if (fInFlight != VK_NULL_HANDLE)
-	{
-		state->WaitOnFence( fInFlight );
-
-		fSwapchain = swapchain;
-
-		VkResult result = vkAcquireNextImageKHR( state->GetDevice(), swapchain, std::numeric_limits< uint64_t >::max(), fImageAvailableSemaphore, VK_NULL_HANDLE, &index );
-
-		WRITE_COMMAND( kCommandBindImageIndex );
-		Write<uint32_t>(index);
-
-		return result;
-	}
-
-	else
-	{
-		return VK_ERROR_INITIALIZATION_FAILED;
-	}
+	return ok;
 }
 
 void
 VulkanCommandBuffer::BeginFrame()
 {
-	fDescriptors = NULL;
-	fCommandBuffer = VK_NULL_HANDLE;
+	fFrameResources = NULL;
 	fPipeline = VK_NULL_HANDLE;
 	fSwapchain = VK_NULL_HANDLE;
 }
 
-void
-VulkanCommandBuffer::BeginRecording( VkCommandBuffer commandBuffer, Descriptor ** descs )
+bool VulkanCommandBuffer::PrepareDraw( VkCommandBuffer commandBuffer, VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & descriptorImageInfo, PushConstantState & pushConstants, U32 stages )
 {
-	if (commandBuffer != VK_NULL_HANDLE && descs)
-	{
-		VkDevice device = fRenderer.GetState()->GetDevice();
-
-		// lists = ..., uniforms, user data, textures, ...
-	
-		descs[Descriptor::kUniforms]->Reset( device );
-		descs[Descriptor::kUserData]->Reset( device );
-		descs[Descriptor::kTexture]->Reset( device );
-
-		VkCommandBufferBeginInfo beginInfo = {};
-
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-		if (VK_SUCCESS == vkBeginCommandBuffer( commandBuffer, &beginInfo ))
-		{
-			fCommandBuffer = commandBuffer;
-			fDescriptors = descs;
-			fProgram = NULL;
-			fCurrentGeometry = NULL;
-
-			for (int i = 0; i < kNumTextures; ++i)
-			{
-				fCurrentTextures[i] = NULL;
-			}
-
-			Buffer( 0 ).AllowMark();
-		}
-
-		else
-		{
-			CoronaLog( "Failed to begin recording command buffer!" );
-		}
-	}
-}
-
-bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & descriptorImageInfo, PushConstantState & pushConstants, U32 stages )
-{
-	bool canDraw = fCommandBuffer != VK_NULL_HANDLE;
+	bool canDraw = VK_NULL_HANDLE != commandBuffer;
 
 	if (canDraw)
 	{
@@ -1602,91 +1581,88 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 
         VkPipeline pipeline = fRenderer.ResolvePipeline();
 
-		if (VK_NULL_HANDLE == pipeline)
+		canDraw = VK_NULL_HANDLE != pipeline;
+
+		if (canDraw)
 		{
-			return false;
-		}
-
-		else if (pipeline != fPipeline)
-		{
-			vkCmdBindPipeline( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
-
-			fPipeline = pipeline;
-		}
-
-		Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-
-		VkDevice device = fRenderer.GetState()->GetDevice();
-		VkDescriptorSet sets[3] = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE };
-		uint32_t dynamicOffsets[2] = {}, count = 0U, nsets = 0U;
-
-		std::vector< VkMappedMemoryRange > memoryRanges;
-
-		static_assert( Descriptor::kUniforms < Descriptor::kUserData, "Uniforms / buffer in unexpected order" );
-		static_assert( Descriptor::kUserData < Descriptor::kTexture, "Buffer / textures in unexpected order" );
-
-		U32 first = 2U; // try to do better
-
-		for (U32 i = 0; i < 2; ++i)
-		{
-			BufferDescriptor & desc = Buffer( i );
-
-			if (desc.fDirty)
+			if (pipeline != fPipeline)
 			{
-				if (i < first)
+				vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
+
+				fPipeline = pipeline;
+			}
+
+			VkDevice device = fRenderer.GetState()->GetDevice();
+			VkDescriptorSet sets[3] = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE };
+			uint32_t dynamicOffsets[2] = {}, count = 0U, nsets = 0U;
+
+			std::vector< VkMappedMemoryRange > memoryRanges;
+
+			static_assert( Descriptor::kUniforms < Descriptor::kUserData, "Uniforms / buffer in unexpected order" );
+			static_assert( Descriptor::kUserData < Descriptor::kTexture, "Buffer / textures in unexpected order" );
+
+			U32 first = 2U; // try to do better
+
+			for (U32 i = 0; i < 2; ++i)
+			{
+				BufferDescriptor & desc = Buffer( i );
+
+				if (desc.fDirty)
 				{
-					first = i;
+					if (i < first)
+					{
+						first = i;
+					}
+
+					desc.TryToAddDynamicOffset( dynamicOffsets, count );
+					desc.TryToAddMemory( memoryRanges, sets, nsets );
+					desc.TryToMark();
+				}
+			}
+
+			if (fFrameResources->fTextures->fDirty)
+			{
+				sets[nsets++] = AddTextureSet( descriptorImageInfo );
+			}
+
+			VkPipelineLayout pipelineLayout = fRenderer.GetPipelineLayout();
+
+			if (nsets > 0U)
+			{
+				if (!memoryRanges.empty())
+				{
+					vkFlushMappedMemoryRanges( device, memoryRanges.size(), memoryRanges.data() );
 				}
 
-				desc.TryToAddDynamicOffset( dynamicOffsets, count );
-				desc.TryToAddMemory( memoryRanges, sets, nsets );
-				desc.TryToMark();
+				if (2U == nsets && !fFrameResources->fUserData->fDirty) // split?
+				{
+					Rtt_ASSERT( 0U == first );
+					Rtt_ASSERT( 1U == count );
+
+					vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0U, 1U, &sets[0], 1U, dynamicOffsets );
+					vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 2U, 1U, &sets[1], 0U, NULL );
+				}
+
+				else
+				{
+					vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, first, nsets, sets, count, dynamicOffsets );
+				}
 			}
-		}
 
-		if (fDescriptors[Descriptor::kTexture]->fDirty)
-		{
-			sets[nsets++] = AddTextureSet( descriptorImageInfo );
-		}
-
-		VkPipelineLayout pipelineLayout = fRenderer.GetPipelineLayout();
-
-		if (nsets > 0U)
-		{
-			if (!memoryRanges.empty())
+			if (pushConstants.IsValid())
 			{
-				vkFlushMappedMemoryRanges( device, memoryRanges.size(), memoryRanges.data() );
+				U32 offset = pushConstants.Offset(), size = pushConstants.Range();
+
+				vkCmdPushConstants( commandBuffer, pipelineLayout, stages, offset, size, pushConstants.GetData( offset ) );
 			}
-
-			if (2U == nsets && !fDescriptors[Descriptor::kUserData]->fDirty) // split?
-			{
-				Rtt_ASSERT( 0U == first );
-				Rtt_ASSERT( 1U == count );
-
-				vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0U, 1U, &sets[0], 1U, dynamicOffsets );
-				vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 2U, 1U, &sets[1], 0U, NULL );
-			}
-
-			else
-			{
-				vkCmdBindDescriptorSets( fCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, first, nsets, sets, count, dynamicOffsets );
-			}
-		}
-
-		for (int i = 0; i < 3; ++i)
-		{
-			fDescriptors[i]->fDirty = 0U;
-		}
-
-		if (pushConstants.IsValid())
-		{
-			U32 offset = pushConstants.Offset(), size = pushConstants.Range();
-
-			vkCmdPushConstants( fCommandBuffer, pipelineLayout, stages, offset, size, pushConstants.GetData( offset ) );
-
-			pushConstants.Reset();
 		}
 	}
+
+	fFrameResources->fUniforms->fDirty = 0U;
+	fFrameResources->fUserData->fDirty = 0U;
+	fFrameResources->fTextures->fDirty = 0U;
+
+	pushConstants.Reset();
 
 	return canDraw;
 }
@@ -1694,7 +1670,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkPrimitiveTopology topology, std::vector
 VkDescriptorSet VulkanCommandBuffer::AddTextureSet( const std::vector< VkDescriptorImageInfo > & imageInfo )
 {
 	VulkanState * state = fRenderer.GetState();
-	TexturesDescriptor & desc = *static_cast< TexturesDescriptor * >( fDescriptors[Descriptor::kTexture] );
+	TexturesDescriptor & desc = *static_cast< TexturesDescriptor * >( fFrameResources->fTextures );
 
 	VkDescriptorSetAllocateInfo allocInfo = {};
 	VkDescriptorSetLayout layout = fRenderer.GetTextureLayout();
@@ -2049,7 +2025,17 @@ U8 * VulkanCommandBuffer::PointToUniform( U32 index, size_t offset )
 
 BufferDescriptor & VulkanCommandBuffer::Buffer( U32 index )
 {
-	return *static_cast< BufferDescriptor * >( fDescriptors[index] );
+	Rtt_ASSERT( fFrameResources );
+
+	switch (index)
+	{
+	case Descriptor::kUniforms:
+		return *fFrameResources->fUniforms;
+	case Descriptor::kUserData:
+		return *fFrameResources->fUserData;
+	default:
+		Rtt_ASSERT_NOT_REACHED();
+	}
 }
 
 BufferDescriptor & VulkanCommandBuffer::BufferForIndex( U32 index )

@@ -27,11 +27,10 @@
 #define _Rtt_VulkanRenderer_H__
 
 #include "Renderer/Rtt_Renderer.h"
+#include "Renderer/Rtt_VulkanIncludes.h"
 
 #include <map>
 #include <vector>
-
-#include <vulkan/vulkan.h>
 
 // ----------------------------------------------------------------------------
 
@@ -121,11 +120,30 @@ struct TexturesDescriptor : public Descriptor {
 	VkDescriptorPool fPool;
 };
 
+struct FrameResources {
+	FrameResources();
+
+	bool AddSynchronizationObjects( VkDevice device, const VkAllocationCallbacks * allocator );
+	void CleanUpCommandPool( VkDevice device, const VkAllocationCallbacks * allocator );
+	void CleanUpDescriptorObjects( VkDevice device, const VkAllocationCallbacks * allocator );
+	void CleanUpSynchronizationObjects( VkDevice device, const VkAllocationCallbacks * allocator );
+
+	BufferDescriptor * fUniforms;
+	BufferDescriptor * fUserData;
+	TexturesDescriptor * fTextures;
+	VkCommandPool fCommands;
+	VkSemaphore fImageAvailable;
+	VkSemaphore fRenderFinished;
+	VkFence fFence;
+};
+
 class VulkanRenderer : public Renderer
 {
 	public:
 		typedef Renderer Super;
 		typedef VulkanRenderer Self;
+
+		enum { kFramesInFlight = 3 }; // see https://software.intel.com/content/www/us/en/develop/articles/practical-approach-to-vulkan-part-1.html
 
 	public:
 		VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state );
@@ -172,13 +190,11 @@ class VulkanRenderer : public Renderer
 		void PrepareCapture( VulkanFrameBufferObject * fbo, VkFence fence );
 
 	protected:
-		// Create an OpenGL resource appropriate for the given CPUResource.
 		virtual GPUResource* Create( const CPUResource* resource );
 		
 	private:
 		void InitializePipelineState();
 		void RestartWorkingPipeline();
-		void WipeDescriptors();
 
 	private:
 		struct PipelineCreateInfo {
@@ -210,9 +226,8 @@ class VulkanRenderer : public Renderer
 		FrameBufferObject * fPrimaryFBO;
 		VulkanFrameBufferObject * fCaptureFBO; // not owned by renderer
 		std::vector< VkImage > fSwapchainImages;
-		std::vector< VkCommandBuffer > fCommandBuffers;
-		std::vector< Descriptor * > fDescriptors;
 		std::map< PipelineKey, VkPipeline > fBuiltPipelines;
+		FrameResources fFrameResources[kFramesInFlight];
 		VkPipeline fFirstPipeline;
 		VkDescriptorPool fPool;
 		VkDescriptorSetLayout fUniformsLayout;
@@ -224,6 +239,7 @@ class VulkanRenderer : public Renderer
 		PipelineKey fDefaultKey;
 		PipelineKey fWorkingKey;
 		VkPipelineColorBlendAttachmentState fColorBlendState;
+		int fFrameIndex;
 };
 
 // ----------------------------------------------------------------------------

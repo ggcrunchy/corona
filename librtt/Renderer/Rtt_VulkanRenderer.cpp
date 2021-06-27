@@ -344,6 +344,90 @@ TexturesDescriptor::Wipe( VkDevice device, const VkAllocationCallbacks * allocat
 	WipeDescriptorPool( device, fPool, allocator );
 }
 
+FrameResources::FrameResources()
+:	fUniforms( NULL ),
+	fUserData( NULL ),
+	fTextures( NULL ),
+	fCommands( VK_NULL_HANDLE ),
+	fImageAvailable( VK_NULL_HANDLE ),
+	fRenderFinished( VK_NULL_HANDLE ),
+	fFence( VK_NULL_HANDLE )
+{
+}
+
+bool
+FrameResources::AddSynchronizationObjects( VkDevice device, const VkAllocationCallbacks * allocator )
+{
+	VkFenceCreateInfo createFenceInfo = {};
+
+	createFenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	createFenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	if (VK_SUCCESS != vkCreateFence( device, &createFenceInfo, allocator, &fFence ))
+	{
+		// TODO...
+	}
+
+	VkSemaphoreCreateInfo createSemaphoreInfo = {};
+
+	createSemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	if (VK_SUCCESS != vkCreateSemaphore( device, &createSemaphoreInfo, allocator, &fImageAvailable ))
+	{
+		// TODO...
+	}
+
+	if (VK_SUCCESS != vkCreateSemaphore( device, &createSemaphoreInfo, allocator, &fRenderFinished ))
+	{
+		// TODO...
+	}
+
+	return true;
+}
+
+void
+FrameResources::CleanUpCommandPool( VkDevice device, const VkAllocationCallbacks * allocator )
+{
+	vkDestroyCommandPool( device, fCommands, allocator );
+
+	fCommands = VK_NULL_HANDLE;
+}
+
+static void
+CleanUpDescriptor( Descriptor * descriptor, VkDevice device, const VkAllocationCallbacks * allocator )
+{
+	if (descriptor)
+	{
+		descriptor->Wipe( device, allocator );
+
+		Rtt_DELETE( descriptor );
+	}
+}
+
+void
+FrameResources::CleanUpDescriptorObjects( VkDevice device, const VkAllocationCallbacks * allocator )
+{
+	CleanUpDescriptor( fUniforms, device, allocator );
+	CleanUpDescriptor( fUserData, device, allocator );
+	CleanUpDescriptor( fTextures, device, allocator );
+
+	fUniforms = NULL;
+	fUserData = NULL;
+	fTextures = NULL;
+}
+
+void
+FrameResources::CleanUpSynchronizationObjects( VkDevice device, const VkAllocationCallbacks * allocator )
+{
+	vkDestroyFence( device, fFence, allocator );
+	vkDestroySemaphore( device, fImageAvailable, allocator );
+	vkDestroySemaphore( device, fRenderFinished, allocator );
+
+	fFence = VK_NULL_HANDLE;
+	fImageAvailable = VK_NULL_HANDLE;
+	fRenderFinished = VK_NULL_HANDLE;
+}
+
 VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 :   Super( allocator ),
 	fState( state ),
@@ -356,7 +440,8 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	fUserDataLayout( VK_NULL_HANDLE ),
 	fTextureLayout( VK_NULL_HANDLE ),
 	fPipelineLayout( VK_NULL_HANDLE ),
-	fCaptureFence( VK_NULL_HANDLE )
+	fCaptureFence( VK_NULL_HANDLE ),
+	fFrameIndex( 0 )
 {
 	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
 	fBackCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
@@ -435,6 +520,44 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	}
 
 	fSwapchainTexture = Rtt_NEW( allocator, TextureSwapchain( allocator, state ) );
+
+	VkDescriptorPoolSize size;
+
+	size.descriptorCount = kFramesInFlight * 64U;
+	size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+
+	fPool = AddPool( state, &size, 1U, kFramesInFlight * 80U ); // TODO: wild guess this many uniform buffers can satisfy 256 "render targets" / 1024 uniform blocks, cf. below
+
+	const std::vector< uint32_t > & families = state->GetQueueFamilies();
+	uint32_t graphicsFamilyIndex = state->GetGraphicsFamilyIndex();
+
+	Rtt_ASSERT( !families.empty() );
+	Rtt_ASSERT( graphicsFamilyIndex <= families.size() );
+
+	uint32_t graphicsFamily = families[graphicsFamilyIndex];
+
+	for (int i = 0; i < kFramesInFlight; ++i)
+	{
+		static_assert( Descriptor::kUniforms < Descriptor::kUserData, "Uniforms / buffer in unexpected order" );
+		static_assert( Descriptor::kUserData < Descriptor::kTexture, "Buffer / textures in unexpected order" );
+
+		fFrameResources[i].fUniforms = Rtt_NEW( NULL, BufferDescriptor( state, fPool, fUniformsLayout, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256U, sizeof( VulkanUniforms ) ) );
+		fFrameResources[i].fUserData = Rtt_NEW( NULL, BufferDescriptor( state, fPool, fUserDataLayout, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024U, sizeof( VulkanUserData ) ) );
+		fFrameResources[i].fTextures = Rtt_NEW( NULL, TexturesDescriptor( state, fTextureLayout ) );
+		fFrameResources[i].fCommands = state->MakeCommandPool( graphicsFamily );
+
+		if (!fFrameResources[i].AddSynchronizationObjects( state->GetDevice(), state->GetAllocator() )) // TODO: could fail at other steps...
+		{
+			CoronaLog( "Failed to create some synchronziation objects!" );
+
+			// for (j = 0; j <= i; ++j)
+			fFrameResources[i].CleanUpCommandPool( state->GetDevice(), state->GetAllocator() );
+			fFrameResources[i].CleanUpDescriptorObjects( state->GetDevice(), state->GetAllocator() );
+			fFrameResources[i].CleanUpSynchronizationObjects( state->GetDevice(), state->GetAllocator() );
+
+			// break...
+		}
+	}
 }
 
 VulkanRenderer::~VulkanRenderer()
@@ -445,9 +568,14 @@ VulkanRenderer::~VulkanRenderer()
 
 	Rtt_DELETE( fSwapchainTexture );
 
-	WipeDescriptors();
-
 	auto ci = GetState()->GetCommonInfo();
+
+	for (FrameResources & resources : fFrameResources)
+	{
+		resources.CleanUpCommandPool( ci.device, ci.allocator );
+		resources.CleanUpDescriptorObjects( ci.device, ci.allocator );
+		resources.CleanUpSynchronizationObjects( ci.device, ci.allocator );
+	}
 
 	WipeDescriptorPool( ci.device, fPool, ci.allocator );
 
@@ -497,23 +625,9 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 		}
 	}
 
-	uint32_t index;
-
-	if (canContinue)
+	if (canContinue && vulkanCommandBuffer->Wait( fState, &fFrameResources[fFrameIndex], !isCapture ? swapchain : VK_NULL_HANDLE ))
 	{
-		if (isCapture)
-		{
-			result = vulkanCommandBuffer->Wait( fState );
-
-			index = fCommandBuffers.size() - 1U;
-		}
-
-		else
-		{
-			result = vulkanCommandBuffer->WaitAndAcquire( fState, swapchain, index );
-		}
-
-		canContinue = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
+		fFrameIndex = (fFrameIndex + 1) % kFramesInFlight;
 	}
 
 	if (!isCapture && fPrimaryFBO)
@@ -522,16 +636,6 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 	}
 
 	Super::BeginFrame( totalTime, deltaTime, contentScaleX, contentScaleY );
-
-	if (canContinue)
-	{
-		vulkanCommandBuffer->BeginRecording( fCommandBuffers[index], fDescriptors.data() + 3U * index );
-	}
-
-	else
-	{
-		CoronaLog( "Failed to acquire swap chain image!" ); // TODO: is it possible to arrive here out-of-date?
-	}
 
 	vulkanCommandBuffer->ClearExecuteResult();
 }
@@ -548,6 +652,7 @@ void
 VulkanRenderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bitmap, S32 x_in_pixels, S32 y_in_pixels, S32 w_in_pixels, S32 h_in_pixels )
 {
 	// adapted from https://community.khronos.org/t/readpixels-on-vulkan/6797
+	// TODO: compare Sascha Willems's "Taking Screenshots" example (seems able to avoid the fence)
 
 	VulkanState * state = GetState();
 
@@ -690,51 +795,13 @@ VulkanRenderer::BuildUpSwapchain( VkSwapchainKHR swapchain )
 {
 	fState->SetSwapchain( swapchain );
 
-	VkDevice device = fState->GetDevice();
 	uint32_t imageCount;
 
-	vkGetSwapchainImagesKHR( device, swapchain, &imageCount, NULL );
+	vkGetSwapchainImagesKHR( fState->GetDevice(), swapchain, &imageCount, NULL );
 	
-	fCommandBuffers.resize( imageCount + 1U );
 	fSwapchainImages.resize( imageCount );
 
-	VulkanState * state = GetState();
-
-	VkDescriptorPoolSize size;
-
-	size.descriptorCount = imageCount * 64U;
-	size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-
-	fPool = AddPool( state, &size, 1U, imageCount * 80U ); // TODO: wild guess this many uniform buffers can satisfy 256 "render targets" / 1024 uniform blocks, cf. below
-
-	for (uint32_t i = 0; i <= imageCount; ++i) // add one extra for captures
-	{
-		static_assert( Descriptor::kUniforms < Descriptor::kUserData, "Uniforms / buffer in unexpected order" );
-		static_assert( Descriptor::kUserData < Descriptor::kTexture, "Buffer / textures in unexpected order" );
-
-		fDescriptors.push_back( Rtt_NEW( NULL, BufferDescriptor( state, fPool, fUniformsLayout, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256U, sizeof( VulkanUniforms ) ) ) );
-		fDescriptors.push_back( Rtt_NEW( NULL, BufferDescriptor( state, fPool, fUserDataLayout, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024U, sizeof( VulkanUserData ) ) ) );
-		fDescriptors.push_back( Rtt_NEW( NULL, TexturesDescriptor( state, fTextureLayout ) ) );
-	}
-
-	VkCommandBufferAllocateInfo allocInfo = {};
-
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandBufferCount = imageCount + 1U;
-	allocInfo.commandPool = fState->GetCommandPool();
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-
-    if (VK_SUCCESS == vkAllocateCommandBuffers( device, &allocInfo, fCommandBuffers.data() ))
-	{
-		vkGetSwapchainImagesKHR( device, swapchain, &imageCount, fSwapchainImages.data() );
-
-		// TODO: descriptors? etc.
-	}
-
-	else
-	{
-        CoronaLog( "Failed to allocate command buffers!" );
-    }
+	vkGetSwapchainImagesKHR( fState->GetDevice(), swapchain, &imageCount, fSwapchainImages.data() );
 }
 
 void
@@ -747,7 +814,6 @@ VulkanRenderer::RecreateSwapchain()
 	VkSwapchainKHR newSwapchain = MakeSwapchain();
 
 	TearDownSwapchain();
-	WipeDescriptorPool( fState->GetDevice(), fPool, fState->GetAllocator() );
 
 	if (newSwapchain != VK_NULL_HANDLE )
 	{
@@ -764,9 +830,10 @@ VulkanRenderer::TearDownSwapchain()
 
 	vkDestroySwapchainKHR( ci.device, fState->GetSwapchain(), ci.allocator );
 
-	WipeDescriptors();
-
-	vkFreeCommandBuffers( ci.device, fState->GetCommandPool(), fCommandBuffers.size(), fCommandBuffers.data() );
+	for (FrameResources & resources : fFrameResources)
+	{
+		vkResetCommandPool( ci.device, resources.fCommands, 0U );
+	}
 
     fState->SetSwapchain( VK_NULL_HANDLE );
 
@@ -973,13 +1040,18 @@ IsDynamicBitSet( uint8_t states[], uint8_t value )
 VkPipeline
 VulkanRenderer::ResolvePipeline()
 {
+	PackedPipeline & packedPipeline = GetPackedPipeline( fWorkingKey.fContents );
+
+	if (VulkanProgram::kInvalidID == packedPipeline.fShaderID)
+	{
+		return VK_NULL_HANDLE;
+	}
+
 	auto iter = fBuiltPipelines.find( fWorkingKey );
 	VkPipeline pipeline = VK_NULL_HANDLE;
 
 	if (iter == fBuiltPipelines.end())
 	{
-		PackedPipeline & packedPipeline = GetPackedPipeline( fWorkingKey.fContents );
-
 		std::vector< VkDynamicState > dynamicStates;
 
 		for (uint8_t i = 0; i < kFinalDynamicState; ++i)
@@ -1119,21 +1191,6 @@ void
 VulkanRenderer::RestartWorkingPipeline()
 {
     new (&fPipelineCreateInfo) PipelineCreateInfo;
-}
-
-void
-VulkanRenderer::WipeDescriptors()
-{
-	auto ci = GetState()->GetCommonInfo();
-
-	for (Descriptor * desc : fDescriptors)
-	{
-		desc->Wipe( ci.device, ci.allocator );
-
-		Rtt_DELETE( desc );
-	}
-
-	fDescriptors.clear();
 }
 
 VulkanRenderer::PipelineCreateInfo::PipelineCreateInfo()

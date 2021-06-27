@@ -183,6 +183,11 @@ VulkanProgram::Create( Program::Version version, VersionData& data )
 	{
 		data.fShadersID = sID++;
 	}
+
+	else
+	{
+		data.fShadersID = kInvalidID;
+	}
 }
 
 static int
@@ -397,9 +402,9 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 void
 VulkanProgram::ReplaceSamplers( bool isVertexSource, ShaderCode & code )
 {
-	// in OpenGL (2.*) we can declare samplers in the vertex kernel that get picked up as bindings 0, 1, etc.
+	// In OpenGL 2.* we can declare samplers in the vertex kernel that get picked up as bindings 0, 1, etc.
 	// Vulkan assumes a later GLSL that's more stringent about layout and allocation; we can salvage the old
-	// behavior by making those declarations synonyms for the stock samplers
+	// behavior by making those declarations synonyms for the stock samplers.
 	// TODO: figure out if this is well-defined behavior
 
 	if (isVertexSource)

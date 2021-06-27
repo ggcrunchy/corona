@@ -11,7 +11,10 @@
 #define _Rtt_VulkanState_H__
 
 #include "Renderer/Rtt_Renderer.h"
-#include <vulkan/vulkan.h>
+
+// TODO: seems good spot to do the one-file-only implementation #defines
+
+#include "Renderer/Rtt_VulkanIncludes.h"
 #include <map>
 #include <vector>
 
@@ -86,7 +89,7 @@ class VulkanState
 		VkPhysicalDevice GetPhysicalDevice() const { return fPhysicalDevice; }
 		VkQueue GetGraphicsQueue() const { return fGraphicsQueue; }
 		VkQueue GetPresentQueue() const { return fPresentQueue; }
-		VkCommandPool GetCommandPool() const { return fCommandPool; }
+		VkCommandPool GetSingleTimeCommandsPool() const { return fSingleTimeCommandsPool; }
 		VkSurfaceKHR GetSurface() const { return fSurface; }
 		VkPipelineCache GetPipelineCache() const { return fPipelineCache; }
 		VkSampleCountFlags GetSampleCountFlags() const { return fSampleCountFlags; }
@@ -94,6 +97,8 @@ class VulkanState
 		const std::vector< uint32_t > & GetQueueFamilies() const { return fQueueFamilies; }
 		const Features & GetFeatures() const { return fDeviceDetails.features; }
 		const VkPhysicalDeviceProperties & GetProperties() const { return fDeviceDetails.properties; }
+		uint32_t GetGraphicsFamilyIndex() const { return 0U; }
+		// TODO: GetComputeFamilyIndex()...
 
 		struct CommonInfo {
 			CommonInfo( VulkanState * vs )
@@ -147,10 +152,16 @@ class VulkanState
 			void * data;
 		};
 
+		void PrepareCompiler();
+		VkCommandPool MakeCommandPool( uint32_t queueFamily, bool resetCommandBuffer = false );
+
 		static bool PopulateMultisampleDetails( VulkanState & state );
 		static bool PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
 		static bool PopulateSwapchainDetails( VulkanState & state );
 		static void UpdateSwapchainDetails( VulkanState & state );
+
+		static VkResult VolkInitialize();
+		static void VolkLoadDevice( VkDevice device );
 
 		struct SwapchainDetails {
 			VkSurfaceTransformFlagBitsKHR fTransformFlagBits;
@@ -172,7 +183,7 @@ class VulkanState
 		VkPhysicalDevice fPhysicalDevice;
 		VkQueue fGraphicsQueue;
 		VkQueue fPresentQueue;
-		VkCommandPool fCommandPool;
+		VkCommandPool fSingleTimeCommandsPool;
 		VkSurfaceKHR fSurface;
 		VkPipelineCache fPipelineCache;
 		VkSampleCountFlags fSampleCountFlags;

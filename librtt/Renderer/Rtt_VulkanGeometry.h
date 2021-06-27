@@ -11,9 +11,9 @@
 #define _Rtt_VulkanGeometry_H__
 
 #include "Renderer/Rtt_GPUResource.h"
+#include "Renderer/Rtt_VulkanIncludes.h"
 
 #include <vector>
-#include <vulkan/vulkan.h>
 
 // ----------------------------------------------------------------------------
 
