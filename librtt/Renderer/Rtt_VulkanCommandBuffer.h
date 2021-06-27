@@ -12,8 +12,7 @@
 
 #include "Renderer/Rtt_CommandBuffer.h"
 #include "Renderer/Rtt_Uniform.h"
-
-#include <vulkan/vulkan.h>
+#include "Renderer/Rtt_VulkanIncludes.h"
 
 // ----------------------------------------------------------------------------
 
@@ -28,6 +27,7 @@ class VulkanRenderer;
 class VulkanState;
 struct Descriptor;
 struct BufferDescriptor;
+struct FrameResources;
 struct TimeTransform;
 
 // cf. shell_default_vulkan:
@@ -116,14 +116,12 @@ class VulkanCommandBuffer : public CommandBuffer
 	public:
 		enum { kNumTextures = 5 };
 
-		VkResult Wait( VulkanState * state );
-		VkResult WaitAndAcquire( VulkanState * state, VkSwapchainKHR swapchain, uint32_t & index );
+		bool Wait( VulkanState * state, FrameResources * frameResources, VkSwapchainKHR swapchain );
 		VkResult GetExecuteResult() const { return fExecuteResult; }
 		
 		void BeginFrame();
-		void BeginRecording( VkCommandBuffer commandBuffer, Descriptor ** descs );
 		void ClearExecuteResult() { fExecuteResult = VK_SUCCESS; }
-		bool PrepareDraw( VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & imageInfo, PushConstantState & pushConstants, U32 stages );
+		bool PrepareDraw( VkCommandBuffer commandBuffer, VkPrimitiveTopology topology, std::vector< VkDescriptorImageInfo > & imageInfo, PushConstantState & pushConstants, U32 stages );
 
 	public:
 		VkDescriptorSet AddTextureSet( const std::vector< VkDescriptorImageInfo > & imageInfo );
@@ -175,15 +173,11 @@ class VulkanCommandBuffer : public CommandBuffer
 		TimeTransform* fTimeTransform;
 		S32 fCachedQuery[kNumQueryableParams];
 		VulkanRenderer & fRenderer;
-		VkSemaphore fImageAvailableSemaphore;
-		VkSemaphore fRenderFinishedSemaphore;
-		VkFence fInFlight;
 
 		// non-owned, retained only for frame:
-		// (some of this could go on the stack)
-		Descriptor ** fDescriptors;
-		VkCommandBuffer fCommandBuffer;
+		FrameResources * fFrameResources;
 		VkPipeline fPipeline;
+		VkSwapchainKHR fSwapchain;
 
 		struct FBONode {
 			FrameBufferObject * fFBO;
@@ -208,7 +202,6 @@ class VulkanCommandBuffer : public CommandBuffer
 		Geometry * fCurrentGeometry;
 		Texture * fCurrentTextures[kNumTextures];
 //		dynamic uniform buffers - as a list?
-		VkSwapchainKHR fSwapchain;
 		VkResult fExecuteResult;
 };
 

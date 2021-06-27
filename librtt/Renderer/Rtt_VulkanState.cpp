@@ -13,6 +13,7 @@
 #include "Core/Rtt_Assert.h"
 #include "CoronaLog.h"
 #include <shaderc/shaderc.h>
+#include <pthread.h>
 #include <limits>
 #include <tuple>
 #include <utility>
@@ -104,7 +105,7 @@ VulkanState::VulkanState()
     fPhysicalDevice( VK_NULL_HANDLE ),
     fGraphicsQueue( VK_NULL_HANDLE ),
     fPresentQueue( VK_NULL_HANDLE ),
-	fCommandPool( VK_NULL_HANDLE ),
+	fSingleTimeCommandsPool( VK_NULL_HANDLE ),
     fSurface( VK_NULL_HANDLE ),
 	fPipelineCache( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE ),
@@ -124,7 +125,7 @@ VulkanState::~VulkanState()
 		vkDestroyRenderPass( fDevice, renderPass.second.fPass, fAllocator );
 	}
 
-	vkDestroyCommandPool( fDevice, fCommandPool, fAllocator );
+	vkDestroyCommandPool( fDevice, fSingleTimeCommandsPool, fAllocator );
     vkDestroySurfaceKHR( fInstance, fSurface, fAllocator );
     vkDestroyDevice( fDevice, fAllocator );
 #ifndef NDEBUG
@@ -244,7 +245,7 @@ VulkanState::BeginSingleTimeCommands()
 
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandBufferCount = 1U;
-    allocInfo.commandPool = fCommandPool;
+    allocInfo.commandPool = fSingleTimeCommandsPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
     VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
@@ -288,7 +289,7 @@ VulkanState::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
 		vkDestroyFence( fDevice, fence, fAllocator );
 	}
 
-    vkFreeCommandBuffers( fDevice, fCommandPool, 1U, &commandBuffer );
+    vkFreeCommandBuffers( fDevice, fSingleTimeCommandsPool, 1U, &commandBuffer );
 }
 
 void
@@ -329,6 +330,40 @@ VulkanState::WaitOnFence( VkFence fence )
 	Rtt_ASSERT( VK_NULL_HANDLE != fence );
 
 	vkWaitForFences( fDevice, 1U, &fence, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+}
+
+void
+VulkanState::PrepareCompiler()
+{
+	VulkanProgram::InitializeCompiler( &fCompiler, &fCompileOptions );
+}
+
+VkCommandPool
+VulkanState::MakeCommandPool( uint32_t queueFamily, bool resetCommandBuffer )
+{
+    VkCommandPoolCreateInfo createPoolInfo = {};
+
+    createPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    createPoolInfo.queueFamilyIndex = queueFamily;
+
+	if (resetCommandBuffer)
+	{
+		createPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	}
+
+	VkCommandPool commandPool = VK_NULL_HANDLE;
+
+    if (VK_SUCCESS == vkCreateCommandPool( GetDevice(), &createPoolInfo, GetAllocator(), &commandPool ))
+	{
+		return commandPool;
+	}
+
+	else
+	{
+        CoronaLog( "Failed to create command pool!" );
+
+		return VK_NULL_HANDLE;
+    }
 }
 
 bool
@@ -374,105 +409,6 @@ VulkanState::PopulateMultisampleDetails( VulkanState & state )
 
 	return true;
 }
-/*
-
-
-    void cleanupSwapChain() {
-        vkDestroyImageView(device, depthImageView, nullptr);
-        vkDestroyImage(device, depthImage, nullptr);
-        vkFreeMemory(device, depthImageMemory, nullptr);
-
-        vkDestroyImageView(device, colorImageView, nullptr);
-        vkDestroyImage(device, colorImage, nullptr);
-        vkFreeMemory(device, colorImageMemory, nullptr);
-
-        for (auto framebuffer : swapChainFramebuffers) {
-            vkDestroyFramebuffer(device, framebuffer, nullptr);
-        }
-
-        vkFreeCommandBuffers(device, commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
-
-        vkDestroyPipeline(device, graphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-        vkDestroyRenderPass(device, renderPass, nullptr);
-
-        for (auto imageView : swapChainImageViews) {
-            vkDestroyImageView(device, imageView, nullptr);
-        }
-
-        vkDestroySwapchainKHR(device, swapChain, nullptr);
-
-        for (size_t i = 0; i < swapChainImages.size(); i++) {
-            vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-            vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
-        }
-
-        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-    }
-
-    void cleanup() {
-        cleanupSwapChain();
-
-        vkDestroySampler(device, textureSampler, nullptr);
-        vkDestroyImageView(device, textureImageView, nullptr);
-
-        vkDestroyImage(device, textureImage, nullptr);
-        vkFreeMemory(device, textureImageMemory, nullptr);
-
-        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
-
-        vkDestroyBuffer(device, indexBuffer, nullptr);
-        vkFreeMemory(device, indexBufferMemory, nullptr);
-
-        vkDestroyBuffer(device, vertexBuffer, nullptr);
-        vkFreeMemory(device, vertexBufferMemory, nullptr);
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-            vkDestroyFence(device, inFlightFences[i], nullptr);
-        }
-
-        vkDestroyCommandPool(device, commandPool, nullptr);
-
-        vkDestroyDevice(device, nullptr);
-
-        if (enableValidationLayers) {
-            DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-        }
-
-        vkDestroySurfaceKHR(instance, surface, nullptr);
-        vkDestroyInstance(instance, nullptr);
-
-        glfwDestroyWindow(window);
-
-        glfwTerminate();
-    }
-
-    void recreateSwapChain() {
-        int width = 0, height = 0;
-        while (width == 0 || height == 0) {
-            glfwGetFramebufferSize(window, &width, &height);
-            glfwWaitEvents();
-        }
-
-        vkDeviceWaitIdle(device);
-
-        cleanupSwapChain();
-
-        createSwapChain();
-        createImageViews();
-        createRenderPass();
-        createGraphicsPipeline();
-        createColorResources();
-        createDepthResources();
-        createFramebuffers();
-        createUniformBuffers();
-        createDescriptorPool();
-        createDescriptorSets();
-        createCommandBuffers();
-    }
-*/
 
 const char *
 StringIdentity( const char * str )
@@ -861,33 +797,28 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector< uint32_t 
 	}
 }
 
-static VkCommandPool
-MakeCommandPool( VkDevice device, uint32_t graphicsFamily, const VkAllocationCallbacks * allocator )
+struct CompilerDetails {
+	shaderc_compiler * compiler;
+	shaderc_compile_options * options;
+};
+
+static void *
+CompilerThread(void * arg)
 {
-    VkCommandPoolCreateInfo createPoolInfo = {};
+	VulkanState * state = static_cast< VulkanState * >( arg );
 
-    createPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	createPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    createPoolInfo.queueFamilyIndex = graphicsFamily;
+	state->PrepareCompiler(); // this is relatively slow, at least in debug
 
-	VkCommandPool commandPool = VK_NULL_HANDLE;
-
-    if (VK_SUCCESS == vkCreateCommandPool( device, &createPoolInfo, allocator, &commandPool ))
-	{
-		return commandPool;
-	}
-
-	else
-	{
-        CoronaLog( "Failed to create graphics command pool!" );
-
-		return VK_NULL_HANDLE;
-    }
+	return NULL;
 }
 
 bool
 VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback )
 {
+	pthread_t thread_id;
+
+	pthread_create( &thread_id, NULL, &CompilerThread, &state );
+
 	VkApplicationInfo appInfo = AppInfo();
 	const VkAllocationCallbacks * allocator = state.GetAllocator();
 	VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
@@ -925,22 +856,15 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 					vkGetDeviceQueue( device, queues.fGraphicsFamily, 0U, &state.fGraphicsQueue );
 					vkGetDeviceQueue( device, queues.fPresentFamily, 0U, &state.fPresentQueue );
 
-					VkCommandPool commandPool = MakeCommandPool( device, queues.fGraphicsFamily, allocator );
-
-					if (commandPool != VK_NULL_HANDLE)
-					{
-						state.fCommandPool = commandPool;
-
-						VulkanProgram::InitializeCompiler( &state.fCompiler, &state.fCompileOptions );
-
-						return true;
-					}
+					state.fSingleTimeCommandsPool = state.MakeCommandPool( queues.fGraphicsFamily );
 				}
 			}
 		}
 	}
 
-	return false;
+	pthread_join( thread_id, NULL );
+
+	return VK_NULL_HANDLE != state.fSingleTimeCommandsPool;
 }
 
 bool
@@ -1010,6 +934,24 @@ VulkanState::UpdateSwapchainDetails( VulkanState & state )
 	details.fImageCount = imageCount;
     details.fExtent = capabilities.currentExtent;
 	details.fTransformFlagBits = capabilities.currentTransform;
+}
+
+VkResult
+VulkanState::VolkInitialize()
+{
+#ifdef NDEBUG
+	// TODO: return volkInitialize();
+#else
+	return VK_SUCCESS;
+#endif
+}
+
+void
+VulkanState::VolkLoadDevice( VkDevice device )
+{
+#ifdef NDEBUG
+	// TODO: volkLoadDevice( device );
+#endif
 }
 
 // ----------------------------------------------------------------------------

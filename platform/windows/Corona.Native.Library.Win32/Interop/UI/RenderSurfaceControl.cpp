@@ -18,8 +18,8 @@
 #include <GL\gl.h>
 #include <GL\glu.h>
 
-#include <vulkan\vulkan.h>
 #include "CoronaLog.h"
+#include "Renderer/Rtt_VulkanIncludes.h"
 #include "Renderer/Rtt_VulkanState.h"
 // /STEVE CHANGE
 

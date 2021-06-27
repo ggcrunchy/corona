@@ -262,7 +262,7 @@ Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orie
 
 		else if (strcmp( backend, "vulkanBackend" ) == 0)
 		{
-			fRenderer = Rtt_NEW( allocator, VulkanRenderer( allocator, static_cast< VulkanState *>( backendState ) ) );
+			fRenderer = Rtt_NEW( allocator, VulkanRenderer( allocator, static_cast< VulkanState * >( backendState ) ) );
 		}
 
 		else

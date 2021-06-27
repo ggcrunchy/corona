@@ -13,8 +13,9 @@
 #include "Renderer/Rtt_GPUResource.h"
 #include "Renderer/Rtt_Program.h"
 #include "Renderer/Rtt_Uniform.h"
+#include "Renderer/Rtt_VulkanIncludes.h"
 #include "Core/Rtt_Assert.h"
-#include <vulkan/vulkan.h>
+#include "Core/Rtt_Macros.h"
 #include <map>
 #include <utility>
 #include <vector>
@@ -53,6 +54,8 @@ class VulkanProgram : public GPUResource
 		virtual void Destroy();
 		
 		void Bind( VulkanRenderer & renderer, Program::Version version );
+
+		Rtt_CLASSCONSTANT( VulkanProgram, kInvalidID, ~0U );
 
 		struct Location {
 			Location( size_t offset = 0U, size_t range = 0U, bool isUniform = false )

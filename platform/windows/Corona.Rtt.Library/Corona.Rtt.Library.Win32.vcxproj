@@ -484,6 +484,7 @@
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VideoSource.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VideoTexture.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanCommandBuffer.h" />
+    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanIncludes.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanState.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanFrameBufferObject.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanGeometry.h" />

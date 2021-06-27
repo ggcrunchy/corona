@@ -1850,6 +1850,9 @@
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_ShaderCode.h">
       <Filter>librtt\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanIncludes.h">
+      <Filter>librtt\Renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <LuaToCpp Include="..\..\resources\loader_callback.lua">
