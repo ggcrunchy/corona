@@ -26,6 +26,8 @@ struct shaderc_compile_options;
 namespace Rtt
 {
 
+struct VulkanSurfaceParams;
+
 // ----------------------------------------------------------------------------
 
 class RenderPassKey {
@@ -146,21 +148,16 @@ class VulkanState
 		const DeviceDetails & GetDeviceDetails() const { return fDeviceDetails; }
 
 	public:
-		struct NewSurfaceCallback {
-			VkSurfaceKHR (*make)( VkInstance, void *, const VkAllocationCallbacks * );
-			const char * extension;
-			void * data;
-		};
-
 		void PrepareCompiler();
 		VkCommandPool MakeCommandPool( uint32_t queueFamily, bool resetCommandBuffer = false );
 
 		static bool PopulateMultisampleDetails( VulkanState & state );
-		static bool PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback );
+		static bool PopulatePreSwapchainDetails( VulkanState & state, const VulkanSurfaceParams & params );
 		static bool PopulateSwapchainDetails( VulkanState & state );
 		static void UpdateSwapchainDetails( VulkanState & state );
 
-		static VkResult VolkInitialize();
+		static bool VolkInitialize();
+		static void VolkLoadInstance( VkInstance instance );
 		static void VolkLoadDevice( VkDevice device );
 
 		struct SwapchainDetails {

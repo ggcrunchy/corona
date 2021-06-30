@@ -116,7 +116,7 @@ namespace /*anonymous*/
 
 	// Ensure command count is incremented
 	#define WRITE_COMMAND( command ) Write<Command>( command ); ++fNumCommands;
-#define ENABLE_DEBUG_PRINT 1
+#define ENABLE_DEBUG_PRINT 0
 	// Used to validate that the appropriate Vulkan commands
 	// are being generated and that their arguments are correct
 	#if ENABLE_DEBUG_PRINT 
@@ -1530,7 +1530,7 @@ bool VulkanCommandBuffer::Wait( VulkanState * state, FrameResources * frameResou
 		{
 			uint32_t index;
 
-			VkResult result = vkAcquireNextImageKHR( state->GetDevice(), swapchain, std::numeric_limits< uint64_t >::max(), frameResources->fImageAvailable, VK_NULL_HANDLE, &index );
+			VkResult result = vkAcquireNextImageKHR( state->GetDevice(), swapchain, (std::numeric_limits< uint64_t >::max)(), frameResources->fImageAvailable, VK_NULL_HANDLE, &index );
 
 			ok = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
 
