@@ -11,7 +11,7 @@
 #define _Rtt_VulkanIncludes_H__
 
 #ifdef NDEBUG
-	// TODO: #include "../../vulkanutils/volk.h"
+	#include "../../vulkanutils/volk.h"
 #else
 	#include <vulkan/vulkan.h>
 #endif

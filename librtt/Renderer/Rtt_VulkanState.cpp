@@ -10,6 +10,7 @@
 #include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanProgram.h"
 #include "Renderer/Rtt_VulkanTexture.h"
+#include "Renderer/Rtt_VulkanExports.h"
 #include "Core/Rtt_Assert.h"
 #include "CoronaLog.h"
 #include <shaderc/shaderc.h>
@@ -24,6 +25,34 @@
 
 namespace Rtt
 {
+
+// ----------------------------------------------------------------------------
+
+bool
+VulkanExports::CreateVulkanState( const VulkanSurfaceParams & params, void ** state )
+{
+	VulkanState * vulkanState = Rtt_NEW( NULL, VulkanState );
+	
+	*state = vulkanState; // if we encounter an error we'll need to destroy this, so assign it early
+
+	VkAllocationCallbacks * allocator = NULL; // TODO
+
+	return VulkanState::PopulatePreSwapchainDetails( *vulkanState, params );
+}
+
+void
+VulkanExports::PopulateMultisampleDetails( void * state )
+{
+	VulkanState::PopulateMultisampleDetails( *static_cast< VulkanState * >( state ) );
+}
+
+void
+VulkanExports::DestroyVulkanState( void * state )
+{
+	VulkanState * vulkanState = static_cast< VulkanState * >( state );
+
+	Rtt_DELETE( vulkanState );
+}
 
 // ----------------------------------------------------------------------------
 
@@ -42,7 +71,7 @@ RenderPassKey::operator == ( const RenderPassKey & other ) const
 bool
 RenderPassKey::operator < ( const RenderPassKey & other ) const
 {
-	size_t minSize = std::min( fContents.size(), other.fContents.size() );
+	size_t minSize = (std::min)( fContents.size(), other.fContents.size() );
 	int result = memcmp( fContents.data(), other.fContents.data(), minSize );
 
 	return result < 0 || (0 == result && other.fContents.size() > minSize);
@@ -329,7 +358,7 @@ VulkanState::WaitOnFence( VkFence fence )
 {
 	Rtt_ASSERT( VK_NULL_HANDLE != fence );
 
-	vkWaitForFences( fDevice, 1U, &fence, VK_TRUE, std::numeric_limits< uint64_t >::max() );
+	vkWaitForFences( fDevice, 1U, &fence, VK_TRUE, (std::numeric_limits< uint64_t >::max)() );
 }
 
 void
@@ -813,7 +842,7 @@ CompilerThread(void * arg)
 }
 
 bool
-VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceCallback & surfaceCallback )
+VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const VulkanSurfaceParams & params )
 {
 	pthread_t thread_id;
 
@@ -822,7 +851,19 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 	VkApplicationInfo appInfo = AppInfo();
 	const VkAllocationCallbacks * allocator = state.GetAllocator();
 	VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
-	VkInstance instance = MakeInstance( &appInfo, surfaceCallback.extension, allocator, &messenger );
+	VkInstance instance = VK_NULL_HANDLE;
+
+	if (VulkanState::VolkInitialize())
+	{
+		instance = MakeInstance( &appInfo,
+		
+#ifdef _WIN32
+		VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+#endif
+		, allocator, &messenger );
+	}
+
+	bool ok = false;
 
 	if (instance != VK_NULL_HANDLE)
 	{
@@ -831,9 +872,23 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 		state.fDebugMessenger = messenger;
 	#endif
 
-		VkSurfaceKHR surface = surfaceCallback.make( instance, surfaceCallback.data, allocator );
+		VulkanState::VolkLoadInstance( instance );
 
-		if (surface != VK_NULL_HANDLE)
+	#ifdef _WIN32
+		VkWin32SurfaceCreateInfoKHR createSurfaceInfo = {};
+
+		createSurfaceInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+		createSurfaceInfo.hwnd = params.fWindowHandle;
+		createSurfaceInfo.hinstance = params.fInstance;
+
+		#define CREATE_VULKAN_SURFACE vkCreateWin32SurfaceKHR
+	#else
+		#error Non-Windows Vulkan state not implemented!
+	#endif
+
+		VkSurfaceKHR surface;
+
+		if (VK_SUCCESS == CREATE_VULKAN_SURFACE( instance, &createSurfaceInfo, allocator, &surface ))
 		{
 			state.fSurface = surface;
 
@@ -857,6 +912,13 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 					vkGetDeviceQueue( device, queues.fPresentFamily, 0U, &state.fPresentQueue );
 
 					state.fSingleTimeCommandsPool = state.MakeCommandPool( queues.fGraphicsFamily );
+
+					if (VK_NULL_HANDLE != state.fSingleTimeCommandsPool)
+					{
+						VulkanState::VolkLoadDevice( device );
+
+						ok = true;
+					}
 				}
 			}
 		}
@@ -864,7 +926,7 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const NewSurfaceC
 
 	pthread_join( thread_id, NULL );
 
-	return VK_NULL_HANDLE != state.fSingleTimeCommandsPool;
+	return ok;
 }
 
 bool
@@ -936,13 +998,21 @@ VulkanState::UpdateSwapchainDetails( VulkanState & state )
 	details.fTransformFlagBits = capabilities.currentTransform;
 }
 
-VkResult
+bool
 VulkanState::VolkInitialize()
 {
 #ifdef NDEBUG
-	// TODO: return volkInitialize();
+	return VK_SUCCESS == volkInitialize();
 #else
-	return VK_SUCCESS;
+	return true;
+#endif
+}
+		
+void
+VulkanState::VolkLoadInstance( VkInstance instance )
+{
+#ifdef NDEBUG
+	volkLoadInstance( instance );
 #endif
 }
 
@@ -950,7 +1020,7 @@ void
 VulkanState::VolkLoadDevice( VkDevice device )
 {
 #ifdef NDEBUG
-	// TODO: volkLoadDevice( device );
+	volkLoadDevice( device );
 #endif
 }
 

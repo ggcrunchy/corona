@@ -19,8 +19,7 @@
 #include <GL\glu.h>
 
 #include "CoronaLog.h"
-#include "Renderer/Rtt_VulkanIncludes.h"
-#include "Renderer/Rtt_VulkanState.h"
+#include "Renderer/Rtt_VulkanExports.h"
 // /STEVE CHANGE
 
 namespace Interop { namespace UI {
@@ -173,44 +172,6 @@ void RenderSurfaceControl::OnRaisedDestroyingEvent()
 // STEVE CHANGE
 static HMODULE GetLibraryModuleHandle();
 
-static VkSurfaceKHR
-MakeSurface( VkInstance instance, void * data, const VkAllocationCallbacks * allocator )
-{
-	VkWin32SurfaceCreateInfoKHR createSurfaceInfo = {};
-
-	createSurfaceInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-	createSurfaceInfo.hwnd = (HWND)data;
-	createSurfaceInfo.hinstance = GetLibraryModuleHandle();
-
-	VkSurfaceKHR surface;
-
-	if (vkCreateWin32SurfaceKHR(instance, &createSurfaceInfo, allocator, &surface) != VK_SUCCESS)
-	{
-		CoronaLog("Failed to create window surface!");
-
-		surface = VK_NULL_HANDLE;
-	}
-
-	return surface;
-}
-
-bool RenderSurfaceControl::CreateVulkanState()
-{
-	Rtt::VulkanState * state = Rtt_NEW( NULL, Rtt::VulkanState );
-	
-	fVulkanState = state; // if we encounter an error we'll need to destroy this, so assign it early
-
-	VkAllocationCallbacks * allocator = NULL; // TODO
-
-	Rtt::VulkanState::NewSurfaceCallback surfaceCallback;
-
-	surfaceCallback.make = MakeSurface;
-	surfaceCallback.data = GetWindowHandle();
-	surfaceCallback.extension = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
-
-	return Rtt::VulkanState::PopulatePreSwapchainDetails( *state, surfaceCallback );
-}
-
 // /STEVE CHANGE
 void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHANGE
 {
@@ -224,17 +185,25 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 	// Destroy the last OpenGL context that was created.
 	DestroyContext();
 // STEVE CHANGE
-	if (params.IsVulkanWanted() && !CreateVulkanState())
+	if (params.IsVulkanWanted())
 	{
-		DestroyContext();
+		Rtt::VulkanSurfaceParams surfaceParams;
 
-		if (params.IsVulkanRequired())
+		surfaceParams.fInstance = GetLibraryModuleHandle();
+		surfaceParams.fWindowHandle = windowHandle;
+
+		if (!Rtt::VulkanExports::CreateVulkanState( surfaceParams, &fVulkanState ))
 		{
-			Rtt_LogException( "Unable to instantiate Vulkan");
+			DestroyContext();
 
-			// TODO: anything else?
+			if (params.IsVulkanRequired())
+			{
+				Rtt_LogException( "Unable to instantiate Vulkan");
 
-			return;
+				// TODO: anything else?
+
+				return;
+			}
 		}
 	}
 // /STEVE CHANGE
@@ -345,9 +314,7 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 void RenderSurfaceControl::DestroyContext()
 {
 // STEVE CHANGE
-	Rtt::VulkanState * state = static_cast< Rtt::VulkanState * >( fVulkanState );
-
-	Rtt_DELETE( state );
+	Rtt::VulkanExports::DestroyVulkanState( fVulkanState );
 // /STEVE CHANGE
 	// Fetch this control's window handle.
 	auto windowHandle = GetWindowHandle();
@@ -401,7 +368,7 @@ RenderSurfaceControl::FetchMultisampleFormatResult RenderSurfaceControl::FetchMu
 	// STEVE CHANGE
 	if (fVulkanState)
 	{
-		Rtt::VulkanState::PopulateMultisampleDetails( *static_cast< Rtt::VulkanState * >( fVulkanState ) );
+		Rtt::VulkanExports::PopulateMultisampleDetails( fVulkanState );
 
 		result.IsSupported = true;
 
