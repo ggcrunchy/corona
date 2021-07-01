@@ -63,7 +63,7 @@ class VulkanProgram : public GPUResource
 		
 		void Bind( VulkanRenderer & renderer, Program::Version version );
 
-		Rtt_CLASSCONSTANT( VulkanProgram, kInvalidID, ~0U );
+		Rtt_CLASSCONSTANT( VulkanProgram, kInvalidID, (uint16_t)~0U );
 
 		struct Location {
 			Location( size_t offset = 0U, size_t range = 0U, bool isUniform = false )
@@ -212,7 +212,7 @@ class VulkanProgram : public GPUResource
 		};
 
 		size_t GatherUniformUserdata( bool isVertexSource, ShaderCode & code, UserdataValue values[], std::vector< UserdataDeclaration > & declarations );
-		void ReplaceSamplers( bool isVertexSource, ShaderCode & code );
+		void ReplaceVertexSamplers( ShaderCode & code );
 		void ReplaceVaryings( bool isVertexSource, ShaderCode & code, Maps & maps );
 		void Compile( int kind, ShaderCode & code, Maps & maps, VkShaderModule & module );
 		std::pair< bool, int > SearchForFreeRows( const UserdataValue values[], UserdataPosition positions[], size_t vectorCount );

@@ -230,7 +230,7 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 
 			else
 			{
-				CoronaLog( "Failed to allocate buffer memory!" );
+				CORONA_LOG_ERROR( "Failed to allocate buffer memory!" );
 			}
 		}
 
@@ -239,7 +239,7 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 
 	else
 	{
-        CoronaLog( "Failed to create buffer!" );
+        CORONA_LOG_ERROR( "Failed to create buffer!" );
     }
 
 	return false;
@@ -262,7 +262,7 @@ VulkanState::FindMemoryType( uint32_t typeFilter, VkMemoryPropertyFlags properti
         }
     }
 
-    CoronaLog( "Failed to find suitable memory type!" );
+    CORONA_LOG_ERROR( "Failed to find suitable memory type!" );
 
 	return false;
 }
@@ -389,7 +389,7 @@ VulkanState::MakeCommandPool( uint32_t queueFamily, bool resetCommandBuffer )
 
 	else
 	{
-        CoronaLog( "Failed to create command pool!" );
+        CORONA_LOG_ERROR( "Failed to create command pool!" );
 
 		return VK_NULL_HANDLE;
     }
@@ -478,7 +478,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 ) {
 	if (strcmp( pCallbackData->pMessageIdName, "VUID-VkViewport-height-01772" ) != 0) // seems spurious with VK_KHR_MAINTENANCE1_EXTENSION_NAME enabled...
 	{
-		CoronaLog( "validation layer: %s", pCallbackData->pMessage );
+		CORONA_LOG_WARNING( "validation layer: %s", pCallbackData->pMessage );
 	}
 
 //	VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT: Some event has happened that is unrelated to the specification or performance
@@ -560,7 +560,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 
 		else
 		{
-			CoronaLog( "Unable to find layer %s", layerName );
+			CORONA_LOG_WARNING( "Unable to find layer %s", layerName );
 		}
 	}
 
@@ -580,7 +580,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 
 	if (ok && vkCreateInstance( &createInfo, allocator, &instance ) != VK_SUCCESS)
 	{
-		CoronaLog( "Failed to create instance!\n" );
+		CORONA_LOG_ERROR( "Failed to create instance!\n" );
 
 		ok = false;
 	}
@@ -591,7 +591,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 
 		if (!func || func( instance, &debugCreateInfo, allocator, debugMessenger ) != VK_SUCCESS)
 		{
-			CoronaLog( "Failed to create debug messenger!\n" );
+			CORONA_LOG_ERROR( "Failed to create debug messenger!\n" );
 
 			vkDestroyInstance( instance, allocator );
 
@@ -699,7 +699,7 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 
 	if (0U == deviceCount)
 	{
-		CoronaLog( "Failed to find GPUs with Vulkan support!" );
+		CORONA_LOG_ERROR( "Failed to find GPUs with Vulkan support!" );
 
 		return std::make_tuple( VkPhysicalDevice( VK_NULL_HANDLE ), Queues(), VulkanState::DeviceDetails{} );
 	}
@@ -820,7 +820,7 @@ MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector< uint32_t 
 
 	else
 	{
-		CoronaLog( "Failed to create logical device!" );
+		CORONA_LOG_ERROR( "Failed to create logical device!" );
 
 		return VK_NULL_HANDLE;
 	}
