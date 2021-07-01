@@ -11,9 +11,8 @@
 #define _Rtt_VulkanTexture_H__
 
 #include "Renderer/Rtt_GPUResource.h"
-#include "Renderer/Rtt_Texture.h"
 #include "Renderer/Rtt_VulkanIncludes.h"
-#include <utility>
+
 #include <vector>
 
 // ----------------------------------------------------------------------------
@@ -21,6 +20,7 @@
 namespace Rtt
 {
 
+class Texture;
 class VulkanBufferData;
 class VulkanState;
 struct Descriptor;

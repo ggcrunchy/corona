@@ -29,6 +29,20 @@
 #include <vector>
 #include <stdlib.h>
 
+#ifdef free
+#undef free
+#endif
+
+#ifdef max
+#undef max
+#endif
+
+#ifdef min
+#undef min
+#endif
+
+#include <spirv_cross/spirv_glsl.hpp>
+
 // To reduce memory consumption and startup cost, defer the
 // creation of Vulkan shaders and programs until they're needed.
 // Depending on usage, this could result in framerate dips.
@@ -51,6 +65,77 @@ namespace /*anonymous*/
 
 namespace Rtt
 {
+
+// ----------------------------------------------------------------------------
+
+struct VulkanCompilerMaps {
+	struct BufferValue {
+		BufferValue( size_t offset, size_t range, bool isUniform )
+		:	fLocation( offset, range, isUniform ),
+			fStages( 0U )
+		{
+		}
+
+		VulkanProgram::Location fLocation;
+		U32 fStages;
+	};
+
+	struct SamplerValue {
+		SamplerValue( const spirv_cross::SPIRType::ImageType & details, std::vector< U32 > & counts )
+		:	fDetails( details ),
+			fStages( 0U )
+		{
+			fCounts.swap( counts );
+		}
+
+		spirv_cross::SPIRType::ImageType fDetails;
+		std::vector< U32 > fCounts;
+		U32 fStages;
+	};
+
+	std::map< std::string, BufferValue > buffer_values;
+	std::map< std::string, SamplerValue > samplers;
+	std::map< std::string, int > varyings;
+
+	U32 CheckForSampler( const std::string & key /* TODO: info... */ );
+	VulkanProgram::Location CheckForUniform( const std::string & key );
+};
+
+U32
+VulkanCompilerMaps::CheckForSampler( const std::string & key /* TODO: info... */ )
+{
+	auto iter = samplers.find( key );
+
+	if (iter != samplers.end())
+	{
+		auto imageType = iter->second;
+
+		return 0U;	// TODO: maybe just want binding decorator, from above?
+					// imageType would be handy for later expansion...
+					// TODO 2: might need array index, etc. now
+	}
+
+	else
+	{
+		return ~0U;
+	}
+}
+
+VulkanProgram::Location
+VulkanCompilerMaps::CheckForUniform( const std::string & key )
+{
+	auto iter = buffer_values.find( key );
+
+	if (iter != buffer_values.end())
+	{
+		return iter->second.fLocation;
+	}
+
+	else
+	{
+		return VulkanProgram::Location{};
+	}
+}
 
 // ----------------------------------------------------------------------------
 
@@ -490,7 +575,7 @@ VulkanProgram::ReplaceVertexSamplers( ShaderCode & code )
 }
 
 void
-VulkanProgram::ReplaceVaryings( bool isVertexSource, ShaderCode & code, Maps & maps )
+VulkanProgram::ReplaceVaryings( bool isVertexSource, ShaderCode & code, VulkanCompilerMaps & maps )
 {
 	struct Varying {
 		size_t location;
@@ -564,7 +649,7 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, ShaderCode & code, Maps & m
 }
 
 void
-VulkanProgram::Compile( int ikind, ShaderCode & code, Maps & maps, VkShaderModule & module )
+VulkanProgram::Compile( int ikind, ShaderCode & code, VulkanCompilerMaps & maps, VkShaderModule & module )
 {
 	shaderc_shader_kind kind = shaderc_shader_kind( ikind );
 	const char * what = shaderc_vertex_shader == kind ? "vertex shader" : "fragment shader";
@@ -598,7 +683,7 @@ VulkanProgram::Compile( int ikind, ShaderCode & code, Maps & maps, VkShaderModul
 			for (auto & br : ranges)
 			{
 				std::string name = comp.get_member_name( buffer.base_type_id, br.index );
-				auto iter = maps.buffer_values.insert( std::make_pair( name, Maps::BufferValue( br.offset, br.range, true ) ) );
+				auto iter = maps.buffer_values.insert( std::make_pair( name, VulkanCompilerMaps::BufferValue( br.offset, br.range, true ) ) );
 
 				iter.first->second.fStages |= 1U << kind;
 				// TODO: ensure no clashes when found in both
@@ -613,7 +698,7 @@ VulkanProgram::Compile( int ikind, ShaderCode & code, Maps & maps, VkShaderModul
 			{
 				std::string name = comp.get_member_name( buffer.base_type_id, br.index );
 
-				maps.buffer_values.insert( std::make_pair( name, Maps::BufferValue( br.offset, br.range, false ) ) );
+				maps.buffer_values.insert( std::make_pair( name, VulkanCompilerMaps::BufferValue( br.offset, br.range, false ) ) );
 			}
 
 			switch (kind)
@@ -639,7 +724,7 @@ VulkanProgram::Compile( int ikind, ShaderCode & code, Maps & maps, VkShaderModul
 				counts.push_back( type.array[i] );
 			}
 
-			auto iter = maps.samplers.insert( std::make_pair( sampler.name, Maps::SamplerValue( type.image, counts ) ) );
+			auto iter = maps.samplers.insert( std::make_pair( sampler.name, VulkanCompilerMaps::SamplerValue( type.image, counts ) ) );
 
 			iter.first->second.fStages |= 1U << kind;
 		}
@@ -818,11 +903,9 @@ VulkanProgram::AddToString( std::string & str, const UserdataValue & value )
 	return componentCount;
 }
 
-VulkanProgram::Maps
-VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data )
+void
+VulkanProgram::UpdateShaderSource( VulkanCompilerMaps & maps, Program* program, Program::Version version, VersionData& data )
 {
-	Maps maps;
-
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
 	char maskBuffer[] = "#define MASK_COUNT 0\n";
 	switch( version )
@@ -1088,44 +1171,6 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 #else
 	// no need to compile, but reflection here...
 #endif
-
-	return maps;
-}
-
-U32
-VulkanProgram::Maps::CheckForSampler( const std::string & key /* TODO: info... */ )
-{
-	auto iter = samplers.find( key );
-
-	if (iter != samplers.end())
-	{
-		auto imageType = iter->second;
-
-		return 0U;	// TODO: maybe just want binding decorator, from above?
-					// imageType would be handy for later expansion...
-					// TODO 2: might need array index, etc. now
-	}
-
-	else
-	{
-		return ~0U;
-	}
-}
-
-VulkanProgram::Location
-VulkanProgram::Maps::CheckForUniform( const std::string & key )
-{
-	auto iter = buffer_values.find( key );
-
-	if (iter != buffer_values.end())
-	{
-		return iter->second.fLocation;
-	}
-
-	else
-	{
-		return Location{};
-	}
 }
 
 void
@@ -1133,9 +1178,9 @@ VulkanProgram::Update( Program::Version version, VersionData& data )
 {
 	Program* program = static_cast<Program*>( fResource );
 
-	Maps maps = UpdateShaderSource( program,
-									version,
-									data );
+	VulkanCompilerMaps maps;
+	
+	UpdateShaderSource( maps, program, version,	data );
 
 #ifdef Rtt_USE_PRECOMPILED_SHADERS // TODO! (can probably just load spv?)
 	ShaderBinary *shaderBinary = program->GetCompiledShaders()->Get(version);

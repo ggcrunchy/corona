@@ -557,6 +557,7 @@ void RenderSurfaceControl::OnPaint()
 	// Render to the control.
 // STEVE CHANGE
 	bool canDraw = (fMainDeviceContextHandle && fRenderingContextHandle) || fVulkanState;
+
 	if (canDraw)//fMainDeviceContextHandle && fRenderingContextHandle)
 // /STEVE CHANGE
 	{
