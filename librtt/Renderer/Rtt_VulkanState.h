@@ -173,7 +173,7 @@ class VulkanState
 	private:
 		VkAllocationCallbacks * fAllocator;
 		VkInstance fInstance;
-	#ifndef NDEBUG
+	#ifdef Rtt_DEBUG
 		VkDebugUtilsMessengerEXT fDebugMessenger;
 	#endif
 		VkDevice fDevice;

@@ -16,8 +16,12 @@
 
 // ----------------------------------------------------------------------------
 
+struct Rtt_Allocator;
+
 namespace Rtt
 {
+
+class Renderer;
 
 // ----------------------------------------------------------------------------
 
@@ -35,6 +39,7 @@ public:
 	static bool CreateVulkanState( const VulkanSurfaceParams & params, void ** state );
 	static void PopulateMultisampleDetails( void * state );
 	static void DestroyVulkanState( void * state );
+	static Renderer * CreateVulkanRenderer( Rtt_Allocator * allocator, void * state );
 };
 
 // ----------------------------------------------------------------------------

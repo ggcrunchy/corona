@@ -32,8 +32,7 @@
 
 #include "Renderer/Rtt_GLRenderer.h"
 // STEVE CHANGE
-#include "Renderer/Rtt_VulkanRenderer.h"
-#include "Renderer/Rtt_VulkanState.h"
+#include "Renderer/Rtt_VulkanExports.h"
 // /STEVE CHANGE
 #include "Renderer/Rtt_FrameBufferObject.h"
 #include "Renderer/Rtt_Matrix_Renderer.h"
@@ -262,7 +261,7 @@ Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orie
 
 		else if (strcmp( backend, "vulkanBackend" ) == 0)
 		{
-			fRenderer = Rtt_NEW( allocator, VulkanRenderer( allocator, static_cast< VulkanState * >( backendState ) ) );
+			fRenderer = VulkanExports::CreateVulkanRenderer( allocator, backendState );
 		}
 
 		else
