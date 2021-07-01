@@ -974,7 +974,11 @@ Display::Capture( DisplayObject *object,
 										y_in_pixels,
 										w_in_pixels,
 										h_in_pixels );*/
-		fRenderer->CaptureFrameBuffer( *fStream, *bitmap, x_in_pixels, y_in_pixels, w_in_pixels, h_in_pixels );
+		fRenderer->CaptureFrameBuffer( *fStream, *bitmap,
+										x_in_pixels,
+										y_in_pixels,
+										w_in_pixels,
+										h_in_pixels );
 		// /STEVE CHANGE
 
 		if( output_file_will_be_png_format )

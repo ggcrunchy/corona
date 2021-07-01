@@ -191,18 +191,10 @@ VulkanCommandBuffer::Initialize()
 	InitializeCachedParams();
 	CacheQueryParam( kMaxTextureSize );
 }
+
 void
 VulkanCommandBuffer::InitializeFBO()
 {
-   // Some platforms render to an FBO by default
-	//glGetIntegerv( GL_FRAMEBUFFER_BINDING, &fDefaultFBO ); 
-	/*
-	GLint curFBO = 0;
-	glGetIntegerv( GL_FRAMEBUFFER_BINDING, & curFBO );
-	fDefaultFBO = curFBO;
-	Rtt_STATIC_ASSERT( sizeof( curFBO ) == sizeof( fDefaultFBO ) );
-	*/
-	// TODO: probably a no-op?
 }
 
 void 

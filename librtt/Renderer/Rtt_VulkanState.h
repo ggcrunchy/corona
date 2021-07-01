@@ -10,11 +10,9 @@
 #ifndef _Rtt_VulkanState_H__
 #define _Rtt_VulkanState_H__
 
-#include "Renderer/Rtt_Renderer.h"
-
-// TODO: seems good spot to do the one-file-only implementation #defines
-
 #include "Renderer/Rtt_VulkanIncludes.h"
+#include "Core/Rtt_Types.h"
+
 #include <map>
 #include <vector>
 

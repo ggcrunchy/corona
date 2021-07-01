@@ -16,23 +16,9 @@
 #include "Renderer/Rtt_VulkanIncludes.h"
 #include "Core/Rtt_Assert.h"
 #include "Core/Rtt_Macros.h"
-#include <map>
+
 #include <utility>
 #include <vector>
-
-#ifdef free
-#undef free
-#endif
-
-#ifdef max
-#undef max
-#endif
-
-#ifdef min
-#undef min
-#endif
-
-#include <spirv_cross/spirv_glsl.hpp>
 
 // ----------------------------------------------------------------------------
 
@@ -42,6 +28,7 @@ struct shaderc_compile_options;
 namespace Rtt
 {
 
+struct VulkanCompilerMaps;
 class VulkanRenderer;
 class VulkanState;
 class ShaderCode;
@@ -141,39 +128,6 @@ class VulkanProgram : public GPUResource
 		void Update( Program::Version version, VersionData& data );
 		void Reset( VersionData& data );
 
-		struct Maps {
-			struct BufferValue {
-				BufferValue( size_t offset, size_t range, bool isUniform )
-				:	fLocation( offset, range, isUniform ),
-					fStages( 0U )
-				{
-				}
-
-				Location fLocation;
-				U32 fStages;
-			};
-
-			struct SamplerValue {
-				SamplerValue( const spirv_cross::SPIRType::ImageType & details, std::vector< U32 > & counts )
-				:	fDetails( details ),
-					fStages( 0U )
-				{
-					fCounts.swap( counts );
-				}
-
-				spirv_cross::SPIRType::ImageType fDetails;
-				std::vector< U32 > fCounts;
-				U32 fStages;
-			};
-
-			std::map< std::string, BufferValue > buffer_values;
-			std::map< std::string, SamplerValue > samplers;
-			std::map< std::string, int > varyings;
-
-			U32 CheckForSampler( const std::string & key /* TODO: info... */ );
-			Location CheckForUniform( const std::string & key );
-		};
-
 		struct UserdataValue {
 			UserdataValue()
 			:	fComponentCount( 0U ),
@@ -213,11 +167,11 @@ class VulkanProgram : public GPUResource
 
 		size_t GatherUniformUserdata( bool isVertexSource, ShaderCode & code, UserdataValue values[], std::vector< UserdataDeclaration > & declarations );
 		void ReplaceVertexSamplers( ShaderCode & code );
-		void ReplaceVaryings( bool isVertexSource, ShaderCode & code, Maps & maps );
-		void Compile( int kind, ShaderCode & code, Maps & maps, VkShaderModule & module );
+		void ReplaceVaryings( bool isVertexSource, ShaderCode & code, VulkanCompilerMaps & maps );
+		void Compile( int kind, ShaderCode & code, VulkanCompilerMaps & maps, VkShaderModule & module );
 		std::pair< bool, int > SearchForFreeRows( const UserdataValue values[], UserdataPosition positions[], size_t vectorCount );
 		U32 AddToString( std::string & str, const UserdataValue & value );
-		Maps UpdateShaderSource( Program* program, Program::Version version, VersionData& data );
+		void UpdateShaderSource( VulkanCompilerMaps & maps, Program* program, Program::Version version, VersionData& data );
 
 		static void InitializeCompiler( shaderc_compiler ** compiler, shaderc_compile_options ** options );
 		static void CleanUpCompiler( shaderc_compiler * compiler, shaderc_compile_options * options );

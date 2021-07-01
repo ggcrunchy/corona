@@ -16,6 +16,7 @@
 #include "CoronaLog.h"
 #include <shaderc/shaderc.h>
 #include <pthread.h>
+#include <algorithm>
 #include <limits>
 #include <tuple>
 #include <utility>

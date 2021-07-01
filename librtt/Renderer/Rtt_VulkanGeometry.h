@@ -13,8 +13,6 @@
 #include "Renderer/Rtt_GPUResource.h"
 #include "Renderer/Rtt_VulkanIncludes.h"
 
-#include <vector>
-
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -36,20 +34,6 @@ class VulkanGeometry : public GPUResource
 	public:
 		VulkanGeometry( VulkanState * state );
 		virtual ~VulkanGeometry();
-
-		struct Binding {
-			Binding()
-			:	fVertexBuffer( VK_NULL_HANDLE ),
-				fIndexBuffer( VK_NULL_HANDLE )
-			{
-			}
-
-			std::vector< VkVertexInputBindingDescription > fDescriptions;
-			VkIndexType fIndexType;
-			VkBuffer fVertexBuffer;
-			VkBuffer fIndexBuffer;
-			U32 fInputBindingID;
-		};
 
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
