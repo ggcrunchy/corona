@@ -231,7 +231,7 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 			if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
 			{
-				CoronaLog( "`uniform` never followed by a semi-colon" );
+				CORONA_LOG_ERROR( "`uniform` never followed by a semi-colon" );
 
 				return result;
 			}
@@ -240,7 +240,7 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 			if (std::string::npos == pastUniformPos || pastUniformPos > cpos)
 			{
-				CoronaLog( "Missing type (and optional precision) after `uniform`" );
+				CORONA_LOG_ERROR( "Missing type (and optional precision) after `uniform`" );
 
 				return result;
 			}
@@ -266,7 +266,7 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 				else
 				{
-					CoronaLog( "Invalid precision" );
+					CORONA_LOG_ERROR( "Invalid precision" );
 
 					return result;
 				}
@@ -284,14 +284,14 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 					if (std::string::npos == pastUniformPos || pastUniformPos > cpos)
 					{
-						CoronaLog( "Missing type after `uniform`" );
+						CORONA_LOG_ERROR( "Missing type after `uniform`" );
 
 						return result;
 					}
 
 					if (sscanf( code.GetCStr() + pastUniformPos, "%15s ", type ) == 0)
 					{
-						CoronaLog( "Uniform type in shader was ill-formed" );
+						CORONA_LOG_ERROR( "Uniform type in shader was ill-formed" );
 
 						return result;
 					}
@@ -302,7 +302,7 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 						if (Uniform::kScalar == dataType)
 						{
-							CoronaLog( "Invalid uniform type" );
+							CORONA_LOG_ERROR( "Invalid uniform type" );
 
 							return result;
 						}
@@ -320,7 +320,7 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 				if (std::string::npos == pastUniformPos || pastUniformPos > cpos)
 				{
-					CoronaLog( "Missing `u_UserData?` after `uniform`" );
+					CORONA_LOG_ERROR( "Missing `u_UserData?` after `uniform`" );
 
 					return result;
 				}
@@ -329,12 +329,12 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 				if (sscanf( code.GetCStr() + pastUniformPos, "u_UserData%1i ", &index ) == 0)
 				{
-					CoronaLog( "`u_UserData?` in shader was ill-formed" );
+					CORONA_LOG_ERROR( "`u_UserData?` in shader was ill-formed" );
 				}
 
 				if (index < 0 || index > 3)
 				{
-					CoronaLog( "Invalid uniform userdata `%i`", index );
+					CORONA_LOG_ERROR( "Invalid uniform userdata `%i`", index );
 
 					return result;
 				}
@@ -349,7 +349,7 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 				if (punct != ',' && punct != ';')
 				{
-					CoronaLog( "Expected ',' or ';' after declaration" );
+					CORONA_LOG_ERROR( "Expected ',' or ';' after declaration" );
 
 					return result;
 				}
@@ -363,7 +363,7 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 	
 				else if (values[index].fStages & stage)
 				{
-					CoronaLog( "Uniform userdata `%i` already defined in %s stage", index, isVertexSource ? "vertex" : "fragment" );
+					CORONA_LOG_ERROR( "Uniform userdata `%i` already defined in %s stage", index, isVertexSource ? "vertex" : "fragment" );
 
 					return result;
 				}
@@ -372,7 +372,7 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 				{
 					Rtt_ASSERT( !isVertexSource );
 
-					CoronaLog( "Uniform userdata `%i` definition differs between vertex and fragment stages", index );
+					CORONA_LOG_ERROR( "Uniform userdata `%i` definition differs between vertex and fragment stages", index );
 
 					return result;
 				}
@@ -400,95 +400,92 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 }
 
 void
-VulkanProgram::ReplaceSamplers( bool isVertexSource, ShaderCode & code )
+VulkanProgram::ReplaceVertexSamplers( ShaderCode & code )
 {
 	// In OpenGL 2.* we can declare samplers in the vertex kernel that get picked up as bindings 0, 1, etc.
 	// Vulkan assumes a later GLSL that's more stringent about layout and allocation; we can salvage the old
 	// behavior by making those declarations synonyms for the stock samplers.
 	// TODO: figure out if this is well-defined behavior
 
-	if (isVertexSource)
+	struct Sampler {
+		char name[64];
+		size_t count;
+		size_t pos;
+	};
+
+	std::vector< Sampler > samplerStack;
+	size_t offset = 0U;
+
+	while (true)
 	{
-		struct Sampler {
-			char name[64];
-			size_t count;
-			size_t pos;
-		};
+		Sampler s;
 
-		std::vector< Sampler > samplerStack;
-		size_t offset = 0U;
+		s.pos = code.Find( "uniform ", offset );
 
-		while (true)
+		if (std::string::npos == s.pos)
 		{
-			Sampler s;
+			break;
+		}
 
-			s.pos = code.Find( "uniform ", offset );
+		offset = s.pos + strlen( "uniform " );
 
-			if (std::string::npos == s.pos)
+		if (NoLeadingCharacters( code.GetString(), s.pos ))
+		{
+			size_t cpos = code.Find( ";", offset );
+
+			if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
 			{
-				break;
+				CORONA_LOG_ERROR( "`uniform` never followed by a semi-colon" );
+
+				return;
 			}
 
-			offset = s.pos + strlen( "uniform " );
+			size_t spos = code.Find( "sampler2D", offset );
 
-			if (NoLeadingCharacters( code.GetString(), s.pos ))
+			if (std::string::npos == spos)	// none left to replace?
 			{
-				size_t cpos = code.Find( ";", offset );
+				return;
+			}
 
-				if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
+			else if (spos < cpos) // is this a sampler-type uniform?
+			{
+				size_t bpos = code.Find( "[", offset );
+
+				if (std::string::npos == bpos || cpos < bpos)	// not an array? (also rules out u_Samplers
 				{
-					CoronaLog( "`uniform` never followed by a semi-colon" );
-
-					return;
-				}
-
-				size_t spos = code.Find( "sampler2D", offset );
-
-				if (std::string::npos == spos)	// none left to replace?
-				{
-					return;
-				}
-
-				else if (spos < cpos) // is this a sampler-type uniform?
-				{
-					size_t bpos = code.Find( "[", offset );
-
-					if (std::string::npos == bpos || cpos < bpos)	// not an array? (also rules out u_Samplers
+					if (sscanf( code.GetCStr() + s.pos, "uniform sampler2D %63s", s.name ) < 1)
 					{
-						if (sscanf( code.GetCStr() + s.pos, "uniform sampler2D %63s", s.name ) < 1)
-						{
-							CoronaLog( "Sampler in shader was ill-formed" );
+						CORONA_LOG_ERROR( "Sampler in shader was ill-formed" );
 
-							return;
-						}
-
-						// TODO: see notes about varyings...
-
-						size_t len = strlen( s.name );
-
-						if (ispunct( s.name[len - 1] ))
-						{
-							s.name[len - 1] = '\0';
-						}
-
-						s.count = cpos - s.pos + 1;
-
-						samplerStack.push_back(s);
+						return;
 					}
+
+					// TODO: see notes about varyings...
+
+					size_t len = strlen( s.name );
+
+					if (ispunct( s.name[len - 1] ))
+					{
+						s.name[len - 1] = '\0';
+					}
+
+					s.count = cpos - s.pos + 1;
+
+					samplerStack.push_back(s);
 				}
 			}
 		}
+	}
 
-		char buf[64];
+	char buf[64];
 
-		size_t index = samplerStack.size();
+	size_t index = samplerStack.size();
 
-		for (auto && iter = samplerStack.rbegin(); iter != samplerStack.rend(); ++iter)
-		{
-			sprintf( buf, "#define %s u_FillSampler%i", iter->name, --index );
+	for (auto && iter = samplerStack.rbegin(); iter != samplerStack.rend(); ++iter)
+	{
+		sprintf( buf, "#define %s u_FillSampler%i", iter->name, --index );
 
-			code.Replace( iter->pos, iter->count, buf );
-		}
+		code.Replace( iter->pos, iter->count, buf );
 	}
 }
 
@@ -520,7 +517,7 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, ShaderCode & code, Maps & m
 
 			if (sscanf( code.GetCStr() + v.pos, "varying %15s %15s %63s", precision, type, name ) < 3)
 			{
-				CoronaLog( "Varying in shader was ill-formed" );
+				CORONA_LOG_ERROR( "Varying in shader was ill-formed" );
 
 				return;
 			}
@@ -537,7 +534,7 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, ShaderCode & code, Maps & m
 
 				if (maps.varyings.end() == varying)
 				{
-					CoronaLog( "Fragment kernel refers to varying `%s`, not found on vertex side", name );
+					CORONA_LOG_ERROR( "Fragment kernel refers to varying `%s`, not found on vertex side", name );
 
 					return;
 				}
@@ -573,7 +570,6 @@ VulkanProgram::Compile( int ikind, ShaderCode & code, Maps & maps, VkShaderModul
 	const char * what = shaderc_vertex_shader == kind ? "vertex shader" : "fragment shader";
 	bool isVertexSource = 'v' == what[0];
 
-	ReplaceSamplers( isVertexSource, code );
 	ReplaceVaryings( isVertexSource, code, maps );
 
 	const std::string & codeStr = code.GetString();
@@ -650,13 +646,13 @@ VulkanProgram::Compile( int ikind, ShaderCode & code, Maps & maps, VkShaderModul
 
 		if (vkCreateShaderModule( fState->GetDevice(), &createShaderModuleInfo, fState->GetAllocator(), &module ) != VK_SUCCESS)
 		{
-			CoronaLog( "Failed to create shader module!" );
+			CORONA_LOG_ERROR( "Failed to create shader module!" );
 		}
 	}
 
 	else
 	{
-		CoronaLog( "Failed to compile %s:\n\n%s", what, shaderc_result_get_error_message( result ) );
+		CORONA_LOG_ERROR( "Failed to compile %s:\n\n%s", what, shaderc_result_get_error_message( result ) );
 	}
 
 	shaderc_result_release( result );
@@ -864,6 +860,8 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 		shader_source[3] = program->GetVertexShaderSource();
 
 		vertexCode.SetSources( shader_source, sizeof( shader_source ) / sizeof( shader_source[0] ) );
+
+		ReplaceVertexSamplers( vertexCode );
 
 		vertexOffset = GatherUniformUserdata( true, vertexCode, values, vertexDeclarations );
 	}
@@ -1083,10 +1081,9 @@ VulkanProgram::UpdateShaderSource( Program* program, Program::Version version, V
 
 	// Vertex shader.
 	Compile( shaderc_vertex_shader, vertexCode, maps, data.fVertexShader );
-if (!vertexDeclarations.empty()) CoronaLog( "Vertex code: %s\n\n", vertexCode.GetCStr() ); // <- TODO: this is just debugging
+
 	// Fragment shader.
 	Compile( shaderc_fragment_shader, fragmentCode, maps, data.fFragmentShader );
-if (!fragmentDeclarations.empty()) CoronaLog( "Fragment code: %s\n\n", fragmentCode.GetCStr() ); // <- TODO: ditto
 
 #else
 	// no need to compile, but reflection here...

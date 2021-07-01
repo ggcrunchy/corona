@@ -181,13 +181,13 @@ BufferDescriptor::BufferDescriptor( VulkanState * state, VkDescriptorPool pool, 
 			{
 				buffer.Wipe();
 
-				CoronaLog( "Failed to allocate buffer descriptor" );
+				CORONA_LOG_ERROR( "Failed to allocate buffer descriptor" );
 			}
 		}
 
 		else
 		{
-			CoronaLog( "Failed to create buffer" );
+			CORONA_LOG_ERROR( "Failed to create buffer" );
 
 			break;
 		}
@@ -231,7 +231,7 @@ BufferDescriptor::TryToAddMemory( std::vector< VkMappedMemoryRange > & ranges, V
 
 		if (dynamicBuffer && fIndex == fBuffers.size())
 		{
-			CoronaLog( "Failed to add memory: buffer full!" );
+			CORONA_LOG_ERROR( "Failed to add memory: buffer full!" );
 
 			return; // TODO: much more than this needs hardening
 		}
@@ -300,7 +300,7 @@ AddPool( VulkanState * state, const VkDescriptorPoolSize * sizes, uint32_t sizeC
 
 	else
 	{
-		CoronaLog( "Failed to create descriptor pool!" );
+		CORONA_LOG_ERROR( "Failed to create descriptor pool!" );
 
 		return VK_NULL_HANDLE;
 	}
@@ -469,7 +469,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 	else
 	{
-		CoronaLog( "Failed to create UBO descriptor set layout!" );
+		CORONA_LOG_ERROR( "Failed to create UBO descriptor set layout!" );
 	}
 
 	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetLayoutInfo, state->GetAllocator(), &fUserDataLayout ))
@@ -478,7 +478,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 	else
 	{
-		CoronaLog( "Failed to create uniform user data descriptor set layout!" );
+		CORONA_LOG_ERROR( "Failed to create uniform user data descriptor set layout!" );
 	}
 
 	// if samplerIndexing...
@@ -498,7 +498,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 	else
 	{
-		CoronaLog( "Failed to create texture descriptor set layout!" );
+		CORONA_LOG_ERROR( "Failed to create texture descriptor set layout!" );
 	}
 	
 	VkPipelineLayoutCreateInfo createPipelineLayoutInfo = {};
@@ -516,7 +516,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 	else
 	{
-		CoronaLog( "Failed to create pipeline layout!" );
+		CORONA_LOG_ERROR( "Failed to create pipeline layout!" );
 	}
 
 	fSwapchainTexture = Rtt_NEW( allocator, TextureSwapchain( allocator, state ) );
@@ -548,7 +548,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 		if (!fFrameResources[i].AddSynchronizationObjects( state->GetDevice(), state->GetAllocator() )) // TODO: could fail at other steps...
 		{
-			CoronaLog( "Failed to create some synchronziation objects!" );
+			CORONA_LOG_ERROR( "Failed to create some synchronziation objects!" );
 
 			// for (j = 0; j <= i; ++j)
 			fFrameResources[i].CleanUpCommandPool( state->GetDevice(), state->GetAllocator() );
@@ -729,8 +729,6 @@ VulkanRenderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bit
 
 	vkUnmapMemory( device, bufferData.GetMemory() );
 
-	CoronaLog( "Wait for fences" );
-
 	// TODO: do we need to guard the FBO memory?
 
 	PrepareCapture( NULL, VK_NULL_HANDLE );
@@ -784,7 +782,7 @@ VulkanRenderer::MakeSwapchain()
 
 	else
 	{
-		CoronaLog( "Failed to create swap chain!" );
+		CORONA_LOG_ERROR( "Failed to create swap chain!" );
 
 		return VK_NULL_HANDLE;
 	}
@@ -1118,7 +1116,7 @@ VulkanRenderer::ResolvePipeline()
 
 		else
 		{
-			CoronaLog( "Failed to create pipeline!" );
+			CORONA_LOG_ERROR( "Failed to create pipeline!" );
         }
 	}
 

@@ -167,7 +167,7 @@ VulkanTexture::Create( CPUResource* resource )
         
         else
         {
-            CoronaLog( "Failed to create texture sampler!" );
+            CORONA_LOG_ERROR( "Failed to create texture sampler!" );
         }
     }
 }
@@ -458,7 +458,7 @@ VulkanTexture::CreateImage( VulkanState * state, uint32_t width, uint32_t height
 
         if (foundMemoryType && vkAllocateMemory( ci.device, &allocInfo, ci.allocator, &imageData.fMemory ) != VK_SUCCESS)
         {
-            CoronaLog( "Failed to allocate image memory!" );
+            CORONA_LOG_ERROR( "Failed to allocate image memory!" );
         }
 
         if (imageData.fMemory != VK_NULL_HANDLE)
@@ -476,7 +476,7 @@ VulkanTexture::CreateImage( VulkanState * state, uint32_t width, uint32_t height
 
     else
     {
-        CoronaLog( "Failed to create image!" );
+        CORONA_LOG_ERROR( "Failed to create image!" );
     }
 
     return imageData;
@@ -518,7 +518,7 @@ VulkanTexture::CreateImageView( VulkanState * state, VkImage image, VkFormat for
 
     else
     {
-        CoronaLog( "Failed to create image view!" );
+        CORONA_LOG_ERROR( "Failed to create image view!" );
 
         return VK_NULL_HANDLE;
     }

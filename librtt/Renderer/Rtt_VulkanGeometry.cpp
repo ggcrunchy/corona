@@ -103,7 +103,7 @@ VulkanGeometry::Update( CPUResource* resource )
 
 		else
 		{
-			CoronaLog( "Unable to update GPU geometry. Data is NULL" );
+			CORONA_LOG_ERROR( "Unable to update GPU geometry. Data is NULL" );
 		}
 	}
 	else

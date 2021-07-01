@@ -114,7 +114,7 @@ RenderPassBuilder::Build( VkDevice device, const VkAllocationCallbacks * allocat
 
 	else
 	{
-        CoronaLog( "Failed to create render pass!" );
+        CORONA_LOG_ERROR( "Failed to create render pass!" );
 		
 		return VK_NULL_HANDLE;
     }
@@ -437,7 +437,7 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 			else
 			{
-				CoronaLog( "Failed to create framebuffer!" );
+				CORONA_LOG_ERROR( "Failed to create framebuffer!" );
 
 				// TODO?
 			}
