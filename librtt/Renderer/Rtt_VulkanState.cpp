@@ -9,6 +9,7 @@
 
 #include "Renderer/Rtt_VulkanState.h"
 #include "Renderer/Rtt_VulkanProgram.h"
+#include "Renderer/Rtt_VulkanRenderer.h"
 #include "Renderer/Rtt_VulkanTexture.h"
 #include "Renderer/Rtt_VulkanExports.h"
 #include "Core/Rtt_Assert.h"
@@ -52,6 +53,12 @@ VulkanExports::DestroyVulkanState( void * state )
 	VulkanState * vulkanState = static_cast< VulkanState * >( state );
 
 	Rtt_DELETE( vulkanState );
+}
+
+Rtt::Renderer * 
+VulkanExports::CreateVulkanRenderer( Rtt_Allocator * allocator, void * state )
+{
+	return Rtt_NEW( allocator, VulkanRenderer( allocator, static_cast< VulkanState * >( state ) ) );
 }
 
 // ----------------------------------------------------------------------------
@@ -127,7 +134,7 @@ VulkanBufferData::Disown()
 VulkanState::VulkanState()
 :   fAllocator( NULL ),
     fInstance( VK_NULL_HANDLE ),
-#ifndef NDEBUG
+#ifdef Rtt_DEBUG
 	fDebugMessenger( VK_NULL_HANDLE ),
 #endif
     fDevice( VK_NULL_HANDLE ),
@@ -157,7 +164,7 @@ VulkanState::~VulkanState()
 	vkDestroyCommandPool( fDevice, fSingleTimeCommandsPool, fAllocator );
     vkDestroySurfaceKHR( fInstance, fSurface, fAllocator );
     vkDestroyDevice( fDevice, fAllocator );
-#ifndef NDEBUG
+#ifdef Rtt_DEBUG
     auto func = ( PFN_vkDestroyDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( fInstance, "vkDestroyDebugUtilsMessengerEXT" );
 
     if (func)
@@ -520,7 +527,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 
 	vkEnumerateInstanceExtensionProperties( NULL, &extensionCount, extensionProps.data() );
 
-#ifndef NDEBUG
+#ifdef Rtt_DEBUG
 	extensions.push_back( VK_EXT_DEBUG_UTILS_EXTENSION_NAME );
 #endif
 
@@ -531,7 +538,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 
 	bool ok = true;
 
-#ifndef NDEBUG
+#ifdef Rtt_DEBUG
     uint32_t layerCount;
 
     vkEnumerateInstanceLayerProperties( &layerCount, NULL );
@@ -584,7 +591,7 @@ MakeInstance( VkApplicationInfo * appInfo, const char * extension, const VkAlloc
 
 		ok = false;
 	}
-#ifndef NDEBUG
+#ifdef Rtt_DEBUG
 	if (ok && debugMessenger)
 	{
 		auto func = ( PFN_vkCreateDebugUtilsMessengerEXT ) vkGetInstanceProcAddr( instance, "vkCreateDebugUtilsMessengerEXT" );
@@ -868,7 +875,7 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const VulkanSurfa
 	if (instance != VK_NULL_HANDLE)
 	{
 		state.fInstance = instance;
-	#ifndef NDEBUG
+	#ifdef Rtt_DEBUG
 		state.fDebugMessenger = messenger;
 	#endif
 
@@ -1001,17 +1008,17 @@ VulkanState::UpdateSwapchainDetails( VulkanState & state )
 bool
 VulkanState::VolkInitialize()
 {
-#ifdef NDEBUG
-	return VK_SUCCESS == volkInitialize();
-#else
+#ifdef Rtt_DEBUG
 	return true;
+#else
+	return VK_SUCCESS == volkInitialize();
 #endif
 }
 		
 void
 VulkanState::VolkLoadInstance( VkInstance instance )
 {
-#ifdef NDEBUG
+#ifndef Rtt_DEBUG
 	volkLoadInstance( instance );
 #endif
 }
@@ -1019,7 +1026,7 @@ VulkanState::VolkLoadInstance( VkInstance instance )
 void
 VulkanState::VolkLoadDevice( VkDevice device )
 {
-#ifdef NDEBUG
+#ifndef Rtt_DEBUG
 	volkLoadDevice( device );
 #endif
 }

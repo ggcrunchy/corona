@@ -10,10 +10,10 @@
 #ifndef _Rtt_VulkanIncludes_H__
 #define _Rtt_VulkanIncludes_H__
 
-#ifdef NDEBUG
-	#include "../../vulkanutils/volk.h"
-#else
+#ifdef Rtt_DEBUG
 	#include <vulkan/vulkan.h>
+#else
+	#include "../../vulkanutils/volk.h"
 #endif
 
 #endif // _Rtt_VulkanIncludes_H__
