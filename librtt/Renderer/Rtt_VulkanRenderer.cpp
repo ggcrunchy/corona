@@ -605,7 +605,7 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 
 	bool canContinue = VK_SUCCESS == result;
 	VkSwapchainKHR swapchain = fState->GetSwapchain();
-	
+
 	if (!isCapture && VK_NULL_HANDLE == swapchain)
 	{
 		VulkanState::PopulateSwapchainDetails( *fState );
@@ -813,7 +813,9 @@ VulkanRenderer::RecreateSwapchain()
 
 	TearDownSwapchain();
 
-	if (newSwapchain != VK_NULL_HANDLE )
+	// TODO: window might be minimized...
+
+	if (newSwapchain != VK_NULL_HANDLE)
 	{
 		BuildUpSwapchain( newSwapchain );
 	}

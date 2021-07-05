@@ -52,6 +52,9 @@ class Uniform : public CPUResource
 			kDeltaTime,
 			kTexelSize,
 			kContentScale,
+		// STEVE CHANGE
+			kContentSize, // used by Vulkan backend
+		// /STEVE CHANGE
 			kUserData0,
 			kUserData1,
 			kUserData2,

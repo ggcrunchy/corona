@@ -173,6 +173,7 @@ class VulkanCommandBuffer : public CommandBuffer
 		TimeTransform* fTimeTransform;
 		S32 fCachedQuery[kNumQueryableParams];
 		VulkanRenderer & fRenderer;
+		Uniform fContentSize;
 
 		// non-owned, retained only for frame:
 		FrameResources * fFrameResources;

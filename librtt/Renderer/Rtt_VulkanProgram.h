@@ -166,6 +166,7 @@ class VulkanProgram : public GPUResource
 		};
 
 		size_t GatherUniformUserdata( bool isVertexSource, ShaderCode & code, UserdataValue values[], std::vector< UserdataDeclaration > & declarations );
+		bool ReplaceFragCoords( ShaderCode & code, size_t offset );
 		void ReplaceVertexSamplers( ShaderCode & code );
 		void ReplaceVaryings( bool isVertexSource, ShaderCode & code, VulkanCompilerMaps & maps );
 		void Compile( int kind, ShaderCode & code, VulkanCompilerMaps & maps, VkShaderModule & module );

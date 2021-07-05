@@ -106,6 +106,7 @@ VulkanGeometry::Update( CPUResource* resource )
 			CORONA_LOG_ERROR( "Unable to update GPU geometry. Data is NULL" );
 		}
 	}
+
 	else
 	{
 		memcpy( fMappedVertices, vertexData, geometry->GetVerticesUsed() * sizeof( Geometry::Vertex ) );
