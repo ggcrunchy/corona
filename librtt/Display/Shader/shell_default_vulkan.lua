@@ -21,6 +21,7 @@ layout(location = 3) in attribute vec4 a_UserData;
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 ViewProjectionMatrix;
     vec2 ContentScale;
+    vec2 ContentSize;
     float DeltaTime;
 } ubo;
 
@@ -48,15 +49,6 @@ layout(push_constant) uniform PushConstants {
     vec4 TexelSize; // vector #6
 
     PUSH_CONSTANTS_EXTRA
-
-    // TODO: we have at least 2 or 10 more vectors...
-    // Assuming no contrary outlier got overlooked, this will accommodate the uniform userdata demands of all built-in effects.
-    // while lacking full generality, e.g. three or four mat4s would overflow it, these effects are an important common use case.
-    // The idea will be to pick these userdata out from the shader source, sort them by size, then allocate them to slots; if the
-    // packing comes within 10 vectors, proceed. There might also be precompiled shader considerations here.
-    // might pack as say mat4 ExtraMatrices[2]; vec4 ExtraVectors[2];
-    // then alias or expand according to type / offset... no built-in uses a mat3, so disqualifying them should be fine
-    // new TODO: clean this up and decide on a proper home (needs revision in light of lower minimum than I thought)
 } pc;
 
 #define CoronaVertexUserData a_UserData
@@ -141,6 +133,7 @@ shell.fragment =
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 ViewProjectionMatrix;
     vec2 ContentScale;
+    vec2 ContentSize;
     float DeltaTime;
 } ubo;
 
@@ -211,8 +204,19 @@ P_COLOR vec4 FragmentKernel( P_UV vec2 texCoord );
 
 #define texture2D texture
 
+#define FRAG_COORD gl_FragCoord
+#define USING_GL_FRAG_COORD 0
+
+#if USING_GL_FRAG_COORD
+    P_POSITION vec2 internal_FragCoord;
+#endif
+
 void main()
 {
+#if USING_GL_FRAG_COORD // we use FRAG_COORD as a kludge to "hide" the GL variable
+    internal_FragCoord = vec2( FRAG_COORD.x, ubo.ContentSize.y - FRAG_COORD.y );
+#endif
+
 #ifdef TEX_COORD_Z
     P_COLOR vec4 result = FragmentKernel( v_TexCoord.xy / v_TexCoordZ );
 #else

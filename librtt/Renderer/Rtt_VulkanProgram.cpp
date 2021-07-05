@@ -484,6 +484,48 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 	return result;
 }
 
+bool
+VulkanProgram::ReplaceFragCoords( ShaderCode & code, size_t offset )
+{
+	std::vector< size_t > posStack;
+
+	while (true)
+	{
+		size_t pos = code.Find( "gl_FragCoord", offset );
+
+		if (std::string::npos == pos)
+		{
+			break;
+		}
+
+		offset = pos + strlen( "gl_FragCoord" );
+
+		if (NoLeadingCharacters( code.GetString(), pos ))
+		{
+			size_t cpos = code.Find( ";", offset );
+
+			if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
+			{
+				CORONA_LOG_ERROR( "`gl_FragCoord` never followed by a semi-colon" );
+
+				return false;
+			}
+
+			else if ('_' != code.GetCStr()[offset] && !isalnum( code.GetCStr()[offset] )) // not part of a larger identifier
+			{
+				posStack.push_back( pos );
+			}
+		}
+	}
+
+	for (auto && iter = posStack.rbegin(); iter != posStack.rend(); ++iter)
+	{
+		code.Replace( *iter, strlen( "gl_FragCoord" ), "internal_FragCoord" );
+	}
+
+	return !posStack.empty();
+}
+
 void
 VulkanProgram::ReplaceVertexSamplers( ShaderCode & code )
 {
@@ -933,10 +975,6 @@ VulkanProgram::UpdateShaderSource( VulkanCompilerMaps & maps, Program* program, 
 	}
 
 	ShaderCode vertexCode, fragmentCode;
-	std::vector< UserdataDeclaration > vertexDeclarations, fragmentDeclarations;
-	size_t vertexOffset, fragmentOffset;
-
-	UserdataValue values[4];
 
 	// Vertex shader.
 	{
@@ -945,8 +983,6 @@ VulkanProgram::UpdateShaderSource( VulkanCompilerMaps & maps, Program* program, 
 		vertexCode.SetSources( shader_source, sizeof( shader_source ) / sizeof( shader_source[0] ) );
 
 		ReplaceVertexSamplers( vertexCode );
-
-		vertexOffset = GatherUniformUserdata( true, vertexCode, values, vertexDeclarations );
 	}
 
 	// Fragment shader.
@@ -955,8 +991,29 @@ VulkanProgram::UpdateShaderSource( VulkanCompilerMaps & maps, Program* program, 
 
 		fragmentCode.SetSources( shader_source, sizeof( shader_source ) / sizeof( shader_source[0] ) );
 
-		fragmentOffset = GatherUniformUserdata( false, fragmentCode, values, fragmentDeclarations );
+		size_t fpos = fragmentCode.Find( "#define USING_GL_FRAG_COORD 0", 0U );
+
+		if (std::string::npos == fpos)
+		{
+			CORONA_LOG_ERROR( "Unable to find gl_FragCoord stub" );
+
+			// Error!
+		}
+
+		if (ReplaceFragCoords( fragmentCode, fpos ))
+		{
+			size_t offsetTo0 = strlen( "#define USING_GL_FRAG_COORD " );
+
+			fragmentCode.Replace( fpos + offsetTo0, 1, "1" );
+		}
 	}
+
+	std::vector< UserdataDeclaration > vertexDeclarations, fragmentDeclarations;
+
+	UserdataValue values[4];
+
+	size_t vertexOffset = GatherUniformUserdata( true, vertexCode, values, vertexDeclarations );
+	size_t fragmentOffset = GatherUniformUserdata( false, fragmentCode, values, fragmentDeclarations );
 
 	int vertexExtra = 0, fragmentExtra = 0;
 
@@ -1226,6 +1283,7 @@ VulkanProgram::Update( Program::Version version, VersionData& data )
 	data.fUniformLocations[Uniform::kDeltaTime] = maps.CheckForUniform( "DeltaTime" );
 	data.fUniformLocations[Uniform::kTexelSize] = maps.CheckForUniform( "TexelSize" );
 	data.fUniformLocations[Uniform::kContentScale] = maps.CheckForUniform( "ContentScale" );
+	data.fUniformLocations[Uniform::kContentSize] = maps.CheckForUniform( "ContentSize" );
 	data.fUniformLocations[Uniform::kUserData0] = maps.CheckForUniform( "UserData0" );
 	data.fUniformLocations[Uniform::kUserData1] = maps.CheckForUniform( "UserData1" );
 	data.fUniformLocations[Uniform::kUserData2] = maps.CheckForUniform( "UserData2" );

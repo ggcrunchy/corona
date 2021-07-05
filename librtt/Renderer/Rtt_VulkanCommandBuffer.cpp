@@ -152,6 +152,7 @@ VulkanCommandBuffer::VulkanCommandBuffer( Rtt_Allocator* allocator, VulkanRender
 //	fTimerQueryIndex( 0 ),
 	fElapsedTimeGPU( 0.0f ),
 	fRenderer( renderer ),
+	fContentSize( allocator, Uniform::kVec2 ),
 	fPipeline( VK_NULL_HANDLE ),
 	fSwapchain( VK_NULL_HANDLE )
 {
@@ -507,6 +508,10 @@ VulkanCommandBuffer::SetViewport( int x, int y, int width, int height )
 	Write<int>(height - y);
 	Write<int>(width);
 	Write<int>(-height);
+	
+	fContentSize.SetValue( width, abs( height ) );
+
+	BindUniform( &fContentSize, Uniform::kContentSize );
 }
 
 void 
