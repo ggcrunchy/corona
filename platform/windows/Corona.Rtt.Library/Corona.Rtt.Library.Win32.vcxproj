@@ -196,7 +196,7 @@
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_Uniform.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VideoTexture.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanCommandBuffer.cpp" />
-    <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanState.cpp" />
+    <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanContext.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanFrameBufferObject.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanGeometry.cpp" />
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanProgram.cpp" />
@@ -488,7 +488,7 @@
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanCommandBuffer.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanExports.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanIncludes.h" />
-    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanState.h" />
+    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanContext.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanFrameBufferObject.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanGeometry.h" />
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanProgram.h" />

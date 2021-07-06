@@ -24,7 +24,7 @@ namespace Rtt
 class VulkanFrameBufferObject;
 class VulkanProgram;
 class VulkanRenderer;
-class VulkanState;
+class VulkanContext;
 struct Descriptor;
 struct BufferDescriptor;
 struct FrameResources;
@@ -116,7 +116,7 @@ class VulkanCommandBuffer : public CommandBuffer
 	public:
 		enum { kNumTextures = 5 };
 
-		bool Wait( VulkanState * state, FrameResources * frameResources, VkSwapchainKHR swapchain );
+		bool Wait( VulkanContext * context, FrameResources * frameResources, VkSwapchainKHR swapchain );
 		VkResult GetExecuteResult() const { return fExecuteResult; }
 		
 		void BeginFrame();

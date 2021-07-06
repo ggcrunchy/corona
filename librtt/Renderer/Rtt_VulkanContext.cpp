@@ -7,7 +7,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Renderer/Rtt_VulkanState.h"
+#include "Renderer/Rtt_VulkanContext.h"
 #include "Renderer/Rtt_VulkanProgram.h"
 #include "Renderer/Rtt_VulkanRenderer.h"
 #include "Renderer/Rtt_VulkanTexture.h"
@@ -31,35 +31,35 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 bool
-VulkanExports::CreateVulkanState( const VulkanSurfaceParams & params, void ** state )
+VulkanExports::CreateVulkanContext( const VulkanSurfaceParams & params, void ** context )
 {
-	VulkanState * vulkanState = Rtt_NEW( NULL, VulkanState );
+	VulkanContext * vulkanContext = Rtt_NEW( NULL, VulkanContext );
 	
-	*state = vulkanState; // if we encounter an error we'll need to destroy this, so assign it early
+	*context = vulkanContext; // if we encounter an error we'll need to destroy this, so assign it early
 
 	VkAllocationCallbacks * allocator = NULL; // TODO
 
-	return VulkanState::PopulatePreSwapchainDetails( *vulkanState, params );
+	return VulkanContext::PopulatePreSwapchainDetails( *vulkanContext, params );
 }
 
 void
-VulkanExports::PopulateMultisampleDetails( void * state )
+VulkanExports::PopulateMultisampleDetails( void * context )
 {
-	VulkanState::PopulateMultisampleDetails( *static_cast< VulkanState * >( state ) );
+	VulkanContext::PopulateMultisampleDetails( *static_cast< VulkanContext * >( context ) );
 }
 
 void
-VulkanExports::DestroyVulkanState( void * state )
+VulkanExports::DestroyVulkanContext( void * context )
 {
-	VulkanState * vulkanState = static_cast< VulkanState * >( state );
+	VulkanContext * vulkanContext = static_cast< VulkanContext * >( context );
 
-	Rtt_DELETE( vulkanState );
+	Rtt_DELETE( vulkanContext );
 }
 
 Rtt::Renderer * 
-VulkanExports::CreateVulkanRenderer( Rtt_Allocator * allocator, void * state )
+VulkanExports::CreateVulkanRenderer( Rtt_Allocator * allocator, void * context )
 {
-	return Rtt_NEW( allocator, VulkanRenderer( allocator, static_cast< VulkanState * >( state ) ) );
+	return Rtt_NEW( allocator, VulkanRenderer( allocator, static_cast< VulkanContext * >( context ) ) );
 }
 
 // ----------------------------------------------------------------------------
@@ -132,7 +132,7 @@ VulkanBufferData::Disown()
 	fMemory = VK_NULL_HANDLE;
 }
 
-VulkanState::VulkanState()
+VulkanContext::VulkanContext()
 :   fAllocator( NULL ),
     fInstance( VK_NULL_HANDLE ),
 #ifdef Rtt_DEBUG
@@ -152,9 +152,8 @@ VulkanState::VulkanState()
 {
 }
 
-VulkanState::~VulkanState()
+VulkanContext::~VulkanContext()
 {
-// vkDeviceWaitIdle( fDevice );
 	VulkanProgram::CleanUpCompiler( fCompiler, fCompileOptions );
 
 	for (auto & renderPass : fRenderPasses)
@@ -179,7 +178,7 @@ VulkanState::~VulkanState()
 }
 
 const RenderPassData *
-VulkanState::AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass )
+VulkanContext::AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass )
 {
 	RenderPassData data = { fRenderPasses.size(), renderPass };
 	auto result = fRenderPasses.insert( std::make_pair( key, data ) );
@@ -188,7 +187,7 @@ VulkanState::AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass )
 }
 
 const RenderPassData *
-VulkanState::FindRenderPassData( const RenderPassKey & key ) const
+VulkanContext::FindRenderPassData( const RenderPassKey & key ) const
 {
 	auto iter = fRenderPasses.find( key );
 
@@ -196,7 +195,7 @@ VulkanState::FindRenderPassData( const RenderPassKey & key ) const
 }
 
 bool
-VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VulkanBufferData & bufferData )
+VulkanContext::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VulkanBufferData & bufferData )
 {
     VkBufferCreateInfo createBufferInfo = {};
 
@@ -254,7 +253,7 @@ VulkanState::CreateBuffer( VkDeviceSize size, VkBufferUsageFlags usage, VkMemory
 }
 
 bool
-VulkanState::FindMemoryType( uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t & type )
+VulkanContext::FindMemoryType( uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t & type )
 {
     VkPhysicalDeviceMemoryProperties memProperties;
 
@@ -276,7 +275,7 @@ VulkanState::FindMemoryType( uint32_t typeFilter, VkMemoryPropertyFlags properti
 }
 
 VkCommandBuffer
-VulkanState::BeginSingleTimeCommands()
+VulkanContext::BeginSingleTimeCommands()
 {
     VkCommandBufferAllocateInfo allocInfo = {};
 
@@ -300,7 +299,7 @@ VulkanState::BeginSingleTimeCommands()
 }
 
 void
-VulkanState::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
+VulkanContext::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
 {
     vkEndCommandBuffer( commandBuffer );
 
@@ -330,7 +329,7 @@ VulkanState::EndSingleTimeCommands( VkCommandBuffer commandBuffer )
 }
 
 void
-VulkanState::CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size )
+VulkanContext::CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size )
 {
     VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
     VkBufferCopy copyRegion = {};
@@ -343,7 +342,7 @@ VulkanState::CopyBuffer( VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize si
 }
 
 void *
-VulkanState::MapData( VkDeviceMemory memory, VkDeviceSize count, VkDeviceSize offset )
+VulkanContext::MapData( VkDeviceMemory memory, VkDeviceSize count, VkDeviceSize offset )
 {
 	void * mapping = NULL;
 
@@ -353,7 +352,7 @@ VulkanState::MapData( VkDeviceMemory memory, VkDeviceSize count, VkDeviceSize of
 }
 
 void
-VulkanState::StageData( VkDeviceMemory stagingMemory, const void * data, VkDeviceSize count, VkDeviceSize offset )
+VulkanContext::StageData( VkDeviceMemory stagingMemory, const void * data, VkDeviceSize count, VkDeviceSize offset )
 {
 	void * mapping = MapData( stagingMemory, count, offset );
 
@@ -362,7 +361,7 @@ VulkanState::StageData( VkDeviceMemory stagingMemory, const void * data, VkDevic
 }
 
 void
-VulkanState::WaitOnFence( VkFence fence )
+VulkanContext::WaitOnFence( VkFence fence )
 {
 	Rtt_ASSERT( VK_NULL_HANDLE != fence );
 
@@ -370,13 +369,13 @@ VulkanState::WaitOnFence( VkFence fence )
 }
 
 void
-VulkanState::PrepareCompiler()
+VulkanContext::PrepareCompiler()
 {
 	VulkanProgram::InitializeCompiler( &fCompiler, &fCompileOptions );
 }
 
 VkCommandPool
-VulkanState::MakeCommandPool( uint32_t queueFamily, bool resetCommandBuffer )
+VulkanContext::MakeCommandPool( uint32_t queueFamily, bool resetCommandBuffer )
 {
     VkCommandPoolCreateInfo createPoolInfo = {};
 
@@ -404,44 +403,44 @@ VulkanState::MakeCommandPool( uint32_t queueFamily, bool resetCommandBuffer )
 }
 
 bool
-VulkanState::PopulateMultisampleDetails( VulkanState & state )
+VulkanContext::PopulateMultisampleDetails( VulkanContext & context )
 {
-	const VkPhysicalDeviceLimits & limits = state.fDeviceDetails.properties.limits;
+	const VkPhysicalDeviceLimits & limits = context.fDeviceDetails.properties.limits;
     VkSampleCountFlags counts = limits.framebufferColorSampleCounts & limits.framebufferDepthSampleCounts;
 
     if (counts & VK_SAMPLE_COUNT_64_BIT)
 	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_64_BIT;
+		context.fSampleCountFlags = VK_SAMPLE_COUNT_64_BIT;
 	}
 
     else if (counts & VK_SAMPLE_COUNT_32_BIT)
 	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_32_BIT;
+		context.fSampleCountFlags = VK_SAMPLE_COUNT_32_BIT;
 	}
 
     else if (counts & VK_SAMPLE_COUNT_16_BIT)
 	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_16_BIT;
+		context.fSampleCountFlags = VK_SAMPLE_COUNT_16_BIT;
 	}
 
     else if (counts & VK_SAMPLE_COUNT_8_BIT)
 	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_8_BIT;
+		context.fSampleCountFlags = VK_SAMPLE_COUNT_8_BIT;
 	}
 
     else if (counts & VK_SAMPLE_COUNT_4_BIT)
 	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_4_BIT;
+		context.fSampleCountFlags = VK_SAMPLE_COUNT_4_BIT;
 	}
 
     else if (counts & VK_SAMPLE_COUNT_2_BIT)
 	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_2_BIT;
+		context.fSampleCountFlags = VK_SAMPLE_COUNT_2_BIT;
 	}
 
 	else
 	{
-		state.fSampleCountFlags = VK_SAMPLE_COUNT_1_BIT;
+		context.fSampleCountFlags = VK_SAMPLE_COUNT_1_BIT;
 	}
 
 	return true;
@@ -698,7 +697,7 @@ IsSuitableDevice( VkPhysicalDevice device, VkSurfaceKHR surface, Queues & queues
 	return formatCount != 0U && presentModeCount != 0U;
 }
 
-static std::tuple< VkPhysicalDevice, Queues, VulkanState::DeviceDetails >
+static std::tuple< VkPhysicalDevice, Queues, VulkanContext::DeviceDetails >
 ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 {
 	uint32_t deviceCount = 0U;
@@ -709,7 +708,7 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 	{
 		CORONA_LOG_ERROR( "Failed to find GPUs with Vulkan support!" );
 
-		return std::make_tuple( VkPhysicalDevice( VK_NULL_HANDLE ), Queues(), VulkanState::DeviceDetails{} );
+		return std::make_tuple( VkPhysicalDevice( VK_NULL_HANDLE ), Queues(), VulkanContext::DeviceDetails{} );
 	}
 
 	std::vector< VkPhysicalDevice > devices( deviceCount );
@@ -717,7 +716,7 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 	vkEnumeratePhysicalDevices( instance, &deviceCount, devices.data() );
 	
 	VkPhysicalDevice bestDevice = VK_NULL_HANDLE;
-	VulkanState::DeviceDetails bestDetails;
+	VulkanContext::DeviceDetails bestDetails;
 	uint32_t bestScore = 0U;
 	Queues bestQueues;
 
@@ -730,7 +729,7 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 			continue;
 		}
 
-		VulkanState::DeviceDetails deviceDetails = {};
+		VulkanContext::DeviceDetails deviceDetails = {};
 		VkPhysicalDeviceFeatures features;
 		
 		vkGetPhysicalDeviceFeatures( device, &features );
@@ -782,7 +781,7 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 }
 
 static VkDevice
-MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector< uint32_t > & families, const VulkanState::DeviceDetails & deviceDetails, const VkAllocationCallbacks * allocator )
+MakeLogicalDevice( VkPhysicalDevice physicalDevice, const std::vector< uint32_t > & families, const VulkanContext::DeviceDetails & deviceDetails, const VkAllocationCallbacks * allocator )
 {
 	VkDeviceCreateInfo createDeviceInfo = {};
 
@@ -842,26 +841,26 @@ struct CompilerDetails {
 static void *
 CompilerThread(void * arg)
 {
-	VulkanState * state = static_cast< VulkanState * >( arg );
+	VulkanContext * context = static_cast< VulkanContext * >( arg );
 
-	state->PrepareCompiler(); // this is relatively slow, at least in debug
+	context->PrepareCompiler(); // this is relatively slow, at least in debug
 
 	return NULL;
 }
 
 bool
-VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const VulkanSurfaceParams & params )
+VulkanContext::PopulatePreSwapchainDetails( VulkanContext & context, const VulkanSurfaceParams & params )
 {
 	pthread_t thread_id;
 
-	pthread_create( &thread_id, NULL, &CompilerThread, &state );
+	pthread_create( &thread_id, NULL, &CompilerThread, &context );
 
 	VkApplicationInfo appInfo = AppInfo();
-	const VkAllocationCallbacks * allocator = state.GetAllocator();
+	const VkAllocationCallbacks * allocator = context.GetAllocator();
 	VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 	VkInstance instance = VK_NULL_HANDLE;
 
-	if (VulkanState::VolkInitialize())
+	if (VulkanContext::VolkInitialize())
 	{
 		instance = MakeInstance( &appInfo,
 		
@@ -875,12 +874,12 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const VulkanSurfa
 
 	if (instance != VK_NULL_HANDLE)
 	{
-		state.fInstance = instance;
+		context.fInstance = instance;
 	#ifdef Rtt_DEBUG
-		state.fDebugMessenger = messenger;
+		context.fDebugMessenger = messenger;
 	#endif
 
-		VulkanState::VolkLoadInstance( instance );
+		VulkanContext::VolkLoadInstance( instance );
 
 	#ifdef _WIN32
 		VkWin32SurfaceCreateInfoKHR createSurfaceInfo = {};
@@ -891,39 +890,39 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const VulkanSurfa
 
 		#define CREATE_VULKAN_SURFACE vkCreateWin32SurfaceKHR
 	#else
-		#error Non-Windows Vulkan state not implemented!
+		#error Non-Windows Vulkan context not implemented!
 	#endif
 
 		VkSurfaceKHR surface;
 
 		if (VK_SUCCESS == CREATE_VULKAN_SURFACE( instance, &createSurfaceInfo, allocator, &surface ))
 		{
-			state.fSurface = surface;
+			context.fSurface = surface;
 
 			auto physicalDeviceData = ChoosePhysicalDevice( instance, surface );
 
 			if (std::get< 0 >( physicalDeviceData ) != VK_NULL_HANDLE)
 			{
-				state.fPhysicalDevice = std::get< 0 >( physicalDeviceData );
+				context.fPhysicalDevice = std::get< 0 >( physicalDeviceData );
 
 				const Queues & queues = std::get< 1 >( physicalDeviceData );
 				const std::vector< uint32_t > & families = queues.GetFamilies();
-				VkDevice device = MakeLogicalDevice( state.fPhysicalDevice, families, std::get< 2 >( physicalDeviceData ), allocator );
+				VkDevice device = MakeLogicalDevice( context.fPhysicalDevice, families, std::get< 2 >( physicalDeviceData ), allocator );
 
 				if (device != VK_NULL_HANDLE)
 				{
-					state.fDevice = device;
-					state.fDeviceDetails = std::get< 2 >( physicalDeviceData );
-					state.fQueueFamilies = families;
+					context.fDevice = device;
+					context.fDeviceDetails = std::get< 2 >( physicalDeviceData );
+					context.fQueueFamilies = families;
 
-					vkGetDeviceQueue( device, queues.fGraphicsFamily, 0U, &state.fGraphicsQueue );
-					vkGetDeviceQueue( device, queues.fPresentFamily, 0U, &state.fPresentQueue );
+					vkGetDeviceQueue( device, queues.fGraphicsFamily, 0U, &context.fGraphicsQueue );
+					vkGetDeviceQueue( device, queues.fPresentFamily, 0U, &context.fPresentQueue );
 
-					state.fSingleTimeCommandsPool = state.MakeCommandPool( queues.fGraphicsFamily );
+					context.fSingleTimeCommandsPool = context.MakeCommandPool( queues.fGraphicsFamily );
 
-					if (VK_NULL_HANDLE != state.fSingleTimeCommandsPool)
+					if (VK_NULL_HANDLE != context.fSingleTimeCommandsPool)
 					{
-						VulkanState::VolkLoadDevice( device );
+						VulkanContext::VolkLoadDevice( device );
 
 						ok = true;
 					}
@@ -938,10 +937,10 @@ VulkanState::PopulatePreSwapchainDetails( VulkanState & state, const VulkanSurfa
 }
 
 bool
-VulkanState::PopulateSwapchainDetails( VulkanState & state )
+VulkanContext::PopulateSwapchainDetails( VulkanContext & context )
 {
-	VkPhysicalDevice device = state.GetPhysicalDevice();
-	VkSurfaceKHR surface = state.GetSurface();
+	VkPhysicalDevice device = context.GetPhysicalDevice();
+	VkSurfaceKHR surface = context.GetSurface();
 	uint32_t formatCount = 0U, presentModeCount = 0U;
 
 	vkGetPhysicalDeviceSurfaceFormatsKHR( device, surface, &formatCount, NULL );
@@ -975,22 +974,22 @@ VulkanState::PopulateSwapchainDetails( VulkanState & state )
 		}
 	}
 
-	SwapchainDetails & details = state.fSwapchainDetails;
+	SwapchainDetails & details = context.fSwapchainDetails;
 
 	details.fFormat = format;
 	details.fPresentMode = mode;
 
-	UpdateSwapchainDetails( state );
+	UpdateSwapchainDetails( context );
 
 	return true;
 }
 
 void
-VulkanState::UpdateSwapchainDetails( VulkanState & state )
+VulkanContext::UpdateSwapchainDetails( VulkanContext & context )
 {
 	VkSurfaceCapabilitiesKHR capabilities;
 
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR( state.GetPhysicalDevice(), state.GetSurface(), &capabilities );
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR( context.GetPhysicalDevice(), context.GetSurface(), &capabilities );
 
 	uint32_t imageCount = capabilities.minImageCount + 1U;
 
@@ -999,7 +998,7 @@ VulkanState::UpdateSwapchainDetails( VulkanState & state )
 		imageCount = capabilities.maxImageCount;
 	}
 
-	SwapchainDetails & details = state.fSwapchainDetails;
+	SwapchainDetails & details = context.fSwapchainDetails;
 
 	details.fImageCount = imageCount;
     details.fExtent = capabilities.currentExtent;
@@ -1007,7 +1006,7 @@ VulkanState::UpdateSwapchainDetails( VulkanState & state )
 }
 
 bool
-VulkanState::VolkInitialize()
+VulkanContext::VolkInitialize()
 {
 #ifdef Rtt_DEBUG
 	return true;
@@ -1017,7 +1016,7 @@ VulkanState::VolkInitialize()
 }
 		
 void
-VulkanState::VolkLoadInstance( VkInstance instance )
+VulkanContext::VolkLoadInstance( VkInstance instance )
 {
 #ifndef Rtt_DEBUG
 	volkLoadInstance( instance );
@@ -1025,7 +1024,7 @@ VulkanState::VolkLoadInstance( VkInstance instance )
 }
 
 void
-VulkanState::VolkLoadDevice( VkDevice device )
+VulkanContext::VolkLoadDevice( VkDevice device )
 {
 #ifndef Rtt_DEBUG
 	volkLoadDevice( device );

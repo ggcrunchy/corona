@@ -8,7 +8,7 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #include "Renderer/Rtt_VulkanRenderer.h"
-#include "Renderer/Rtt_VulkanState.h"
+#include "Renderer/Rtt_VulkanContext.h"
 #include "Renderer/Rtt_VulkanProgram.h"
 
 #include "Renderer/Rtt_CommandBuffer.h"
@@ -139,8 +139,8 @@ VulkanCompilerMaps::CheckForUniform( const std::string & key )
 
 // ----------------------------------------------------------------------------
 
-VulkanProgram::VulkanProgram( VulkanState * state )
-:	fState( state ),
+VulkanProgram::VulkanProgram( VulkanContext * context )
+:	fContext( context ),
 	fPushConstantStages( 0U ),
 	fPushConstantUniforms( false )
 {
@@ -178,7 +178,7 @@ VulkanProgram::Update( CPUResource* resource )
 void 
 VulkanProgram::Destroy()
 {
-	auto ci = fState->GetCommonInfo();
+	auto ci = fContext->GetCommonInfo();
 
 	for( U32 i = 0; i < Program::kNumVersions; ++i )
 	{
@@ -701,7 +701,7 @@ VulkanProgram::Compile( int ikind, ShaderCode & code, VulkanCompilerMaps & maps,
 
 	const std::string & codeStr = code.GetString();
 
-	shaderc_compilation_result_t result = shaderc_compile_into_spv( fState->GetCompiler(), codeStr.data(), codeStr.size(), kind, what, "main", fState->GetCompileOptions() );
+	shaderc_compilation_result_t result = shaderc_compile_into_spv( fContext->GetCompiler(), codeStr.data(), codeStr.size(), kind, what, "main", fContext->GetCompileOptions() );
 	shaderc_compilation_status status = shaderc_result_get_compilation_status( result );
 
 	if (shaderc_compilation_status_success == status)
@@ -771,7 +771,7 @@ VulkanProgram::Compile( int ikind, ShaderCode & code, VulkanCompilerMaps & maps,
 			iter.first->second.fStages |= 1U << kind;
 		}
 
-		if (vkCreateShaderModule( fState->GetDevice(), &createShaderModuleInfo, fState->GetAllocator(), &module ) != VK_SUCCESS)
+		if (vkCreateShaderModule( fContext->GetDevice(), &createShaderModuleInfo, fContext->GetAllocator(), &module ) != VK_SUCCESS)
 		{
 			CORONA_LOG_ERROR( "Failed to create shader module!" );
 		}
@@ -818,7 +818,7 @@ GetFirstRow( const std::vector< int > & used, int nrows, int ncols )
 std::pair< bool, int >
 VulkanProgram::SearchForFreeRows( const UserdataValue values[], UserdataPosition positions[], size_t spareVectorCount )
 {
-	const VkPhysicalDeviceLimits & limits = fState->GetDeviceDetails().properties.limits;
+	const VkPhysicalDeviceLimits & limits = fContext->GetDeviceDetails().properties.limits;
 
 	std::vector< int > used( spareVectorCount, 0 );
 
@@ -1033,7 +1033,7 @@ VulkanProgram::UpdateShaderSource( VulkanCompilerMaps & maps, Program* program, 
 			positions[i].fValue = &values[i];
 		}
 
-		const VkPhysicalDeviceLimits & limits = fState->GetDeviceDetails().properties.limits;
+		const VkPhysicalDeviceLimits & limits = fContext->GetDeviceDetails().properties.limits;
 		auto findResult = SearchForFreeRows( values, positions, limits.maxPushConstantsSize / 16 - 6 ); // cf. shell_default_vulkan.lua
 
 		std::sort( positions, positions + 4 ); // sort from lowest (row, offset) to highest

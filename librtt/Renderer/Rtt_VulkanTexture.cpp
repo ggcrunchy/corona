@@ -10,7 +10,7 @@
 #include "Core/Rtt_Config.h"
 
 #include "Renderer/Rtt_VulkanRenderer.h"
-#include "Renderer/Rtt_VulkanState.h"
+#include "Renderer/Rtt_VulkanContext.h"
 #include "Renderer/Rtt_VulkanTexture.h"
 #include "Core/Rtt_Assert.h"
 #include "CoronaLog.h"
@@ -58,8 +58,8 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-VulkanTexture::VulkanTexture( VulkanState * state )
-:	fState( state ),
+VulkanTexture::VulkanTexture( VulkanContext * context )
+:	fContext( context ),
     fSampler( VK_NULL_HANDLE ),
     fFormat( VK_FORMAT_UNDEFINED ),
     fToggled( false )
@@ -77,7 +77,7 @@ VulkanTexture::Create( CPUResource* resource )
         return;
     }
 
-    uint32_t imageCount = texture->IsTarget() ? fState->GetSwapchainDetails().fImageCount : 1U;
+    uint32_t imageCount = texture->IsTarget() ? fContext->GetSwapchainDetails().fImageCount : 1U;
 
     VkComponentMapping mapping = {};
     VkFormat format = GetVulkanFormat( texture->GetFormat(), mapping );
@@ -85,7 +85,7 @@ VulkanTexture::Create( CPUResource* resource )
     VkDeviceSize imageSize = texture->GetSizeInBytes();
     U32 mipLevels = /* static_cast< uint32_t >( std::floor( std::log2( std::max( texture->GetWidth(), texture->GetHeight() ) ) ) ) + */ 1U;
     
-	VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
+	VulkanBufferData bufferData( fContext->GetDevice(), fContext->GetAllocator() );
 
     VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT;
     bool ok = true;
@@ -98,7 +98,7 @@ VulkanTexture::Create( CPUResource* resource )
     else
     {
         usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-        ok = fState->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
+        ok = fContext->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
                                         // ^^ TODO: also non-buffered approach? (suggestions that we should recycle a buffer)
                                         // is it okay to let this go away or should it be backed for a while still?
     }
@@ -108,7 +108,7 @@ VulkanTexture::Create( CPUResource* resource )
         for (U32 i = 0, n = texture->IsTarget() ? 2U : 1U; i < n; ++i)
         {
             ImageData imageData = CreateImage(
-                fState,
+                fContext,
                 texture->GetWidth(), texture->GetHeight(),
                 1U, // mip levels
                 VK_SAMPLE_COUNT_1_BIT,
@@ -142,7 +142,7 @@ VulkanTexture::Create( CPUResource* resource )
         samplerInfo.addressModeV = convertWrapToken( texture->GetWrapY() );
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
-        if (fState->GetFeatures().samplerAnisotropy)
+        if (fContext->GetFeatures().samplerAnisotropy)
         {
             samplerInfo.anisotropyEnable = VK_TRUE;
             samplerInfo.maxAnisotropy = 16.f;
@@ -154,11 +154,11 @@ VulkanTexture::Create( CPUResource* resource )
 
         VkSampler sampler = VK_NULL_HANDLE;
 
-        if (VK_SUCCESS == vkCreateSampler( fState->GetDevice(), &samplerInfo, fState->GetAllocator(), &sampler ))
+        if (VK_SUCCESS == vkCreateSampler( fContext->GetDevice(), &samplerInfo, fContext->GetAllocator(), &sampler ))
         {
             for (ImageData & data : fData)
             {
-                data.fView = CreateImageView( fState, data.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels, &mapping );
+                data.fView = CreateImageView( fContext, data.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels, &mapping );
             }
 
             fSampler = sampler;
@@ -180,9 +180,9 @@ VulkanTexture::Update( CPUResource* resource )
 
     if (!texture->IsTarget())
     {
-        VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
+        VulkanBufferData bufferData( fContext->GetDevice(), fContext->GetAllocator() );
 
-        if (fState->CreateBuffer( texture->GetSizeInBytes(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData ))
+        if (fContext->CreateBuffer( texture->GetSizeInBytes(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData ))
         {
             Load( texture, GetFormat(), bufferData, 1U );
         }
@@ -194,7 +194,7 @@ VulkanTexture::Update( CPUResource* resource )
 void 
 VulkanTexture::Destroy()
 {
-    auto ci = fState->GetCommonInfo();
+    auto ci = fContext->GetCommonInfo();
 
     vkDestroySampler( ci.device, fSampler, ci.allocator );
 
@@ -233,7 +233,7 @@ VulkanTexture::Toggle()
 void
 VulkanTexture::CopyBufferToImage( VkBuffer buffer, VkImage image, uint32_t width, uint32_t height )
 {
-    VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
+    VkCommandBuffer commandBuffer = fContext->BeginSingleTimeCommands();
     VkBufferImageCopy region = {};
 
     region.imageExtent = { width, height, 1U };
@@ -242,7 +242,7 @@ VulkanTexture::CopyBufferToImage( VkBuffer buffer, VkImage image, uint32_t width
 
     vkCmdCopyBufferToImage( commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, &region );
 
-    fState->EndSingleTimeCommands( commandBuffer );
+    fContext->EndSingleTimeCommands( commandBuffer );
 }
 
 static VkImageMemoryBarrier
@@ -268,18 +268,18 @@ VulkanTexture::Load( Texture * texture, VkFormat format, const VulkanBufferData 
 
     if (data)
     {
-        fState->StageData( bufferData.GetMemory(), data, texture->GetSizeInBytes() );
+        fContext->StageData( bufferData.GetMemory(), data, texture->GetSizeInBytes() );
     }
 
     VkImage image = fData.back().fImage;
     VkImageLayout newLayout = texture->IsTarget() ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    bool ok = TransitionImageLayout( fState, image, format, VK_IMAGE_LAYOUT_UNDEFINED, newLayout, mipLevels );
+    bool ok = TransitionImageLayout( fContext, image, format, VK_IMAGE_LAYOUT_UNDEFINED, newLayout, mipLevels );
 
     if (ok && !texture->IsTarget())
     {
         CopyBufferToImage( bufferData.GetBuffer(), image, texture->GetWidth(), texture->GetHeight() );
 
-        VkCommandBuffer commandBuffer = fState->BeginSingleTimeCommands();
+        VkCommandBuffer commandBuffer = fContext->BeginSingleTimeCommands();
         VkImageMemoryBarrier barrier = PrepareBarrier( image, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
         // generateMipmaps(textureImage, format, texWidth, texHeight, mipLevels);
@@ -300,7 +300,7 @@ VulkanTexture::Load( Texture * texture, VkFormat format, const VulkanBufferData 
             1U, &barrier
         );
 
-        fState->EndSingleTimeCommands( commandBuffer );
+        fContext->EndSingleTimeCommands( commandBuffer );
     }
 
     return ok;
@@ -313,7 +313,7 @@ HasStencilComponent( VkFormat format )
 }
 
 bool
-VulkanTexture::TransitionImageLayout( VulkanState * state, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, VkCommandBuffer commandBuffer )
+VulkanTexture::TransitionImageLayout( VulkanContext * context, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, VkCommandBuffer commandBuffer )
 {
     VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 
@@ -331,7 +331,7 @@ VulkanTexture::TransitionImageLayout( VulkanState * state, VkImage image, VkForm
 
     if (!haveCommandBuffer)
     {
-        commandBuffer = state->BeginSingleTimeCommands();
+        commandBuffer = context->BeginSingleTimeCommands();
     }
 
     VkImageMemoryBarrier barrier = PrepareBarrier( image, aspectFlags, mipLevels );
@@ -416,14 +416,14 @@ VulkanTexture::TransitionImageLayout( VulkanState * state, VkImage image, VkForm
 
     if (!haveCommandBuffer)
     {
-        state->EndSingleTimeCommands( commandBuffer );
+        context->EndSingleTimeCommands( commandBuffer );
     }
 
     return true;
 }
 
 VulkanTexture::ImageData
-VulkanTexture::CreateImage( VulkanState * state, uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties )
+VulkanTexture::CreateImage( VulkanContext * context, uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties )
 {
     VkImageCreateInfo createImageInfo = {};
 
@@ -439,7 +439,7 @@ VulkanTexture::CreateImage( VulkanState * state, uint32_t width, uint32_t height
     createImageInfo.tiling = tiling;
     createImageInfo.usage = usage;
 
-    auto ci = state->GetCommonInfo();
+    auto ci = context->GetCommonInfo();
     VkImage image = VK_NULL_HANDLE;
     ImageData imageData;
 
@@ -454,7 +454,7 @@ VulkanTexture::CreateImage( VulkanState * state, uint32_t width, uint32_t height
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
 
-        bool foundMemoryType = state->FindMemoryType( memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex );
+        bool foundMemoryType = context->FindMemoryType( memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex );
 
         if (foundMemoryType && vkAllocateMemory( ci.device, &allocInfo, ci.allocator, &imageData.fMemory ) != VK_SUCCESS)
         {
@@ -483,7 +483,7 @@ VulkanTexture::CreateImage( VulkanState * state, uint32_t width, uint32_t height
 }
 
 VkImageView
-VulkanTexture::CreateImageView( VulkanState * state, VkImage image, VkFormat format, VkImageAspectFlags flags, uint32_t mipLevels, const VkComponentMapping * componentMapping )
+VulkanTexture::CreateImageView( VulkanContext * context, VkImage image, VkFormat format, VkImageAspectFlags flags, uint32_t mipLevels, const VkComponentMapping * componentMapping )
 {
 	VkImageViewCreateInfo createImageViewInfo = {};
 
@@ -511,7 +511,7 @@ VulkanTexture::CreateImageView( VulkanState * state, VkImage image, VkFormat for
 
 	VkImageView view = VK_NULL_HANDLE;
 
-	if (VK_SUCCESS == vkCreateImageView( state->GetDevice(), &createImageViewInfo, state->GetAllocator(), &view ))
+	if (VK_SUCCESS == vkCreateImageView( context->GetDevice(), &createImageViewInfo, context->GetAllocator(), &view ))
 	{
         return view;
     }

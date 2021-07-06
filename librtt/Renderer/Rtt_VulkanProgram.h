@@ -30,7 +30,7 @@ namespace Rtt
 
 struct VulkanCompilerMaps;
 class VulkanRenderer;
-class VulkanState;
+class VulkanContext;
 class ShaderCode;
 
 // ----------------------------------------------------------------------------
@@ -42,7 +42,7 @@ class VulkanProgram : public GPUResource
 		typedef VulkanProgram Self;
 
 	public:
-		VulkanProgram( VulkanState * state );
+		VulkanProgram( VulkanContext * context );
 
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
@@ -177,7 +177,7 @@ class VulkanProgram : public GPUResource
 		static void InitializeCompiler( shaderc_compiler ** compiler, shaderc_compile_options ** options );
 		static void CleanUpCompiler( shaderc_compiler * compiler, shaderc_compile_options * options );
 
-		VulkanState * fState;
+		VulkanContext * fContext;
 		VersionData fData[Program::kNumVersions];
 		CPUResource* fResource;
 		U32 fPushConstantStages;
@@ -185,7 +185,7 @@ class VulkanProgram : public GPUResource
 
 		static U32 sID;
 
-		friend class VulkanState;
+		friend class VulkanContext;
 };
 
 // ----------------------------------------------------------------------------

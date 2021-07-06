@@ -7,8 +7,8 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#ifndef _Rtt_VulkanState_H__
-#define _Rtt_VulkanState_H__
+#ifndef _Rtt_VulkanContext_H__
+#define _Rtt_VulkanContext_H__
 
 #include "Renderer/Rtt_VulkanIncludes.h"
 #include "Core/Rtt_Types.h"
@@ -64,17 +64,17 @@ private:
 	VkBuffer fBuffer;
 	VkDeviceMemory fMemory;
 
-	friend class VulkanState;
+	friend class VulkanContext;
 };
 
-class VulkanState
+class VulkanContext
 {
 	public:
-		typedef VulkanState Self;
+		typedef VulkanContext Self;
 
 	public:
-		VulkanState();
-		~VulkanState();
+		VulkanContext();
+		~VulkanContext();
 
 	public:
 		struct Features {
@@ -101,14 +101,14 @@ class VulkanState
 		// TODO: GetComputeFamilyIndex()...
 
 		struct CommonInfo {
-			CommonInfo( VulkanState * vs )
-			:	state( vs ),
-				device( vs->GetDevice() ),
-				allocator( vs->GetAllocator() )
+			CommonInfo( VulkanContext * ctx )
+			:	context( ctx ),
+				device( ctx->GetDevice() ),
+				allocator( ctx->GetAllocator() )
 			{
 			}
 
-			VulkanState * state;
+			VulkanContext * context;
 			VkDevice device;
 			const VkAllocationCallbacks * allocator;
 		};
@@ -149,10 +149,10 @@ class VulkanState
 		void PrepareCompiler();
 		VkCommandPool MakeCommandPool( uint32_t queueFamily, bool resetCommandBuffer = false );
 
-		static bool PopulateMultisampleDetails( VulkanState & state );
-		static bool PopulatePreSwapchainDetails( VulkanState & state, const VulkanSurfaceParams & params );
-		static bool PopulateSwapchainDetails( VulkanState & state );
-		static void UpdateSwapchainDetails( VulkanState & state );
+		static bool PopulateMultisampleDetails( VulkanContext & context );
+		static bool PopulatePreSwapchainDetails( VulkanContext & context, const VulkanSurfaceParams & params );
+		static bool PopulateSwapchainDetails( VulkanContext & context );
+		static void UpdateSwapchainDetails( VulkanContext & context );
 
 		static bool VolkInitialize();
 		static void VolkLoadInstance( VkInstance instance );
@@ -197,4 +197,4 @@ class VulkanState
 
 // ----------------------------------------------------------------------------
 
-#endif // _Rtt_VulkanState_H__
+#endif // _Rtt_VulkanContext_H__

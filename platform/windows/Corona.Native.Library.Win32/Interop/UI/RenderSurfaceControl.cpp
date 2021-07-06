@@ -33,7 +33,7 @@ RenderSurfaceControl::RenderSurfaceControl(HWND windowHandle, const Params & par
 	fPaintDeviceContextHandle(nullptr),
 	fRenderingContextHandle(nullptr),
 // STEVE CHANGE
-	fVulkanState(nullptr)
+	fVulkanContext(nullptr)
 // /STEVE CHANGE
 {
 	// Add event handlers.
@@ -74,7 +74,7 @@ void RenderSurfaceControl::SetRenderFrameHandler(RenderSurfaceControl::RenderFra
 void RenderSurfaceControl::SelectRenderingContext()
 {
 	// STEVE CHANGE
-	if (fVulkanState)
+	if (fVulkanContext)
 	{
 		return;
 	}
@@ -129,7 +129,7 @@ void RenderSurfaceControl::SelectRenderingContext()
 void RenderSurfaceControl::SwapBuffers()
 {
 // STEVE CHANGE
-	if (fVulkanState)
+	if (fVulkanContext)
 	{
 		return;
 	}
@@ -192,7 +192,7 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 		surfaceParams.fInstance = GetLibraryModuleHandle();
 		surfaceParams.fWindowHandle = windowHandle;
 
-		if (!Rtt::VulkanExports::CreateVulkanState( surfaceParams, &fVulkanState ))
+		if (!Rtt::VulkanExports::CreateVulkanContext( surfaceParams, &fVulkanContext ))
 		{
 			DestroyContext();
 
@@ -211,7 +211,7 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 	auto multisampleTestResult = FetchMultisampleFormat();
 
 	// STEVE CHANGE
-	if (fVulkanState)
+	if (fVulkanContext)
 	{
 		fRendererVersion.SetString("OpenGL 4.6"); // TODO? pull in actual Vulkan state...
 		fRendererVersion.SetMajorNumber(4);
@@ -314,7 +314,7 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 void RenderSurfaceControl::DestroyContext()
 {
 // STEVE CHANGE
-	Rtt::VulkanExports::DestroyVulkanState( fVulkanState );
+	Rtt::VulkanExports::DestroyVulkanContext( fVulkanContext );
 // /STEVE CHANGE
 	// Fetch this control's window handle.
 	auto windowHandle = GetWindowHandle();
@@ -323,13 +323,13 @@ void RenderSurfaceControl::DestroyContext()
 	::wglMakeCurrent(nullptr, nullptr);
 	if (fRenderingContextHandle)
 	{
-		Rtt_ASSERT(!fVulkanState);
+		Rtt_ASSERT(!fVulkanContext);
 
 		::wglDeleteContext(fRenderingContextHandle);
 		fRenderingContextHandle = nullptr;
 	}
 
-	fVulkanState = nullptr;
+	fVulkanContext = nullptr;
 // /STEVE CHANGE
 	if (fMainDeviceContextHandle)
 	{
@@ -366,9 +366,9 @@ RenderSurfaceControl::FetchMultisampleFormatResult RenderSurfaceControl::FetchMu
 	result.IsSupported = false;
 
 	// STEVE CHANGE
-	if (fVulkanState)
+	if (fVulkanContext)
 	{
-		Rtt::VulkanExports::PopulateMultisampleDetails( fVulkanState );
+		Rtt::VulkanExports::PopulateMultisampleDetails( fVulkanContext );
 
 		result.IsSupported = true;
 
@@ -556,14 +556,14 @@ void RenderSurfaceControl::OnPaint()
 
 	// Render to the control.
 // STEVE CHANGE
-	bool canDraw = (fMainDeviceContextHandle && fRenderingContextHandle) || fVulkanState;
+	bool canDraw = (fMainDeviceContextHandle && fRenderingContextHandle) || fVulkanContext;
 
 	if (canDraw)//fMainDeviceContextHandle && fRenderingContextHandle)
 // /STEVE CHANGE
 	{
 		// Select this control's OpenGL context.
 		// STEVE CHANGE
-		if (!fVulkanState)
+		if (!fVulkanContext)
 		{
 		// /STEVE CHANGE
 		SelectRenderingContext();
@@ -584,7 +584,7 @@ void RenderSurfaceControl::OnPaint()
 			}
 			catch (std::exception ex) { }
 		}
-		if (false == didDraw && !fVulkanState) // <- STEVE CHANGE
+		if (false == didDraw && !fVulkanContext) // <- STEVE CHANGE
 		{
 			::glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 			::glClear(GL_COLOR_BUFFER_BIT);
