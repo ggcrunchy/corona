@@ -21,7 +21,7 @@ namespace Rtt
 class Geometry;
 class VulkanBufferData;
 class VulkanRenderer;
-class VulkanState;
+class VulkanContext;
 
 // ----------------------------------------------------------------------------
 
@@ -32,7 +32,7 @@ class VulkanGeometry : public GPUResource
 		typedef VulkanGeometry Self;
 
 	public:
-		VulkanGeometry( VulkanState * state );
+		VulkanGeometry( VulkanContext * context );
 		virtual ~VulkanGeometry();
 
 		virtual void Create( CPUResource* resource );
@@ -47,7 +47,7 @@ class VulkanGeometry : public GPUResource
 		bool TransferToGPU( VkBuffer bufferOnGPU, const void * data, VkDeviceSize bufferSize );
 
 	private:
-		VulkanState * fState;
+		VulkanContext * fContext;
 		VulkanBufferData * fVertexBufferData;
 		VulkanBufferData * fIndexBufferData;
 		Geometry * fResource;

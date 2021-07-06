@@ -185,8 +185,8 @@ class RenderSurfaceControl : public Control
 		void RequestRender();
 
 		// STEVE CHANGE
-		bool IsUsingVulkanBackend() const { return !!fVulkanState; }
-		void * GetBackendState() const { return IsUsingVulkanBackend() ? fVulkanState : nullptr; }
+		bool IsUsingVulkanBackend() const { return !!fVulkanContext; }
+		void * GetBackendContext() const { return IsUsingVulkanBackend() ? fVulkanContext : nullptr; }
 		// /STEVE CHANGE
 
 		#pragma endregion
@@ -244,10 +244,10 @@ class RenderSurfaceControl : public Control
 		void CreateContext(const Params & params);
 
 		/// <summary>
-		///  <para>Creates Vulkan state for the currently referenced control.</para>
+		///  <para>Creates Vulkan context for the currently referenced control.</para>
 		///  <para>Will destroy the last state or context if still active.</para>
 		/// </summary>
-		bool CreateVulkanState();
+		bool CreateVulkanContext();
 
 		/// <summary>Destroys the last created rendering context.</summary>
 		void DestroyContext();
@@ -292,8 +292,8 @@ class RenderSurfaceControl : public Control
 		RenderSurfaceControl::Version fRendererVersion;
 
 		// STEVE CHANGE
-		/// <summary>Various Vulkan-related state, if chosen as the backend.</summary>
-		void * fVulkanState;
+		/// <summary>Vulkan analogue to the GL context, when chosen as the backend.</summary>
+		void * fVulkanContext;
 		// /STEVE CHANGE
 
 		#pragma endregion

@@ -36,10 +36,10 @@ struct VulkanSurfaceParams {
 
 class VulkanExports {
 public:
-	static bool CreateVulkanState( const VulkanSurfaceParams & params, void ** state );
+	static bool CreateVulkanContext( const VulkanSurfaceParams & params, void ** context );
 	static void PopulateMultisampleDetails( void * state );
-	static void DestroyVulkanState( void * state );
-	static Renderer * CreateVulkanRenderer( Rtt_Allocator * allocator, void * state );
+	static void DestroyVulkanContext( void * state );
+	static Renderer * CreateVulkanRenderer( Rtt_Allocator * allocator, void * context );
 };
 
 // ----------------------------------------------------------------------------

@@ -10,7 +10,7 @@
 #include "Core/Rtt_Build.h"
 
 #include "Renderer/Rtt_VulkanRenderer.h"
-#include "Renderer/Rtt_VulkanState.h"
+#include "Renderer/Rtt_VulkanContext.h"
 #include "Renderer/Rtt_VulkanGeometry.h"
 
 #include "Renderer/Rtt_Geometry_Renderer.h"
@@ -23,8 +23,8 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-VulkanGeometry::VulkanGeometry( VulkanState * state )
-:	fState( state ),
+VulkanGeometry::VulkanGeometry( VulkanContext * context )
+:	fContext( context ),
 	fVertexBufferData( NULL ),
 	fIndexBufferData( NULL ),
 	fResource( NULL ),
@@ -66,11 +66,11 @@ VulkanGeometry::Create( CPUResource* resource )
 
 	else
 	{
-        VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
+        VulkanBufferData bufferData( fContext->GetDevice(), fContext->GetAllocator() );
 
-		fState->CreateBuffer( fVertexCount * sizeof( Geometry::Vertex ), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
+		fContext->CreateBuffer( fVertexCount * sizeof( Geometry::Vertex ), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
 
-		fMappedVertices = fState->MapData( bufferData.GetMemory() );
+		fMappedVertices = fContext->MapData( bufferData.GetMemory() );
 		fVertexBufferData = bufferData.Extract( NULL );
 
 		fResource = geometry;
@@ -118,7 +118,7 @@ VulkanGeometry::Destroy()
 {
 	if (fMappedVertices)
 	{
-		vkUnmapMemory( fState->GetDevice(), fVertexBufferData->GetMemory() );
+		vkUnmapMemory( fContext->GetDevice(), fVertexBufferData->GetMemory() );
 
 		fMappedVertices = NULL;
 	}
@@ -172,9 +172,9 @@ VulkanGeometry::Populate()
 VulkanBufferData *
 VulkanGeometry::CreateBufferOnGPU( VkDeviceSize bufferSize, VkBufferUsageFlags usage )
 {
-    VulkanBufferData bufferData( fState->GetDevice(), fState->GetAllocator() );
+    VulkanBufferData bufferData( fContext->GetDevice(), fContext->GetAllocator() );
     
-	fState->CreateBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferData );
+	fContext->CreateBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferData );
 
 	return bufferData.Extract( NULL );
 }
@@ -182,13 +182,13 @@ VulkanGeometry::CreateBufferOnGPU( VkDeviceSize bufferSize, VkBufferUsageFlags u
 bool
 VulkanGeometry::TransferToGPU( VkBuffer bufferOnGPU, const void * data, VkDeviceSize bufferSize )
 {
-    VulkanBufferData stagingData( fState->GetDevice(), fState->GetAllocator() );
-    bool ableToTransfer = fState->CreateBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingData );
+    VulkanBufferData stagingData( fContext->GetDevice(), fContext->GetAllocator() );
+    bool ableToTransfer = fContext->CreateBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingData );
 
 	if (ableToTransfer)
 	{
-		fState->StageData( stagingData.GetMemory(), data, bufferSize );
-		fState->CopyBuffer( stagingData.GetBuffer(), bufferOnGPU, bufferSize );
+		fContext->StageData( stagingData.GetMemory(), data, bufferSize );
+		fContext->CopyBuffer( stagingData.GetBuffer(), bufferOnGPU, bufferSize );
 
 		// TODO: lifetime issue...
 	}

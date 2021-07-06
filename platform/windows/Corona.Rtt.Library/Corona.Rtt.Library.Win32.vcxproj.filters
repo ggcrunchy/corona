@@ -921,7 +921,7 @@
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanFrameBufferObject.cpp">
       <Filter>librtt\Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanState.cpp">
+    <ClCompile Include="..\..\..\librtt\Renderer\Rtt_VulkanContext.cpp">
       <Filter>librtt\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\librtt\Renderer\Rtt_ShaderCode.cpp">
@@ -1850,7 +1850,7 @@
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanRenderer.h">
       <Filter>librtt\Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanState.h">
+    <ClInclude Include="..\..\..\librtt\Renderer\Rtt_VulkanContext.h">
       <Filter>librtt\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\librtt\Renderer\Rtt_ShaderCode.h">

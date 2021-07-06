@@ -22,7 +22,7 @@ namespace Rtt
 
 class Texture;
 class VulkanBufferData;
-class VulkanState;
+class VulkanContext;
 struct Descriptor;
 
 // ----------------------------------------------------------------------------
@@ -34,7 +34,7 @@ class VulkanTexture : public GPUResource
 		typedef VulkanTexture Self;
 
 	public:
-		VulkanTexture( VulkanState * state );
+		VulkanTexture( VulkanContext * context );
 
 	public:
 		virtual void Create( CPUResource* resource );
@@ -47,7 +47,7 @@ class VulkanTexture : public GPUResource
 	public:
 		void CopyBufferToImage( VkBuffer buffer, VkImage image, uint32_t width, uint32_t height );
 		bool Load( Texture * texture, VkFormat format, const VulkanBufferData & bufferData, U32 mipLevels );
-		static bool TransitionImageLayout( VulkanState * state, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, VkCommandBuffer = VK_NULL_HANDLE );
+		static bool TransitionImageLayout( VulkanContext * context, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, VkCommandBuffer = VK_NULL_HANDLE );
 
 		VkImage GetImage() const { return fData[ GetIndex() ].fImage; }
 		VkImageView GetImageView() const { return fData[ GetIndex() ].fView; }
@@ -70,13 +70,13 @@ class VulkanTexture : public GPUResource
 			VkDeviceMemory fMemory;
 		};
 
-		static ImageData CreateImage( VulkanState * state, uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties );
-		static VkImageView CreateImageView( VulkanState * state, VkImage image, VkFormat format, VkImageAspectFlags flags, uint32_t mipLevels, const VkComponentMapping * componentMapping = NULL );
+		static ImageData CreateImage( VulkanContext * context, uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties );
+		static VkImageView CreateImageView( VulkanContext * context, VkImage image, VkFormat format, VkImageAspectFlags flags, uint32_t mipLevels, const VkComponentMapping * componentMapping = NULL );
 		static VkFormat GetVulkanFormat( Texture::Format format, VkComponentMapping & mapping );
 
 	private:
 		std::vector< ImageData > fData;
-		VulkanState * fState;
+		VulkanContext * fContext;
 		VkSampler fSampler;
 		VkFormat fFormat;
 //		uint32_t fMipLevels;

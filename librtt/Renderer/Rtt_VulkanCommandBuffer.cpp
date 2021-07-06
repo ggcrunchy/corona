@@ -7,7 +7,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#include "Renderer/Rtt_VulkanState.h"
+#include "Renderer/Rtt_VulkanContext.h"
 #include "Renderer/Rtt_VulkanCommandBuffer.h"
 
 #include "Renderer/Rtt_FrameBufferObject.h"
@@ -210,7 +210,7 @@ VulkanCommandBuffer::InitializeCachedParams()
 void 
 VulkanCommandBuffer::CacheQueryParam( CommandBuffer::QueryableParams param )
 {
-	const VkPhysicalDeviceProperties & properties = fRenderer.GetState()->GetProperties();
+	const VkPhysicalDeviceProperties & properties = fRenderer.GetContext()->GetProperties();
 
 	if (CommandBuffer::kMaxTextureSize == param)
 	{
@@ -693,8 +693,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 #endif
 
 	VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-	const VulkanState * state = fRenderer.GetState();
-	VkDevice device = state->GetDevice();
+	const VulkanContext * context = fRenderer.GetContext();
+	VkDevice device = context->GetDevice();
 
 	if (fFrameResources)
 	{
@@ -1456,9 +1456,9 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				submitInfo.waitSemaphoreCount = 1U;
 			}
 
-			vkResetFences( state->GetDevice(), 1U, &fFrameResources->fFence );
+			vkResetFences( context->GetDevice(), 1U, &fFrameResources->fFence );
 
-			submitResult = vkQueueSubmit( state->GetGraphicsQueue(), 1U, &submitInfo, fFrameResources->fFence );
+			submitResult = vkQueueSubmit( context->GetGraphicsQueue(), 1U, &submitInfo, fFrameResources->fFence );
 		}
 	}
 
@@ -1473,7 +1473,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 		presentInfo.swapchainCount = 1U;
 		presentInfo.waitSemaphoreCount = 1U;
 
-		VkResult presentResult = vkQueuePresentKHR( state->GetPresentQueue(), &presentInfo );
+		VkResult presentResult = vkQueuePresentKHR( context->GetPresentQueue(), &presentInfo );
 
 		if (VK_ERROR_OUT_OF_DATE_KHR == presentResult || VK_SUBOPTIMAL_KHR == presentResult)
 		{
@@ -1512,7 +1512,7 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 	return fElapsedTimeGPU;
 }
 
-bool VulkanCommandBuffer::Wait( VulkanState * state, FrameResources * frameResources, VkSwapchainKHR swapchain )
+bool VulkanCommandBuffer::Wait( VulkanContext * context, FrameResources * frameResources, VkSwapchainKHR swapchain )
 {
 	Rtt_ASSERT( NULL == fFrameResources );
 	Rtt_ASSERT( frameResources );
@@ -1521,13 +1521,13 @@ bool VulkanCommandBuffer::Wait( VulkanState * state, FrameResources * frameResou
 
 	if (ok)
 	{
-		state->WaitOnFence( frameResources->fFence );
+		context->WaitOnFence( frameResources->fFence );
 		
 		if (VK_NULL_HANDLE != swapchain)
 		{
 			uint32_t index;
 
-			VkResult result = vkAcquireNextImageKHR( state->GetDevice(), swapchain, (std::numeric_limits< uint64_t >::max)(), frameResources->fImageAvailable, VK_NULL_HANDLE, &index );
+			VkResult result = vkAcquireNextImageKHR( context->GetDevice(), swapchain, (std::numeric_limits< uint64_t >::max)(), frameResources->fImageAvailable, VK_NULL_HANDLE, &index );
 
 			ok = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
 
@@ -1589,7 +1589,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkCommandBuffer commandBuffer, VkPrimitiv
 				fPipeline = pipeline;
 			}
 
-			VkDevice device = fRenderer.GetState()->GetDevice();
+			VkDevice device = fRenderer.GetContext()->GetDevice();
 			VkDescriptorSet sets[3] = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE };
 			uint32_t dynamicOffsets[2] = {}, count = 0U, nsets = 0U;
 
@@ -1666,7 +1666,7 @@ bool VulkanCommandBuffer::PrepareDraw( VkCommandBuffer commandBuffer, VkPrimitiv
 
 VkDescriptorSet VulkanCommandBuffer::AddTextureSet( const std::vector< VkDescriptorImageInfo > & imageInfo )
 {
-	VulkanState * state = fRenderer.GetState();
+	VulkanContext * context = fRenderer.GetContext();
 	TexturesDescriptor & desc = *static_cast< TexturesDescriptor * >( fFrameResources->fTextures );
 
 	VkDescriptorSetAllocateInfo allocInfo = {};
@@ -1678,7 +1678,7 @@ VkDescriptorSet VulkanCommandBuffer::AddTextureSet( const std::vector< VkDescrip
 	allocInfo.pSetLayouts = &layout;
 				
 	VkDescriptorSet set = VK_NULL_HANDLE;
-	VkResult result = vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &set );
+	VkResult result = vkAllocateDescriptorSets( context->GetDevice(), &allocInfo, &set );
 
 	if (VK_ERROR_OUT_OF_POOL_MEMORY == result)
 	{
@@ -1745,7 +1745,7 @@ VkDescriptorSet VulkanCommandBuffer::AddTextureSet( const std::vector< VkDescrip
 			}
 		}
 
-		vkUpdateDescriptorSets( state->GetDevice(), writes.size(), writes.data(), 0U, NULL );
+		vkUpdateDescriptorSets( context->GetDevice(), writes.size(), writes.data(), 0U, NULL );
 
 		return set;
 	}

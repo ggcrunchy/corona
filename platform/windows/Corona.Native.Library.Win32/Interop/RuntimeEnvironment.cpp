@@ -1374,7 +1374,7 @@ OperationResult RuntimeEnvironment::RunUsing(const RuntimeEnvironment::CreationS
 	// STEVE CHANGE
 	if (fRenderSurfacePointer->IsUsingVulkanBackend())
 	{
-		fRuntimePointer->SetBackend("vulkanBackend", fRenderSurfacePointer->GetBackendState());
+		fRuntimePointer->SetBackend("vulkanBackend", fRenderSurfacePointer->GetBackendContext());
 	}
 	// /STEVE CHANGE
 

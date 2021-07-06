@@ -9,7 +9,7 @@
 
 #include "Renderer/Rtt_VulkanRenderer.h"
 
-#include "Renderer/Rtt_VulkanState.h"
+#include "Renderer/Rtt_VulkanContext.h"
 #include "Renderer/Rtt_VulkanCommandBuffer.h"
 #include "Renderer/Rtt_VulkanFrameBufferObject.h"
 #include "Renderer/Rtt_VulkanGeometry.h"
@@ -75,7 +75,7 @@ BufferData::Wipe()
 	Rtt_DELETE( fData );
 }
 
-BufferDescriptor::BufferDescriptor( VulkanState * state, VkDescriptorPool pool, VkDescriptorSetLayout setLayout, VkDescriptorType type, size_t count, size_t size )
+BufferDescriptor::BufferDescriptor( VulkanContext * context, VkDescriptorPool pool, VkDescriptorSetLayout setLayout, VkDescriptorType type, size_t count, size_t size )
 :	Descriptor( setLayout ),
 	fLastSet( VK_NULL_HANDLE ),
 	fType( type ),
@@ -91,8 +91,8 @@ BufferDescriptor::BufferDescriptor( VulkanState * state, VkDescriptorPool pool, 
 	fWritten( 0U ),
 	fMarkWritten( false )
 {
-	const VkPhysicalDeviceLimits & limits = state->GetProperties().limits;
-	VulkanBufferData bufferData( state->GetDevice(), state->GetAllocator() );
+	const VkPhysicalDeviceLimits & limits = context->GetProperties().limits;
+	VulkanBufferData bufferData( context->GetDevice(), context->GetAllocator() );
 
 	VkBufferUsageFlags usageFlags = 0;
 	uint32_t alignment = 0U, maxSize = ~0U;
@@ -144,11 +144,11 @@ BufferDescriptor::BufferDescriptor( VulkanState * state, VkDescriptorPool pool, 
 
 	for (U32 i = 0; i < n; ++i)
 	{
-		if (state->CreateBuffer( fBufferSize, usageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, bufferData ))
+		if (context->CreateBuffer( fBufferSize, usageFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, bufferData ))
 		{
 			BufferData buffer;
 
-			buffer.fMapped = state->MapData( bufferData.GetMemory() );
+			buffer.fMapped = context->MapData( bufferData.GetMemory() );
 			buffer.fData = bufferData.Extract( NULL );
 
 			VkDescriptorSetAllocateInfo allocInfo = {};
@@ -158,7 +158,7 @@ BufferDescriptor::BufferDescriptor( VulkanState * state, VkDescriptorPool pool, 
 			allocInfo.descriptorSetCount = 1U;
 			allocInfo.pSetLayouts = &fSetLayout;
 
-			if (VK_SUCCESS == vkAllocateDescriptorSets( state->GetDevice(), &allocInfo, &buffer.fSet ))
+			if (VK_SUCCESS == vkAllocateDescriptorSets( context->GetDevice(), &allocInfo, &buffer.fSet ))
 			{
 				VkWriteDescriptorSet descriptorWrite = {};
 				VkDescriptorBufferInfo bufferInfo = {};
@@ -172,7 +172,7 @@ BufferDescriptor::BufferDescriptor( VulkanState * state, VkDescriptorPool pool, 
 				descriptorWrite.dstSet = buffer.fSet;
 				descriptorWrite.pBufferInfo = &bufferInfo;
 
-				vkUpdateDescriptorSets( state->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
+				vkUpdateDescriptorSets( context->GetDevice(), 1U, &descriptorWrite, 0U, NULL );
 
 				fBuffers.push_back( buffer );
 			}
@@ -281,7 +281,7 @@ BufferDescriptor::TryToAddDynamicOffset( uint32_t offsets[], size_t & count )
 }
 
 static VkDescriptorPool
-AddPool( VulkanState * state, const VkDescriptorPoolSize * sizes, uint32_t sizeCount, U32 maxSets, VkDescriptorPoolCreateFlags flags = 0 )
+AddPool( VulkanContext * context, const VkDescriptorPoolSize * sizes, uint32_t sizeCount, U32 maxSets, VkDescriptorPoolCreateFlags flags = 0 )
 {
 	VkDescriptorPoolCreateInfo poolInfo = {};
 
@@ -293,7 +293,7 @@ AddPool( VulkanState * state, const VkDescriptorPoolSize * sizes, uint32_t sizeC
 
 	VkDescriptorPool pool = VK_NULL_HANDLE;
 
-	if (VK_SUCCESS == vkCreateDescriptorPool( state->GetDevice(), &poolInfo, state->GetAllocator(), &pool ))
+	if (VK_SUCCESS == vkCreateDescriptorPool( context->GetDevice(), &poolInfo, context->GetAllocator(), &pool ))
 	{
 		return pool;
 	}
@@ -306,7 +306,7 @@ AddPool( VulkanState * state, const VkDescriptorPoolSize * sizes, uint32_t sizeC
 	}
 }
 
-TexturesDescriptor::TexturesDescriptor( VulkanState * state, VkDescriptorSetLayout setLayout )
+TexturesDescriptor::TexturesDescriptor( VulkanContext * context, VkDescriptorSetLayout setLayout )
 :	Descriptor( setLayout )
 {
 	const U32 arrayCount = 1024U; // TODO: is this how to allocate this? (maybe arrays are just too complex / wasteful for the common case)
@@ -317,7 +317,7 @@ TexturesDescriptor::TexturesDescriptor( VulkanState * state, VkDescriptorSetLayo
 	poolSize.descriptorCount = descriptorCount;
 	poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-	fPool = AddPool( state, &poolSize, 1U, arrayCount );
+	fPool = AddPool( context, &poolSize, 1U, arrayCount );
 }
 
 void
@@ -428,9 +428,9 @@ FrameResources::CleanUpSynchronizationObjects( VkDevice device, const VkAllocati
 	fRenderFinished = VK_NULL_HANDLE;
 }
 
-VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
+VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanContext * context )
 :   Super( allocator ),
-	fState( state ),
+	fContext( context ),
     fSwapchainTexture( NULL ),
 	fPrimaryFBO( NULL ),
 	fCaptureFBO( NULL ),
@@ -463,7 +463,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetLayoutInfo, state->GetAllocator(), &fUniformsLayout ))
+	if (VK_SUCCESS == vkCreateDescriptorSetLayout( context->GetDevice(), &createDescriptorSetLayoutInfo, context->GetAllocator(), &fUniformsLayout ))
 	{
 	}
 
@@ -472,7 +472,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 		CORONA_LOG_ERROR( "Failed to create UBO descriptor set layout!" );
 	}
 
-	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetLayoutInfo, state->GetAllocator(), &fUserDataLayout ))
+	if (VK_SUCCESS == vkCreateDescriptorSetLayout( context->GetDevice(), &createDescriptorSetLayoutInfo, context->GetAllocator(), &fUserDataLayout ))
 	{
 	}
 
@@ -492,7 +492,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 		// binging 0: 1 (VK_DESCRIPTOR_TYPE_SAMPLER) descriptor
 		// binding 1: 4096 (VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE) descriptors
 
-	if (VK_SUCCESS == vkCreateDescriptorSetLayout( state->GetDevice(), &createDescriptorSetLayoutInfo, state->GetAllocator(), &fTextureLayout ))
+	if (VK_SUCCESS == vkCreateDescriptorSetLayout( context->GetDevice(), &createDescriptorSetLayoutInfo, context->GetAllocator(), &fTextureLayout ))
 	{
 	}
 
@@ -510,7 +510,7 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 	createPipelineLayoutInfo.pushConstantRangeCount = 1U;
 	createPipelineLayoutInfo.setLayoutCount = 3U;
 
-	if (VK_SUCCESS == vkCreatePipelineLayout( state->GetDevice(), &createPipelineLayoutInfo, state->GetAllocator(), &fPipelineLayout ))
+	if (VK_SUCCESS == vkCreatePipelineLayout( context->GetDevice(), &createPipelineLayoutInfo, context->GetAllocator(), &fPipelineLayout ))
 	{
 	}
 
@@ -519,17 +519,17 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 		CORONA_LOG_ERROR( "Failed to create pipeline layout!" );
 	}
 
-	fSwapchainTexture = Rtt_NEW( allocator, TextureSwapchain( allocator, state ) );
+	fSwapchainTexture = Rtt_NEW( allocator, TextureSwapchain( allocator, context ) );
 
 	VkDescriptorPoolSize size;
 
 	size.descriptorCount = kFramesInFlight * 64U;
 	size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 
-	fPool = AddPool( state, &size, 1U, kFramesInFlight * 80U ); // TODO: wild guess this many uniform buffers can satisfy 256 "render targets" / 1024 uniform blocks, cf. below
+	fPool = AddPool( context, &size, 1U, kFramesInFlight * 80U ); // TODO: wild guess this many uniform buffers can satisfy 256 "render targets" / 1024 uniform blocks, cf. below
 
-	const std::vector< uint32_t > & families = state->GetQueueFamilies();
-	uint32_t graphicsFamilyIndex = state->GetGraphicsFamilyIndex();
+	const std::vector< uint32_t > & families = context->GetQueueFamilies();
+	uint32_t graphicsFamilyIndex = context->GetGraphicsFamilyIndex();
 
 	Rtt_ASSERT( !families.empty() );
 	Rtt_ASSERT( graphicsFamilyIndex <= families.size() );
@@ -541,19 +541,19 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 		static_assert( Descriptor::kUniforms < Descriptor::kUserData, "Uniforms / buffer in unexpected order" );
 		static_assert( Descriptor::kUserData < Descriptor::kTexture, "Buffer / textures in unexpected order" );
 
-		fFrameResources[i].fUniforms = Rtt_NEW( NULL, BufferDescriptor( state, fPool, fUniformsLayout, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256U, sizeof( VulkanUniforms ) ) );
-		fFrameResources[i].fUserData = Rtt_NEW( NULL, BufferDescriptor( state, fPool, fUserDataLayout, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024U, sizeof( VulkanUserData ) ) );
-		fFrameResources[i].fTextures = Rtt_NEW( NULL, TexturesDescriptor( state, fTextureLayout ) );
-		fFrameResources[i].fCommands = state->MakeCommandPool( graphicsFamily );
+		fFrameResources[i].fUniforms = Rtt_NEW( NULL, BufferDescriptor( context, fPool, fUniformsLayout, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256U, sizeof( VulkanUniforms ) ) );
+		fFrameResources[i].fUserData = Rtt_NEW( NULL, BufferDescriptor( context, fPool, fUserDataLayout, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024U, sizeof( VulkanUserData ) ) );
+		fFrameResources[i].fTextures = Rtt_NEW( NULL, TexturesDescriptor( context, fTextureLayout ) );
+		fFrameResources[i].fCommands = context->MakeCommandPool( graphicsFamily );
 
-		if (!fFrameResources[i].AddSynchronizationObjects( state->GetDevice(), state->GetAllocator() )) // TODO: could fail at other steps...
+		if (!fFrameResources[i].AddSynchronizationObjects( context->GetDevice(), context->GetAllocator() )) // TODO: could fail at other steps...
 		{
 			CORONA_LOG_ERROR( "Failed to create some synchronziation objects!" );
 
 			// for (j = 0; j <= i; ++j)
-			fFrameResources[i].CleanUpCommandPool( state->GetDevice(), state->GetAllocator() );
-			fFrameResources[i].CleanUpDescriptorObjects( state->GetDevice(), state->GetAllocator() );
-			fFrameResources[i].CleanUpSynchronizationObjects( state->GetDevice(), state->GetAllocator() );
+			fFrameResources[i].CleanUpCommandPool( context->GetDevice(), context->GetAllocator() );
+			fFrameResources[i].CleanUpDescriptorObjects( context->GetDevice(), context->GetAllocator() );
+			fFrameResources[i].CleanUpSynchronizationObjects( context->GetDevice(), context->GetAllocator() );
 
 			// break...
 		}
@@ -562,13 +562,13 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state )
 
 VulkanRenderer::~VulkanRenderer()
 {
-	vkQueueWaitIdle( fState->GetGraphicsQueue() );
+	vkQueueWaitIdle( fContext->GetGraphicsQueue() );
 
 	TearDownSwapchain();
 
 	Rtt_DELETE( fSwapchainTexture );
 
-	auto ci = GetState()->GetCommonInfo();
+	auto ci = GetContext()->GetCommonInfo();
 
 	for (FrameResources & resources : fFrameResources)
 	{
@@ -604,11 +604,11 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 	vulkanCommandBuffer->BeginFrame();
 
 	bool canContinue = VK_SUCCESS == result;
-	VkSwapchainKHR swapchain = fState->GetSwapchain();
+	VkSwapchainKHR swapchain = fContext->GetSwapchain();
 
 	if (!isCapture && VK_NULL_HANDLE == swapchain)
 	{
-		VulkanState::PopulateSwapchainDetails( *fState );
+		VulkanContext::PopulateSwapchainDetails( *fContext );
 
 		swapchain = MakeSwapchain();
 
@@ -625,7 +625,7 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 		}
 	}
 
-	if (canContinue && vulkanCommandBuffer->Wait( fState, &fFrameResources[fFrameIndex], !isCapture ? swapchain : VK_NULL_HANDLE ))
+	if (canContinue && vulkanCommandBuffer->Wait( fContext, &fFrameResources[fFrameIndex], !isCapture ? swapchain : VK_NULL_HANDLE ))
 	{
 		fFrameIndex = (fFrameIndex + 1) % kFramesInFlight;
 	}
@@ -654,24 +654,24 @@ VulkanRenderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bit
 	// adapted from https://community.khronos.org/t/readpixels-on-vulkan/6797
 	// TODO: compare Sascha Willems's "Taking Screenshots" example (seems able to avoid the fence)
 
-	VulkanState * state = GetState();
+	VulkanContext * context = GetContext();
 
-	VulkanBufferData bufferData( state->GetDevice(), state->GetAllocator() );
+	VulkanBufferData bufferData( context->GetDevice(), context->GetAllocator() );
 
 	size_t size = bitmap.Width() * bitmap.Height() * 4U;
-    bool ok = state->CreateBuffer( size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
+    bool ok = context->CreateBuffer( size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
 
 	void * data = NULL;
-	VkDevice device = state->GetDevice();
+	VkDevice device = context->GetDevice();
 	VkResult errorCode = vkMapMemory( device, bufferData.GetMemory(), 0, VK_WHOLE_SIZE, 0, (void **)&data );
 
-	state->WaitOnFence( fCaptureFence );
+	context->WaitOnFence( fCaptureFence );
 
 	VulkanTexture * texture = static_cast< VulkanTexture * >( fCaptureFBO->GetTextureName() );
 	VkImage image = texture->GetImage();
-	VkCommandBuffer commandBuffer = state->BeginSingleTimeCommands();
+	VkCommandBuffer commandBuffer = context->BeginSingleTimeCommands();
 
-	VulkanTexture::TransitionImageLayout( state, image, texture->GetFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0U, commandBuffer );
+	VulkanTexture::TransitionImageLayout( context, image, texture->GetFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0U, commandBuffer );
 
 	VkBufferImageCopy region = {};
 	
@@ -704,9 +704,9 @@ VulkanRenderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bit
 */
 	vkCmdCopyImageToBuffer( commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bufferData.GetBuffer(), 1U, &region );
 
-	VulkanTexture::TransitionImageLayout( state, image, texture->GetFormat(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0U, commandBuffer );
+	VulkanTexture::TransitionImageLayout( context, image, texture->GetFormat(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0U, commandBuffer );
 
-	state->EndSingleTimeCommands( commandBuffer );
+	context->EndSingleTimeCommands( commandBuffer );
 
 	uint8_t * bits = (uint8_t *)bitmap.WriteAccess();
 	uint8_t * dataBytes = (uint8_t *)data;
@@ -739,7 +739,7 @@ VulkanRenderer::EndCapture()
 {
 	if (VK_NULL_HANDLE != fCaptureFence)
 	{
-		fState->WaitOnFence( fCaptureFence );
+		fContext->WaitOnFence( fCaptureFence );
 	}
 
 	PrepareCapture( NULL, VK_NULL_HANDLE );
@@ -748,8 +748,8 @@ VulkanRenderer::EndCapture()
 VkSwapchainKHR
 VulkanRenderer::MakeSwapchain()
 {
-    const VulkanState::SwapchainDetails & details = fState->GetSwapchainDetails();
-    auto & queueFamilies = fState->GetQueueFamilies();
+    const VulkanContext::SwapchainDetails & details = fContext->GetSwapchainDetails();
+    auto & queueFamilies = fContext->GetQueueFamilies();
 	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
 
 	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -762,10 +762,10 @@ VulkanRenderer::MakeSwapchain()
 	swapchainCreateInfo.imageSharingMode = 1U == queueFamilies.size() ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
 	swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	swapchainCreateInfo.minImageCount = details.fImageCount;
-	swapchainCreateInfo.oldSwapchain = fState->GetSwapchain();
+	swapchainCreateInfo.oldSwapchain = fContext->GetSwapchain();
 	swapchainCreateInfo.presentMode = details.fPresentMode;
 	swapchainCreateInfo.preTransform = details.fTransformFlagBits; // TODO: relevant to portrait, landscape, etc?
-	swapchainCreateInfo.surface = fState->GetSurface();
+	swapchainCreateInfo.surface = fContext->GetSurface();
 
 	if (VK_SHARING_MODE_CONCURRENT == swapchainCreateInfo.imageSharingMode)
 	{
@@ -775,7 +775,7 @@ VulkanRenderer::MakeSwapchain()
 
 	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 
-	if (VK_SUCCESS == vkCreateSwapchainKHR( fState->GetDevice(), &swapchainCreateInfo, fState->GetAllocator(), &swapchain ))
+	if (VK_SUCCESS == vkCreateSwapchainKHR( fContext->GetDevice(), &swapchainCreateInfo, fContext->GetAllocator(), &swapchain ))
 	{
 		return swapchain;
 	}
@@ -791,23 +791,23 @@ VulkanRenderer::MakeSwapchain()
 void
 VulkanRenderer::BuildUpSwapchain( VkSwapchainKHR swapchain )
 {
-	fState->SetSwapchain( swapchain );
+	fContext->SetSwapchain( swapchain );
 
 	uint32_t imageCount;
 
-	vkGetSwapchainImagesKHR( fState->GetDevice(), swapchain, &imageCount, NULL );
+	vkGetSwapchainImagesKHR( fContext->GetDevice(), swapchain, &imageCount, NULL );
 	
 	fSwapchainImages.resize( imageCount );
 
-	vkGetSwapchainImagesKHR( fState->GetDevice(), swapchain, &imageCount, fSwapchainImages.data() );
+	vkGetSwapchainImagesKHR( fContext->GetDevice(), swapchain, &imageCount, fSwapchainImages.data() );
 }
 
 void
 VulkanRenderer::RecreateSwapchain()
 {
-	vkQueueWaitIdle( fState->GetGraphicsQueue() );
+	vkQueueWaitIdle( fContext->GetGraphicsQueue() );
 
-	VulkanState::UpdateSwapchainDetails( *fState );
+	VulkanContext::UpdateSwapchainDetails( *fContext );
 
 	VkSwapchainKHR newSwapchain = MakeSwapchain();
 
@@ -826,16 +826,16 @@ VulkanRenderer::RecreateSwapchain()
 void
 VulkanRenderer::TearDownSwapchain()
 {
-    auto ci = fState->GetCommonInfo();
+    auto ci = fContext->GetCommonInfo();
 
-	vkDestroySwapchainKHR( ci.device, fState->GetSwapchain(), ci.allocator );
+	vkDestroySwapchainKHR( ci.device, fContext->GetSwapchain(), ci.allocator );
 
 	for (FrameResources & resources : fFrameResources)
 	{
 		vkResetCommandPool( ci.device, resources.fCommands, 0U );
 	}
 
-    fState->SetSwapchain( VK_NULL_HANDLE );
+    fContext->SetSwapchain( VK_NULL_HANDLE );
 
 	Rtt_DELETE( fPrimaryFBO );
 }
@@ -1104,9 +1104,9 @@ VulkanRenderer::ResolvePipeline()
 		pipelineCreateInfo.renderPass = fPipelineCreateInfo.fRenderPass;
         pipelineCreateInfo.stageCount = fPipelineCreateInfo.fShaderStages.size();
 
-		auto ci = fState->GetCommonInfo();
+		auto ci = fContext->GetCommonInfo();
 // TODO: can we use another queue to actually build this while still recording commands?
-        if (VK_SUCCESS == vkCreateGraphicsPipelines( ci.device, fState->GetPipelineCache(), 1U, &pipelineCreateInfo, ci.allocator, &pipeline ))
+        if (VK_SUCCESS == vkCreateGraphicsPipelines( ci.device, fContext->GetPipelineCache(), 1U, &pipelineCreateInfo, ci.allocator, &pipeline ))
 		{
 			if (VK_NULL_HANDLE == fFirstPipeline)
 			{
@@ -1152,9 +1152,9 @@ VulkanRenderer::Create( const CPUResource* resource )
 	switch( resource->GetType() )
 	{
 		case CPUResource::kFrameBufferObject: return new VulkanFrameBufferObject( *this );
-		case CPUResource::kGeometry: return new VulkanGeometry( fState );
-		case CPUResource::kProgram: return new VulkanProgram( fState );
-		case CPUResource::kTexture: return new VulkanTexture( fState );
+		case CPUResource::kGeometry: return new VulkanGeometry( fContext );
+		case CPUResource::kProgram: return new VulkanProgram( fContext );
+		case CPUResource::kTexture: return new VulkanTexture( fContext );
 		case CPUResource::kUniform: return NULL;
 		default: Rtt_ASSERT_NOT_REACHED(); return NULL;
 	}

@@ -64,7 +64,7 @@ class TextureSwapchain : public Texture
 		typedef TextureSwapchain Self;
 
 	public:
-		TextureSwapchain( Rtt_Allocator * allocator, VulkanState * state );
+		TextureSwapchain( Rtt_Allocator * allocator, VulkanContext * context );
 		virtual ~TextureSwapchain();
 
 	public:
@@ -74,7 +74,7 @@ class TextureSwapchain : public Texture
 		virtual Filter GetFilter() const { return kNumFilters; }
 
 	private:
-		VulkanState * fState;
+		VulkanContext * fContext;
 };
 
 class VulkanFrameBufferObject : public GPUResource

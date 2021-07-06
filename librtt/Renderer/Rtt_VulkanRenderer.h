@@ -29,7 +29,7 @@ class FrameBufferObject;
 class Texture;
 class VulkanBufferData;
 class VulkanFrameBufferObject;
-class VulkanState;
+class VulkanContext;
 
 // ----------------------------------------------------------------------------
 
@@ -60,7 +60,7 @@ struct BufferData {
 };
 
 struct BufferDescriptor : public Descriptor {
-	BufferDescriptor( VulkanState * state, VkDescriptorPool pool, VkDescriptorSetLayout setLayout, VkDescriptorType type, size_t count, size_t size );
+	BufferDescriptor( VulkanContext * context, VkDescriptorPool pool, VkDescriptorSetLayout setLayout, VkDescriptorType type, size_t count, size_t size );
 
 	void AllowMark() { fMarkWritten = true; }
 	void ResetMark() { fWritten = 0U; }
@@ -96,7 +96,7 @@ struct BufferDescriptor : public Descriptor {
 };
 
 struct TexturesDescriptor : public Descriptor {
-	TexturesDescriptor( VulkanState * state, VkDescriptorSetLayout setLayout );
+	TexturesDescriptor( VulkanContext * context, VkDescriptorSetLayout setLayout );
 
 	virtual void Reset( VkDevice device );
 	virtual void Wipe( VkDevice device, const VkAllocationCallbacks * allocator );
@@ -130,7 +130,7 @@ class VulkanRenderer : public Renderer
 		enum { kFramesInFlight = 3 }; // see https://software.intel.com/content/www/us/en/develop/articles/practical-approach-to-vulkan-part-1.html
 
 	public:
-		VulkanRenderer( Rtt_Allocator* allocator, VulkanState * state );
+		VulkanRenderer( Rtt_Allocator* allocator, VulkanContext * context );
 		virtual ~VulkanRenderer();
 
 		virtual void BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY, bool isCapture );
@@ -146,7 +146,7 @@ class VulkanRenderer : public Renderer
 		void TearDownSwapchain();
 
 	public:
-		VulkanState * GetState() const { return fState; }
+		VulkanContext * GetContext() const { return fContext; }
 		VkDescriptorSetLayout GetUniformsLayout() const { return fUniformsLayout; }
 		VkDescriptorSetLayout GetUserDataLayout() const { return fUserDataLayout; }
 		VkDescriptorSetLayout GetTextureLayout() const { return fTextureLayout; }
@@ -205,7 +205,7 @@ class VulkanRenderer : public Renderer
 			bool operator == ( const PipelineKey & other ) const;
 		};
 
-		VulkanState * fState;
+		VulkanContext * fContext;
 		Texture * fSwapchainTexture;
 		FrameBufferObject * fPrimaryFBO;
 		VulkanFrameBufferObject * fCaptureFBO; // not owned by renderer

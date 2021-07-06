@@ -8,7 +8,7 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #include "Renderer/Rtt_VulkanRenderer.h"
-#include "Renderer/Rtt_VulkanState.h"
+#include "Renderer/Rtt_VulkanContext.h"
 #include "Renderer/Rtt_VulkanFrameBufferObject.h"
 #include "Renderer/Rtt_VulkanTexture.h"
 
@@ -211,9 +211,9 @@ RenderPassBuilder::AddAttachment( VkAttachmentDescription & description, std::ve
 	fDescriptions.push_back( description );
 }
 
-TextureSwapchain::TextureSwapchain( Rtt_Allocator * allocator, VulkanState * state )
+TextureSwapchain::TextureSwapchain( Rtt_Allocator * allocator, VulkanContext * context )
 :	Super( allocator ),
-	fState( state )
+	fContext( context )
 {
 }
 
@@ -224,13 +224,13 @@ TextureSwapchain::~TextureSwapchain()
 U32
 TextureSwapchain::GetWidth() const
 {
-	return fState->GetSwapchainDetails().fExtent.width;
+	return fContext->GetSwapchainDetails().fExtent.width;
 }
 
 U32
 TextureSwapchain::GetHeight() const
 {
-	return fState->GetSwapchainDetails().fExtent.height;
+	return fContext->GetSwapchainDetails().fExtent.height;
 }
 
 VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanRenderer & renderer )
@@ -261,9 +261,9 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 	CleanUpImageData();
 
 	bool isSwapchain = Texture::kNumFilters == fTexture->GetFilter(), wantMultisampleResources = isSwapchain;
-	auto ci = fRenderer.GetState()->GetCommonInfo();
+	auto ci = fRenderer.GetContext()->GetCommonInfo();
 	VkComponentMapping mapping = {};
-	VkFormat format = isSwapchain ? ci.state->GetSwapchainDetails().fFormat.format : VulkanTexture::GetVulkanFormat( fTexture->GetFormat(), mapping );
+	VkFormat format = isSwapchain ? ci.context->GetSwapchainDetails().fFormat.format : VulkanTexture::GetVulkanFormat( fTexture->GetFormat(), mapping );
 
 	RenderPassBuilder builder;
 
@@ -272,10 +272,10 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 	if (wantMultisampleResources)
 	{
-		fSampleCount = VkSampleCountFlagBits( ci.state->GetSampleCountFlags() );
+		fSampleCount = VkSampleCountFlagBits( ci.context->GetSampleCountFlags() );
 
 		VulkanTexture::ImageData color = VulkanTexture::CreateImage(
-			ci.state,
+			ci.context,
 			fExtent.width, fExtent.height, 1U,
 			fSampleCount,
 			format,
@@ -283,7 +283,7 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 			VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
 		);
-		VkImageView colorView = VulkanTexture::CreateImageView( ci.state, color.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
+		VkImageView colorView = VulkanTexture::CreateImageView( ci.context, color.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
 		fImages.push_back( color.fImage );
 		fMemory.push_back( color.fMemory );
@@ -308,7 +308,7 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 		for (VkImage swapchainImage : swapchainImages)
 		{
-			VkImageView swapchainView = VulkanTexture::CreateImageView( ci.state, swapchainImage, format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
+			VkImageView swapchainView = VulkanTexture::CreateImageView( ci.context, swapchainImage, format, VK_IMAGE_ASPECT_COLOR_BIT, 1U );
 
 			fImageViews.push_back( swapchainView );
 		}
@@ -390,13 +390,13 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 		builder.GetKey( key );
 
-		fRenderPassData[i] = ci.state->FindRenderPassData( key );
+		fRenderPassData[i] = ci.context->FindRenderPassData( key );
 
 		if (!fRenderPassData[i])
 		{
 			VkRenderPass renderPass = builder.Build( ci.device, ci.allocator );
 
-			fRenderPassData[i] = ci.state->AddRenderPass( key, renderPass );
+			fRenderPassData[i] = ci.context->AddRenderPass( key, renderPass );
 		}
 
 		builder.ReplaceClearsWithLoads();
@@ -514,7 +514,7 @@ VulkanFrameBufferObject::BeginOffscreenPass( VulkanRenderer & renderer, VkComman
 void
 VulkanFrameBufferObject::CleanUpImageData()
 {
-	auto ci = fRenderer.GetState()->GetCommonInfo();
+	auto ci = fRenderer.GetContext()->GetCommonInfo();
 
 	for (VkFramebuffer framebuffer : fFramebuffers)
 	{
