@@ -441,7 +441,8 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanContext * contex
 	fTextureLayout( VK_NULL_HANDLE ),
 	fPipelineLayout( VK_NULL_HANDLE ),
 	fCaptureFence( VK_NULL_HANDLE ),
-	fFrameIndex( 0 )
+	fFrameIndex( 0 ),
+	fSwapchainInvalid( false )
 {
 	fFrontCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
 	fBackCommandBuffer = Rtt_NEW( allocator, VulkanCommandBuffer( allocator, *this ) );
@@ -604,24 +605,40 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 	vulkanCommandBuffer->BeginFrame();
 
 	bool canContinue = VK_SUCCESS == result;
-	VkSwapchainKHR swapchain = fContext->GetSwapchain();
+	VkSwapchainKHR swapchain = !GetSwapchainInvalid() ? fContext->GetSwapchain() : VK_NULL_HANDLE;
 
 	if (!isCapture && VK_NULL_HANDLE == swapchain)
 	{
 		VulkanContext::PopulateSwapchainDetails( *fContext );
 
-		swapchain = MakeSwapchain();
+	#ifdef _WIN32
+		const VulkanContext::SwapchainDetails & details = fContext->GetSwapchainDetails();
 
-		if (swapchain != VK_NULL_HANDLE)
+		canContinue = details.fExtent.width > 0 && details.fExtent.height > 0; // not minimized?
+
+		if (canContinue)
+	#endif
 		{
-			BuildUpSwapchain( swapchain );
+			swapchain = MakeSwapchain();
 
-			fPrimaryFBO = Rtt_NEW( fAllocator, FrameBufferObject( fAllocator, fSwapchainTexture ) );
-		}
+			if (GetSwapchainInvalid()) // out-of-date or suboptimal
+			{
+				TearDownSwapchain();
+			}
 
-		else
-		{
-			canContinue = false;
+			if (swapchain != VK_NULL_HANDLE)
+			{
+				BuildUpSwapchain( swapchain );
+
+				fPrimaryFBO = Rtt_NEW( fAllocator, FrameBufferObject( fAllocator, fSwapchainTexture ) );
+
+				SetSwapchainInvalid( false );
+			}
+
+			else
+			{
+				canContinue = false;
+			}
 		}
 	}
 
@@ -803,27 +820,6 @@ VulkanRenderer::BuildUpSwapchain( VkSwapchainKHR swapchain )
 }
 
 void
-VulkanRenderer::RecreateSwapchain()
-{
-	vkQueueWaitIdle( fContext->GetGraphicsQueue() );
-
-	VulkanContext::UpdateSwapchainDetails( *fContext );
-
-	VkSwapchainKHR newSwapchain = MakeSwapchain();
-
-	TearDownSwapchain();
-
-	// TODO: window might be minimized...
-
-	if (newSwapchain != VK_NULL_HANDLE)
-	{
-		BuildUpSwapchain( newSwapchain );
-	}
-
-	fPrimaryFBO = Rtt_NEW( fAllocator, FrameBufferObject( fAllocator, fSwapchainTexture ) );
-}
-
-void
 VulkanRenderer::TearDownSwapchain()
 {
     auto ci = fContext->GetCommonInfo();
@@ -838,6 +834,8 @@ VulkanRenderer::TearDownSwapchain()
     fContext->SetSwapchain( VK_NULL_HANDLE );
 
 	Rtt_DELETE( fPrimaryFBO );
+
+	fPrimaryFBO = NULL;
 }
 
 const size_t kFinalBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;

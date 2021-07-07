@@ -151,8 +151,11 @@ class VulkanRenderer : public Renderer
 		VkDescriptorSetLayout GetUserDataLayout() const { return fUserDataLayout; }
 		VkDescriptorSetLayout GetTextureLayout() const { return fTextureLayout; }
 		VkPipelineLayout GetPipelineLayout() const { return fPipelineLayout; }
+		bool GetSwapchainInvalid() const { return fSwapchainInvalid; }
 
 		const std::vector< VkImage > & GetSwapchainImages() const { return fSwapchainImages; }
+
+		void SetSwapchainInvalid( bool newValue ) { fSwapchainInvalid = newValue; }
 
 	public:
 		void EnableBlend( bool enabled );
@@ -224,6 +227,7 @@ class VulkanRenderer : public Renderer
 		PipelineKey fWorkingKey;
 		VkPipelineColorBlendAttachmentState fColorBlendState;
 		int fFrameIndex;
+		bool fSwapchainInvalid;
 };
 
 // ----------------------------------------------------------------------------
