@@ -741,23 +741,26 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 		}
 	}
 
-	std::vector< VulkanGeometry * > geometryList;
+	std::sort( fOffscreenSequence.begin(), fOffscreenSequence.end() );
 
 	VulkanUniforms uniforms;
 	VulkanUserData userData;
 	PushConstantState pushConstants;
 
-	Buffer( 0 ).SetWorkspace( &uniforms );
-	Buffer( 1 ).SetWorkspace( &userData );
-
-	std::sort( fOffscreenSequence.begin(), fOffscreenSequence.end() );
-
 	U32 numPasses = 1U + fOffscreenSequence.size();
 
-	if (VK_NULL_HANDLE == commandBuffer)
+	if (VK_NULL_HANDLE != commandBuffer)
+	{
+		Buffer( 0 ).SetWorkspace( &uniforms );
+		Buffer( 1 ).SetWorkspace( &userData );
+	}
+
+	else
 	{
 		numPasses = 0U;
 	}
+
+	std::vector< VulkanGeometry * > geometryList;
 
 	uint32_t imageIndex = ~0U;
 
@@ -1477,8 +1480,10 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 
 		if (VK_ERROR_OUT_OF_DATE_KHR == presentResult || VK_SUBOPTIMAL_KHR == presentResult)
 		{
-			fRenderer.RecreateSwapchain();
+			vkQueueWaitIdle( fRenderer.GetContext()->GetGraphicsQueue() ); // do this once now, else we might call many times if minimized
 
+			fRenderer.SetSwapchainInvalid( true );
+			
 			presentResult = VK_SUCCESS;
 		}
 
@@ -1527,9 +1532,12 @@ bool VulkanCommandBuffer::Wait( VulkanContext * context, FrameResources * frameR
 		{
 			uint32_t index;
 
-			VkResult result = vkAcquireNextImageKHR( context->GetDevice(), swapchain, (std::numeric_limits< uint64_t >::max)(), frameResources->fImageAvailable, VK_NULL_HANDLE, &index );
+			if (!fRenderer.GetSwapchainInvalid())
+			{
+				VkResult result = vkAcquireNextImageKHR( context->GetDevice(), swapchain, (std::numeric_limits< uint64_t >::max)(), frameResources->fImageAvailable, VK_NULL_HANDLE, &index );
 
-			ok = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
+				ok = VK_SUCCESS == result || VK_SUBOPTIMAL_KHR == result;
+			}
 
 			if (ok)
 			{
