@@ -612,9 +612,9 @@ VulkanRenderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, 
 		VulkanContext::PopulateSwapchainDetails( *fContext );
 
 	#ifdef _WIN32
-		const VulkanContext::SwapchainDetails & details = fContext->GetSwapchainDetails();
+		VkExtent2D extent = fContext->GetSwapchainDetails().fExtent;
 
-		canContinue = details.fExtent.width > 0 && details.fExtent.height > 0; // not minimized?
+		canContinue = extent.width > 0 && extent.height > 0; // not minimized?
 
 		if (canContinue)
 	#endif
@@ -669,7 +669,6 @@ void
 VulkanRenderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bitmap, S32 x_in_pixels, S32 y_in_pixels, S32 w_in_pixels, S32 h_in_pixels )
 {
 	// adapted from https://community.khronos.org/t/readpixels-on-vulkan/6797
-	// TODO: compare Sascha Willems's "Taking Screenshots" example (seems able to avoid the fence)
 
 	VulkanContext * context = GetContext();
 

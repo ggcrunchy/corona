@@ -13,7 +13,7 @@
 #ifdef Rtt_DEBUG
 	#include <vulkan/vulkan.h>
 #else
-	#include "../../vulkanutils/volk.h"
+	#include "../../vulkan/utils/volk.h"
 #endif
 
 #endif // _Rtt_VulkanIncludes_H__
