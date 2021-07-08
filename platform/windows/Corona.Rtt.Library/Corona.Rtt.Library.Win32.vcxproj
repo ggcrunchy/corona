@@ -900,6 +900,17 @@
       <AdditionalDependencies>vulkan-1.lib;shaderc_combinedd.lib;spirv-cross-cored.lib;spirv-cross-glsld.lib;</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\..\external\vulkan\Lib32;</AdditionalLibraryDirectories>
     </Lib>
+    <PreBuildEvent>
+      <Command>set DIRECTORY=$(ProjectDir)../../../external/vulkan/Lib32
+set LIBRARYROOT=%DIRECTORY%/shaderc_combinedd
+set LIBRARY=%LIBRARYROOT%.lib
+set ARCHIVE=%LIBRARYROOT%.7z
+set ZIP=$(ProjectDir)../Build.Tools/7za
+
+if NOT EXIST %LIBRARY% (
+  %ZIP% e %ARCHIVE% -o%DIRECTORY%
+)</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug.App|Win32'">
     <ClCompile>
@@ -918,6 +929,17 @@
       <AdditionalDependencies>vulkan-1.lib;shaderc_combinedd.lib;spirv-cross-cored.lib;spirv-cross-glsld.lib;</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\..\external\vulkan\Lib32;</AdditionalLibraryDirectories>
     </Lib>
+    <PreBuildEvent>
+      <Command>set DIRECTORY=$(ProjectDir)../../../external/vulkan/Lib32
+set LIBRARYROOT=%DIRECTORY%/shaderc_combinedd
+set LIBRARY=%LIBRARYROOT%.lib
+set ARCHIVE=%LIBRARYROOT%.7z
+set ZIP=$(ProjectDir)../Build.Tools/7za
+
+if NOT EXIST %LIBRARY% (
+  %ZIP% e %ARCHIVE% -o%DIRECTORY%
+)</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug.CoronaBuilder|Win32'">
     <ClCompile>
