@@ -80,6 +80,7 @@ class VulkanContext
 		struct Features {
 			bool samplerAnisotropy;
 			bool shaderSampledImageArrayDynamicIndexing;
+			bool supportsBlit;
 		};
 
 	public:

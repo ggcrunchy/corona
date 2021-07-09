@@ -665,85 +665,154 @@ VulkanRenderer::EndFrame()
 	SetFrameBufferObject(NULL);
 }
 
+static void
+BlitImage( VkCommandBuffer commandBuffer, VkImage srcImage, VkImage dstImage, S32 w_in_pixels, S32 h_in_pixels )
+{
+	VkOffset3D size;
+
+	size.x = w_in_pixels;
+	size.y = h_in_pixels;
+	size.z = 1U;
+
+	VkImageBlit blitRegion = {};
+
+	blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	blitRegion.srcSubresource.layerCount = 1U;
+	blitRegion.srcOffsets[1] = size;
+	blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	blitRegion.dstSubresource.layerCount = 1U;
+	blitRegion.dstOffsets[1] = size;
+
+	vkCmdBlitImage( commandBuffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, &blitRegion, VK_FILTER_NEAREST );
+}
+
+static void
+CopyImage( VkCommandBuffer commandBuffer, VkImage srcImage, VkImage dstImage, S32 w_in_pixels, S32 h_in_pixels )
+{
+	VkImageCopy copyRegion = {};
+
+	copyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copyRegion.srcSubresource.layerCount = 1;
+	copyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copyRegion.dstSubresource.layerCount = 1;
+	copyRegion.extent.width = w_in_pixels;
+	copyRegion.extent.height = h_in_pixels;
+	copyRegion.extent.depth = 1U;
+
+	vkCmdCopyImage( commandBuffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion );
+}
+
+static void
+ReadAfterBlit( uint8_t * bits, uint8_t * dataBytes, S32 w_in_pixels, S32 h_in_pixels, VkDeviceSize rowPitch )
+{
+	for (U32 y = 0; y < h_in_pixels; ++y)
+	{
+		uint8_t * line = (uint8_t *)bits + y * w_in_pixels * 4U;
+
+		memcpy( line, dataBytes, w_in_pixels * 4U );
+
+		dataBytes += rowPitch;
+	}
+}
+
+static void
+ReadAfterCopy( uint8_t * bits, uint8_t * dataBytes, S32 w_in_pixels, S32 h_in_pixels, VkDeviceSize rowPitch )
+{
+	for (U32 y = 0; y < h_in_pixels; ++y)
+	{
+		uint8_t * line = (uint8_t *)bits + y * w_in_pixels * 4U;
+		uint8_t * dataLine = dataBytes;
+
+		for (U32 x = 0; x < w_in_pixels; ++x)
+		{
+			line[0] = dataLine[3];
+			line[1] = dataLine[2];
+			line[2] = dataLine[1];
+			line[3] = dataLine[0];
+
+			line += 4;
+			dataLine += 4;
+		}
+
+		dataBytes += rowPitch;
+	}
+}
+
 void
 VulkanRenderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bitmap, S32 x_in_pixels, S32 y_in_pixels, S32 w_in_pixels, S32 h_in_pixels )
 {
-	// adapted from https://community.khronos.org/t/readpixels-on-vulkan/6797
+	// originally adapted from https://community.khronos.org/t/readpixels-on-vulkan/6797
+	// revised to follow https://github.com/SaschaWillems/Vulkan/blob/master/examples/screenshot/screenshot.cpp
 
 	VulkanContext * context = GetContext();
 
-	VulkanBufferData bufferData( context->GetDevice(), context->GetAllocator() );
+	// n.b. currently bitmap.Width(), bitmap.Height() are always w_in_pixels, h_in_pixels
 
-	size_t size = bitmap.Width() * bitmap.Height() * 4U;
-    bool ok = context->CreateBuffer( size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
+	VulkanTexture::ImageData imageData = VulkanTexture::CreateImage(
+		context,
+		w_in_pixels, h_in_pixels,
+		1U,
+		VK_SAMPLE_COUNT_1_BIT,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		VK_IMAGE_TILING_LINEAR,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+	);
 
 	void * data = NULL;
 	VkDevice device = context->GetDevice();
-	VkResult errorCode = vkMapMemory( device, bufferData.GetMemory(), 0, VK_WHOLE_SIZE, 0, (void **)&data );
-
+	VkResult errorCode = vkMapMemory( device, imageData.fMemory, 0, VK_WHOLE_SIZE, 0, (void **)&data );
+	
 	context->WaitOnFence( fCaptureFence );
 
 	VulkanTexture * texture = static_cast< VulkanTexture * >( fCaptureFBO->GetTextureName() );
 	VkImage image = texture->GetImage();
 	VkCommandBuffer commandBuffer = context->BeginSingleTimeCommands();
 
-	VulkanTexture::TransitionImageLayout( context, image, texture->GetFormat(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0U, commandBuffer );
-
-	VkBufferImageCopy region = {};
+	VulkanTexture::TransitionImageLayout( context, image, texture->GetFormat(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 1U, commandBuffer );
+    VulkanTexture::TransitionImageLayout( context, imageData.fImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, commandBuffer );
 	
-	region.bufferRowLength = w_in_pixels;
-	region.bufferImageHeight = h_in_pixels;
-	region.imageExtent.width = w_in_pixels;
-	region.imageExtent.height = h_in_pixels;
-	region.imageExtent.depth = 1U;
-	region.imageOffset.x = x_in_pixels;
-	region.imageOffset.y = y_in_pixels;
-	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	region.imageSubresource.layerCount = 1U;
+	bool supportsBlit = context->GetFeatures().supportsBlit;
 
-/*
-	If CaptureFrameBuffer in Rtt_GPUStream is any indication, we don't need to account for scaling; however, if this is a wrong
-	assessment, we could make an intermediate object backed by the very buffer that follows and then blit to it like so:
+	if (supportsBlit)
+	{
+		BlitImage( commandBuffer, image, imageData.fImage, w_in_pixels, h_in_pixels );
+	}
 
-	VkImageBlit b;
-	VKAPI_ATTR void VKAPI_CALL vkCmdBlitImage(
-		VkCommandBuffer                             commandBuffer,
-		VkImage                                     srcImage,
-		VkImageLayout                               srcImageLayout,
-		VkImage                                     dstImage,
-		VkImageLayout                               dstImageLayout,
-		uint32_t                                    regionCount,
-		const VkImageBlit*                          pRegions,
-		VkFilter                                    filter);
+	else
+	{
+		CopyImage( commandBuffer, image, imageData.fImage, w_in_pixels, h_in_pixels );
+	}
 
-	Actually, this might obviate the swizzling that follows and be more robust against differing formats.
-*/
-	vkCmdCopyImageToBuffer( commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bufferData.GetBuffer(), 1U, &region );
-
-	VulkanTexture::TransitionImageLayout( context, image, texture->GetFormat(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 0U, commandBuffer );
+	VulkanTexture::TransitionImageLayout( context, image, texture->GetFormat(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1U, commandBuffer );
+	VulkanTexture::TransitionImageLayout( context, imageData.fImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 1U, commandBuffer );
 
 	context->EndSingleTimeCommands( commandBuffer );
 
+	VkImageSubresource subResource = {};
+	
+	subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+	VkSubresourceLayout subResourceLayout;
+
+	vkGetImageSubresourceLayout( device, imageData.fImage, &subResource, &subResourceLayout );
+
 	uint8_t * bits = (uint8_t *)bitmap.WriteAccess();
-	uint8_t * dataBytes = (uint8_t *)data;
+	uint8_t * dataBytes = (uint8_t *)data + subResourceLayout.offset;
 
-	for (U32 y = 0; y < bitmap.Height(); ++y)
+	if (supportsBlit)
 	{
-		uint8_t * line = (uint8_t *)bits + y * bitmap.Width() * 4U;
-
-		for (U32 x = 0; x < bitmap.Width(); ++x)
-		{
-			line[0] = dataBytes[3];
-			line[1] = dataBytes[2];
-			line[2] = dataBytes[1];
-			line[3] = dataBytes[0];
-
-			dataBytes += 4;
-			line += 4;
-		}
+		ReadAfterBlit( bits, dataBytes, bitmap.Width(), bitmap.Height(), subResourceLayout.rowPitch );
 	}
 
-	vkUnmapMemory( device, bufferData.GetMemory() );
+	else
+	{
+		ReadAfterCopy( bits, dataBytes, bitmap.Width(), bitmap.Height(), subResourceLayout.rowPitch );
+	}
+
+	vkUnmapMemory( device, imageData.fMemory );
+
+	imageData.Destroy( device, context->GetAllocator() );
 
 	// TODO: do we need to guard the FBO memory?
 
@@ -753,7 +822,7 @@ VulkanRenderer::CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bit
 void
 VulkanRenderer::EndCapture()
 {
-	if (VK_NULL_HANDLE != fCaptureFence)
+	if (VK_NULL_HANDLE != fCaptureFence) // TODO: is this just fFrameResources[(fFrameIndex - 1) % 3]?
 	{
 		fContext->WaitOnFence( fCaptureFence );
 	}

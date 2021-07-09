@@ -65,6 +65,8 @@ class VulkanTexture : public GPUResource
 			{
 			}
 
+			void Destroy( VkDevice device, const VkAllocationCallbacks * allocator );
+
 			VkImage fImage;
 			VkImageView fView;
 			VkDeviceMemory fMemory;

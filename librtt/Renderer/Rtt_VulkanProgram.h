@@ -119,6 +119,7 @@ class VulkanProgram : public GPUResource
 			// TODO? divvy these up between uniforms and push constants
 			U32 fTimestamps[Uniform::kNumBuiltInVariables];
 			U32 fShadersID;
+			bool fAttemptedCreation; // prevent re-attempts to create if compilation fails
 			
 			// Metadata
 			int fHeaderNumLines;
@@ -165,11 +166,20 @@ class VulkanProgram : public GPUResource
 			U32 fRow;
 		};
 
-		size_t GatherUniformUserdata( bool isVertexSource, ShaderCode & code, UserdataValue values[], std::vector< UserdataDeclaration > & declarations );
-		bool ReplaceFragCoords( ShaderCode & code, size_t offset );
-		void ReplaceVertexSamplers( ShaderCode & code );
-		void ReplaceVaryings( bool isVertexSource, ShaderCode & code, VulkanCompilerMaps & maps );
-		void Compile( int kind, ShaderCode & code, VulkanCompilerMaps & maps, VkShaderModule & module );
+		struct CompileState {
+			void Report( const char * prefix );
+			void SetError( const char * fmt, ... );
+
+			bool HasError() const;
+
+			std::string fError;
+		};
+
+		size_t GatherUniformUserdata( bool isVertexSource, ShaderCode & code, UserdataValue values[], std::vector< UserdataDeclaration > & declarations, CompileState & state );
+		bool ReplaceFragCoords( ShaderCode & code, size_t offset, CompileState & state );
+		void ReplaceVertexSamplers( ShaderCode & code, CompileState & state );
+		void ReplaceVaryings( bool isVertexSource, ShaderCode & code, VulkanCompilerMaps & maps, CompileState & state );
+		void Compile( int kind, ShaderCode & code, VulkanCompilerMaps & maps, VkShaderModule & module, CompileState & state );
 		std::pair< bool, int > SearchForFreeRows( const UserdataValue values[], UserdataPosition positions[], size_t vectorCount );
 		U32 AddToString( std::string & str, const UserdataValue & value );
 		void UpdateShaderSource( VulkanCompilerMaps & maps, Program* program, Program::Version version, VersionData& data );

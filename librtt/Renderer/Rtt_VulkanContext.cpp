@@ -765,6 +765,31 @@ ChoosePhysicalDevice( VkInstance instance, VkSurfaceKHR surface )
 		// Maximum possible size of textures affects graphics quality
 		score += deviceDetails.properties.limits.maxImageDimension2D;
 
+		VkFormatProperties formatProperties;
+
+		vkGetPhysicalDeviceFormatProperties( device,
+
+		#if defined( Rtt_OPENGLES ) // this parallels the capture logic in Rtt_Display.cpp
+			VK_FORMAT_R8G8B8A8_UNORM
+		#else
+			VK_FORMAT_B8G8R8A8_UNORM
+		#endif
+
+			, &formatProperties );
+
+		bool canBlitFromOptimalTiledImage = formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT;
+
+		vkGetPhysicalDeviceFormatProperties( device, VK_FORMAT_R8G8B8A8_UNORM, &formatProperties );
+
+		bool canBlitToLinearTiledImage = formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT;
+
+		if (canBlitFromOptimalTiledImage && canBlitToLinearTiledImage)
+		{
+			score += 50U;
+
+			deviceDetails.features.supportsBlit = true;
+		}
+
 		// other ideas: texture compression
 		// could make the rating adjustable in config.lua?
 
@@ -864,9 +889,10 @@ VulkanContext::PopulatePreSwapchainDetails( VulkanContext & context, const Vulka
 	{
 		instance = MakeInstance( &appInfo,
 		
-#ifdef _WIN32
+	#ifdef _WIN32
 		VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-#endif
+	#endif
+
 		, allocator, &messenger );
 	}
 

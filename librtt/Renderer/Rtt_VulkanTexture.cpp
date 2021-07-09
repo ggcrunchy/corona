@@ -87,7 +87,7 @@ VulkanTexture::Create( CPUResource* resource )
     
 	VulkanBufferData bufferData( fContext->GetDevice(), fContext->GetAllocator() );
 
-    VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     bool ok = true;
 
     if (texture->IsTarget())
@@ -97,7 +97,7 @@ VulkanTexture::Create( CPUResource* resource )
 
     else
     {
-        usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         ok = fContext->CreateBuffer( imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferData );
                                         // ^^ TODO: also non-buffered approach? (suggestions that we should recycle a buffer)
                                         // is it okay to let this go away or should it be backed for a while still?
@@ -200,9 +200,7 @@ VulkanTexture::Destroy()
 
     for (ImageData & data : fData)
     {
-        vkDestroyImageView( ci.device, data.fView, ci.allocator );
-        vkDestroyImage( ci.device, data.fImage, ci.allocator );
-        vkFreeMemory( ci.device, data.fMemory, ci.allocator );
+        data.Destroy( ci.device, ci.allocator );
     }
 }
 
@@ -400,7 +398,11 @@ VulkanTexture::TransitionImageLayout( VulkanContext * context, VkImage image, Vk
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
         break;
+    case VK_IMAGE_LAYOUT_GENERAL:
+        barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 
+        break;
     default:
         Rtt_ASSERT_NOT_IMPLEMENTED();
     }
@@ -420,6 +422,14 @@ VulkanTexture::TransitionImageLayout( VulkanContext * context, VkImage image, Vk
     }
 
     return true;
+}
+
+void 
+VulkanTexture::ImageData::Destroy( VkDevice device, const VkAllocationCallbacks * allocator )
+{
+    vkDestroyImageView( device, fView, allocator );
+    vkDestroyImage( device, fImage, allocator );
+    vkFreeMemory( device, fMemory, allocator );
 }
 
 VulkanTexture::ImageData
