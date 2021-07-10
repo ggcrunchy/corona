@@ -17,6 +17,7 @@
 #include "Core/Rtt_Assert.h"
 #include "Core/Rtt_Macros.h"
 
+#include <string>
 #include <utility>
 #include <vector>
 

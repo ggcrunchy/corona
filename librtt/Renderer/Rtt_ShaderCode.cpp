@@ -54,6 +54,8 @@ ShaderCode::Find( const char * what, size_t offset ) const
 	}
 }
 
+// TODO: we often want the behavior "skip stuff honoring predicate X until we reach predicate Y", e.g. eat spaces until a letter, failing if anything else shows up
+
 size_t
 ShaderCode::Skip( size_t offset, int (*pred)( int ) ) const
 {
@@ -62,9 +64,9 @@ ShaderCode::Skip( size_t offset, int (*pred)( int ) ) const
 
 	for (size_t index = 0U, pos = offset; pos < fCode.size(); )
 	{
-		if (pred( str[pos] ))
+		if (pred( str[pos] )) // possible terminating character
 		{
-			for (; index < fIntervals.size(); ++index)
+			for (; index < fIntervals.size(); ++index) // see if it belongs to comments
 			{
 				if (pos < fIntervals[index].second)
 				{
@@ -74,18 +76,18 @@ ShaderCode::Skip( size_t offset, int (*pred)( int ) ) const
 				}
 			}
 
-			if (pos >= cur.first && pos <= cur.second)
+			if (pos >= cur.first && pos <= cur.second) // in comments?
 			{
-				pos = cur.second + 1;
+				pos = cur.second + 1; // ignore it and skip the rest
 			}
 
-			else
+			else // success!
 			{
 				return pos;
 			}
 		}
 
-		else
+		else // regular character, skip
 		{
 			++pos;
 		}

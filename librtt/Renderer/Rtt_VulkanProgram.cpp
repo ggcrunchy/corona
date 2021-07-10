@@ -331,7 +331,35 @@ IsAcceptableCodePosition( size_t pos, size_t cpos )
 }
 
 static bool
-GetUserDataPrecision( ShaderCode & code, size_t & pos, size_t cpos, char * precision, VulkanProgram::CompileState & state )
+GetPrecisionWord( const char * s, char * out, int n )
+{
+	if ('P' != *s++ || '_' != *s++)
+	{
+		return false;
+	}
+
+	for (int i = 0; i < n; ++i)
+	{
+		if (isalpha( s[i] ))
+		{
+			out[i] = s[i];
+		}
+	
+		else
+		{
+			out[i] = '\0';
+
+			return isspace( s[i] );
+		}
+	}
+
+	out[n] = '\0';
+
+	return true;
+}
+
+static bool
+GetUserDataPrecision( ShaderCode & code, size_t & pos, size_t cpos, char * precision, int n, VulkanProgram::CompileState & state )
 {
 	pos = code.Skip( pos, isalpha );
 
@@ -342,7 +370,7 @@ GetUserDataPrecision( ShaderCode & code, size_t & pos, size_t cpos, char * preci
 		return false;
 	}
 
-	if (sscanf( code.GetCStr() + pos, "P_%15s ", precision ) == 1)
+	if (GetPrecisionWord( code.GetCStr() + pos, precision, n ))
 	{
 		const char * options[] = { "COLOR", "DEFAULT", "NORMAL", "POSITION", "RANDOM", "UV", NULL }, * choice = NULL;
 
@@ -370,6 +398,29 @@ GetUserDataPrecision( ShaderCode & code, size_t & pos, size_t cpos, char * preci
 	return true;
 }
 
+static bool
+GetTypeWord( const char * s, char * out, int n )
+{
+	for (int i = 0; i < n; ++i)
+	{
+		if (isalnum( s[i] ))
+		{
+			out[i] = s[i];
+		}
+	
+		else
+		{
+			out[i] = '\0';
+
+			return isspace( s[i] );
+		}
+	}
+
+	out[n] = '\0';
+
+	return true;
+}
+
 static size_t
 GetUserDataType( ShaderCode & code, size_t & pos, size_t cpos, VulkanProgram::CompileState & state )
 {
@@ -384,7 +435,7 @@ GetUserDataType( ShaderCode & code, size_t & pos, size_t cpos, VulkanProgram::Co
 
 	char type[16];
 
-	if (sscanf( code.GetCStr() + pos, "%15s ", type ) == 0)
+	if (!GetTypeWord( code.GetCStr() + pos, type, sizeof( type ) / sizeof( type[0] ) - 1 ))
 	{
 		state.SetError( "Uniform type in shader was ill-formed" );
 
@@ -448,10 +499,16 @@ GetUserDataIndex( ShaderCode & code, size_t & pos, size_t cpos, VulkanProgram::C
 	return index;
 }
 
+static int
+IsPunct( int c )
+{
+	return ('_' != c && ispunct( c )) ? 1 : 0; // n.b. suppress squigglies on MSVC
+}
+
 static char
 GetPunctuationAfterDeclaration( ShaderCode & code, size_t & pos, size_t cpos, VulkanProgram::CompileState & state )
 {
-	pos = code.Skip( pos, ispunct );
+	pos = code.Skip( pos, IsPunct );
 
 	Rtt_ASSERT( IsAcceptableCodePosition( pos, cpos ) );
 
@@ -459,8 +516,6 @@ GetPunctuationAfterDeclaration( ShaderCode & code, size_t & pos, size_t cpos, Vu
 
 	if (punct != ',' && punct != ';')
 	{
-		state.SetError( "Expected ',' or ';' after declaration" );
-
 		return '\0';
 	}
 
@@ -496,7 +551,7 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 			char precision[16];
 
-			if (!GetUserDataPrecision( code, pastUniformPos, cpos, precision, state ))
+			if (!GetUserDataPrecision( code, pastUniformPos, cpos, precision, sizeof( precision ) / sizeof( precision[0] ) - 1, state ))
 			{
 				return result;
 			}
@@ -521,6 +576,8 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 				if ('\0' == punct)
 				{
+					state.SetError( "Expected comma-separated userdata declaration followed by a semi-colon" );
+
 					return result;
 				}
 
@@ -611,6 +668,101 @@ VulkanProgram::ReplaceFragCoords( ShaderCode & code, size_t offset, CompileState
 	return !posStack.empty();
 }
 
+static bool
+GetIdentifier( const char * s, char * out, int n )
+{
+	for (int i = 0; i < n; ++i)
+	{
+		if ('_' == s[i] || (i > 0 ? isalnum : isalpha)( s[i] ))
+		{
+			out[i] = s[i];
+		}
+	
+		else
+		{
+			out[i] = '\0';
+
+			return i > 0;
+		}
+	}
+
+	out[n] = '\0';
+
+	return true;
+}
+
+static int
+IsIdentifierStart( int c )
+{
+	return ('_' == c || isalpha( c )) ? 1 : 0; // n.b. suppress squigglies on MSVC
+}
+
+static bool
+GetSamplerIdentifier( ShaderCode & code, size_t & pos, size_t cpos, char * name, int n, VulkanProgram::CompileState & state )
+{
+	pos = code.Skip( pos, IsIdentifierStart );
+
+	if (!IsAcceptableCodePosition( pos, cpos ))
+	{
+		state.SetError( "Missing identifier after `sampler2D`" );
+
+		return false;
+	}
+
+	if (GetIdentifier( code.GetCStr() + pos, name, n ))
+	{
+		return true;
+	}
+
+	else
+	{
+		state.SetError( "Missing sampler identifier" ); // does the acceptable code position above rule this out?
+
+		return false;
+	}
+}
+
+static size_t
+FindWordInCode( const ShaderCode & code, const char * word, size_t pos, int (*pred)(int) )
+{
+	const char * str = code.GetCStr() + pos;
+	size_t len = strlen( word );
+
+	if (strncmp( str, word, len ) != 0)
+	{
+		return 0U;
+	}
+
+	if (pred && !pred( str[len] )) // n.b. safe, since we know there is at least a semi-colon up ahead
+	{
+		return 0U;
+	}
+
+	return len;
+}
+
+static bool
+FoundSamplerKeyword( const ShaderCode & code, size_t & pos, VulkanProgram::CompileState & state )
+{
+	pos = code.Skip( pos, isalpha );
+
+	if (std::string::npos == pos )
+	{
+		state.SetError( "Missing identifier after `uniform`" );
+
+		return false;
+	}
+
+	size_t len = FindWordInCode( code, "sampler2D", pos, isspace );
+
+	if (len)
+	{
+		pos += len + 1;
+	}
+
+	return !!len;
+}
+
 void
 VulkanProgram::ReplaceVertexSamplers( ShaderCode & code, CompileState & state )
 {
@@ -619,31 +771,28 @@ VulkanProgram::ReplaceVertexSamplers( ShaderCode & code, CompileState & state )
 	// behavior by making those declarations, in order, synonyms for the stock samplers.
 	// TODO: figure out if this is well-defined behavior
 
-	struct Sampler {
-		char name[64];
+	struct SamplerLine {
+		std::string replacement;
 		size_t count;
 		size_t pos;
 	};
 
-	std::vector< Sampler > samplerStack;
+	std::vector< SamplerLine > samplerLineStack;
 	size_t offset = 0U;
 
 	while (true)
 	{
-		Sampler s;
+		size_t pos = code.Find( "uniform ", offset ); // TODO: using explicit space, but tabs and newline would be valid too...
 
-		s.pos = code.Find( "uniform ", offset );
-
-		if (std::string::npos == s.pos)
+		if (std::string::npos == pos)
 		{
 			break;
 		}
 
-		offset = s.pos + strlen( "uniform " );
-
-		if (NoLeadingCharacters( code.GetString(), s.pos ))
+		if (NoLeadingCharacters( code.GetString(), pos ))
 		{
-			size_t cpos = code.Find( ";", offset );
+			size_t pastUniformPos = pos + strlen( "uniform " );
+			size_t cpos = code.Find( ";", pastUniformPos );
 
 			if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
 			{
@@ -652,52 +801,65 @@ VulkanProgram::ReplaceVertexSamplers( ShaderCode & code, CompileState & state )
 				return;
 			}
 
-			size_t spos = code.Find( "sampler2D", offset );
+			if (FoundSamplerKeyword( code, pastUniformPos, state )) // is this a sampler-type uniform?
+			{
+				size_t bpos = code.Find( "[", pastUniformPos );
 
-			if (std::string::npos == spos)	// none left to replace?
+				if (std::string::npos == bpos || cpos < bpos) // not an array? (this rules out u_Samplers) TODO? but of course limits valid usage...
+				{
+					SamplerLine line;
+					int index = 0;
+
+					for (char punct = '\0'; ';' != punct; )
+					{
+						char name[64];
+
+						if (!GetSamplerIdentifier( code, pastUniformPos, cpos, name, sizeof( name ) / sizeof( name[0] ) - 1, state ))
+						{
+							return;
+						}
+
+						punct = GetPunctuationAfterDeclaration( code, pastUniformPos, cpos, state );
+
+						if ('\0' == punct)
+						{
+							state.SetError( "Expected comma-separated vertex sampler declaration followed by a semi-colon" );
+
+							return;
+						}
+
+						char buf[sizeof( name ) + 32];
+
+						sprintf( buf, "#define %s u_FillSampler%i", name, index++ );
+
+						if (!line.replacement.empty())
+						{
+							// TODO: find tabs etc?
+							line.replacement += '\n';
+						}
+
+						line.replacement += buf;
+
+						line.pos = pos;
+						line.count = cpos - line.pos + 1;
+
+						samplerLineStack.push_back( line );
+					}
+				}
+			}
+
+			else if (state.HasError())
 			{
 				return;
 			}
-
-			else if (spos < cpos) // is this a sampler-type uniform?
-			{
-				size_t bpos = code.Find( "[", offset );
-
-				if (std::string::npos == bpos || cpos < bpos) // not an array? (TODO? this rules out u_Samplers, but of course limits valid usage... )
-				{
-					if (sscanf( code.GetCStr() + s.pos, "uniform sampler2D %63s", s.name ) < 1)
-					{
-						state.SetError( "Sampler in shader was ill-formed" );
-
-						return;
-					}
-
-					// TODO: see notes about varyings...
-
-					size_t len = strlen( s.name );
-
-					if (ispunct( s.name[len - 1] ))
-					{
-						s.name[len - 1] = '\0';
-					}
-
-					s.count = cpos - s.pos + 1;
-
-					samplerStack.push_back(s);
-				}
-			}
 		}
+
+		offset = pos + 1U;
 	}
 
-	char buf[64];
-
-	size_t index = samplerStack.size();
-
-	for (auto && iter = samplerStack.rbegin(); iter != samplerStack.rend(); ++iter)
+	for (auto && iter = samplerLineStack.rbegin(); iter != samplerLineStack.rend(); ++iter)
 	{
-		sprintf( buf, "#define %s u_FillSampler%i", iter->name, --index );
-
-		code.Replace( iter->pos, iter->count, buf );
+		code.Replace( iter->pos, iter->count, iter->replacement );
 	}
 }
 
@@ -852,6 +1014,7 @@ VulkanProgram::Compile( int ikind, ShaderCode & code, VulkanCompilerMaps & maps,
 
 	if (shaderc_compilation_status_success == status)
 	{
+// TODO: the following is also roughly the Rtt_USE_PRECOMPILED_SHADERS logic we would need, making the proper substitutions for the shaderc_* bits:
 		const uint32_t * ir = reinterpret_cast< const uint32_t * >( shaderc_result_get_bytes( result ) );
 		VkShaderModuleCreateInfo createShaderModuleInfo = {};
 
