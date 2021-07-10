@@ -101,6 +101,16 @@ class VulkanProgram : public GPUResource
 
 		U32 GetPushConstantStages() const { return fPushConstantStages; }
 		bool HavePushConstantUniforms() const { return fPushConstantUniforms; }
+	
+	public:
+		struct CompileState {
+			void Report( const char * prefix );
+			void SetError( const char * fmt, ... );
+
+			bool HasError() const;
+
+			std::string fError;
+		};
 
 	private:
 		// To make custom shader code work seamlessly with masking, multiple
@@ -166,15 +176,6 @@ class VulkanProgram : public GPUResource
 			U32 fRow;
 		};
 
-		struct CompileState {
-			void Report( const char * prefix );
-			void SetError( const char * fmt, ... );
-
-			bool HasError() const;
-
-			std::string fError;
-		};
-
 		size_t GatherUniformUserdata( bool isVertexSource, ShaderCode & code, UserdataValue values[], std::vector< UserdataDeclaration > & declarations, CompileState & state );
 		bool ReplaceFragCoords( ShaderCode & code, size_t offset, CompileState & state );
 		void ReplaceVertexSamplers( ShaderCode & code, CompileState & state );
@@ -182,6 +183,10 @@ class VulkanProgram : public GPUResource
 		void Compile( int kind, ShaderCode & code, VulkanCompilerMaps & maps, VkShaderModule & module, CompileState & state );
 		std::pair< bool, int > SearchForFreeRows( const UserdataValue values[], UserdataPosition positions[], size_t vectorCount );
 		U32 AddToString( std::string & str, const UserdataValue & value );
+		const char * PrepareTotalTimeReplacement( UserdataValue values[], int index, std::string & replacement );
+		const char * PrepareTexelSizeReplacement( UserdataValue values[], int startingIndex, U32 total, U32 & paddingCount, std::string & replacement );
+		void PackUserData( UserdataPosition positions[], U32 & paddingCount, std::string & extra );
+		void InstallDeclaredUserData( ShaderCode & code, const std::vector< UserdataDeclaration > & declarations, int codeExtra, const std::string & prefix1, const std::string & prefix2 );
 		void UpdateShaderSource( VulkanCompilerMaps & maps, Program* program, Program::Version version, VersionData& data );
 
 		static void InitializeCompiler( shaderc_compiler ** compiler, shaderc_compile_options ** options );

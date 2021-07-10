@@ -255,23 +255,6 @@ VulkanProgram::Bind( VulkanRenderer & renderer, Program::Version version )
 	renderer.SetShaderStages( data.fShadersID, stages );
 }
 
-U32 VulkanProgram::sID;
-
-void
-VulkanProgram::Create( Program::Version version, VersionData& data )
-{
-	Update( version, data );
-
-	if (data.IsValid())
-	{
-		data.fShadersID = sID++;
-	}
-
-	else
-	{
-		data.fShadersID = kInvalidID;
-	}
-}
 
 void
 VulkanProgram::CompileState::Report( const char * prefix )
@@ -304,6 +287,24 @@ VulkanProgram::CompileState::HasError() const
 	return !fError.empty();
 }
 
+U32 VulkanProgram::sID;
+
+void
+VulkanProgram::Create( Program::Version version, VersionData& data )
+{
+	Update( version, data );
+
+	if (data.IsValid())
+	{
+		data.fShadersID = sID++;
+	}
+
+	else
+	{
+		data.fShadersID = kInvalidID;
+	}
+}
+
 static int
 CountLines( const char **segments, int numSegments )
 {
@@ -321,6 +322,149 @@ static bool
 NoLeadingCharacters( const std::string & code, size_t pos )
 {
 	return !isalnum( code[pos - 1] ) && code[pos - 1] != '_'; // TODO: code can be UTF8?
+}
+
+static bool
+IsAcceptableCodePosition( size_t pos, size_t cpos )
+{
+	return std::string::npos != pos && pos <= cpos;
+}
+
+static bool
+GetUserDataPrecision( ShaderCode & code, size_t & pos, size_t cpos, char * precision, VulkanProgram::CompileState & state )
+{
+	pos = code.Skip( pos, isalpha );
+
+	if (!IsAcceptableCodePosition( pos, cpos ))
+	{
+		state.SetError( "Missing type (and optional precision) after `uniform`" );
+
+		return false;
+	}
+
+	if (sscanf( code.GetCStr() + pos, "P_%15s ", precision ) == 1)
+	{
+		const char * options[] = { "COLOR", "DEFAULT", "NORMAL", "POSITION", "RANDOM", "UV", NULL }, * choice = NULL;
+
+		for (int i = 0; options[i] && !choice; ++i)
+		{
+			if (strcmp( precision, options[i] ) == 0)
+			{
+				choice = options[i];
+			}
+		}
+
+		if (choice)
+		{
+			pos += strlen( "P_" ) + strlen( choice ) + 1;
+		}
+
+		else
+		{
+			state.SetError( "Invalid precision" );
+
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static size_t
+GetUserDataType( ShaderCode & code, size_t & pos, size_t cpos, VulkanProgram::CompileState & state )
+{
+	pos = code.Skip( pos, isalpha );
+
+	if (std::string::npos == pos || pos > cpos)
+	{
+		state.SetError( "Missing type after `uniform`" );
+
+		return 0U;
+	}
+
+	char type[16];
+
+	if (sscanf( code.GetCStr() + pos, "%15s ", type ) == 0)
+	{
+		state.SetError( "Uniform type in shader was ill-formed" );
+
+		return 0U;
+	}
+
+	size_t componentCount = 1U;
+
+	if (strcmp( type, "float" ) != 0)
+	{
+		Uniform::DataType dataType = Uniform::DataTypeForString( type );
+
+		if (Uniform::kScalar == dataType)
+		{
+			state.SetError( "Invalid uniform type" );
+
+			return 0U;
+		}
+
+		else
+		{
+			componentCount = Uniform( dataType ).GetNumValues();
+		}
+	}
+
+	pos += strlen( type ) + 1;
+
+	return componentCount;
+}
+
+static int
+GetUserDataIndex( ShaderCode & code, size_t & pos, size_t cpos, VulkanProgram::CompileState & state )
+{
+	pos = code.Skip( pos, isalpha );
+
+	if (!IsAcceptableCodePosition( pos, cpos ))
+	{
+		state.SetError( "Missing `u_UserData?` after `uniform`" );
+
+		return -1;
+	}
+
+	int index;
+
+	if (sscanf( code.GetCStr() + pos, "u_UserData%1i ", &index ) == 0)
+	{
+		state.SetError( "`u_UserData?` in shader was ill-formed" );
+
+		return -1;
+	}
+
+	if (index < 0 || index > 3)
+	{
+		state.SetError( "Invalid uniform userdata `%i`", index );
+
+		return -1;
+	}
+
+	pos += strlen( "u_UserData?" );
+
+	return index;
+}
+
+static char
+GetPunctuationAfterDeclaration( ShaderCode & code, size_t & pos, size_t cpos, VulkanProgram::CompileState & state )
+{
+	pos = code.Skip( pos, ispunct );
+
+	Rtt_ASSERT( IsAcceptableCodePosition( pos, cpos ) );
+
+	char punct = code.GetCStr()[pos++];
+
+	if (punct != ',' && punct != ';')
+	{
+		state.SetError( "Expected ',' or ';' after declaration" );
+
+		return '\0';
+	}
+
+	return punct;
 }
 
 size_t
@@ -350,123 +494,33 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 				return result;
 			}
 
-			pastUniformPos = code.Skip( pastUniformPos, isalpha );
+			char precision[16];
 
-			if (std::string::npos == pastUniformPos || pastUniformPos > cpos)
+			if (!GetUserDataPrecision( code, pastUniformPos, cpos, precision, state ))
 			{
-				state.SetError( "Missing type (and optional precision) after `uniform`" );
-
 				return result;
 			}
 
-			char precision[16];
-
-			if (sscanf( code.GetCStr() + pastUniformPos, "P_%15s ", precision ) == 1)
+			U32 componentCount = GetUserDataType( code, pastUniformPos, cpos, state );
+								
+			if (0U == componentCount)
 			{
-				const char * options[] = { "COLOR", "DEFAULT", "NORMAL", "POSITION", "RANDOM", "UV", NULL }, * choice = NULL;
-
-				for (int i = 0; options[i] && !choice; ++i)
-				{
-					if (strcmp( precision, options[i] ) == 0)
-					{
-						choice = options[i];
-					}
-				}
-
-				if (choice)
-				{
-					pastUniformPos += strlen( "P_" ) + strlen( choice ) + 1;
-				}
-
-				else
-				{
-					state.SetError( "Invalid precision" );
-
-					return result;
-				}
+				return result;
 			}
 
-			char punct = '\0';
+			for (char punct = '\0'; ';' != punct; )
+			{
+				int index = GetUserDataIndex( code, pastUniformPos, cpos, state );
 
-			do {
-				U32 componentCount = 1U;
-				char type[16];
+				if (index < 0)
+				{
+					return result;
+				}
+
+				punct = GetPunctuationAfterDeclaration( code, pastUniformPos, cpos, state );
 
 				if ('\0' == punct)
 				{
-					pastUniformPos = code.Skip( pastUniformPos, isalpha );
-
-					if (std::string::npos == pastUniformPos || pastUniformPos > cpos)
-					{
-						state.SetError( "Missing type after `uniform`" );
-
-						return result;
-					}
-
-					if (sscanf( code.GetCStr() + pastUniformPos, "%15s ", type ) == 0)
-					{
-						state.SetError( "Uniform type in shader was ill-formed" );
-
-						return result;
-					}
-
-					else if (strcmp( type, "float" ) != 0)
-					{
-						Uniform::DataType dataType = Uniform::DataTypeForString( type );
-
-						if (Uniform::kScalar == dataType)
-						{
-							state.SetError( "Invalid uniform type" );
-
-							return result;
-						}
-
-						else
-						{
-							componentCount = Uniform( dataType ).GetNumValues();
-						}
-					}
-
-					pastUniformPos += strlen( type ) + 1;
-				}
-
-				pastUniformPos = code.Skip( pastUniformPos, isalpha );
-
-				if (std::string::npos == pastUniformPos || pastUniformPos > cpos)
-				{
-					state.SetError( "Missing `u_UserData?` after `uniform`" );
-
-					return result;
-				}
-
-				int index;
-
-				if (sscanf( code.GetCStr() + pastUniformPos, "u_UserData%1i ", &index ) == 0)
-				{
-					state.SetError( "`u_UserData?` in shader was ill-formed" );
-
-					return result;
-				}
-
-				if (index < 0 || index > 3)
-				{
-					state.SetError( "Invalid uniform userdata `%i`", index );
-
-					return result;
-				}
-
-				pastUniformPos += strlen( "u_UserData?" );
-
-				pastUniformPos = code.Skip( pastUniformPos, ispunct );
-
-				Rtt_ASSERT( std::string::npos != pastUniformPos && pastUniformPos <= cpos );
-
-				punct = code.GetCStr()[pastUniformPos++];
-
-				if (punct != ',' && punct != ';')
-				{
-					state.SetError( "Expected ',' or ';' after declaration" );
-
 					return result;
 				}
 
@@ -506,7 +560,7 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 				}
 
 				declarations.push_back( declaration );
-			} while (';' != punct);
+			}
 		}
 
 		offset = pos + 1U;
@@ -721,6 +775,62 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, ShaderCode & code, VulkanCo
 	}
 }
 
+static void
+GetUniformBufferMembersAndAssignStages( spirv_cross::CompilerGLSL & comp, const spirv_cross::Resource & buffer, VulkanCompilerMaps & maps, shaderc_shader_kind kind )
+{
+	auto ranges = comp.get_active_buffer_ranges( buffer.id );
+
+	for (auto & br : ranges)
+	{
+		std::string name = comp.get_member_name( buffer.base_type_id, br.index );
+		auto iter = maps.buffer_values.insert( std::make_pair( name, VulkanCompilerMaps::BufferValue( br.offset, br.range, true ) ) );
+
+		iter.first->second.fStages |= 1U << kind;
+		// TODO: ensure no clashes when found in both
+	}
+}
+
+static void
+GetPushConstantMembersAndAssignStages( spirv_cross::CompilerGLSL & comp, const spirv_cross::Resource & buffer, VulkanCompilerMaps & maps, shaderc_shader_kind kind, U32 & stages )
+{
+	auto ranges = comp.get_active_buffer_ranges( buffer.id );
+
+	for (auto & br : ranges)
+	{
+		std::string name = comp.get_member_name( buffer.base_type_id, br.index );
+
+		maps.buffer_values.insert( std::make_pair( name, VulkanCompilerMaps::BufferValue( br.offset, br.range, false ) ) );
+	}
+
+	switch (kind)
+	{
+		case shaderc_vertex_shader:
+			stages |= VK_SHADER_STAGE_VERTEX_BIT;
+			break;
+		case shaderc_fragment_shader:
+			stages |= VK_SHADER_STAGE_FRAGMENT_BIT;
+			break;
+		default:
+			break;
+	}
+}
+
+static void
+GetSamplersAndAssignStages( spirv_cross::CompilerGLSL & comp, const spirv_cross::Resource & sampler, VulkanCompilerMaps & maps, shaderc_shader_kind kind )
+{
+	const spirv_cross::SPIRType & type = comp.get_type_from_variable( sampler.id );
+	std::vector< U32 > counts;
+
+	for (uint32_t i = 0; i < type.array.size(); ++i)
+	{
+		counts.push_back( type.array[i] );
+	}
+
+	auto iter = maps.samplers.insert( std::make_pair( sampler.name, VulkanCompilerMaps::SamplerValue( type.image, counts ) ) );
+
+	iter.first->second.fStages |= 1U << kind;
+}
+
 void
 VulkanProgram::Compile( int ikind, ShaderCode & code, VulkanCompilerMaps & maps, VkShaderModule & module, CompileState & state )
 {
@@ -752,62 +862,22 @@ VulkanProgram::Compile( int ikind, ShaderCode & code, VulkanCompilerMaps & maps,
 		spirv_cross::CompilerGLSL comp( ir, createShaderModuleInfo.codeSize / 4U );
 		spirv_cross::ShaderResources resources = comp.get_shader_resources();
 
-		auto uniformBuffers = resources.uniform_buffers;
-
-		for (auto & buffer : uniformBuffers)
+		for (auto & buffer : resources.uniform_buffers)
 		{
-			auto ranges = comp.get_active_buffer_ranges( buffer.id );
-
-			for (auto & br : ranges)
-			{
-				std::string name = comp.get_member_name( buffer.base_type_id, br.index );
-				auto iter = maps.buffer_values.insert( std::make_pair( name, VulkanCompilerMaps::BufferValue( br.offset, br.range, true ) ) );
-
-				iter.first->second.fStages |= 1U << kind;
-				// TODO: ensure no clashes when found in both
-			}
+			GetUniformBufferMembersAndAssignStages( comp, buffer, maps, kind );
 		}
 		
 		for (auto & buffer : resources.push_constant_buffers) // 0 or 1
 		{
-			auto ranges = comp.get_active_buffer_ranges( buffer.id );
-
-			for (auto & br : ranges)
-			{
-				std::string name = comp.get_member_name( buffer.base_type_id, br.index );
-
-				maps.buffer_values.insert( std::make_pair( name, VulkanCompilerMaps::BufferValue( br.offset, br.range, false ) ) );
-			}
-
-			switch (kind)
-			{
-				case shaderc_vertex_shader:
-					fPushConstantStages |= VK_SHADER_STAGE_VERTEX_BIT;
-					break;
-				case shaderc_fragment_shader:
-					fPushConstantStages |= VK_SHADER_STAGE_FRAGMENT_BIT;
-					break;
-				default:
-					break;
-			}
+			GetPushConstantMembersAndAssignStages(  comp, buffer, maps, kind, fPushConstantStages );
 		}
 
 		for (auto & sampler : resources.sampled_images)
 		{
-			const spirv_cross::SPIRType & type = comp.get_type_from_variable( sampler.id );
-			std::vector< U32 > counts;
-
-			for (uint32_t i = 0; i < type.array.size(); ++i)
-			{
-				counts.push_back( type.array[i] );
-			}
-
-			auto iter = maps.samplers.insert( std::make_pair( sampler.name, VulkanCompilerMaps::SamplerValue( type.image, counts ) ) );
-
-			iter.first->second.fStages |= 1U << kind;
+			GetSamplersAndAssignStages( comp, sampler, maps, kind );
 		}
 
-		if (vkCreateShaderModule( fContext->GetDevice(), &createShaderModuleInfo, fContext->GetAllocator(), &module ) != VK_SUCCESS)
+		if (VK_SUCCESS != vkCreateShaderModule( fContext->GetDevice(), &createShaderModuleInfo, fContext->GetAllocator(), &module ))
 		{
 			state.SetError( "Failed to create shader module!" );
 		}
@@ -899,6 +969,95 @@ VulkanProgram::SearchForFreeRows( const UserdataValue values[], UserdataPosition
 	return std::make_pair( true, 0 );
 }
 
+const char *
+VulkanProgram::PrepareTotalTimeReplacement( UserdataValue values[], int index, std::string & replacement )
+{
+	replacement = "float u_UserData";
+
+	replacement += '0' + values[index].fIndex;
+	replacement += ';';
+
+	return "float TotalTime;";
+}
+
+static void
+PadVector( std::string & str, U32 lastUpTo, U32 & paddingCount)
+{
+	const char * padding[] = { "vec3 pad", "vec2 pad" "float pad" };
+
+	str += padding[lastUpTo - 1];
+	str += '0' + paddingCount;
+	str += ";  ";
+
+	++paddingCount;
+}
+
+const char *
+VulkanProgram::PrepareTexelSizeReplacement( UserdataValue values[], int startingIndex, U32 total, U32 & paddingCount, std::string & replacement )
+{
+	for (int i = startingIndex; i < 4 && values[i].IsValid(); ++i)
+	{
+		if (i > 0)
+		{
+			replacement += " ";
+		}
+
+		AddToString( replacement, values[i] );
+	}
+
+	if (total < 4U)
+	{
+		replacement += " ";
+
+		PadVector( replacement, total, paddingCount );
+	}
+
+	return "vec4 TexelSize;";
+}
+
+void
+VulkanProgram::PackUserData( UserdataPosition positions[], U32 & paddingCount, std::string & extra )
+{
+	U32 lastComponentCount;
+
+	for (int i = 0; i < 4 && positions[i].IsValid(); ++i)
+	{
+		extra += " ";
+
+		if (i > 0 && 0U == positions[i].fOffset)
+		{
+			U32 lastUpTo = positions[i - 1].fOffset + lastComponentCount;
+
+			if (lastUpTo < 4U) // incomplete vector?
+			{
+				PadVector( extra, lastUpTo, paddingCount );
+			}
+		}
+
+		lastComponentCount = AddToString( extra, *positions[i].fValue );
+	}
+}
+
+void
+VulkanProgram::InstallDeclaredUserData( ShaderCode & code, const std::vector< UserdataDeclaration > & declarations, int codeExtra, const std::string & prefix1, const std::string & prefix2 )
+{
+	for (auto && iter = declarations.rbegin(); iter != declarations.rend(); ++iter)
+	{
+		const char suffix[] = { '0' + iter->fValue->fIndex, 0 };
+		std::string declaration = (prefix1 + suffix) + (prefix2 + suffix);
+
+		if (iter->fLength)
+		{
+			code.Replace( iter->fPosition + codeExtra, iter->fLength, declaration );
+		}
+
+		else
+		{
+			code.Insert( iter->fPosition + codeExtra, declaration + '\n' );
+		}
+	}
+}
+
 static bool
 HasPrefix( const std::string & code, const char * prefix, size_t pos )
 {
@@ -931,18 +1090,6 @@ UsesPushConstant( const ShaderCode & code, const char * what, size_t offset )
 	}
 
 	return HasPrefix( codeStr, "u_", pos ) || HasPrefix( codeStr, "Corona", pos );
-}
-
-static void
-PadVector( std::string & str, U32 lastUpTo, U32 & paddingCount)
-{
-	const char * padding[] = { "vec3 pad", "vec2 pad" "float pad" };
-
-	str += padding[lastUpTo - 1];
-	str += '0' + paddingCount;
-	str += ";  ";
-
-	++paddingCount;
 }
 
 U32
@@ -979,6 +1126,41 @@ VulkanProgram::AddToString( std::string & str, const UserdataValue & value )
 	str += ";";
 
 	return componentCount;
+}
+
+static void
+ModifyUserDataMarker( ShaderCode & code, const char * userDataMarker, const std::string & extra, int & codeExtra, bool canUsePushConstants, VulkanProgram::CompileState & state )
+{
+	size_t epos = code.Find( userDataMarker, 0U );
+
+	if (std::string::npos != epos)
+	{
+		if (canUsePushConstants)
+		{
+			codeExtra = code.Insert( epos + strlen( userDataMarker ), extra );
+		}
+
+		else
+		{
+			codeExtra = code.Replace( epos, strlen( userDataMarker ), extra );
+		}
+	}
+
+	else
+	{
+		state.SetError( "Failed to find user data marker" );
+	}
+}
+
+static void
+InstallReplacement( ShaderCode & code, const char * toReplace, const std::string & replacement )
+{
+	size_t pos = code.Find( toReplace, 0U );
+
+	if (std::string::npos != pos)
+	{
+		code.Replace( pos, strlen( toReplace ), replacement );
+	}
 }
 
 void
@@ -1036,7 +1218,7 @@ VulkanProgram::UpdateShaderSource( VulkanCompilerMaps & maps, Program* program, 
 			fragmentCompileState.SetError( "Unable to find gl_FragCoord stub" );
 		}
 
-		if (!fragmentCompileState.HasError() && ReplaceFragCoords( fragmentCode, fpos, fragmentCompileState ))
+		else if (ReplaceFragCoords( fragmentCode, fpos, fragmentCompileState ))
 		{
 			size_t offsetTo0 = strlen( "#define USING_GL_FRAG_COORD " );
 
@@ -1095,33 +1277,12 @@ VulkanProgram::UpdateShaderSource( VulkanCompilerMaps & maps, Program* program, 
 
 				if (1U == total && !UsesPushConstant( vertexCode, "TotalTime", vertexOffset ) && !UsesPushConstant( fragmentCode, "TotalTime", fragmentOffset ))
 				{
-					toReplace = "float TotalTime;";
-					replacement = "float u_UserData";
-
-					replacement += '0' + values[findResult.second].fIndex;
-					replacement += ';';
+					toReplace = PrepareTotalTimeReplacement( values, findResult.second, replacement );
 				}
 
 				else if (total <= 4U && !UsesPushConstant( vertexCode, "TexelSize", vertexOffset ) && !UsesPushConstant( fragmentCode, "TexelSize", fragmentOffset ))
 				{
-					toReplace = "vec4 TexelSize;";
-
-					for (int i = findResult.second; i < 4 && values[i].IsValid(); ++i)
-					{
-						if (i > 0)
-						{
-							replacement += " ";
-						}
-
-						AddToString( replacement, values[i] );
-					}
-
-					if (total < 4U)
-					{
-						replacement += " ";
-
-						PadVector( replacement, total, paddingCount );
-					}
+					toReplace = PrepareTexelSizeReplacement( values, findResult.second, total, paddingCount, replacement );
 				}
 
 				else
@@ -1144,125 +1305,34 @@ VulkanProgram::UpdateShaderSource( VulkanCompilerMaps & maps, Program* program, 
 				}
 			}
 
-			const char * userDataMarker = canUsePushConstants ? "PUSH_CONSTANTS_EXTRA" : "mat4 Stub[4];";
-			std::string userDataGroup( canUsePushConstants ? " pc" : " userDataObject" );
-
 			std::string extra;
-			U32 lastComponentCount;
 
-			for (int i = 0; i < 4 && positions[i].IsValid(); ++i)
-			{
-				extra += " ";
+			PackUserData( positions, paddingCount, extra );
 
-				if (i > 0 && 0U == positions[i].fOffset)
-				{
-					U32 lastUpTo = positions[i - 1].fOffset + lastComponentCount;
-
-					if (lastUpTo < 4U) // incomplete vector?
-					{
-						PadVector( extra, lastUpTo, paddingCount );
-					}
-				}
-
-				lastComponentCount = AddToString( extra, *positions[i].fValue );
-			}
+			const char * userDataMarker = canUsePushConstants ? "PUSH_CONSTANTS_EXTRA" : "mat4 Stub[4];";
 
 			if (!vertexDeclarations.empty())
 			{
-				size_t epos = vertexCode.Find( userDataMarker, 0U );
-
-				if (std::string::npos != epos)
-				{
-					if (canUsePushConstants)
-					{
-						vertexExtra = vertexCode.Insert( epos + strlen( userDataMarker ), extra );
-					}
-
-					else
-					{
-						vertexExtra = vertexCode.Replace( epos, strlen( userDataMarker ), extra );
-					}
-				}
-
-				else
-				{
-					vertexCompileState.SetError( "Failed to find user data marker" );
-				}
+				ModifyUserDataMarker( vertexCode, userDataMarker, extra, vertexExtra, canUsePushConstants, vertexCompileState );
 			}
 
 			if (!fragmentDeclarations.empty())
 			{
-				size_t epos = fragmentCode.Find( userDataMarker, 0U );
-
-				if (std::string::npos != epos)
-				{
-					if (canUsePushConstants)
-					{
-						fragmentExtra = fragmentCode.Insert( epos + strlen( userDataMarker ), extra );
-					}
-
-					else
-					{
-						fragmentExtra = fragmentCode.Replace( epos, strlen( userDataMarker ), extra );
-					}
-				}
-
-				else
-				{
-					fragmentCompileState.SetError( "Failed to find user data marker" );
-				}
+				ModifyUserDataMarker( fragmentCode, userDataMarker, extra, fragmentExtra, canUsePushConstants, fragmentCompileState );
 			}
 
 			if (!vertexCompileState.HasError() && !fragmentCompileState.HasError())
 			{
+				std::string userDataGroup( canUsePushConstants ? " pc" : " userDataObject" );
 				std::string prefix1( "#define u_UserData" ), prefix2 = userDataGroup + ".UserData";
 
-				for (auto && iter = vertexDeclarations.rbegin(); iter != vertexDeclarations.rend(); ++iter)
-				{
-					const char suffix[] = { '0' + iter->fValue->fIndex, 0 };
-					std::string declaration = (prefix1 + suffix) + (prefix2 + suffix);
-
-					if (iter->fLength)
-					{
-						vertexCode.Replace( iter->fPosition + vertexExtra, iter->fLength, declaration );
-					}
-
-					else
-					{
-						vertexCode.Insert( iter->fPosition + vertexExtra, declaration + '\n' );
-					}
-				}
-
-				for (auto && iter = fragmentDeclarations.rbegin(); iter != fragmentDeclarations.rend(); ++iter)
-				{
-					const char suffix[] = { '0' + iter->fValue->fIndex, 0 };
-					std::string declaration = (prefix1 + suffix) + (prefix2 + suffix);
-
-					if (iter->fLength)
-					{
-						fragmentCode.Replace( iter->fPosition + fragmentExtra, iter->fLength, declaration );
-					}
-
-					else
-					{
-						fragmentCode.Insert( iter->fPosition + fragmentExtra, declaration + '\n' );
-					}
-				}
+				InstallDeclaredUserData( vertexCode, vertexDeclarations, vertexExtra, prefix1, prefix2 );
+				InstallDeclaredUserData( fragmentCode, fragmentDeclarations, fragmentExtra, prefix1, prefix2 );
 
 				if (toReplace)
 				{
-					size_t vertexPos = vertexCode.Find( toReplace, 0U );
-					size_t fragmentPos = fragmentCode.Find( toReplace, 0U );
-
-					if (std::string::npos != vertexPos)
-					{
-						vertexCode.Replace( vertexPos, strlen( toReplace ), replacement );
-					}
-
-					if (std::string::npos != fragmentPos)
-					{
-						fragmentCode.Replace( fragmentPos, strlen( toReplace ), replacement );
-					}
+					InstallReplacement( vertexCode, toReplace, replacement );
+					InstallReplacement( fragmentCode, toReplace, replacement );
 				}
 
 				fPushConstantUniforms = canUsePushConstants;
@@ -1381,10 +1451,6 @@ VulkanProgram::InitializeCompiler( shaderc_compiler_t * compiler, shaderc_compil
 	{
 		*compiler = shaderc_compiler_initialize();
 		*options = shaderc_compile_options_initialize();
-
-// void shaderc_compile_options_set_generate_debug_info(shaderc_compile_options_t options)
-// void shaderc_compile_options_set_optimization_level(shaderc_compile_options_t options, shaderc_optimization_level level)
-// void shaderc_compile_options_set_invert_y(shaderc_compile_options_t options, bool enable)
 	}
 }
 
