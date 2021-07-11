@@ -177,6 +177,12 @@ class VulkanProgram : public GPUResource
 			U32 fRow;
 		};
 
+		struct VariablesLine {
+			std::string replacement;
+			size_t count;
+			size_t pos;
+		};
+
 		size_t GatherUniformUserdata( bool isVertexSource, ShaderCode & code, UserdataValue values[], std::vector< UserdataDeclaration > & declarations, CompileState & state );
 		bool ReplaceFragCoords( ShaderCode & code, size_t offset, CompileState & state );
 		void ReplaceVertexSamplers( ShaderCode & code, CompileState & state );

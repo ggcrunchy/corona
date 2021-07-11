@@ -359,13 +359,13 @@ GetPrecisionWord( const char * s, char * out, int n )
 }
 
 static bool
-GetUserDataPrecision( ShaderCode & code, size_t & pos, size_t cpos, char * precision, int n, VulkanProgram::CompileState & state )
+GetPrecision( ShaderCode & code, size_t & pos, size_t cpos, char * precision, int n, VulkanProgram::CompileState & state, const char * what )
 {
 	pos = code.Skip( pos, isalpha );
 
 	if (!IsAcceptableCodePosition( pos, cpos ))
 	{
-		state.SetError( "Missing type (and optional precision) after `uniform`" );
+		state.SetError( "Missing type (and optional precision) after `%s`", what );
 
 		return false;
 	}
@@ -422,22 +422,20 @@ GetTypeWord( const char * s, char * out, int n )
 }
 
 static size_t
-GetUserDataType( ShaderCode & code, size_t & pos, size_t cpos, VulkanProgram::CompileState & state )
+GetType( ShaderCode & code, size_t & pos, size_t cpos, char * type, int n, VulkanProgram::CompileState & state, const char * what )
 {
 	pos = code.Skip( pos, isalpha );
 
 	if (std::string::npos == pos || pos > cpos)
 	{
-		state.SetError( "Missing type after `uniform`" );
+		state.SetError( "Missing type after `%s`", what );
 
 		return 0U;
 	}
 
-	char type[16];
-
-	if (!GetTypeWord( code.GetCStr() + pos, type, sizeof( type ) / sizeof( type[0] ) - 1 ))
+	if (!GetTypeWord( code.GetCStr() + pos, type, n ))
 	{
-		state.SetError( "Uniform type in shader was ill-formed" );
+		state.SetError( "Type of %s in shader was ill-formed", what );
 
 		return 0U;
 	}
@@ -450,7 +448,7 @@ GetUserDataType( ShaderCode & code, size_t & pos, size_t cpos, VulkanProgram::Co
 
 		if (Uniform::kScalar == dataType)
 		{
-			state.SetError( "Invalid uniform type" );
+			state.SetError( "Invalid %s type", what );
 
 			return 0U;
 		}
@@ -506,7 +504,7 @@ IsPunct( int c )
 }
 
 static char
-GetPunctuationAfterDeclaration( ShaderCode & code, size_t & pos, size_t cpos, VulkanProgram::CompileState & state )
+GetPunctuationAfterDeclaration( ShaderCode & code, size_t & pos, size_t cpos, VulkanProgram::CompileState & state, const char * what )
 {
 	pos = code.Skip( pos, IsPunct );
 
@@ -516,11 +514,15 @@ GetPunctuationAfterDeclaration( ShaderCode & code, size_t & pos, size_t cpos, Vu
 
 	if (punct != ',' && punct != ';')
 	{
+		state.SetError( "Expected comma-separated %s declaration followed by a semi-colon", what );
+
 		return '\0';
 	}
 
 	return punct;
 }
+
+#define VP_STR_AND_LEN( str ) str, sizeof( str ) / sizeof( str[0] ) - 1
 
 size_t
 VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, UserdataValue values[], std::vector< UserdataDeclaration > & declarations, CompileState & state )
@@ -551,12 +553,13 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 			char precision[16];
 
-			if (!GetUserDataPrecision( code, pastUniformPos, cpos, precision, sizeof( precision ) / sizeof( precision[0] ) - 1, state ))
+			if (!GetPrecision( code, pastUniformPos, cpos, VP_STR_AND_LEN( precision ), state, "uniform" ))
 			{
 				return result;
 			}
 
-			U32 componentCount = GetUserDataType( code, pastUniformPos, cpos, state );
+			char type[16];
+			U32 componentCount = GetType( code, pastUniformPos, cpos, VP_STR_AND_LEN( type ), state, "uniform" );
 								
 			if (0U == componentCount)
 			{
@@ -572,12 +575,10 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 					return result;
 				}
 
-				punct = GetPunctuationAfterDeclaration( code, pastUniformPos, cpos, state );
+				punct = GetPunctuationAfterDeclaration( code, pastUniformPos, cpos, state, "userdata" );
 
 				if ('\0' == punct)
 				{
-					state.SetError( "Expected comma-separated userdata declaration followed by a semi-colon" );
-
 					return result;
 				}
 
@@ -669,7 +670,7 @@ VulkanProgram::ReplaceFragCoords( ShaderCode & code, size_t offset, CompileState
 }
 
 static bool
-GetIdentifier( const char * s, char * out, int n )
+ReadIdentifier( const char * s, char * out, int n )
 {
 	for (int i = 0; i < n; ++i)
 	{
@@ -698,25 +699,25 @@ IsIdentifierStart( int c )
 }
 
 static bool
-GetSamplerIdentifier( ShaderCode & code, size_t & pos, size_t cpos, char * name, int n, VulkanProgram::CompileState & state )
+GetIdentifier( ShaderCode & code, size_t & pos, size_t cpos, char * name, int n, VulkanProgram::CompileState & state, const char * what )
 {
 	pos = code.Skip( pos, IsIdentifierStart );
 
 	if (!IsAcceptableCodePosition( pos, cpos ))
 	{
-		state.SetError( "Missing identifier after `sampler2D`" );
+		state.SetError( "Missing identifier after `%s`", what );
 
 		return false;
 	}
 
-	if (GetIdentifier( code.GetCStr() + pos, name, n ))
+	if (ReadIdentifier( code.GetCStr() + pos, name, n ))
 	{
 		return true;
 	}
 
 	else
 	{
-		state.SetError( "Missing sampler identifier" ); // does the acceptable code position above rule this out?
+		state.SetError( "Missing %s identifier", what ); // does the acceptable code position above rule this out?
 
 		return false;
 	}
@@ -771,14 +772,9 @@ VulkanProgram::ReplaceVertexSamplers( ShaderCode & code, CompileState & state )
 	// behavior by making those declarations, in order, synonyms for the stock samplers.
 	// TODO: figure out if this is well-defined behavior
 
-	struct SamplerLine {
-		std::string replacement;
-		size_t count;
-		size_t pos;
-	};
-
-	std::vector< SamplerLine > samplerLineStack;
+	std::vector< VariablesLine > samplerLineStack;
 	size_t offset = 0U;
+	int index = 0;
 
 	while (true)
 	{
@@ -807,24 +803,21 @@ VulkanProgram::ReplaceVertexSamplers( ShaderCode & code, CompileState & state )
 
 				if (std::string::npos == bpos || cpos < bpos) // not an array? (this rules out u_Samplers) TODO? but of course limits valid usage...
 				{
-					SamplerLine line;
-					int index = 0;
+					VariablesLine line;
 
 					for (char punct = '\0'; ';' != punct; )
 					{
 						char name[64];
 
-						if (!GetSamplerIdentifier( code, pastUniformPos, cpos, name, sizeof( name ) / sizeof( name[0] ) - 1, state ))
+						if (!GetIdentifier( code, pastUniformPos, cpos, VP_STR_AND_LEN( name ), state, "sampler2D" ))
 						{
 							return;
 						}
 
-						punct = GetPunctuationAfterDeclaration( code, pastUniformPos, cpos, state );
+						punct = GetPunctuationAfterDeclaration( code, pastUniformPos, cpos, state, "vertex sampler" );
 
 						if ('\0' == punct)
 						{
-							state.SetError( "Expected comma-separated vertex sampler declaration followed by a semi-colon" );
-
 							return;
 						}
 
@@ -839,12 +832,12 @@ VulkanProgram::ReplaceVertexSamplers( ShaderCode & code, CompileState & state )
 						}
 
 						line.replacement += buf;
-
-						line.pos = pos;
-						line.count = cpos - line.pos + 1;
-
-						samplerLineStack.push_back( line );
 					}
+
+					line.pos = pos;
+					line.count = cpos - line.pos + 1;
+
+					samplerLineStack.push_back( line );
 				}
 			}
 
@@ -866,74 +859,107 @@ VulkanProgram::ReplaceVertexSamplers( ShaderCode & code, CompileState & state )
 void
 VulkanProgram::ReplaceVaryings( bool isVertexSource, ShaderCode & code, VulkanCompilerMaps & maps, CompileState & state )
 {
-	struct Varying {
-		size_t location;
-		size_t pos;
-	};
-
-	std::vector< Varying > varyingStack;
+	std::vector< VariablesLine > varyingLineStack;
 	size_t offset = 0U, varyingLocation = 0U;
 
 	while (true)
 	{
-		Varying v;
+		size_t pos = code.Find( "varying ", offset );
 
-		v.pos = code.Find( "varying ", offset );
-
-		if (std::string::npos == v.pos)
+		if (std::string::npos == pos)
 		{
 			break;
 		}
 
-		if (NoLeadingCharacters( code.GetString(), v.pos ))
+		if (NoLeadingCharacters( code.GetString(), pos ))
 		{
-			char precision[16], type[16], name[64];
+			size_t pastVaryingPos = pos + strlen( "varying " );
+			size_t cpos = code.Find( ";", pastVaryingPos );
 
-			if (sscanf( code.GetCStr() + v.pos, "varying %15s %15s %63s", precision, type, name ) < 3)
+			if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
 			{
-				state.SetError( "Varying in shader was ill-formed" );
+				state.SetError( "`varying` never followed by a semi-colon" );
 
 				return;
 			}
 
-			// TODO: validate: known precision, known type, identifier
-			// also, if we don't care about mobile we could forgo the type...
-			// could also be comma-separated, see GatherUniformUserData()
+			char precision[16];
 
-			v.location = varyingLocation;
-
-			if (!isVertexSource)
+			if (!GetPrecision( code, pastVaryingPos, cpos, VP_STR_AND_LEN( precision ), state, "varying" ))
 			{
-				auto & varying = maps.varyings.find( name );
+				return;
+			}
 
-				if (maps.varyings.end() == varying)
+			char type[16];
+			U32 componentCount = GetType( code, pastVaryingPos, cpos, VP_STR_AND_LEN( type ), state, "varying" );
+								
+			if (0U == componentCount)
+			{
+				return;
+			}
+
+			VariablesLine line;
+
+			for (char punct = '\0'; ';' != punct; )
+			{
+				char name[64];
+
+				if (!GetIdentifier( code, pastVaryingPos, cpos, VP_STR_AND_LEN( name ), state, "varying" ))
 				{
-					state.SetError( "Fragment kernel refers to varying `%s`, not found on vertex side", name );
-
 					return;
 				}
 
-				v.location = varying->second;
+				punct = GetPunctuationAfterDeclaration( code, pastVaryingPos, cpos, state, "varying" );
+
+				if ('\0' == punct)
+				{
+					return;
+				}
+
+				char buf[sizeof( name ) + 64];
+
+				if (isVertexSource)
+				{
+					sprintf( buf, "layout(location = %u) out %s %s;", varyingLocation, type, name );
+
+					maps.varyings[name] = varyingLocation++;
+				}
+
+				else
+				{
+					auto & varying = maps.varyings.find( name );
+
+					if (maps.varyings.end() == varying)
+					{
+						state.SetError( "Fragment kernel refers to varying `%s`, not found on vertex side", name );
+
+						return;
+					}
+
+					sprintf( buf, "layout(location = %u) in %s %s;", varying->second, type, name );
+				}
+					
+				if (!line.replacement.empty())
+				{
+					// TODO: find tabs etc?
+					line.replacement += '\n';
+				}
+
+				line.replacement += buf;
 			}
 
-			if (isVertexSource)
-			{
-				maps.varyings[name] = varyingLocation++;
-			}
+			line.pos = pos;
+			line.count = cpos - line.pos + 1;
 
-			varyingStack.push_back( v );
+			varyingLineStack.push_back( line );
 		}
 
-		offset = v.pos + strlen( "varying " );
+		offset = pos + 1U;
 	}
 
-	char buf[64];
-
-	for (auto && iter = varyingStack.rbegin(); iter != varyingStack.rend(); ++iter)
+	for (auto && iter = varyingLineStack.rbegin(); iter != varyingLineStack.rend(); ++iter)
 	{
-		sprintf( buf, "layout(location = %u) %s", iter->location, isVertexSource ? "out" : "in" );
-
-		code.Replace( iter->pos, strlen( "varying" ), buf );
+		code.Replace( iter->pos, iter->count, iter->replacement );
 	}
 }
 
@@ -1629,3 +1655,5 @@ VulkanProgram::CleanUpCompiler( shaderc_compiler_t compiler, shaderc_compile_opt
 } // namespace Rtt
 
 // ----------------------------------------------------------------------------
+
+#undef VP_STR_AND_LEN
