@@ -331,6 +331,8 @@ class Runtime : public MCallback,
 	// STEVE CHANGE
 	public:
 		void SetBackend( const char * backend, void * backendState) { fBackend = backend; fBackendState = backendState; }
+
+		const char * GetBackend() const { return fBackend; }
 	// /STEVE CHANGE
 	public:
 		// MCallback

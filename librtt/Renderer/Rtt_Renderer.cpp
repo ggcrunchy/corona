@@ -1023,10 +1023,6 @@ Renderer::CheckAndInsertDrawCommand()
 void
 Renderer::FlushBatch()
 {
-if (!fPrevious.fGeometry && !fCurrentGeometry)
-{
-	return;
-}
 	bool storedOnGPU = fPrevious.fGeometry && fPrevious.fGeometry->GetStoredOnGPU();
 
 	UpdateBatch( false, NULL != fCurrentGeometry, storedOnGPU, 0 );
