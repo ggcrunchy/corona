@@ -532,16 +532,17 @@ VulkanProgram::GatherUniformUserdata( bool isVertexSource, ShaderCode & code, Us
 
 	while (true)
 	{
-		size_t pos = code.Find( "uniform ", offset );
+		size_t pos = code.Find( "uniform", offset );
 
 		if (std::string::npos == pos)
 		{
 			return result;
 		}
 
-		if (NoLeadingCharacters( code.GetString(), pos ))
+		size_t pastUniformPos = pos + strlen( "uniform" );
+
+		if (NoLeadingCharacters( code.GetString(), pos ) && isspace( code.GetCStr()[pastUniformPos] ))
 		{
-			size_t pastUniformPos = pos + strlen( "uniform " );
 			size_t cpos = code.Find( ";", pastUniformPos );
 
 			if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
@@ -778,16 +779,17 @@ VulkanProgram::ReplaceVertexSamplers( ShaderCode & code, CompileState & state )
 
 	while (true)
 	{
-		size_t pos = code.Find( "uniform ", offset ); // TODO: using explicit space, but tabs and newline would be valid too...
+		size_t pos = code.Find( "uniform", offset );
 
 		if (std::string::npos == pos)
 		{
 			break;
 		}
 
-		if (NoLeadingCharacters( code.GetString(), pos ))
+		size_t pastUniformPos = pos + strlen( "uniform" );
+
+		if (NoLeadingCharacters( code.GetString(), pos ) && isspace( code.GetCStr()[pastUniformPos] ))
 		{
-			size_t pastUniformPos = pos + strlen( "uniform " );
 			size_t cpos = code.Find( ";", pastUniformPos );
 
 			if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...
@@ -864,16 +866,17 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, ShaderCode & code, VulkanCo
 
 	while (true)
 	{
-		size_t pos = code.Find( "varying ", offset );
+		size_t pos = code.Find( "varying", offset );
 
 		if (std::string::npos == pos)
 		{
 			break;
 		}
 
-		if (NoLeadingCharacters( code.GetString(), pos ))
+		size_t pastVaryingPos = pos + strlen( "varying" );
+
+		if (NoLeadingCharacters( code.GetString(), pos ) && isspace( code.GetCStr()[pastVaryingPos] ))
 		{
-			size_t pastVaryingPos = pos + strlen( "varying " );
 			size_t cpos = code.Find( ";", pastVaryingPos );
 
 			if (std::string::npos == cpos)	// sanity check: must have semi-colon eventually...

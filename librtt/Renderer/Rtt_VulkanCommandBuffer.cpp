@@ -1482,6 +1482,8 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 		{
 			vkQueueWaitIdle( fRenderer.GetContext()->GetGraphicsQueue() ); // do this once now, else we might call many times if minimized
 
+			fRenderer.ForceInvalidation(); // kludge: if nothing gets updated, the scene would have been updated THIS frame if the orientation / size changes,
+											// we will be reconstructing the swapchain NEXT frame, so we manually invalidate to account for this case
 			fRenderer.SetSwapchainInvalid( true );
 			
 			presentResult = VK_SUCCESS;

@@ -242,8 +242,16 @@ Display::~Display()
 	Rtt_DELETE( fDefaults );
 }
 
+// STEVE CHANGE
+static void
+InvalidateDisplay( void * display )
+{
+	static_cast< Display * >( display )->GetScene().Invalidate();
+}
+// /STEVE CHANGE
+
 bool
-Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orientation, const char * backend, void * backendState ) // <- STEVE CHANGE
+Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orientation, const char * backend, void * backendContext ) // <- STEVE CHANGE
 {
 	bool result = false;
 
@@ -261,7 +269,7 @@ Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orie
 
 		else if (strcmp( backend, "vulkanBackend" ) == 0)
 		{
-			fRenderer = VulkanExports::CreateVulkanRenderer( allocator, backendState );
+			fRenderer = VulkanExports::CreateVulkanRenderer( allocator, backendContext, &InvalidateDisplay, this );
 		}
 
 		else

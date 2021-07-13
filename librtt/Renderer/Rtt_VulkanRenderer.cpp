@@ -428,7 +428,7 @@ FrameResources::CleanUpSynchronizationObjects( VkDevice device, const VkAllocati
 	fRenderFinished = VK_NULL_HANDLE;
 }
 
-VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanContext * context )
+VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanContext * context, void (*invalidate)(void *), void * display )
 :   Super( allocator ),
 	fContext( context ),
     fSwapchainTexture( NULL ),
@@ -441,6 +441,8 @@ VulkanRenderer::VulkanRenderer( Rtt_Allocator* allocator, VulkanContext * contex
 	fTextureLayout( VK_NULL_HANDLE ),
 	fPipelineLayout( VK_NULL_HANDLE ),
 	fCaptureFence( VK_NULL_HANDLE ),
+	fInvalidate( invalidate ),
+	fDisplay( display ),
 	fFrameIndex( 0 ),
 	fSwapchainInvalid( false )
 {
@@ -1204,7 +1206,12 @@ VulkanRenderer::ResetPipelineInfo()
 	RestartWorkingPipeline();
 }
 
-
+void
+VulkanRenderer::ForceInvalidation()
+{
+	fInvalidate( fDisplay );
+}
+		
 void
 VulkanRenderer::PrepareCapture( VulkanFrameBufferObject * fbo, VkFence fence )
 {

@@ -130,7 +130,7 @@ class VulkanRenderer : public Renderer
 		enum { kFramesInFlight = 3 }; // see https://software.intel.com/content/www/us/en/develop/articles/practical-approach-to-vulkan-part-1.html
 
 	public:
-		VulkanRenderer( Rtt_Allocator* allocator, VulkanContext * context );
+		VulkanRenderer( Rtt_Allocator* allocator, VulkanContext * context, void (*invalidate)(void *), void * display );
 		virtual ~VulkanRenderer();
 
 		virtual void BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY, bool isCapture );
@@ -174,6 +174,7 @@ class VulkanRenderer : public Renderer
 		VkPipelineColorBlendAttachmentState & GetColorBlendState() { return fColorBlendState; }
 
 	public:
+		void ForceInvalidation();
 		void PrepareCapture( VulkanFrameBufferObject * fbo, VkFence fence );
 
 	protected:
@@ -226,6 +227,8 @@ class VulkanRenderer : public Renderer
 		PipelineKey fDefaultKey;
 		PipelineKey fWorkingKey;
 		VkPipelineColorBlendAttachmentState fColorBlendState;
+		void (*fInvalidate)(void *);
+		void * fDisplay;
 		int fFrameIndex;
 		bool fSwapchainInvalid;
 };

@@ -57,9 +57,9 @@ VulkanExports::DestroyVulkanContext( void * context )
 }
 
 Rtt::Renderer * 
-VulkanExports::CreateVulkanRenderer( Rtt_Allocator * allocator, void * context )
+VulkanExports::CreateVulkanRenderer( Rtt_Allocator * allocator, void * context, void (*invalidate)(void *), void * display )
 {
-	return Rtt_NEW( allocator, VulkanRenderer( allocator, static_cast< VulkanContext * >( context ) ) );
+	return Rtt_NEW( allocator, VulkanRenderer( allocator, static_cast< VulkanContext * >( context ), invalidate, display ) );
 }
 
 // ----------------------------------------------------------------------------

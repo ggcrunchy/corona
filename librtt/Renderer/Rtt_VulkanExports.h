@@ -39,7 +39,7 @@ public:
 	static bool CreateVulkanContext( const VulkanSurfaceParams & params, void ** context );
 	static void PopulateMultisampleDetails( void * state );
 	static void DestroyVulkanContext( void * state );
-	static Renderer * CreateVulkanRenderer( Rtt_Allocator * allocator, void * context );
+	static Renderer * CreateVulkanRenderer( Rtt_Allocator * allocator, void * context, void (*invalidate)(void *), void * display );
 };
 
 // ----------------------------------------------------------------------------
