@@ -13,8 +13,6 @@
 #include "Renderer/Rtt_GPUResource.h"
 #include "Renderer/Rtt_VulkanIncludes.h"
 
-#include <vector>
-
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -42,19 +40,16 @@ class VulkanTexture : public GPUResource
 		virtual void Destroy();
 
 		void Bind( Descriptor & desc, VkDescriptorImageInfo & imageInfo );
-		void Toggle();
 
 	public:
 		void CopyBufferToImage( VkBuffer buffer, VkImage image, uint32_t width, uint32_t height );
 		bool Load( Texture * texture, VkFormat format, const VulkanBufferData & bufferData, U32 mipLevels );
 		static bool TransitionImageLayout( VulkanContext * context, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels, VkCommandBuffer = VK_NULL_HANDLE );
 
-		VkImage GetImage() const { return fData[ GetIndex() ].fImage; }
-		VkImageView GetImageView() const { return fData[ GetIndex() ].fView; }
+		VkImage GetImage() const { return fData.fImage; }
+		VkImageView GetImageView() const { return fData.fView; }
 		VkSampler GetSampler() const { return fSampler; }
 		VkFormat GetFormat() const { return fFormat; }
-		uint32_t GetIndex() const { return fToggled ? 1 : 0; }
-		size_t GetImageCount() const { return fData.size(); }
 
 	public:
 		struct ImageData {
@@ -77,12 +72,11 @@ class VulkanTexture : public GPUResource
 		static VkFormat GetVulkanFormat( Texture::Format format, VkComponentMapping & mapping );
 
 	private:
-		std::vector< ImageData > fData;
+		ImageData fData;
 		VulkanContext * fContext;
 		VkSampler fSampler;
 		VkFormat fFormat;
 //		uint32_t fMipLevels;
-		bool fToggled;
 };
 
 // ----------------------------------------------------------------------------

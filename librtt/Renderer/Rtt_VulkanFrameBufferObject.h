@@ -34,7 +34,6 @@ class RenderPassBuilder {
 			VkImageLayout finalLayout;
 			bool isResolve = false;
 			bool isResult = false; // n.b. already implied by isResolve
-			bool sameLayout = false;
 		};
 
 		void AddColorAttachment( VkFormat format, const AttachmentOptions & options = AttachmentOptions() );
@@ -48,7 +47,7 @@ class RenderPassBuilder {
 		void ReplaceClearsWithLoads();
 
 	private:
-		void AddAttachment( VkAttachmentDescription & description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, VkImageLayout finalLayout, bool sameLayout );
+		void AddAttachment( VkAttachmentDescription & description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, VkImageLayout finalLayout );
 
 		std::vector< VkSubpassDependency > fDependencies;
 		std::vector< VkAttachmentDescription > fDescriptions;
@@ -109,7 +108,6 @@ class VulkanFrameBufferObject : public GPUResource
 		std::vector< VkImageView > fImageViews;
 		const RenderPassData * fRenderPassData[2];
 		Texture * fTexture;
-		bool fMustClear;
 };
 
 // ----------------------------------------------------------------------------

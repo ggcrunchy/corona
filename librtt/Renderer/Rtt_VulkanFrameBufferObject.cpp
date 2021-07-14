@@ -67,7 +67,7 @@ RenderPassBuilder::AddColorAttachment( VkFormat format, const AttachmentOptions 
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	}
 
-	AddAttachment( colorAttachment, options.isResolve ? fResolveReferences : fColorReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, options.finalLayout, options.sameLayout );
+	AddAttachment( colorAttachment, options.isResolve ? fResolveReferences : fColorReferences, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, options.finalLayout );
 }
 
 void
@@ -75,7 +75,7 @@ RenderPassBuilder::AddDepthStencilAttachment( VkFormat format, const AttachmentO
 {
 	VkAttachmentDescription depthAttachment = PrepareAttachmentDescription( format );
 
-	AddAttachment( depthAttachment, fDepthStencilReferences, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, false );
+	AddAttachment( depthAttachment, fDepthStencilReferences, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL );
 }
 
 void
@@ -191,7 +191,7 @@ RenderPassBuilder::ReplaceClearsWithLoads()
 }
 
 void
-RenderPassBuilder::AddAttachment( VkAttachmentDescription & description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, VkImageLayout finalLayout, bool sameLayout )
+RenderPassBuilder::AddAttachment( VkAttachmentDescription & description, std::vector< VkAttachmentReference > & references, VkImageLayout layout, VkImageLayout finalLayout )
 {
 	VkAttachmentReference attachmentRef = {};
 
@@ -199,11 +199,6 @@ RenderPassBuilder::AddAttachment( VkAttachmentDescription & description, std::ve
 	attachmentRef.layout = layout;
 
 	references.push_back( attachmentRef );
-
-	if (sameLayout)
-	{
-		description.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	}
 
 	description.finalLayout = finalLayout;
 	description.samples = description.samples;
@@ -267,7 +262,6 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 	RenderPassBuilder builder;
 
-	fMustClear = true;
 	fSampleCount = VK_SAMPLE_COUNT_1_BIT;
 
 	if (wantMultisampleResources)
@@ -320,56 +314,31 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 	{
 		fImageViews.push_back( vulkanTexture->GetImageView() );
 
-		vulkanTexture->Toggle();
+		VkSubpassDependency srcDependency;
 
-		VkImageView otherView = vulkanTexture->GetImageView();
+		srcDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+		srcDependency.dstSubpass = 0;
+		srcDependency.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		srcDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		srcDependency.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		srcDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		srcDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-		if (fImageViews.back() != otherView)
-		{
-			fImageViews.push_back( otherView );
+		builder.AddSubpassDependency( srcDependency );
 
-			vulkanTexture->Toggle();
-		}
+		VkSubpassDependency dstDependency;
 
-		fMustClear = fbo->GetMustClear();
+		dstDependency.srcSubpass = 0;
+		dstDependency.dstSubpass = VK_SUBPASS_EXTERNAL;
+		dstDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dstDependency.dstStageMask = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		dstDependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		dstDependency.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		dstDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-	//	if (fMustClear)
-		{
-			VkSubpassDependency srcDependency;
+		builder.AddSubpassDependency( dstDependency );
 
-			srcDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-			srcDependency.dstSubpass = 0;
-			srcDependency.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			srcDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			srcDependency.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			srcDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			srcDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-			builder.AddSubpassDependency( srcDependency );
-
-			VkSubpassDependency dstDependency;
-
-			dstDependency.srcSubpass = 0;
-			dstDependency.dstSubpass = VK_SUBPASS_EXTERNAL;
-			dstDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			dstDependency.dstStageMask = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			dstDependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			dstDependency.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			dstDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-			builder.AddSubpassDependency( dstDependency );
-		}
-
-		if (true)//fMustClear)
-		{
-			finalResultOptions.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		}
-
-		else
-		{
-			finalResultOptions.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		//	finalResultOptions.sameLayout = true;
-		}
+		finalResultOptions.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
 
 	finalResultOptions.isResolve = wantMultisampleResources;
@@ -377,10 +346,11 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 	builder.AddColorAttachment( format, finalResultOptions );
 
-	size_t passCount = fMustClear ? 1 : 2;
+	size_t passCount = fbo->GetMustClear() ? 1 : 2;
 
 	if (!isSwapchain)
 	{
+		// TODO: leave as is for now, but might be able to refine the dependencies above based on GetMustClear()
 	//	builder.AddReadAfterWriteStages();
 	}
 
@@ -415,12 +385,12 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 			createFramebufferInfo.attachmentCount = currentSize + 1; // n.b. ignore "extra" image views, cf. note a few lines below
 			createFramebufferInfo.height = fExtent.height;
 			createFramebufferInfo.layers = 1U;
-			createFramebufferInfo.pAttachments = fImageViews.data() + vulkanTexture->GetIndex();
+			createFramebufferInfo.pAttachments = fImageViews.data();
 			createFramebufferInfo.width = fExtent.width;
 	// TODO: look into VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT...
 			VkFramebuffer framebuffer = VK_NULL_HANDLE;
 
-			vulkanTexture->Toggle();
+		//	vulkanTexture->Toggle();
 
 			if (VK_SUCCESS == vkCreateFramebuffer( ci.device, &createFramebufferInfo, ci.allocator, &framebuffer ))
 			{
@@ -470,12 +440,6 @@ VulkanFrameBufferObject::Bind( VulkanRenderer & renderer, uint32_t index, VkRend
 	fRenderer.SetRenderPass( renderPassData->fID, renderPassData->fPass );
 
 	VulkanTexture * texture = static_cast< VulkanTexture * >( GetTextureName() );
-	U32 count = texture->GetImageCount();
-
-	if (count)
-	{
-		index = passIndex * count + texture->GetIndex();
-	}
 
 	passBeginInfo.framebuffer = fFramebuffers[index];
 	passBeginInfo.renderArea.extent = fExtent;

@@ -61,8 +61,8 @@ namespace Rtt
 VulkanTexture::VulkanTexture( VulkanContext * context )
 :	fContext( context ),
     fSampler( VK_NULL_HANDLE ),
-    fFormat( VK_FORMAT_UNDEFINED ),
-    fToggled( false )
+    fFormat( VK_FORMAT_UNDEFINED )/*,
+    fToggled( false )*/
 {
 }
 
@@ -105,26 +105,21 @@ VulkanTexture::Create( CPUResource* resource )
 
     if (ok)
     {
-        for (U32 i = 0, n = texture->IsTarget() ? 2U : 1U; i < n; ++i)
+        fData = CreateImage(
+            fContext,
+            texture->GetWidth(), texture->GetHeight(),
+            1U, // mip levels
+            VK_SAMPLE_COUNT_1_BIT,
+            format,
+            VK_IMAGE_TILING_OPTIMAL,
+            usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        );
+
+        ok = fData.fImage != VK_NULL_HANDLE;
+
+        if (ok)
         {
-            ImageData imageData = CreateImage(
-                fContext,
-                texture->GetWidth(), texture->GetHeight(),
-                1U, // mip levels
-                VK_SAMPLE_COUNT_1_BIT,
-                format,
-                VK_IMAGE_TILING_OPTIMAL,
-                usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-            );
-
-            ok = imageData.fImage != VK_NULL_HANDLE;
-
-            if (ok)
-            {
-                fData.push_back( imageData );
-
-                ok = Load( texture, format, bufferData, mipLevels );
-            }
+            ok = Load( texture, format, bufferData, mipLevels );
         }
     }
     
@@ -156,10 +151,7 @@ VulkanTexture::Create( CPUResource* resource )
 
         if (VK_SUCCESS == vkCreateSampler( fContext->GetDevice(), &samplerInfo, fContext->GetAllocator(), &sampler ))
         {
-            for (ImageData & data : fData)
-            {
-                data.fView = CreateImageView( fContext, data.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels, &mapping );
-            }
+            fData.fView = CreateImageView( fContext, fData.fImage, format, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels, &mapping );
 
             fSampler = sampler;
             fFormat = format;
@@ -198,10 +190,7 @@ VulkanTexture::Destroy()
 
     vkDestroySampler( ci.device, fSampler, ci.allocator );
 
-    for (ImageData & data : fData)
-    {
-        data.Destroy( ci.device, ci.allocator );
-    }
+    fData.Destroy( ci.device, ci.allocator );
 }
 
 void
@@ -216,15 +205,6 @@ VulkanTexture::Bind( Descriptor & desc, VkDescriptorImageInfo & imageInfo )
 	    imageInfo.imageView = view;
 	    imageInfo.sampler = fSampler;
 	    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    }
-}
-
-void
-VulkanTexture::Toggle()
-{
-    if (fData.size() > 1U)
-    {
-        fToggled = !fToggled;
     }
 }
 
@@ -269,7 +249,7 @@ VulkanTexture::Load( Texture * texture, VkFormat format, const VulkanBufferData 
         fContext->StageData( bufferData.GetMemory(), data, texture->GetSizeInBytes() );
     }
 
-    VkImage image = fData.back().fImage;
+    VkImage image = fData.fImage;
     VkImageLayout newLayout = texture->IsTarget() ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     bool ok = TransitionImageLayout( fContext, image, format, VK_IMAGE_LAYOUT_UNDEFINED, newLayout, mipLevels );
 

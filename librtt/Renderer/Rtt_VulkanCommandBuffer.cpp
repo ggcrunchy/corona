@@ -876,9 +876,6 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 					{
 						index = clearValues.empty(); // use the buffer / pass for the desired clear behavior
 
-						VulkanTexture * texture = static_cast< VulkanTexture * >( fbo->GetTextureName() );
-
-						texture->Toggle();
 						fbo->BeginOffscreenPass( fRenderer, commandBuffer, clearValues.empty() );
 
 						DEBUG_PRINT( "Offscreen pass: %s", clearValues.empty() ? "load" : "clear" );
