@@ -198,11 +198,7 @@ void RenderSurfaceControl::CreateContext(const Params & params) // <- STEVE CHAN
 
 			if (params.IsVulkanRequired())
 			{
-				Rtt_LogException( "Unable to instantiate Vulkan");
-
-				// TODO: anything else?
-
-				return;
+				throw std::exception( "Unable to instantiate Vulkan" );
 			}
 		}
 	}
