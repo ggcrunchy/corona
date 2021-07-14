@@ -255,7 +255,7 @@ VulkanFrameBufferObject::Update( CPUResource* resource )
 
 	CleanUpImageData();
 
-	bool isSwapchain = Texture::kNumFilters == fTexture->GetFilter(), wantMultisampleResources = isSwapchain;
+	bool isSwapchain = Texture::kNumFilters == fTexture->GetFilter(), wantMultisampleResources = isSwapchain && fRenderer.GetMultisampleEnabled();
 	auto ci = fRenderer.GetContext()->GetCommonInfo();
 	VkComponentMapping mapping = {};
 	VkFormat format = isSwapchain ? ci.context->GetSwapchainDetails().fFormat.format : VulkanTexture::GetVulkanFormat( fTexture->GetFormat(), mapping );

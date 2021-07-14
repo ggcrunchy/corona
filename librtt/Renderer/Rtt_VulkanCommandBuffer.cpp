@@ -524,11 +524,8 @@ VulkanCommandBuffer::SetScissorEnabled( bool enabled )
 void 
 VulkanCommandBuffer::SetScissorRegion( int x, int y, int width, int height )
 {
-	WRITE_COMMAND( kCommandSetScissorRegion );/*
-	Write<GLint>(x);
-	Write<GLint>(y);
-	Write<GLsizei>(width);
-	Write<GLsizei>(height);*/
+	WRITE_COMMAND( kCommandSetScissorRegion );
+
 	// TODO? seems to be dead code
 }
 
@@ -536,21 +533,6 @@ void
 VulkanCommandBuffer::SetMultisampleEnabled( bool enabled )
 {
 	WRITE_COMMAND( enabled ? kCommandEnableMultisample : kCommandDisableMultisample );
-//	fMultisampleStateCreateInfo.rasterizationSamples
-/*
-			case kCommandEnableMultisample:
-			{
-				Rtt_glEnableMultisample();
-				DEBUG_PRINT( "Enable multisample test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-			case kCommandDisableMultisample:
-			{
-				Rtt_glDisableMultisample();
-				DEBUG_PRINT( "Disable multisample test" );
-				CHECK_ERROR_AND_BREAK;
-			}
-*/
 }
 
 void 
@@ -1345,24 +1327,19 @@ VulkanCommandBuffer::Execute( bool measureGPU )
 				case kCommandSetScissorRegion:
 				{
 					// TODO?
-					/*
-					GLint x = Read<GLint>();
-					GLint y = Read<GLint>();
-					GLsizei width = Read<GLsizei>();
-					GLsizei height = Read<GLsizei>();
-					glScissor( x, y, width, height );
-					DEBUG_PRINT( "Set scissor window x=%i, y=%i, width=%i, height=%i", x, y, width, height );*/
 					CHECK_ERROR_AND_BREAK;
 				}
 				case kCommandEnableMultisample:
 				{
-					// TODO: Rtt_glEnableMultisample();
+					fRenderer.SetMultisample( fRenderer.GetContext()->GetSampleCountFlags() );
+
 					DEBUG_PRINT( "Enable multisample test" );
 					CHECK_ERROR_AND_BREAK;
 				}
 				case kCommandDisableMultisample:
 				{
-					// TODO: Rtt_glDisableMultisample();
+					fRenderer.SetMultisample( VK_SAMPLE_COUNT_1_BIT );
+
 					DEBUG_PRINT( "Disable multisample test" );
 					CHECK_ERROR_AND_BREAK;
 				}

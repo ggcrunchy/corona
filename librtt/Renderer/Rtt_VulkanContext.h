@@ -93,7 +93,7 @@ class VulkanContext
 		VkCommandPool GetSingleTimeCommandsPool() const { return fSingleTimeCommandsPool; }
 		VkSurfaceKHR GetSurface() const { return fSurface; }
 		VkPipelineCache GetPipelineCache() const { return fPipelineCache; }
-		VkSampleCountFlags GetSampleCountFlags() const { return fSampleCountFlags; }
+		VkSampleCountFlagBits GetSampleCountFlags() const { return fSampleCountFlags; }
 		VkSwapchainKHR GetSwapchain() const { return fSwapchain; }
 		const std::vector< uint32_t > & GetQueueFamilies() const { return fQueueFamilies; }
 		const Features & GetFeatures() const { return fDeviceDetails.features; }
@@ -182,7 +182,7 @@ class VulkanContext
 		VkCommandPool fSingleTimeCommandsPool;
 		VkSurfaceKHR fSurface;
 		VkPipelineCache fPipelineCache;
-		VkSampleCountFlags fSampleCountFlags;
+		VkSampleCountFlagBits fSampleCountFlags;
 		VkSwapchainKHR fSwapchain;
 		SwapchainDetails fSwapchainDetails;
 		DeviceDetails fDeviceDetails;
