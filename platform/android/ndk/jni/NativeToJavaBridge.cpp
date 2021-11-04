@@ -2067,29 +2067,10 @@ NativeToJavaBridge::MakeLowerCase(Rtt::String *stringToConvert)
 }
 
 void
-NativeToJavaBridge::Vibrate(const char * hapticType, const char* hapticStyle)
+NativeToJavaBridge::Vibrate()
 {
+	CallVoidMethod( "callVibrate" );
 	HandleJavaException();
-	NativeTrace trace( "NativeToJavaBridge::Vibrate" );
-
-
-	jclassInstance bridge( GetJNIEnv(), kNativeToJavaBridge );
-
-	if ( bridge.isValid() ) {
-
-		jmethodID mid = bridge.getEnv()->GetStaticMethodID( bridge.getClass(),
-															"callVibrate", "(Lcom/ansca/corona/CoronaRuntime;Ljava/lang/String;Ljava/lang/String;)V" );
-
-		if ( mid != NULL ) {
-			jstringParam hapticTypeJ( bridge.getEnv(), hapticType );
-			jstringParam hapticStyleJ( bridge.getEnv(), hapticStyle );
-
-			bridge.getEnv()->CallStaticVoidMethod(
-					bridge.getClass(), mid, fCoronaRuntime, hapticTypeJ.getValue(), hapticStyleJ.getValue());
-			HandleJavaException();
-
-		}
-	}
 }
 
 void

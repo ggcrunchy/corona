@@ -67,13 +67,15 @@ std::vector<std::string> Rtt_ListFiles(const char *directoryName);
 		~nnFile();
 
 		bool isOpen() const;
-		int write(void* data, int size);
-		void close();
-
-	private:
+		int getc();
+		int nnungetc(int c);
+		bool load();
 
 		nn::fs::FileHandle fHandle;
-		int64_t fPos;
+		long int fPos;		// current position
+		uint8_t* fData;
+		int64_t fSize;
+		std::string fPath;
 	};
 	#endif
 

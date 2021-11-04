@@ -2256,9 +2256,9 @@ public class NativeToJavaBridge {
 		return null;
 	}
 
-	protected static void callVibrate(CoronaRuntime runtime, String hapticType, String hapticStyle)
+	protected static void callVibrate(CoronaRuntime runtime)
 	{
-		runtime.getController().vibrate(hapticType, hapticStyle);
+		runtime.getController().vibrate();
 	}
 
 	protected static void callSetLocationAccuracy( double meters, CoronaRuntime runtime )

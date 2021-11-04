@@ -811,7 +811,7 @@ bool CSimulatorApp::ShouldShowLinuxBuildDlg()
 }
 bool CSimulatorApp::ShouldShowNXBuildDlg()
 {
-	bool show = getenv("NINTENDO_SDK_ROOT") != NULL;
+	bool show = GetProfileInt(REGISTRY_SECTION, REGISTRY_SHOWNXSBUILD, REGISTRY_SHOWNXSBUILD_DEFAULT) ? true : false;
 	return show;
 }
 

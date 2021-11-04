@@ -51,7 +51,6 @@ class Scheduler
 	public:
 //		void Prepend( Task* e );
 		void Append( Task* e );
-		void Delete(Task* e);
 
 	public:
 		void Run();

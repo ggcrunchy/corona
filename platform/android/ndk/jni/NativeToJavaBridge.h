@@ -179,7 +179,7 @@ class NativeToJavaBridge
 		bool HasAccelerometer();
 		bool HasGyroscope();
 		bool HasHeadingHardware();
-		void Vibrate(const char * hapticType = NULL, const char* hapticStyle = NULL);
+		void Vibrate();
 		
 		void DisplayObjectDestroy( int id );
 		void DisplayObjectSetVisible( int id, bool visible );

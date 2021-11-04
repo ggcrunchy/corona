@@ -91,7 +91,7 @@ const char* WinDevice::GetManufacturer() const
 		if (deviceSimulatorServicesPointer)
 		{
 			// Fetch the simulated device's manufacturer name.
-			fManufacturerName = deviceSimulatorServicesPointer->GetManufacturerName();
+			fModelName = deviceSimulatorServicesPointer->GetManufacturerName();
 		}
 		else
 		{
