@@ -101,7 +101,7 @@ typedef struct CoronaMemoryCallbacks {
 	 On success, points to the acquired memory and populates `byteCount` with the addressable size; if the stack has grown,
 	 a reference to the topmost value will also be kept with the memory data.
 	*/
-	void * (*getBytes)( lua_State * L, int objectIndex, unsigned int * byteCount, CoronaMemoryKind kind, CoronaMemoryExtra * extra );
+	void * (*getBytes)( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsigned int * byteCount, CoronaMemoryExtra * extra );
 
 	/**
 	 Optional
@@ -156,33 +156,38 @@ int CoronaMemoryIsValid( lua_State * L, const CoronaMemoryHandle * memoryHandle 
 CORONA_API
 int CoronaMemoryGetPosition( lua_State * L, CoronaMemoryHandle * memoryHandle ) CORONA_PUBLIC_SUFFIX;
 
+// ----------------------------------------------------------------------------
+
 /**
- Acquire memory from an object that may be read, via its read callbacks. @see CoronaMemoryCallbacks
+ Acquire memory from an object, via its callbacks. @see CoronaMemoryCallbacks
  @param L Lua state pointer
- @param kind TODO
- @param objectIndex Stack position of the object providing the memory. (This object may be a Lua string; if it does not
-			already have one of the callbacks, a reader is provided that interprets it as a length-sized array.) The call
+ @param objectIndex Stack position of the object providing the memory. The call
 			will replace this object: on success, by some internal state; otherwise, an error.
+            If this is a read-style acquire, the object may be a Lua string: if so, and it has
+            no callbacks, it is interpreted as a length-sized array.
+ @param kind TODO
  @param params User-supplied parameter; may be `NULL`. @see CoronaMemoryExtra
  @return Handle to memory data, with valid contents on success. @see CoronaMemoryHandle
 */
 CORONA_API
-CoronaMemoryHandle CoronaMemoryAcquireBytes( lua_State * L, CoronaMemoryKind kind, int objectIndex, void * params ) CORONA_PUBLIC_SUFFIX;
+CoronaMemoryHandle CoronaMemoryAcquireBytes( lua_State * L, int objectIndex, CoronaMemoryKind kind, void * params ) CORONA_PUBLIC_SUFFIX;
 
 /**
- Acquire memory from an object that may be read, via its read callbacks. @see CoronaMemoryCallbacks
-			This requires an `ensureSizes()` callback and will invoke this with the expected sizes.
+ Acquire memory from an object, via its callbacks. @see CoronaMemoryCallbacks
+			This requires an `ensureSizes()` callback and will invoke it with the expected sizes.
  @param L Lua state pointer
- @param kind
  @param objectIndex Stack position of the object providing the memory. The call will replace this object: on success, by
 			some internal state; otherwise, an error.
+ @param kind
  @param expectedSizes Array of sizes.
- @param sizeCount Size of array, >= 1.
- @param params User-supplied parameter; may be NULL. @see CoronaMemoryExtra
+ @param sizeCount Count of elements in `expectedSizes`, >= 1.
+ @param params User-supplied parameter; may be `NULL`. @see CoronaMemoryExtra
  @return Handle to memory data, with valid contents on success. @see CoronaMemoryHandle
 */
 CORONA_API
-CoronaMemoryHandle CoronaMemoryEnsureSizeAndAcquireBytes( lua_State * L, CoronaMemoryKind kind, int objectIndex, const unsigned int * expectedSizes, int sizeCount, void * params ) CORONA_PUBLIC_SUFFIX;
+CoronaMemoryHandle CoronaMemoryEnsureSizeAndAcquireBytes( lua_State * L, int objectIndex, CoronaMemoryKind kind, const unsigned int * expectedSizes, int sizeCount, void * params ) CORONA_PUBLIC_SUFFIX;
+
+// ----------------------------------------------------------------------------
 
 /**
  Get readable memory, following a corresponding acquire.
@@ -231,6 +236,8 @@ int CoronaMemoryGetStride( lua_State * L, CoronaMemoryHandle * memoryHandle, int
 CORONA_API
 unsigned int CoronaMemoryGetStrideCount( lua_State * L, CoronaMemoryHandle * memoryHandle ) CORONA_PUBLIC_SUFFIX;
 
+// ----------------------------------------------------------------------------
+
 /**
  Release the state used by the acquired memory. This is not strictly necessary (only the stack is used internally to maintain
  references, thus garbage collection will account for everything), but allows for some resource-pooling.
@@ -241,6 +248,8 @@ unsigned int CoronaMemoryGetStrideCount( lua_State * L, CoronaMemoryHandle * mem
 */
 CORONA_API
 int CoronaMemoryRelease( lua_State * L, CoronaMemoryHandle * memoryHandle ) CORONA_PUBLIC_SUFFIX;
+
+// ----------------------------------------------------------------------------
 
 /**
  The object on top of the stack is appended to an array belonging to the acquired memory.
@@ -275,6 +284,8 @@ int CoronaMemoryRemoveFromStash( lua_State * L, CoronaMemoryHandle * memoryHandl
 CORONA_API
 int CoronaMemoryPeekAtStash( lua_State * L, CoronaMemoryHandle * memoryHandle ) CORONA_PUBLIC_SUFFIX;
 
+// ----------------------------------------------------------------------------
+
 /**
  Register callbacks for later use.
  @param L Lua state pointer
@@ -297,6 +308,17 @@ CORONA_API
 void * CoronaMemoryFindCallbacks( lua_State * L, const char * name ) CORONA_PUBLIC_SUFFIX;
 
 /**
+ If available, push the object's callbacks onto the stack. @see CoronaMemorySetCallbacks, CoronaMemorySetRCallbacksByKey
+ Unregistered callbacks must remain on the stack while setting any other callbacks with the returned key. @see CoronaMemoryRegisterCallbacks
+ @param L Lua state pointer
+ @param objectIndex Stack position of the object.
+ @param kind
+ @return On success, the callbacks' key; else `NULL`.
+*/
+CORONA_API
+void * CoronaMemoryGetCallbacks( lua_State * L, int objectIndex, CoronaMemoryKind kind ) CORONA_PUBLIC_SUFFIX;
+
+/**
  TODO
  @param L Lua state pointer
  @param objectIndex Stack position of the object.
@@ -306,72 +328,65 @@ void * CoronaMemoryFindCallbacks( lua_State * L, const char * name ) CORONA_PUBL
  @return Non-0 on success.
 */
 CORONA_API
-void * CoronaMemorySetCallbacks( lua_State * L, CoronaMemoryKind kind, int objectIndex, const CoronaMemoryCallbacks * callbacks, int userDataFromStack, unsigned int * hash ) CORONA_PUBLIC_SUFFIX;
+void * CoronaMemorySetCallbacks( lua_State * L, int objectIndex, CoronaMemoryKind kind, const CoronaMemoryCallbacks * callbacks, int userDataFromStack, unsigned int * hash ) CORONA_PUBLIC_SUFFIX;
 
 /**
  TODO
  @param L Lua state pointer
- @param kind
  @param objectIndex Stack position of the object.
+ @param kind
  @param key
  @return Non-0 on success.
 */
 CORONA_API
-int CoronaMemorySetCallbacksByKey( lua_State * L, CoronaMemoryKind kind, int objectIndex, void * key, unsigned int * hash ) CORONA_PUBLIC_SUFFIX;
+int CoronaMemorySetCallbacksByKey( lua_State * L, int objectIndex, CoronaMemoryKind kind, void * key, unsigned int * hash ) CORONA_PUBLIC_SUFFIX;
 
 /**
  TODO
  @param L Lua state pointer
  @param kind
  @param objectIndex Stack position of the object.
- @param callbacks @see CoronaMemoryCallbacks
  @param kind
+ @param callbacks @see CoronaMemoryCallbacks
  @param userData
  @return Non-0 on success.
 */
 CORONA_API
-int CoronaMemoryRemoveCallbacks( lua_State * L, CoronaMemoryKind kind, int objectIndex, unsigned int hash ) CORONA_PUBLIC_SUFFIX;
+int CoronaMemoryRemoveCallbacks( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsigned int hash ) CORONA_PUBLIC_SUFFIX;
+
+// ----------------------------------------------------------------------------
 
 /**
  TODO
  @param L Lua state pointer
- @param kind
  @param objectIndex Stack position of the object.
+ @param kind
  @param alignment
  @return 1 on success, else 0
 */
 CORONA_API
-int CoronaMemoryGetAlignment( lua_State * L, CoronaMemoryKind kind, int objectIndex, unsigned int * alignment ) CORONA_PUBLIC_SUFFIX;
+int CoronaMemoryGetAlignment( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsigned int * alignment ) CORONA_PUBLIC_SUFFIX;
 
 /**
  TODO
  @param L Lua state pointer
- @param kind
  @param objectIndex Stack position of the object.
- @return Non-0 if writable, 0 otherwise.
+ @param kind
+ @return Non-0 if available, 0 otherwise.
 */
 CORONA_API
-int CoronaMemoryIsAvailable( lua_State * L, CoronaMemoryKind kind, int objectIndex ) CORONA_PUBLIC_SUFFIX;
+int CoronaMemoryIsAvailable( lua_State * L, int objectIndex, CoronaMemoryKind kind ) CORONA_PUBLIC_SUFFIX;
 
 /**
  TODO
  @param L Lua state pointer
- @param kind
  @param objectIndex Stack position of the object.
+ @param kind 
  @return Non-0 if resizable, 0 otherwise.
 */
 CORONA_API
-int CoronaMemoryIsResizable( lua_State * L, CoronaMemoryKind kind, int objectIndex ) CORONA_PUBLIC_SUFFIX;
+int CoronaMemoryIsResizable( lua_State * L, int objectIndex, CoronaMemoryKind kind ) CORONA_PUBLIC_SUFFIX;
 
-/**
- If available, pushes the object's read callbacks onto the stack. @see CoronaMemorySetReadCallbacks, CoronaMemorySetReadCallbacksByKey
- Unregistered callbacks must remain on the stack while setting any other callbacks with the returned key. @see CoronaMemoryRegisterCallbacks
- @param L Lua state pointer
- @param kind
- @param objectIndex Stack position of the object.
- @return On success, the callbacks' key; else `NULL`.
-*/
-CORONA_API
-void * CoronaMemoryGetCallbacks( lua_State * L, CoronaMemoryKind kind, int objectIndex ) CORONA_PUBLIC_SUFFIX;
+// ----------------------------------------------------------------------------
 
 #endif // _CoronaMemory_H__

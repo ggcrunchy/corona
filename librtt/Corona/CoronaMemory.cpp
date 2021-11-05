@@ -7,12 +7,16 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#include "Core/Rtt_Config.h"
+#include "Core/Rtt_Types.h"
 #include "Core/Rtt_Time.h"
 
 #include "CoronaMemory.h"
 #include "CoronaLua.h"
 
 #include <functional>
+
+// ----------------------------------------------------------------------------
 
 struct CoronaMemoryData {
 	CoronaMemoryData();
@@ -33,6 +37,8 @@ CoronaMemoryData::CoronaMemoryData()
 	fWritable( false )
 {
 }
+
+// ----------------------------------------------------------------------------
 
 CORONA_API
 const char * CoronaMemoryGetLastError( lua_State * L, CoronaMemoryHandle * memoryHandle, int clear )
@@ -107,57 +113,12 @@ int CoronaMemoryGetPosition( lua_State * L, CoronaMemoryHandle * memoryHandle )
 	return memoryHandle->lastKnownStackPosition;
 }
 
-static void
-GetWeakTable( lua_State * L, CoronaMemoryKind kind, bool hashProduct = false )
-{
-	static int sWeakTableCookie;
-
-	lua_pushlightuserdata( L, &sWeakTableCookie ); // ..., cookie
-	lua_rawget( L, LUA_REGISTRYINDEX ); // ..., weak_tables?
-
-	if (lua_isnil( L, -1 ))
-	{
-		lua_pop( L, 1 ); // ...
-		lua_createtable( L, 2, 0 ); // ..., weak_tables
-		lua_createtable( L, 0, 1 ); // ..., weak_tables, mt
-		lua_pushliteral( L, "k" ); // ..., weak_tables, mt, "k"
-		lua_setfield( L, -2, "__mode" ); // ..., weak_tables, mt = { __mode = "k" }
-
-		for (int i = 1; i <= 3; ++i)
-		{
-			lua_pushvalue( L, -1 ); // ..., weak_tables, mt, mt[, mt[, mt]]
-		}
-
-		for (int i = 1; i <= 4; ++i) // readable, writable, readable hash products, writable hash products
-		{
-			lua_newtable( L ); // ..., weak_table, mt[, mt[, mt[, mt]]], wt
-			lua_insert( L, -2 ); // ..., weak_tables[, mt[, mt[, mt]]], wt, mt
-			lua_setmetatable( L, -2 ); // ..., weak_tables[, mt[, mt[, mt]]]], wt; wt.metatable = mt
-			lua_rawseti( L, -6 + i, i ); // ..., weak_tables = { ..., wt }[, mt]
-		}
-
-		lua_pushlightuserdata( L, &sWeakTableCookie ); // ..., weak_tables, cookie
-		lua_pushvalue( L, -2 ); // ..., weak_tables, cookie, weak_tables
-		lua_rawset( L, LUA_REGISTRYINDEX ); // ..., weak_tables; registry[cookie] = weak_tables
-	}
-
-	lua_rawgeti( L, -1, (kMemoryWrite == kind ? 2 : 1) + (hashProduct ? 2 : 0) ); // ..., weak_tables, wt
-	lua_remove( L, -2 ); // ..., wt
-}
-
-static void
-ObjectLookup( lua_State * L, int objectIndex, CoronaMemoryKind kind, bool hashProduct = false )
-{
-	GetWeakTable( L, kind, hashProduct ); // ..., object, ..., wt
-
-	lua_pushvalue( L, objectIndex ); // ..., object, ..., wt, object
-	lua_rawget( L, -2 ); // ..., object, ..., wt, info?
-}
+// ----------------------------------------------------------------------------
 
 static CoronaMemoryCallbacks *
 AsCallbacks(lua_State * L, int index )
 {
-	return (CoronaMemoryCallbacks *)lua_touserdata( L, index );
+	return ( CoronaMemoryCallbacks * )lua_touserdata( L, index );
 }
 
 struct CallbackInfo {
@@ -179,7 +140,7 @@ struct CallbackInfo {
                 fName = lua_tostring( L, -2 );
             }
             
-			lua_pop( L, 1 ); // ..., t
+			lua_pop( L, 3 ); // ..., t
 		}
 
 		else
@@ -228,22 +189,15 @@ GetMemoryData( lua_State * L, const CoronaMemoryData & work )
 	lua_rawgeti( L, -1, ( int )lua_objlen( L, -1 ) ); // ..., cache, memoryData?
 	lua_remove( L, -2 ); // ..., memoryData?
 
-	CoronaMemoryData * memoryData;
-
 	if (lua_isnil( L, -1 ))
 	{
 		lua_pop( L, 1 ); // ...
-
-		memoryData = (CoronaMemoryData *)lua_newuserdata( L, sizeof( CoronaMemoryData ) ); // ..., memoryData
-
+        lua_newuserdata( L, sizeof( CoronaMemoryData ) ); // ..., memoryData
 		lua_createtable( L, 1, 0 ); // ..., memoryData, env
 		lua_setfenv( L, -2 ); // ..., memoryData; data.environment = env
 	}
 
-	else
-	{
-		memoryData = (CoronaMemoryData *)lua_touserdata( L, -1 );
-	}
+    CoronaMemoryData * memoryData = ( CoronaMemoryData * )lua_touserdata( L, -1 );
 
 	new (memoryData) CoronaMemoryData( work );
 
@@ -251,18 +205,18 @@ GetMemoryData( lua_State * L, const CoronaMemoryData & work )
 }
 
 static void
-ReplaceWithError( lua_State * L, int objectIndex, int oldTop, const char * defaultError )
+ReplaceWithError( lua_State * L, int objectIndex, int oldTop, const char * defaultError, const char * substr = NULL )
 {
 	int newTop = lua_gettop( L );
 
 	if (newTop == oldTop || lua_isnil( L, newTop ))
     {
-        lua_pushstring( L, defaultError ); // ..., object, ..., etc., defError
+        lua_pushfstring( L, defaultError, substr ); // ..., object, ..., etc., defError
     }
     
 	else if (lua_isstring( L, -1 ))
 	{
-		lua_pushstring( L, defaultError ); // ..., object, ..., etc., error, defError
+		lua_pushfstring( L, defaultError, substr ); // ..., object, ..., etc., error, defError
 		lua_insert( L, -2 ); // ..., object, ..., etc., defError, error
 		lua_pushliteral( L, ": " ); // ..., object, ..., etc., defError, error, ": "
 		lua_insert( L, -2 ); // ..., object, ..., etc., defError, ": ", error
@@ -295,9 +249,9 @@ NullHandle( )
 }
 
 static CoronaMemoryHandle
-ReplaceWithErrorAndReturnNullHandle( lua_State * L, int objectIndex, int oldTop, const char * defaultError )
+ReplaceWithErrorAndReturnNullHandle( lua_State * L, int objectIndex, int oldTop, const char * defaultError, const char * substr = NULL )
 {
-	ReplaceWithError( L, objectIndex, oldTop, defaultError );
+	ReplaceWithError( L, objectIndex, oldTop, defaultError, substr );
 
 	return NullHandle( );
 }
@@ -307,7 +261,7 @@ GetBytesAndRest( lua_State * L, int objectIndex, int oldTop, const CallbackInfo 
 {
 	CoronaMemoryData work;
 
-	work.fBytes = info.fCallbacks->getBytes( L, objectIndex, &work.fByteCount, kind, extra ); // ...[, etc., error]
+	work.fBytes = info.fCallbacks->getBytes( L, objectIndex, kind, &work.fByteCount, extra ); // ...[, etc., error]
 
 	if (!work.fBytes)
 	{
@@ -404,6 +358,53 @@ Acquire( lua_State * L, int objectIndex, CoronaMemoryKind kind, void * params )
 	}
 }
 
+static void
+GetWeakTable( lua_State * L, CoronaMemoryKind kind, bool hashProduct = false )
+{
+    static int sWeakTableCookie;
+
+    lua_pushlightuserdata( L, &sWeakTableCookie ); // ..., cookie
+    lua_rawget( L, LUA_REGISTRYINDEX ); // ..., weak_tables?
+
+    if (lua_isnil( L, -1 ))
+    {
+        lua_pop( L, 1 ); // ...
+        lua_createtable( L, 2, 0 ); // ..., weak_tables
+        lua_createtable( L, 0, 1 ); // ..., weak_tables, mt
+        lua_pushliteral( L, "k" ); // ..., weak_tables, mt, "k"
+        lua_setfield( L, -2, "__mode" ); // ..., weak_tables, mt = { __mode = "k" }
+
+        for (int i = 1; i <= 3; ++i)
+        {
+            lua_pushvalue( L, -1 ); // ..., weak_tables, mt, mt[, mt[, mt]]
+        }
+
+        for (int i = 1; i <= 4; ++i) // readable, writable, readable hash products, writable hash products
+        {
+            lua_newtable( L ); // ..., weak_table, mt[, mt[, mt[, mt]]], wt
+            lua_insert( L, -2 ); // ..., weak_tables[, mt[, mt[, mt]]], wt, mt
+            lua_setmetatable( L, -2 ); // ..., weak_tables[, mt[, mt[, mt]]], wt; wt.metatable = mt
+            lua_rawseti( L, -6 + i, i ); // ..., weak_tables = { ..., wt }[, mt[, mt[, mt]]]
+        }
+
+        lua_pushlightuserdata( L, &sWeakTableCookie ); // ..., weak_tables, cookie
+        lua_pushvalue( L, -2 ); // ..., weak_tables, cookie, weak_tables
+        lua_rawset( L, LUA_REGISTRYINDEX ); // ..., weak_tables; registry[cookie] = weak_tables
+    }
+
+    lua_rawgeti( L, -1, (kMemoryWrite == kind ? 2 : 1) + (hashProduct ? 2 : 0) ); // ..., weak_tables, wt
+    lua_remove( L, -2 ); // ..., wt
+}
+
+static void
+ObjectLookup( lua_State * L, int objectIndex, CoronaMemoryKind kind, bool hashProduct = false )
+{
+    GetWeakTable( L, kind, hashProduct ); // ..., object, ..., wt
+
+    lua_pushvalue( L, objectIndex ); // ..., object, ..., wt, object
+    lua_rawget( L, -2 ); // ..., object, ..., wt, info?
+}
+
 static bool
 GetAssignedCallbacks( lua_State * L, int & objectIndex, CoronaMemoryKind kind, bool wantEnsureSizes )
 {
@@ -458,7 +459,7 @@ GetLuaObjectReader (lua_State * L)
 
 		callbacks.size = sizeof( CoronaMemoryCallbacks );
 
-		callbacks.getBytes = []( lua_State * L, int objectIndex, unsigned int * count, CoronaMemoryKind kind, CoronaMemoryExtra * )
+		callbacks.getBytes = []( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsigned int * count, CoronaMemoryExtra * )
 		{
 			*count = lua_objlen( L, objectIndex );
 
@@ -502,7 +503,7 @@ GetLuaObjectReader (lua_State * L)
 }
 
 CORONA_API
-CoronaMemoryHandle CoronaMemoryAcquireBytes( lua_State * L, CoronaMemoryKind kind, int objectIndex, void * params )
+CoronaMemoryHandle CoronaMemoryAcquireBytes( lua_State * L, int objectIndex, CoronaMemoryKind kind, void * params )
 {
     objectIndex = CoronaLuaNormalize( L, objectIndex );
 
@@ -522,14 +523,14 @@ CoronaMemoryHandle CoronaMemoryAcquireBytes( lua_State * L, CoronaMemoryKind kin
 
 	else
 	{
-		ReplaceWithError( L, objectIndex, lua_gettop( L ), "Object has no reader or reader-writer" ); // TODO: reader vs. writer
+		ReplaceWithError( L, objectIndex, lua_gettop( L ), "Object has no %s or reader-writer", kMemoryRead == kind ? "reader" : "writer" );
 
 		return NullHandle( );
 	}
 }
 
 static CoronaMemoryHandle
-EnsureSizeAndAcquire( lua_State * L, int objectIndex, const unsigned int * expectedSizes, int sizeCount, CoronaMemoryKind kind, void * params )
+EnsureSizeAndAcquire( lua_State * L, int objectIndex, CoronaMemoryKind kind, const unsigned int * expectedSizes, int sizeCount, void * params )
 {
 	CallbackInfo info( L ); // ...
 
@@ -558,20 +559,22 @@ EnsureSizeAndAcquire( lua_State * L, int objectIndex, const unsigned int * expec
 }
 
 CORONA_API
-CoronaMemoryHandle CoronaMemoryEnsureSizeAndAcquireBytes( lua_State * L, CoronaMemoryKind kind, int objectIndex, const unsigned int * expectedSizes, int sizeCount, void * params )
+CoronaMemoryHandle CoronaMemoryEnsureSizeAndAcquireBytes( lua_State * L, int objectIndex, CoronaMemoryKind kind, const unsigned int * expectedSizes, int sizeCount, void * params )
 {
 	objectIndex = CoronaLuaNormalize( L, objectIndex );
 
 	if (GetAssignedCallbacks( L, objectIndex, kind, false )) // ..., object, ...[, reader / writer]
 	{
-		return EnsureSizeAndAcquire( L, objectIndex, expectedSizes, sizeCount, kind, params );
+		return EnsureSizeAndAcquire( L, objectIndex, kind, expectedSizes, sizeCount, params );
 	}
 
 	else
 	{
-		return ReplaceWithErrorAndReturnNullHandle( L, objectIndex, lua_gettop( L ), "Object has no reader or reader-writer" ); // TODO: reader vs. writer
+		return ReplaceWithErrorAndReturnNullHandle( L, objectIndex, lua_gettop( L ), "Object has no %s or reader-writer", kMemoryRead == kind ? "reader" : "writer" );
 	}
 }
+
+// ----------------------------------------------------------------------------
 
 CORONA_API
 const void * CoronaMemoryGetReadableBytes( lua_State * L, CoronaMemoryHandle * memoryHandle )
@@ -635,6 +638,8 @@ unsigned int CoronaMemoryGetStrideCount( lua_State * L, CoronaMemoryHandle * mem
 	return CoronaMemoryGetPosition( L, memoryHandle ) ? memoryHandle->data->fStrideCount : 0U;
 }
 
+// ----------------------------------------------------------------------------
+
 static int
 StackSize( lua_State * L, int index )
 {
@@ -670,13 +675,15 @@ int CoronaMemoryRelease( lua_State * L, CoronaMemoryHandle * memoryHandle )
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
+
 CORONA_API
 int CoronaMemoryAddToStash( lua_State * L, CoronaMemoryHandle * memoryHandle )
 {
 	if (CoronaMemoryGetPosition( L, memoryHandle ) && memoryHandle->lastKnownStackPosition != lua_gettop( L ))
 	{
 		lua_getfenv( L, memoryHandle->lastKnownStackPosition ); // ..., object, env
-		lua_insert( L, -2); // ..., env, object
+		lua_insert( L, -2 ); // ..., env, object
 		lua_rawseti( L, -2, StackSize( L, -2 ) + 1 ); // ..., env = { ..., object }
 		lua_pop( L, 1 ); // ...
 
@@ -739,6 +746,8 @@ int CoronaMemoryPeekAtStash( lua_State * L, CoronaMemoryHandle * memoryHandle )
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
+
 static CoronaMemoryCallbacks *
 NewCallbacks( lua_State * L, const CoronaMemoryCallbacks * callbacks, const char * name, bool userDataFromStack )
 {
@@ -754,7 +763,7 @@ NewCallbacks( lua_State * L, const CoronaMemoryCallbacks * callbacks, const char
 
 		if (userDataFromStack)
 		{
-			res->userData = lua_touserdata( L, -4 );
+			res->userData = lua_touserdata( L, -3 );
 
 			lua_pushvalue( L, -3 ); // ..., userData, callbacks, callbacks_info, userData
 			lua_remove( L, -4 ); // ..., callbacks, callbacks_info, userData
@@ -817,7 +826,7 @@ void * CoronaMemoryFindCallbacks( lua_State * L, const char * name )
 
 		GetCallbacksTable( L ); // ..., callbacks
 
-		for (lua_pushnil( L ); lua_next( L, -1 ); lua_pop( L, 1 ))
+		for (lua_pushnil( L ); lua_next( L, -2 ); lua_pop( L, 1 ))
 		{
 			if (lua_istable( L, -1 ))
 			{
@@ -838,6 +847,24 @@ void * CoronaMemoryFindCallbacks( lua_State * L, const char * name )
 	}
 
 	return key;
+}
+
+CORONA_API
+void * CoronaMemoryGetCallbacks( lua_State * L, int objectIndex, CoronaMemoryKind kind )
+{
+    if (GetAssignedCallbacks( L, objectIndex, kind, false )) // ...[, callbacks]
+    {
+        return lua_touserdata( L, -1 );
+    }
+
+    else if (kMemoryRead == kind && lua_isstring( L, objectIndex ))
+    {
+        GetLuaObjectReader( L ); // ..., LuaObjectReader
+
+        return lua_touserdata( L, -1 );
+    }
+    
+    return NULL;
 }
 
 static unsigned int
@@ -891,7 +918,7 @@ AssignInfoToObject( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsig
 }
 
 CORONA_API
-void * CoronaMemorySetCallbacks( lua_State * L, CoronaMemoryKind kind, int objectIndex, const CoronaMemoryCallbacks * callbacks, int userDataFromStack, unsigned int * hash )
+void * CoronaMemorySetCallbacks( lua_State * L, int objectIndex, CoronaMemoryKind kind, const CoronaMemoryCallbacks * callbacks, int userDataFromStack, unsigned int * hash )
 {
     if (!lua_isnoneornil( L, objectIndex ) && sizeof( CoronaMemoryCallbacks ) == callbacks->size && callbacks->getBytes)
     {
@@ -939,7 +966,7 @@ FoundCallbacksAt( lua_State * L, int index, void * object )
 }
 
 CORONA_API
-int CoronaMemorySetCallbacksByKey( lua_State * L, CoronaMemoryKind kind, int objectIndex, void * key, unsigned int * hash )
+int CoronaMemorySetCallbacksByKey( lua_State * L, int objectIndex, CoronaMemoryKind kind, void * key, unsigned int * hash )
 {
     int available = 0;
 
@@ -977,7 +1004,7 @@ int CoronaMemorySetCallbacksByKey( lua_State * L, CoronaMemoryKind kind, int obj
 }
 
 CORONA_API
-int CoronaMemoryRemoveCallbacks( lua_State * L, CoronaMemoryKind kind, int objectIndex, unsigned int hash )
+int CoronaMemoryRemoveCallbacks( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsigned int hash )
 {
     objectIndex = CoronaLuaNormalize( L, objectIndex );
     
@@ -989,7 +1016,7 @@ int CoronaMemoryRemoveCallbacks( lua_State * L, CoronaMemoryKind kind, int objec
     {
         ObjectLookup( L, objectIndex, kind ); // ..., object, ..., hash_products, product, wt, callbacks
 
-        if (KeyHashProduct( lua_touserdata( L, -1 ), hash) == size_t( luaL_optnumber( L, -3, 0U ) ) )
+        if (KeyHashProduct( lua_touserdata( L, -1 ), hash ) == ( size_t )luaL_optnumber( L, -3, 0U ))
         {
             lua_pushvalue( L, objectIndex ); // ..., object, ..., hash_products, product, wt, callbacks, object
             lua_pushnil( L ); // ..., object, ..., hash_products, product, wt, callbacks, object, nil
@@ -1004,8 +1031,10 @@ int CoronaMemoryRemoveCallbacks( lua_State * L, CoronaMemoryKind kind, int objec
     return result;
 }
 
+// ----------------------------------------------------------------------------
+
 CORONA_API
-int CoronaMemoryGetAlignment( lua_State * L, CoronaMemoryKind kind, int objectIndex, unsigned int * alignment )
+int CoronaMemoryGetAlignment( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsigned int * alignment )
 {
     if (GetAssignedCallbacks( L, objectIndex, kind, false )) // ...[, callbacks]
     {
@@ -1046,31 +1075,15 @@ FindResult( lua_State * L, int objectIndex, CoronaMemoryKind kind, bool wantEnsu
 }
 
 CORONA_API
-int CoronaMemoryIsAvailable( lua_State * L, CoronaMemoryKind kind, int objectIndex )
+int CoronaMemoryIsAvailable( lua_State * L, int objectIndex, CoronaMemoryKind kind )
 {
 	return (kMemoryRead == kind && lua_isstring( L, objectIndex )) || FindResult( L, objectIndex, kind, false );
 }
 
 CORONA_API
-int CoronaMemoryIsResizable( lua_State * L, CoronaMemoryKind kind, int objectIndex )
+int CoronaMemoryIsResizable( lua_State * L, int objectIndex, CoronaMemoryKind kind )
 {
 	return FindResult( L, objectIndex, kind, true );
 }
 
-CORONA_API
-void * CoronaMemoryGetCallbacks( lua_State * L, CoronaMemoryKind kind, int objectIndex )
-{
-    if (GetAssignedCallbacks( L, objectIndex, kind, false )) // ...[, callbacks]
-    {
-        return lua_touserdata( L, -1 );
-    }
-
-    else if (kMemoryRead == kind && lua_isstring( L, objectIndex ))
-    {
-        GetLuaObjectReader( L ); // ..., LuaObjectReader
-
-        return lua_touserdata( L, -1 );
-    }
-	
-    return NULL;
-}
+// ----------------------------------------------------------------------------
