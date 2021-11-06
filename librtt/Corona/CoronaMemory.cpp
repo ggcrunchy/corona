@@ -163,7 +163,7 @@ GetRegistryTable( lua_State * L, void * cookie )
 	lua_pushlightuserdata( L, cookie ); // ..., cookie
 	lua_rawget( L, LUA_REGISTRYINDEX ); // ..., t?
 
-	if (lua_isnil( L, -1 ))
+	if (lua_isnil( L, -1 )) // no table yet?
 	{
 		lua_pop( L, 1 ); // ...
 		lua_newtable( L ); // ..., t
@@ -189,7 +189,7 @@ GetMemoryData( lua_State * L, const CoronaMemoryData & work )
 	lua_rawgeti( L, -1, ( int )lua_objlen( L, -1 ) ); // ..., cache, memoryData?
 	lua_remove( L, -2 ); // ..., memoryData?
 
-	if (lua_isnil( L, -1 ))
+	if (lua_isnil( L, -1 )) // no memory data yet?
 	{
 		lua_pop( L, 1 ); // ...
         lua_newuserdata( L, sizeof( CoronaMemoryData ) ); // ..., memoryData
@@ -209,12 +209,12 @@ ReplaceWithError( lua_State * L, int objectIndex, int oldTop, const char * defau
 {
 	int newTop = lua_gettop( L );
 
-	if (newTop == oldTop || lua_isnil( L, newTop ))
+	if (newTop == oldTop || lua_isnil( L, newTop )) // no custom error?
     {
         lua_pushfstring( L, defaultError, substr ); // ..., object, ..., etc., defError
     }
     
-	else if (lua_isstring( L, -1 ))
+	else if (lua_isstring( L, -1 )) // string-type custom error?
 	{
 		lua_pushfstring( L, defaultError, substr ); // ..., object, ..., etc., error, defError
 		lua_insert( L, -2 ); // ..., object, ..., etc., defError, error
@@ -261,6 +261,7 @@ GetBytesAndRest( lua_State * L, int objectIndex, int oldTop, const CallbackInfo 
 {
 	CoronaMemoryData work;
 
+    // Try to get the bytes.
 	work.fBytes = info.fCallbacks->getBytes( L, objectIndex, kind, &work.fByteCount, extra ); // ...[, etc., error]
 
 	if (!work.fBytes)
@@ -270,6 +271,7 @@ GetBytesAndRest( lua_State * L, int objectIndex, int oldTop, const CallbackInfo 
 
 	lua_settop( L, oldTop ); // ...
 
+    // The bytes might not be one flat array. Try to get any strides.
 	if (info.fCallbacks->getStrides && !info.fCallbacks->getStrides( L, objectIndex, &work.fStrideCount, extra )) // ...[, etc. / strides, error]
 	{
 		return ReplaceWithErrorAndReturnNullHandle( L, objectIndex, oldTop, "'getStrides()' callback failed" ); // ...
@@ -300,6 +302,7 @@ GetBytesAndRest( lua_State * L, int objectIndex, int oldTop, const CallbackInfo 
 		}
 	}
 
+    // Replace the object on the stack, stashing it first.
 	lua_pushvalue( L, objectIndex ); // ..., object, ...[, etc., strides], object
 
 	CoronaMemoryData * memoryData = GetMemoryData( L, work ); // ..., object, ...[, etc., strides], object, memoryData
@@ -312,12 +315,13 @@ GetBytesAndRest( lua_State * L, int objectIndex, int oldTop, const CallbackInfo 
 
 	CoronaMemoryAddToStash( L, &handle ); // ..., memoryData, ...[, etc., strides]
 
+    // If there are strides, save them for lookup.
 	if (work.fStrideCount > 0U)
 	{
 		lua_getfenv( L, objectIndex ); // ..., memoryData, ...[, etc.], strides, env
 		lua_getfield( L, -1, "strides" ); // ..., memoryData, ...[, etc.], strides, env, envStrides
 
-		if (lua_isnil( L, -1 ))
+		if (lua_isnil( L, -1 )) // no strides array yet?
 		{
 			lua_pop( L, 1 ); // ..., memoryData, ...[, etc.], strides, env
 			lua_newtable( L ); // ..., memoryData, ...[, etc.], strides, env, envStrides
@@ -334,6 +338,7 @@ GetBytesAndRest( lua_State * L, int objectIndex, int oldTop, const CallbackInfo 
 		}
 	}
 
+    // Restore the stack and supply the result.
 	lua_settop( L, oldTop ); // ..., memoryData, ...
 
 	return handle;
@@ -366,10 +371,10 @@ GetWeakTable( lua_State * L, CoronaMemoryKind kind, bool hashProduct = false )
     lua_pushlightuserdata( L, &sWeakTableCookie ); // ..., cookie
     lua_rawget( L, LUA_REGISTRYINDEX ); // ..., weak_tables?
 
-    if (lua_isnil( L, -1 ))
+    if (lua_isnil( L, -1 )) // no weak tables array yet?
     {
         lua_pop( L, 1 ); // ...
-        lua_createtable( L, 2, 0 ); // ..., weak_tables
+        lua_createtable( L, 4, 0 ); // ..., weak_tables
         lua_createtable( L, 0, 1 ); // ..., weak_tables, mt
         lua_pushliteral( L, "k" ); // ..., weak_tables, mt, "k"
         lua_setfield( L, -2, "__mode" ); // ..., weak_tables, mt = { __mode = "k" }
@@ -414,7 +419,7 @@ GetAssignedCallbacks( lua_State * L, int & objectIndex, CoronaMemoryKind kind, b
 
 	lua_remove( L, -2 ); // ..., callbacks_info?
 
-	if (lua_istable( L, -1 ))
+	if (lua_istable( L, -1 )) // no info yet?
 	{
 		lua_getfield( L, -1, "callbacks" );// ..., callbacks_info?, callbacks?
 		lua_remove( L, -2 ); // ..., callbacks?
@@ -451,7 +456,7 @@ GetLuaObjectReader (lua_State * L)
 	lua_pushlightuserdata( L, &sKeyCookie ); // ..., callbacks, cookie
 	lua_rawget( L, LUA_REGISTRYINDEX ); // ..., callbacks, key?
 
-	if (lua_isnil( L, -1 ))
+	if (lua_isnil( L, -1 )) // no reader yet?
 	{
 		lua_pop( L, 1 ); // ..., callbacks
 
@@ -480,7 +485,7 @@ GetLuaObjectReader (lua_State * L)
 
 				break;
 			case LUA_TUSERDATA:
-				result = lua_touserdata(L, objectIndex);
+				result = lua_touserdata( L, objectIndex );
 
 				break;
 			default:
@@ -892,9 +897,9 @@ AssignInfoToObject( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsig
 {
 	ObjectLookup( L, objectIndex, kind );	// ..., object, ..., callbacks_info, wt, info?
 
-	if (lua_isnil( L, -1 ))
+	if (lua_isnil( L, -1 )) // no info yet?
 	{
-		if (hash)
+		if (hash) // might want to remove?
 		{
 			GetWeakTable( L, kind, true ); // ..., object, ..., callbacks_info, wt, nil, hash_products_wt
 			PushCallbacksFrom( L, -4 ); // ..., object, ..., callbacks_info, wt, nil, hash_products_wt, callbacks
