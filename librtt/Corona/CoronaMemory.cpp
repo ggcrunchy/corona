@@ -116,17 +116,17 @@ int CoronaMemoryGetPosition( lua_State * L, CoronaMemoryHandle * memoryHandle )
 // ----------------------------------------------------------------------------
 
 static CoronaMemoryCallbacks *
-AsCallbacks(lua_State * L, int index )
+AsCallbacks( lua_State * L, int index )
 {
 	return ( CoronaMemoryCallbacks * )lua_touserdata( L, index );
 }
 
 struct CallbackInfo {
-	CallbackInfo (lua_State * L)
+	CallbackInfo( lua_State * L )
     :   fName( NULL ),
 		fUserData( NULL )
 	{
-		if (lua_istable( L, -1) )
+		if (lua_istable( L, -1 ) )
 		{
 			lua_getfield( L, -1, "callbacks" ); // ..., t, callbacks
 			lua_getfield( L, -2, "name" ); // ..., t, callbacks, name?
@@ -439,7 +439,7 @@ GetAssignedCallbacks( lua_State * L, int & objectIndex, CoronaMemoryKind kind, b
 }
 
 static void
-GetCallbacksTable (lua_State * L)
+GetCallbacksTable( lua_State * L )
 {
 	static int sCallbacksCookie;
 
@@ -447,7 +447,7 @@ GetCallbacksTable (lua_State * L)
 }
 
 static void
-GetLuaObjectReader (lua_State * L)
+GetLuaObjectReader( lua_State * L )
 {
 	static int sKeyCookie;
 
@@ -1052,7 +1052,7 @@ int CoronaMemoryGetAlignment( lua_State * L, int objectIndex, CoronaMemoryKind k
             return 0;
         }
 
-        if (*alignment < alignof( void * )) // 0 or too-small power of 2?
+        if (*alignment < alignof( void * )) // 0 or too-small power?
         {
             *alignment = alignof( void * );
         }
