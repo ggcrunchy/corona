@@ -231,6 +231,11 @@ LuaLibSystem::getInfo( lua_State *L )
 		Runtime *runtime = LuaContext::GetRuntime( L );
 		lua_pushboolean( L, runtime->GetDisplay().GetGpuSupportsHighPrecisionFragmentShaders() );
 	}
+    else if ( Rtt_StringCompare( key, "maxUniformVectorsCount" ) == 0 )
+    {
+        Runtime *runtime = LuaContext::GetRuntime( L );
+        lua_pushnumber( L, runtime->GetDisplay().GetMaxUniformVectorsCount() );
+    }
 	else if ( Rtt_StringCompare( key, "maxVertexTextureUnits" ) == 0 )
 	{
 		Runtime *runtime = LuaContext::GetRuntime( L );
