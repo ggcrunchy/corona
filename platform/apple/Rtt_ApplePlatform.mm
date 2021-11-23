@@ -51,6 +51,9 @@
 	#include "CoronaLuaObjCHelper.h"
 	#include "CoronaEvent.h"
 	#include "Corona/CoronaGraphics.h"
+// STEVE CHANGE
+    #include "Corona/CoronaMemory.h"
+// /STEVE CHANGE
 
 	volatile void* fakeVariableToPreventSymbolStripping[] __attribute__((used)) = {
 		(void*)CoronaEventNameKey,
@@ -71,6 +74,29 @@
 		(void*)CoronaExternalPushTexture,
 		(void*)CoronaExternalGetUserData,
 		(void*)CoronaExternalFormatBPP,
+    // STEVE CHANGE
+        (void*)CoronaMemoryGetLastError,
+        (void*)CoronaMemoryIsValid,
+        (void*)CoronaMemoryGetPosition,
+        (void*)CoronaMemoryAcquireBytes,
+        (void*)CoronaMemoryEnsureSizeAndAcquireBytes,
+        (void*)CoronaMemoryGetReadableBytes,
+        (void*)CoronaMemoryGetWritableBytes,
+        (void*)CoronaMemoryGetByteCount,
+        (void*)CoronaMemoryGetStride,
+        (void*)CoronaMemoryGetStrideCount,
+        (void*)CoronaMemoryRelease,
+        (void*)CoronaMemoryRegisterCallbacks,
+        (void*)CoronaMemoryFindCallbacks,
+        (void*)CoronaMemoryUnregisterCallbacks,
+        (void*)CoronaMemoryGetCallbacks,
+        (void*)CoronaMemorySetCallbacks,
+        (void*)CoronaMemorySetCallbacksByKey,
+        (void*)CoronaMemoryRemoveCallbacks,
+        (void*)CoronaMemoryGetAlignment,
+        (void*)CoronaMemoryIsAvailable,
+        (void*)CoronaMemoryIsResizable
+    // /STEVE CHANGE
 	};
 
 #endif

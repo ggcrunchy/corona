@@ -58,10 +58,13 @@ typedef enum {
  The callbacks are traversed in the order listed below, and called if present and relevant. The
  acquire as a whole fails if any of these operations does, "failure" being a 0 or `NULL` result.
  After an acquire attempt, the object on the stack will be replaced.
- On success, some internal state will take the object's place. However, a reference to it is still
- maintained. @see CoronaMemoryAddToStash
+ On success, some internal state will take the object's place, although a reference to it is held.[1]
  In the event of failure, on the other hand, an error will replace it. If the stack had grown, the
  topmost item--if not `nil`--will be used, else a suitable default.
+ 
+ [1] - In particular, after `getBytes()` has succeeded. Up to this point, the callbacks may in fact
+ swap out the object on the stack themselves. The reference is still available for collection, e.g.
+ if `getStride()` were to raise an error.
 */
 typedef struct CoronaMemoryCallbacks {
 	/**
@@ -90,26 +93,26 @@ typedef struct CoronaMemoryCallbacks {
 	 Optional
 	 The acquire attempt will be aborted if this returns 0.
 	*/
-	int (*canAcquire)( lua_State * L, int objectIndex, CoronaMemoryExtra * extra );
+	int (*canAcquire)( lua_State * L, int objectIndex, const CoronaMemoryExtra * extra );
 
 	/**
 	 Optional
 	 If requested, attempts to conform the object's memory to the expected sizes.
 	*/
-	int (*ensureSizes)( lua_State * L, int objectIndex, const unsigned int * expectedSizes, int sizeCount, CoronaMemoryExtra * extra );
+	int (*ensureSizes)( lua_State * L, int objectIndex, const unsigned int * expectedSizes, int sizeCount, const CoronaMemoryExtra * extra );
 
 	/**
 	 Required
 	 Point to the acquired memory and populate `byteCount` with the addressable size.
 	*/
-	void * (*getBytes)( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsigned int * byteCount, CoronaMemoryExtra * extra );
+	void * (*getBytes)( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsigned int * byteCount, const CoronaMemoryExtra * extra );
 
 	/**
 	 Optional
 	 If requested, `strideCount` is populated with some count >= 0 and the corresponding numbers
      are pushed on the stack. Their product must be <= the byte count.
 	*/
-	int (*getStrides)( lua_State * L, int objectIndex, unsigned int * strideCount, CoronaMemoryExtra * extra );
+	int (*getStrides)( lua_State * L, int objectIndex, unsigned int * strideCount, const CoronaMemoryExtra * extra );
 } CoronaMemoryCallbacks;
 
 
@@ -255,51 +258,17 @@ int CoronaMemoryRelease( lua_State * L, CoronaMemoryHandle * memoryHandle ) CORO
 // ----------------------------------------------------------------------------
 
 /**
- The item on top of the stack is appended to an array belonging to the acquired memory.
- This is mainly intended for internal use: as described in the various acquire operations, the object
- will be replaced on the stack. Due to garbage collection, this might not be safe on its own, so the
- object is temporarily stashed. Other use cases might store additional items in the same way.
- In the event of an error, the underlying array will be cleaned up along with the acquired memory.
- TODO: should this require a hash? written on first add, must be same for subsequent ones? (if so, how to expose?)
- @param L Lua state pointer.
- @param memoryHandle Handle to memory data acquired from an object.
- @return Non-0 on success.
-*/
-CORONA_API
-int CoronaMemoryAddToStash( lua_State * L, CoronaMemoryHandle * memoryHandle/*, unsigned int * hash */) CORONA_PUBLIC_SUFFIX;
-
-/**
- Remove the item most recently added to the acquired memory's stash. @see CoronaMemoryAddToStash
- TODO: if add requires hash, so must this
- @param L Lua state pointer.
- @param memoryHandle Handle to memory data acquired from an object.
- @return Non-0 on success.
-*/
-CORONA_API
-int CoronaMemoryRemoveFromStash( lua_State * L, CoronaMemoryHandle * memoryHandle/*, unsigned int hash */ ) CORONA_PUBLIC_SUFFIX;
-
-/**
- The item most recently added to the acquired memory's stash is pushed onto the stack. @see CoronaMemoryAddToStash
- @param L Lua state pointer.
- @param memoryHandle Handle to memory data acquired from an object.
- @return Non-0 on success.
-*/
-CORONA_API
-int CoronaMemoryPeekAtStash( lua_State * L, CoronaMemoryHandle * memoryHandle ) CORONA_PUBLIC_SUFFIX;
-
-// ----------------------------------------------------------------------------
-
-/**
  Register callbacks for later use.
  @param L Lua state pointer.
  @param callbacks @see CoronaMemoryCallbacks
  @param name If not `NULL`, used for later discovery. @see CoronaMemoryFindCallbacks
  @param userDataFromStack If non-0, the callbacks take ownership of the object on top
  of the stack. If this is a userdata, the callbacks' `userData` member will point to it. @see CoronaMemoryCallbacks
+ @param hash If not `NULL`, populated on success. @see CoronaMemoryUnregisterCallbacks
  @return On success, the callbacks' key; else `NULL`.
 */
 CORONA_API
-void * CoronaMemoryRegisterCallbacks( lua_State * L, const CoronaMemoryCallbacks * callbacks, const char * name, int userDataFromStack ) CORONA_PUBLIC_SUFFIX;
+void * CoronaMemoryRegisterCallbacks( lua_State * L, const CoronaMemoryCallbacks * callbacks, const char * name, int userDataFromStack, unsigned int * hash ) CORONA_PUBLIC_SUFFIX;
 
 /**
  Find a set of registered callbacks. @see CoronaMemoryRegisterCallacks
@@ -310,6 +279,16 @@ void * CoronaMemoryRegisterCallbacks( lua_State * L, const CoronaMemoryCallbacks
 */
 CORONA_API
 void * CoronaMemoryFindCallbacks( lua_State * L, const char * name ) CORONA_PUBLIC_SUFFIX;
+
+/**
+ Remove a set of registered callbacks. @see CoronaMemoryRegisterCallbacks
+ @param L Lua state pointer.
+ @param name Name of the set.
+ @param hash Hash requested when callbacks were registered.
+ @return Non-0 on success.
+*/
+CORONA_API
+int CoronaMemoryUnregisterCallbacks( lua_State * L, const char * name, unsigned int hash ) CORONA_PUBLIC_SUFFIX;
 
 /**
  Push the object's callbacks, if any, onto the stack. @see CoronaMemorySetCallbacks, CoronaMemorySetCallbacksByKey

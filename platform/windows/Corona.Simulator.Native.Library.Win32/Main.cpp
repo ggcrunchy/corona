@@ -25,6 +25,9 @@
 #include "CoronaMacros.h"
 #include "CoronaVersion.h"
 #include "CoronaGraphics.h"
+// STEVE CHANGE
+#include "CoronaMemory.h"
+// /STEVE CHANGE
 //#include "CoronaWin32.h"
 #include <Windows.h>
 
@@ -596,3 +599,177 @@ int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format)
 	return CoronaCallbackInvoke(format);
 }
 #pragma endregion
+
+// STEVE CHANGE
+#pragma region Corona Memory APIs
+
+CORONA_API
+CoronaMemoryGetLastError( lua_State * L, CoronaMemoryHandle * memoryHandle, int clear )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, CoronaMemoryHandle *, int);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, memoryHandle, clear);
+}
+
+CORONA_API
+int CoronaMemoryIsValid( lua_State * L, const CoronaMemoryHandle * memoryHandle )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, const CoronaMemoryHandle *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, memoryHandle);
+}
+
+CORONA_API
+int CoronaMemoryGetPosition( lua_State * L, CoronaMemoryHandle * memoryHandle )
+{
+    typedef int(*CoronaCallbackType)(lua_State * L, CoronaMemoryHandle *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, memoryHandle);
+}
+
+CORONA_API
+CoronaMemoryHandle CoronaMemoryAcquireBytes( lua_State * L, int objectIndex, CoronaMemoryKind kind, void * params )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, int, CoronaMemoryKind, void *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, objectIndex, kind, params);
+}
+
+CORONA_API
+CoronaMemoryHandle CoronaMemoryEnsureSizeAndAcquireBytes( lua_State * L, int objectIndex, CoronaMemoryKind kind, const unsigned int * expectedSizes, int sizeCount, void * params )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, int, CoronaMemoryKind, const unsigned int *, int, void *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, objectIndex, kind, expectedSizes, sizeCount, params);
+}
+
+CORONA_API
+const void * CoronaMemoryGetReadableBytes( lua_State * L, CoronaMemoryHandle * memoryHandle )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, CoronaMemoryHandle *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, memoryHandle);
+}
+
+CORONA_API
+void * CoronaMemoryGetWritableBytes( lua_State * L, CoronaMemoryHandle * memoryHandle )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, CoronaMemoryHandle *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, memoryHandle);
+}
+
+CORONA_API
+unsigned int CoronaMemoryGetByteCount( lua_State * L, CoronaMemoryHandle * memoryHandle )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, CoronaMemoryHandle *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, memoryHandle);
+}
+
+CORONA_API
+int CoronaMemoryGetStride( lua_State * L, CoronaMemoryHandle * memoryHandle, int strideIndex, unsigned int * stride )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, CoronaMemoryHandle *, int, unsigned int *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, memoryHandle, strideIndex, stride);
+}
+
+CORONA_API
+unsigned int CoronaMemoryGetStrideCount( lua_State * L, CoronaMemoryHandle * memoryHandle )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, CoronaMemoryHandle *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, memoryHandle);
+}
+
+CORONA_API
+int CoronaMemoryRelease( lua_State * L, CoronaMemoryHandle * memoryHandle )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, CoronaMemoryHandle *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, memoryHandle);
+}
+
+CORONA_API
+void * CoronaMemoryRegisterCallbacks( lua_State * L, const CoronaMemoryCallbacks * callbacks, const char * name, int userDataFromStack, unsigned int * hash )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, const CoronaMemoryCallbacks *, const char *, int, unsigned int *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, callbacks, name, userDataFromStack, hash);
+}
+
+CORONA_API
+void * CoronaMemoryFindCallbacks( lua_State * L, const char * name )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, const char *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, name);
+}
+
+CORONA_API
+int CoronaMemoryUnregisterCallbacks( lua_State * L, const char * name, unsigned int hash )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, const char *, unsigned int);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, name, hash);
+}
+
+CORONA_API
+void * CoronaMemoryGetCallbacks( lua_State * L, int objectIndex, CoronaMemoryKind kind )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, int, CoronaMemoryKind);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, objectIndex, kind);
+}
+
+CORONA_API
+void * CoronaMemorySetCallbacks( lua_State * L, int objectIndex, CoronaMemoryKind kind, const CoronaMemoryCallbacks * callbacks, int userDataFromStack, unsigned int * hash )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, int, CoronaMemoryKind, const CoronaMemoryCallbacks *, int, unsigned int *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, objectIndex, kind, callbacks, userDataFromStack, hash);
+}
+
+CORONA_API
+int CoronaMemorySetCallbacksByKey( lua_State * L, int objectIndex, CoronaMemoryKind kind, void * key, unsigned int * hash )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, int, CoronaMemoryKind, void *, unsigned int *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, objectIndex, kind, key, hash);
+}
+
+CORONA_API
+int CoronaMemoryRemoveCallbacks( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsigned int hash )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, int, CoronaMemoryKind, unsigned int);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, objectIndex, kind, hash);
+}
+
+CORONA_API
+int CoronaMemoryGetAlignment( lua_State * L, int objectIndex, CoronaMemoryKind kind, unsigned int * alignment )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, int, CoronaMemoryKind, unsigned int *);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, objectIndex, kind, alignment);
+}
+
+CORONA_API
+int CoronaMemoryIsAvailable( lua_State * L, int objectIndex, CoronaMemoryKind kind )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, int, CoronaMemoryKind);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, objectIndex, kind);
+}
+
+CORONA_API
+int CoronaMemoryIsResizable( lua_State * L, int objectIndex, CoronaMemoryKind kind )
+{
+    typedef int(*CoronaCallbackType)(lua_State *, int, CoronaMemoryKind);
+    CoronaCallbackLoad();
+    return CoronaCallbackInvoke(L, objectIndex, kind);
+}
+
+#pragma endregion
+// /STEVE CHANGE
