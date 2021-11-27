@@ -509,6 +509,12 @@ GetLuaObjectReader( lua_State * L )
 	lua_remove( L, -2 ); // ..., LuaObjectReader
 }
 
+static bool
+HasImplicitReader( lua_State * L, int objectIndex, CoronaMemoryKind kind )
+{
+    return kMemoryRead == kind && lua_isstring( L, objectIndex );
+}
+
 CORONA_API
 CoronaMemoryHandle CoronaMemoryAcquireBytes( lua_State * L, int objectIndex, CoronaMemoryKind kind, void * params )
 {
@@ -516,7 +522,7 @@ CoronaMemoryHandle CoronaMemoryAcquireBytes( lua_State * L, int objectIndex, Cor
 
 	bool found = GetAssignedCallbacks( L, objectIndex, kind, false ); // ..., object, ...[, reader / writer]
 
-	if (!found && kMemoryRead == kind && lua_isstring( L, objectIndex ))
+	if (!found && HasImplicitReader( L, objectIndex, kind ))
 	{
 		GetLuaObjectReader( L ); // ..., object, ..., LuaObjectReader
 
@@ -849,7 +855,7 @@ void * CoronaMemoryGetCallbacks( lua_State * L, int objectIndex, CoronaMemoryKin
         return lua_touserdata( L, -1 );
     }
 
-    else if (kMemoryRead == kind && lua_isstring( L, objectIndex ))
+    else if (HasImplicitReader( L, objectIndex, kind ))
     {
         GetLuaObjectReader( L ); // ..., LuaObjectReader
 
@@ -1063,7 +1069,7 @@ FindResult( lua_State * L, int objectIndex, CoronaMemoryKind kind, bool wantEnsu
 CORONA_API
 int CoronaMemoryIsAvailable( lua_State * L, int objectIndex, CoronaMemoryKind kind )
 {
-	return (kMemoryRead == kind && lua_isstring( L, objectIndex )) || FindResult( L, objectIndex, kind, false );
+	return HasImplicitReader( L, objectIndex, kind ) || FindResult( L, objectIndex, kind, false );
 }
 
 CORONA_API
