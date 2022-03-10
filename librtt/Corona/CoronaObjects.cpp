@@ -1570,20 +1570,7 @@ int CoronaObjectInvalidate( const CoronaDisplayObject * object )
     return 0;
 }
 
-CORONA_API
-int CoronaObjectSetHasDummyStageBounds( const CoronaDisplayObject * object, int hasBounds )
-{
-    auto * displayObject = OBJECT_BOX_LOAD( DisplayObject, object );
-
-    if (displayObject)
-    {
-        displayObject->SetDummyStageBounds( hasBounds );
-
-        return 1;
-    }
-
-    return 0;
-}
+// STEVE CHANGE removed SetHasDummyStageBounds
 
 // ----------------------------------------------------------------------------
 

@@ -789,7 +789,7 @@ DisplayLibrary::newPolygon( lua_State *L )
 
         if (hasZ)
         {
-            ArrayIndex * indexArray = path->GetFillSource().ExtraIndexArray( 0U, true ); // FIXME!
+            ArrayIndex * indexArray = path->GetFillSource().ExtraIndexArray( DisplayPath::IndicesKey(), true ); // STEVE CHANGE
 
             tesselator->SetTriangulationArray( indexArray );
 
@@ -1938,11 +1938,6 @@ DisplayLibrary::getDefault( lua_State *L )
         lua_pushboolean( L, value ? 1 : 0 );
     }
 // STEVE CHANGE
-    else if ( ( Rtt_StringCompare( key, "ignoresStageBounds" ) == 0 ) )
-    {
-        bool value = defaults.GetIgnoresStageBounds();
-        lua_pushboolean( L, value ? 1 : 0 );
-    }
     else if ( ( Rtt_StringCompare( key, "skipsCulling" ) == 0 ) )
     {
         bool value = defaults.GetSkipsCull();
@@ -2116,11 +2111,6 @@ DisplayLibrary::setDefault( lua_State *L )
         defaults.SetImageSheetSampledInsideFrame( value );
     }
 // STEVE CHANGE
-    else if ( ( Rtt_StringCompare( key, "ignoresStageBounds" ) == 0 ) )
-    {
-        bool value = lua_toboolean( L, index ) ? true : false;
-        defaults.SetIgnoresStageBounds( value );
-    }
     else if ( ( Rtt_StringCompare( key, "skipsCulling" ) == 0 ) )
     {
         bool value = lua_toboolean( L, index ) ? true : false;
@@ -2887,7 +2877,6 @@ LuaLibDisplay::AssignParentAndPushResult( lua_State *L, Display& display, Displa
         o->SetAnchorY( defaults.GetAnchorY() );
     }
 // STEVE CHANGE
-    o->SetDummyStageBounds( defaults.GetIgnoresStageBounds() );
     o->SetSkipsCull( defaults.GetSkipsCull() );
     o->SetSkipsHitTest( defaults.GetSkipsHitTest() );
 // /STEVE CHANGE

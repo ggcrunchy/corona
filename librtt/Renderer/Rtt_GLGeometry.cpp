@@ -514,7 +514,7 @@ GLGeometry::Update( CPUResource* resource )
             // STEVE CHANGE
             /*const */size_t size = sizeof(Geometry::Vertex);
             
-            if (extensionList->HasVertexRateData())
+            if (extensionList && extensionList->HasVertexRateData()) // <- STEVE CHANGE
             {
                 Geometry::Vertex* extendedData = geometry->GetWritableExtendedVertexData();
                 
@@ -600,7 +600,7 @@ GLGeometry::Update( CPUResource* resource )
             // STEVE CHANGE
             size_t size = sizeof(Geometry::Vertex);
             
-            if (extensionList->HasVertexRateData())
+            if (extensionList && extensionList->HasVertexRateData()) // <- STEVE CHANGE
             {
                 Geometry::Vertex* extendedData = geometry->GetWritableExtendedVertexData();
                 

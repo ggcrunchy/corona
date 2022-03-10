@@ -119,7 +119,7 @@
         (void*)CoronaObjectsPushSprite,
         (void*)CoronaObjectsPushText,
         (void*)CoronaObjectInvalidate,
-        (void*)CoronaObjectSetHasDummyStageBounds,
+        // STEVE CHANGE removed SetHasDummyStageBounds
         (void*)CoronaObjectGetParent,
         (void*)CoronaGroupObjectGetChild,
         (void*)CoronaGroupObjectGetNumChildren,
