@@ -440,7 +440,7 @@ GraphicsLibrary::defineShellTransform( lua_State * L )
 
                             else
                             {
-                                Rtt_TRACE_SIM( ( "graphics.defineShellTransform(): non-string modification value" ) );
+                                Rtt_TRACE_SIM( ( "graphics.defineShellTransform(): non-number priority" ) ); // <- STEVE CHANGE
                             }
 
                             lua_pop( L, 1 ); // params, transformations, name, xforms, xform, original, modificationTable
@@ -642,6 +642,28 @@ GraphicsLibrary::defineVertexExtension( lua_State *L )
         Rtt_TRACE_SIM( ( "WARNING: `graphics.defineVertexExtension()` expected table" ) );
     }
 
+	VertexAttributeSupport support;
+	
+	library->GetDisplay().GetVertexAttributes( support );
+	
+	int instanceByID;
+	
+	if (ok)
+	{
+		lua_getfield( L, 1, "instanceByID" ); // params, name, instanceByID
+
+		instanceByID = lua_toboolean( L, -1 ); // params, name
+		
+		lua_pop( L, 1 ); // 
+		
+		ok = !instanceByID || NULL != support.suffix;
+
+		if (!ok)
+		{
+			Rtt_TRACE_SIM( ( "WARNING: `instance-by-ID requested, but not supported" ) );
+		}
+	}
+	
     if (!ok)
     {
         lua_pushboolean( L, 0 ); // params[, name], false
@@ -649,12 +671,8 @@ GraphicsLibrary::defineVertexExtension( lua_State *L )
         return 1;
     }
  
-    std::vector< CoronaVertexExtensionAttribute > attributes;
-    VertexAttributeSupport support;
-    
-    U32 attribCount = 0;
-    
-    library->GetDisplay().GetVertexAttributes( support );
+    std::vector< CoronaVertexExtensionAttribute > attributes;	
+	U32 attribCount = 0;
 
     ok = false;
 
@@ -808,6 +826,7 @@ GraphicsLibrary::defineVertexExtension( lua_State *L )
         extension.size = sizeof( CoronaVertexExtension );
         extension.attributes = attributes.data();
         extension.count = attributes.size();
+		extension.instanceByID = instanceByID;
         
         ok = CoronaGeometryRegisterVertexExtension( L, name, &extension );
     }

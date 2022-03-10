@@ -22,7 +22,6 @@
 // STEVE CHANGE
 #include <stddef.h>
 // /STEVE CHANGE
-#include "Corona/CoronaLog.h" // <- STEVE CHANGE HACK
 
 // ----------------------------------------------------------------------------
 
@@ -263,10 +262,6 @@ GLGeometry::GLGeometry()
     fInstancesAllocated( -1 )
 // /STEVE CHANGE
 {
-    // STEVE CHANGE HACK
-    static int siii;
-    iii=siii++;
-    // /STEVE CHANGE HACK
 }
 
 // STEVE CHANGE
@@ -431,7 +426,7 @@ GLGeometry::Create( CPUResource* resource )
 {
     Rtt_ASSERT( CPUResource::kGeometry == resource->GetType() );
     Geometry* geometry = static_cast<Geometry*>( resource );
-    CoronaLog("CREATE %i", iii); // <- STEVE CHANGE HACK
+
     bool shouldStoreOnGPU = geometry->GetStoredOnGPU();
     if ( shouldStoreOnGPU )
     {
@@ -458,7 +453,7 @@ GLGeometry::Create( CPUResource* resource )
     // STEVE CHANGE
         const Geometry::ExtensionBlock* block = geometry->GetExtensionBlock();
         
-        if (block && block->fCount > 0)
+        if (block && block->fCount > 0 && geometry->GetExtensionList()->HasInstanceRateData())
         {
             createInstanceVBO( geometry, fInstancesVBO );
             fInstancesAllocated = block->fCount;
@@ -698,7 +693,6 @@ GLGeometry::Destroy()
         fInstancesVBO = 0;
     }
 // /STEVE CHANGE
-    CoronaLog("DESTROY %i",iii); // <- STEVE CHANGE HACK
 }
 
 // STEVE CHANGE

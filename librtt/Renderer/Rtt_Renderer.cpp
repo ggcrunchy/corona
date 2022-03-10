@@ -582,7 +582,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
     }
     
     const Geometry::ExtensionBlock* block = geometry->GetExtensionBlock();
-    bool isInstanced = block && block->fInstanceData;
+    bool isInstanced = block && (block->fInstanceData || extensionList->instancedByID);
  // /STEVE CHANGE
     // Geometry that is stored on the GPU does not need to be copied
     // over each frame. As a consequence, they can not be batched.
@@ -707,7 +707,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
         // STEVE CHANGE
         if (isInstanced)
         {
-            Rtt_ASSERT( programList && programList->HasInstanceRateData() );
+            Rtt_ASSERT( programList && programList->IsInstanced() );
 
             InsertInstancing( block, programList, extensionList );
             
@@ -1454,13 +1454,13 @@ Renderer::InsertInstancing( const Geometry::ExtensionBlock* block, const FormatE
     bool enoughSpace = fCurrentInstancingGeometry && verticesRequired <=
      ( fCurrentInstancingGeometry->GetVerticesAllocated() - fCurrentInstancingGeometry->GetVerticesUsed() );
     
-    if (!enoughSpace)
+    if (verticesRequired > 0 && !enoughSpace)
     {
         fCurrentInstancingGeometry = fInstancingGeometryPool->GetOrCreate( verticesRequired );
         fCurrentInstancingVertex = fCurrentInstancingGeometry->GetVertexData();
     }
     
-    fBackCommandBuffer->BindInstancing( block->fCount, fCurrentInstancingVertex );
+    fBackCommandBuffer->BindInstancing( block->fCount, verticesRequired > 0 ? fCurrentInstancingVertex : NULL );
     
     for (auto iter = FormatExtensionList::InstancedGroups( programList ); !iter.IsDone(); iter.Advance())
     {
@@ -1489,7 +1489,10 @@ Renderer::InsertInstancing( const Geometry::ExtensionBlock* block, const FormatE
         fCurrentInstancingVertex += vertexCount;
     }
     
-    fCurrentInstancingGeometry->SetVerticesUsed( fCurrentInstancingGeometry->GetVerticesUsed() + verticesRequired );
+	if (verticesRequired > 0)
+	{
+		fCurrentInstancingGeometry->SetVerticesUsed( fCurrentInstancingGeometry->GetVerticesUsed() + verticesRequired );
+	}
 }
 // /STEVE CHANGE
 

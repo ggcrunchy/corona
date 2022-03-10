@@ -438,7 +438,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
             extendedHints[4] = "extensionAttributes";
             
             // enable instances and / or provide IDs for the same
-            if (extensionList->HasInstanceRateData()) // TODO: or "wants instancing"?
+            if (extensionList->IsInstanced())
             {
                 const char * idSuffix = GLGeometry::InstanceIDSuffix();
                 

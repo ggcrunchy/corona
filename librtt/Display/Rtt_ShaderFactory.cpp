@@ -1463,11 +1463,17 @@ ShaderFactory::RegisterVertexExtension( const char * name, const CoronaVertexExt
         VertexAttributeSupport support;
         
         fOwner.GetVertexAttributes( support );
-        
-        U32 count = extension.count;
+
+        U32 n = extension.count, count = n;
         bool ok = true;
         
-        for (unsigned int i = 0; i < extension.count; ++i)
+		if (extension.instanceByID && NULL == support.suffix)
+		{
+			ok = false;
+			n = 0;
+		}
+		
+        for (unsigned int i = 0; i < n; ++i)
         {
             const CoronaVertexExtensionAttribute & attribute = extension.attributes[i];
             
