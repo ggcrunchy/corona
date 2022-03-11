@@ -549,6 +549,10 @@ GraphicsLibrary::defineShellTransform( lua_State * L )
 
                     for (const PairWithPriority & pwp : entry.fFindAndReplace)
                     {
+						// STEVE CHANGE
+						size_t lastPos = std::string::npos;
+						U32 repeatCount = 0, overallCount = 0;
+						// /STEVE CHANGE
                         while (true)
                         {
                             size_t pos = updated.find( pwp.fOriginal );
@@ -557,8 +561,34 @@ GraphicsLibrary::defineShellTransform( lua_State * L )
                             {
                                 break;
                             }
+							
+							// STEVE CHANGE
+							// Guard against getting stuck, e.g. if our substitution
+							// ens up copying or appending to the input string.
+							if (pos == lastPos)
+							{
+								++repeatCount;
+							}
+							
+							else
+							{
+								lastPos = pos;
+								repeatCount = 0;
+							}
+							
+							++overallCount;
+							
+							bool tooManyLoops = 10 == repeatCount || 100 == overallCount;
+							// /STEVE CHANGE
 
-                            updated.replace( pos, pwp.fOriginal.size(), pwp.fModifier );
+                            updated.replace( pos, pwp.fOriginal.size(), !tooManyLoops ? pwp.fModifier : "\n#error Too many loops\n" ); // <- STEVE CHANGE
+							
+							// STEVE CHANGE
+							if (tooManyLoops)
+							{
+								break;
+							}
+							// /STEVE CHANGE
                         }
                     }
 
@@ -597,12 +627,10 @@ GraphicsLibrary::defineShellTransform( lua_State * L )
 
     if (ok)
     {
-        lua_pushboolean( L, 1 ); // params, transformations, true
-        lua_rawset( L, LUA_REGISTRYINDEX ); // params; registry = { ..., [transformations] = true }
-        // STEVE CHANGE FIXME
-            // not acknowledged by Unregister()... add to ShaderFactory() state
-            // use some "ShellTransform" key?
-        // /STEVE CHANGE
+		GraphicsLibrary *library = GraphicsLibrary::ToLibrary( L );
+		ShaderFactory& factory = library->GetDisplay().GetShaderFactory();
+		
+		factory.AddExternalInfo( L, name, "shellTransform" ); // params
     }
 
     lua_pushboolean( L, ok ); // params[, transformations], ok

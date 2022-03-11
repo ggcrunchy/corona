@@ -90,6 +90,11 @@
         (void*)CoronaGeometryCopyData,
         (void*)CoronaGeometryGetMappingFromRenderData,
         
+	// STEVE CHANGE
+		(void*)CoronaGeometryRegisterVertexExtension,
+		(void*)CoronaGeometryUnregisterVertexExtension,
+	// /STEVE CHANGE
+		
         (void*)CoronaShaderGetEffectDetail,
         (void*)CoronaShaderRegisterShellTransform,
         (void*)CoronaShaderUnregisterShellTransform,
