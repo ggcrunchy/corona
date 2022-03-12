@@ -1894,9 +1894,15 @@ Display::GetMaxVertexTextureUnits()
 
 // STEVE CHANGE
 void
-Display::GetVertexAttributes( VertexAttributeSupport & support )
+Display::GetVertexAttributes( VertexAttributeSupport & support ) const
 {
     fRenderer->GetVertexAttributes( support );
+}
+
+bool
+Display::HasFramebufferBlit() const
+{
+    return fRenderer->HasFramebufferBlit();
 }
 // /STEVE CHANGE
 

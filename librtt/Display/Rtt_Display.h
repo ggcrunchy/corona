@@ -330,7 +330,8 @@ class Display
         static U32 GetMaxUniformVectorsCount();
         static U32 GetMaxVertexTextureUnits();
     // STEVE CHANGE
-        void GetVertexAttributes( VertexAttributeSupport & support );
+        void GetVertexAttributes( VertexAttributeSupport & support ) const;
+		bool HasFramebufferBlit() const;
     // /STEVE CHANGE
 
     public:

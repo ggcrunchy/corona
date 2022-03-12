@@ -412,7 +412,7 @@ Renderer::GetFrameBufferObject() const
 }
 
 void
-Renderer::SetFrameBufferObject( FrameBufferObject* fbo )
+Renderer::SetFrameBufferObject( FrameBufferObject* fbo, bool asDrawBuffer ) // <- STEVE CHANGE
 {
     fFrameBufferObject = fbo;
 
@@ -431,7 +431,7 @@ Renderer::SetFrameBufferObject( FrameBufferObject* fbo )
             QueueCreate( fbo );
         }
     }
-    fBackCommandBuffer->BindFrameBufferObject( fbo );
+    fBackCommandBuffer->BindFrameBufferObject( fbo, asDrawBuffer ); // <- STEVE CHANGE
     
     DEBUG_PRINT( "Bind FrameBufferObject: %p\n", fbo );
 }
@@ -1220,9 +1220,15 @@ Renderer::GetMaxVertexTextureUnits()
 
 // STEVE CHANGE
 void
-Renderer::GetVertexAttributes( VertexAttributeSupport & support )
+Renderer::GetVertexAttributes( VertexAttributeSupport & support ) const
 {
     fBackCommandBuffer->GetVertexAttributes( support );
+}
+
+bool
+Renderer::HasFramebufferBlit() const
+{
+	return fBackCommandBuffer->HasFramebufferBlit();
 }
 // /STEVE CHANGE
 

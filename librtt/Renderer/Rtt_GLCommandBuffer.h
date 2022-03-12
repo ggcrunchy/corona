@@ -33,7 +33,8 @@ class GLCommandBuffer : public CommandBuffer
         typedef GLCommandBuffer Self;
     
     // STEVE CHANGE
-        void GetVertexAttributes( VertexAttributeSupport & support );
+        void GetVertexAttributes( VertexAttributeSupport & support ) const;
+		bool HasFramebufferBlit() const;
     // /STEVE CHANGE
 
     public:
@@ -48,7 +49,10 @@ class GLCommandBuffer : public CommandBuffer
 
         // Generate the appropriate buffered OpenGL commands to accomplish the
         // specified state changes.
-        virtual void BindFrameBufferObject( FrameBufferObject* fbo );
+        virtual void BindFrameBufferObject( FrameBufferObject* fbo, bool asDrawBuffer ); // <- STEVE CHANGE
+	// STEVE CHANGE
+		virtual void CaptureRect( FrameBufferObject* fbo, Texture& texture, const Rect& rect );
+	// /STEVE CHANGE
         virtual void BindGeometry( Geometry* geometry );
         virtual void BindTexture( Texture* texture, U32 unit );
         virtual void BindUniform( Uniform* uniform, U32 unit );

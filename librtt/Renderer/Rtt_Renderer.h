@@ -107,7 +107,7 @@ class Renderer
 
         // Set the FrameBufferObject. All subsequently inserted RenderData will
         // be drawn to this FBO until SetFrameBufferObject() is called again.
-        void SetFrameBufferObject( FrameBufferObject* fbo );
+        void SetFrameBufferObject( FrameBufferObject* fbo, bool asDrawBuffer = false ); // <- STEVE CHANGE
 
     // STEVE CHANGE
         struct ExtraClearOptions {
@@ -182,7 +182,8 @@ class Renderer
         static U32 GetMaxUniformVectorsCount();
         static U32 GetMaxVertexTextureUnits();
     // STEVE CHANGE
-        void GetVertexAttributes( VertexAttributeSupport & support );
+        void GetVertexAttributes( VertexAttributeSupport & support ) const;
+		bool HasFramebufferBlit() const;
     // /STEVE CHANGE
 
         struct Statistics

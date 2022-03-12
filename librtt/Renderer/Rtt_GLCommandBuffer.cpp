@@ -45,6 +45,9 @@ namespace /*anonymous*/
     {
         kCommandBindFrameBufferObject,
         kCommandUnBindFrameBufferObject,
+	// STEVE CHANGE
+		kCommandCaptureRect,
+	// /STEVE CHANGE
         kCommandBindGeometry,
         kCommandBindTexture,
         kCommandBindProgram,
@@ -325,7 +328,7 @@ CommandBuffer::GetGpuSupportsHighPrecisionFragmentShaders()
 
 // STEVE CHANGE
 void
-GLCommandBuffer::GetVertexAttributes( VertexAttributeSupport & support )
+GLCommandBuffer::GetVertexAttributes( VertexAttributeSupport & support ) const
 {
     static GLint sMaxVertexAttribs = -1;
     
@@ -341,6 +344,12 @@ GLCommandBuffer::GetVertexAttributes( VertexAttributeSupport & support )
     support.hasDivisors = GLGeometry::SupportsDivisors();
     support.hasPerInstance = support.hasDivisors; // divisor == 1
     support.suffix = GLGeometry::InstanceIDSuffix();
+}
+
+bool
+GLCommandBuffer::HasFramebufferBlit() const
+{
+	return GLFrameBufferObject::HasFramebufferBlit();
 }
 // /STEVE CHANGE
 
@@ -464,18 +473,39 @@ GLCommandBuffer::ClearUserUniforms()
 }
 
 void
-GLCommandBuffer::BindFrameBufferObject(FrameBufferObject* fbo)
+GLCommandBuffer::BindFrameBufferObject(FrameBufferObject* fbo, bool asDrawBuffer) // <- STEVE CHANGE
 {
     if( fbo )
     {
         WRITE_COMMAND( kCommandBindFrameBufferObject );
         Write<GPUResource*>( fbo->GetGPUResource() );
+		Write<bool>( asDrawBuffer ); // <- STEVE CHANGE
     }
     else
     {
         WRITE_COMMAND( kCommandUnBindFrameBufferObject );
     }
 }
+
+// STEVE CHANGE
+void
+GLCommandBuffer::CaptureRect( FrameBufferObject* fbo, Texture& texture, const Rect& rect )
+{
+	WRITE_COMMAND( kCommandCaptureRect );
+	
+	if (!fbo)
+	{
+		Write<GPUResource*>( texture.GetGPUResource() );
+	}
+	
+	else
+	{
+		Write<GPUResource*>( NULL );
+	}
+	
+	Write<Rect>( rect );
+}
+// /STEVE CHANGE
 
 void
 GLCommandBuffer::BindGeometry( Geometry* geometry )
@@ -924,6 +954,7 @@ GLCommandBuffer::Execute( bool measureGPU )
     //GL_CHECK_ERROR();
     // STEVE CHANGE
     GLGeometry* geometry = NULL;
+	GLTexture* lastTexture0 = NULL;
     Geometry::Vertex* instancingData = NULL;
     U32 currentAttributeCount = 0, instanceCount = 0, vertexOffset = 0;
     bool formatDirty = false, clearingDepth = false, clearingStencil = false;
@@ -941,10 +972,12 @@ GLCommandBuffer::Execute( bool measureGPU )
             case kCommandBindFrameBufferObject:
             {
                 GLFrameBufferObject* fbo = Read<GLFrameBufferObject*>();
-                fbo->Bind();
-                DEBUG_PRINT( "Bind FrameBufferObject: OpenGL name: %i, OpenGL Texture name, if any: %d",
+				bool asDrawBuffer = Read<bool>(); // <- STEVE CHANGE
+                fbo->Bind( asDrawBuffer ); // <- STEVE CHANGE
+                DEBUG_PRINT( "Bind FrameBufferObject (as draw buffer = %s): OpenGL name: %i, OpenGL Texture name, if any: %d",
+								asDrawBuffer ? "true" : "false",
                                 fbo->GetName(),
-                                fbo->GetTextureName() );
+                                fbo->GetTextureName() ); // <- STEVE CHANGE
                 CHECK_ERROR_AND_BREAK;
             }
             case kCommandUnBindFrameBufferObject:
@@ -953,6 +986,37 @@ GLCommandBuffer::Execute( bool measureGPU )
                 DEBUG_PRINT( "Unbind FrameBufferObject: OpenGL name: %i (fDefaultFBO)", fDefaultFBO );
                 CHECK_ERROR_AND_BREAK;
             }
+		// STEVE CHANGE
+			case kCommandCaptureRect:
+			{
+				GLTexture* texture = Read<GLTexture*>();
+				Rect rect = Read<Rect>();
+				
+				int w = rect.xMax - rect.xMin; 
+				int h = rect.yMax - rect.yMin;
+				
+				if (!texture)
+				{
+					// TODO: allow some flexibility for downsampling etc.
+					
+					GLFrameBufferObject::Blit( rect.xMin, rect.yMin, w, h, rect.xMin, rect.yMin, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+				}
+				else
+				{
+					texture->Bind( 0 );
+					
+					glCopyTexSubImage2D( GL_TEXTURE_2D, 0, rect.xMin, rect.yMin, rect.xMin, rect.yMin, w, h );
+					
+					if (lastTexture0)
+					{
+						lastTexture0->Bind( 0 );
+					}
+				}
+				
+				DEBUG_PRINT( "Capture Rect: (%i, %i, %i, %i), using FBO = %s", rect.xMin, rect.yMin, w, h, !texture ? "true" : "false" );
+				CHECK_ERROR_AND_BREAK;
+			}
+		// /STEVE CHANGE
             case kCommandBindGeometry:
             {
                 /*GLGeometry* */geometry = Read<GLGeometry*>(); // <- STEVE CHANGE
@@ -965,6 +1029,12 @@ GLCommandBuffer::Execute( bool measureGPU )
                 U32 unit = Read<U32>();
                 GLTexture* texture = Read<GLTexture*>();
                 texture->Bind( unit );
+			// STEVE CHANGE
+				if (0 == unit)
+				{
+					lastTexture0 = texture;
+				}
+			// /STEVE CHANGE
                 DEBUG_PRINT( "Bind Texture: texture=%p unit=%i OpenGL name=%d",
                                 texture,
                                 unit,

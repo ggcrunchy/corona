@@ -30,10 +30,16 @@ class GLFrameBufferObject : public GPUResource
 		virtual void Create( CPUResource* resource );
 		virtual void Update( CPUResource* resource );
 		virtual void Destroy();
-		virtual void Bind();
+		virtual void Bind( bool asDrawBuffer ); // <- STEVE CHANGE
 
 		virtual GLuint GetName();
 		virtual GLuint GetTextureName();
+
+	// STEVE CHANGE
+	public:
+		static bool HasFramebufferBlit();
+		static void Blit( int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2, GLbitfield mask, GLenum filter );
+	// /STEVE CHANGE
 };
 
 // ----------------------------------------------------------------------------
