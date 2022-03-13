@@ -118,6 +118,7 @@ typedef void (*BindFramebufferPtr)( GLenum target, GLuint framebuffer );
 static BlitFramebufferPtr sBlitFramebuffer;
 static BindFramebufferPtr sBindFramebuffer;
 static GLenum sDrawBufferBinding;
+static GLenum sReadBufferBinding;
 // /STEVE CHANGE
 
 void 
@@ -129,6 +130,7 @@ GLFrameBufferObject::Bind( bool asDrawBuffer ) // <- STEVE CHANGE
 		Rtt_ASSERT( HasFramebufferBlit() );
 		
 		sBindFramebuffer( sDrawBufferBinding, GetName() );
+		sBindFramebuffer( sReadBufferBinding, 0 );
 	}
 	
 	else
@@ -186,6 +188,7 @@ GLFrameBufferObject::HasFramebufferBlit()
 		#if GL_ARB_framebuffer_object 
 			sBlitFramebuffer = glBlitFramebuffer;
 			sDrawBufferBinding = GL_DRAW_FRAMEBUFFER;
+			sReadBufferBinding = GL_READ_FRAMEBUFFER;
 		#endif
 			
 		#if GL_EXT_framebuffer_blit
@@ -194,11 +197,13 @@ GLFrameBufferObject::HasFramebufferBlit()
 				sBlitFramebuffer = GL_GET_PROC( BlitFramebuffer, EXT );
 				sBindFramebuffer = GL_GET_PROC( BindFramebuffer, EXT );
 				sDrawBufferBinding = GL_DRAW_FRAMEBUFFER_EXT;
+				sReadBufferBinding = GL_READ_FRAMEBUFFER_EXT;
 			}
 		#endif
 	#elif defined( GL_DRAW_FRAMEBUFFER_ANGLE )
 		sBlitFramebuffer = GL_GET_PROC( BlitFramebuffer, ANGLE );
 		sDrawBufferBinding = GL_DRAW_FRAMEBUFFER_ANGLE;
+		sReadBufferBinding = GL_READ_FRAMEBUFFER_ANGLE;
 	#endif
 	}
 		
@@ -208,18 +213,18 @@ GLFrameBufferObject::HasFramebufferBlit()
 #undef GL_GET_PROC
 
 void
-GLFrameBufferObject::Blit( int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2, GLbitfield mask, GLenum filter )
+GLFrameBufferObject::Blit( int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, GLbitfield mask, GLenum filter )
 {
 	Rtt_ASSERT( HasFramebufferBlit() ); // n.b. assumed not to be first time called
 
 #if defined( Rtt_OPENGLES )
 	// ANGLE extension does not support stretching
-	w2 = w1;
-	h2 = h1;
+	dstX1 = dstX0 + (srcX1 - srcX0);
+	dstY1 = dstY0 + (srcY1 - srcY0);
 	filter = GL_NEAREST;
 #endif
 	
-	sBlitFramebuffer( x1, y1, w1, h1, x2, y2, w2, h2, mask, filter );
+	sBlitFramebuffer( srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter );
 }
 // /STEVE CHANGE
 

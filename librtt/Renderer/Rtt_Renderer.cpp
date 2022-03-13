@@ -196,21 +196,7 @@ Renderer::Initialize()
     fFrontCommandBuffer->Initialize();
 }
 
-static void
-CallOps( Rtt::Renderer * renderer, Rtt::Array< Renderer::CustomOp > & ops, Rtt::ObjectBoxList & list )
-{
-    OBJECT_BOX_STORE( Renderer, ref, renderer );
-
-    for (S32 i = 0; i < ops.Length(); ++i)
-    {
-        Renderer::CustomOp & op = ops[i];
-
-        if (op.fAction)
-        {
-            op.fAction( ref, op.fUserData );
-        }
-    }
-}
+// STEVE CHANGE removed CallOps
 
 void
 Renderer::BeginFrame( Real totalTime, Real deltaTime, Real contentScaleX, Real contentScaleY )

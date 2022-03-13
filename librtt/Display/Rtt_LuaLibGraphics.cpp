@@ -1277,7 +1277,7 @@ SharedPtr<TextureResource> CreateResourceCaptureFromTable(Rtt::TextureFactory &f
 		{
 			pixelWidth = Rtt_RealToInt( width );
 			pixelHeight = Rtt_RealToInt( height );
-			display.ContentToScreen( pixelWidth, pixelHeight );
+		//	display.ContentToScreen( pixelWidth, pixelHeight );
 		}
 		
 		int texSize = display.GetMaxTextureSize();

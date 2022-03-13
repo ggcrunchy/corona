@@ -13,8 +13,10 @@
 #include "Rtt_LuaProxyVTable.h"
 #include "Rtt_LuaLibDisplay.h"
 #include "Rtt_GroupObject.h"
-
 // STEVE CHANGE
+#include "Rtt_Display.h"
+#include "Rtt_Runtime.h"
+
 #include "Rtt_ObjectBoxList.h"
 #include "Renderer/Rtt_Renderer.h"
 #include "Renderer/Rtt_CommandBuffer.h"
@@ -296,7 +298,7 @@ TextureResourceCaptureAdapter::GetHash( lua_State *L ) const
 		"newCaptureRect"	//4
 	};
 	
-	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 0, 0, 0, __FILE__, __LINE__ );
+	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 5, 2, 1, __FILE__, __LINE__ );
 	return &sHash;
 }
 
@@ -386,7 +388,12 @@ TextureResourceCaptureAdapter::newCaptureRect( lua_State *L )
 {
 	static bool sInitialized;
 	static CoronaObjectParams sParams;
-	static unsigned long sCommandID, sStateBlockID;
+	static unsigned long sStateBlockID;
+	
+	struct InputDrawData {
+		TextureResourceCapture * capture;
+		Display * display;
+	};
 	
 	if (!sInitialized)
 	{
@@ -395,30 +402,8 @@ TextureResourceCaptureAdapter::newCaptureRect( lua_State *L )
 		struct CaptureState {
 			U32 counter;
 			TextureResourceCapture * capture;
-			FrameBufferObject * oldFBO;
 			Rect rect;
 		};
-		
-		CoronaCommand command = {};
-		
-		command.reader = [](const CoronaCommandBuffer * commandBuffer, const unsigned char * data, unsigned int size) {
-			CaptureState state;
-
-			Rtt_ASSERT( size >= sizeof( CaptureState ) );
-
-			memcpy( &state, data, sizeof( CaptureState ) );
-
-			CommandBuffer * commandBufferObject = OBJECT_BOX_LOAD( CommandBuffer, commandBuffer );
-			
-			Rtt_ASSERT( commandBufferObject );
-			
-			FrameBufferObject * fbo = state.capture->GetFBO();
-			Texture & texture = state.capture->GetTexture();
-			
-			// TODO: commandBufferObject->CaptureRect( fbo, texture, state.capture->rect );
-		};
-
-		CoronaRendererRegisterCommand( L, &command, &sCommandID );
 		
 		CoronaStateBlock captureState = {};
 		
@@ -428,19 +413,28 @@ TextureResourceCaptureAdapter::newCaptureRect( lua_State *L )
 		
 			if (!restore)
 			{
+				Renderer * rendererObject = OBJECT_BOX_LOAD( Renderer, renderer );
+				
+				Rtt_ASSERT( rendererObject );
+				
+				FrameBufferObject * fbo = state.capture->GetFBO(), * oldFBO = NULL;
+				
+				if (fbo)
+				{
+					oldFBO = rendererObject->GetFrameBufferObject();
+					
+					rendererObject->SetFrameBufferObject( fbo, true );
+				}
+
 				CommandBuffer * commandBufferObject = OBJECT_BOX_LOAD( CommandBuffer, commandBuffer );
 				
 				Rtt_ASSERT( commandBufferObject );
 				
-				CoronaRendererIssueCommand( renderer, sCommandID, &state, sizeof(CaptureState) );
+				commandBufferObject->CaptureRect( fbo, state.capture->GetTexture(), state.rect );
 
-				if (state.oldFBO)
+				if (fbo)
 				{
-					Renderer * rendererObject = OBJECT_BOX_LOAD( Renderer, renderer );
-					
-					Rtt_ASSERT( rendererObject );
-					
-					rendererObject->SetFrameBufferObject( state.oldFBO );
+					rendererObject->SetFrameBufferObject( oldFBO );
 				}
 			}
 		};
@@ -456,7 +450,18 @@ TextureResourceCaptureAdapter::newCaptureRect( lua_State *L )
 		{
 			*result = false;
 		};
-
+		
+		struct DrawData {
+			DrawData( TextureResourceCapture * capture, Display * display )
+			:	fResource( capture->GetWeakResource() ),
+				fDisplay( display )
+			{
+			}
+			
+			WeakPtr<TextureResource> fResource;
+			Display * fDisplay;
+		};
+		
 		CoronaObjectDrawParams drawParams = {};
 
 		drawParams.header.method = kAugmentedMethod_Draw;
@@ -465,49 +470,49 @@ TextureResourceCaptureAdapter::newCaptureRect( lua_State *L )
 		{
 			static U32 sCounter;
 			
-			SharedPtr<TextureResource> tex( *static_cast< WeakPtr<TextureResource> * >( userData ) );
+			DrawData * drawData = static_cast< DrawData * >( userData );
+			SharedPtr<TextureResource> tex( drawData->fResource );
 			
 			if (!tex.IsNull())
-			{
-				TextureResourceCapture & capture = static_cast< TextureResourceCapture & >( *tex );
-				CaptureState state = {};
-
+			{				
 				DisplayObject * displayObject = OBJECT_BOX_LOAD( DisplayObject, object );
 				
 				Rtt_ASSERT( displayObject );
+
+				TextureResourceCapture & capture = static_cast< TextureResourceCapture & >( *tex );
+				CaptureState state = {};
 				
+				state.capture = &capture;
+				state.counter = sCounter++;
 				state.rect = displayObject->StageBounds();
+		
+				S32 x = floorf( state.rect.xMin );
+				S32 y = floorf( state.rect.yMin );
+				S32 w = ceilf( state.rect.xMax + Rtt_REAL_HALF ) - x;
+				S32 h = ceilf( state.rect.yMax + Rtt_REAL_HALF ) - y;
 				
-				state.rect.xMin = floorf( state.rect.xMin );
-				state.rect.yMin = floorf( state.rect.yMin );
-				state.rect.xMax = ceilf( state.rect.xMax + Rtt_REAL_HALF );
-				state.rect.yMax = ceilf( state.rect.yMax + Rtt_REAL_HALF );
+				drawData->fDisplay->ContentToScreen( x, y, w, h );
+				
+				state.rect.xMin = x;
+				state.rect.yMin = y;
+				state.rect.xMax = x + w;
+				state.rect.yMax = y + h;
 				
 				Rect texBounds;
 				
 				texBounds.xMin = texBounds.yMin = 0;
-				texBounds.xMax = state.capture->GetTexWidth();
-				texBounds.yMax = state.capture->GetTexHeight();
+				texBounds.xMax = state.capture->GetContentWidth();
+				texBounds.yMax = state.capture->GetContentHeight();
 				
 				state.rect.Intersect( texBounds );
-				
-				state.capture = &capture;
-				state.counter = sCounter++;
-				
+
 				Renderer * rendererObject = OBJECT_BOX_LOAD( Renderer, renderer );
 				
 				Rtt_ASSERT( rendererObject );
 				
 				FrameBufferObject * fbo = capture.GetFBO();
 				
-				if (fbo)
-				{
-					state.oldFBO = rendererObject->GetFrameBufferObject();
-					
-					rendererObject->SetFrameBufferObject( fbo, true );
-				}
-				
-				else if (NULL == state.capture->GetTexture().GetGPUResource())
+				if (!fbo && NULL == state.capture->GetTexture().GetGPUResource())
 				{
 					rendererObject->QueueCreate( &state.capture->GetTexture() );
 				}
@@ -520,12 +525,9 @@ TextureResourceCaptureAdapter::newCaptureRect( lua_State *L )
 		
 		onCreateParams.header.method = kAugmentedMethod_OnCreate;
 		onCreateParams.action = []( const CoronaDisplayObject *, void ** userData ) {
-			TextureResourceCapture * capture = static_cast< TextureResourceCapture * >( *userData );
-			WeakPtr<TextureResource> & res = capture->GetWeakResource();
-			
-			Rtt_ASSERT( !res.IsNull() );
-			
-			*userData = Rtt_NEW( NULL, WeakPtr<TextureResource>( res ) );
+			InputDrawData * input = static_cast< InputDrawData * >( *userData );
+
+			*userData = Rtt_NEW( NULL, DrawData( input->capture, input->display ) );
 		};
 		
 		CoronaObjectOnFinalizeParams onFinalizeParams = {};
@@ -533,7 +535,7 @@ TextureResourceCaptureAdapter::newCaptureRect( lua_State *L )
 		onFinalizeParams.header.method = kAugmentedMethod_OnFinalize;
 		onFinalizeParams.action = []( const CoronaDisplayObject *, void * userData )
 		{
-			delete static_cast< WeakPtr<TextureResource> * >( userData );
+			delete static_cast< DrawData * >( userData );
 		};
 		
 		paramsList.next = &canHitTest.header;
@@ -553,7 +555,12 @@ TextureResourceCaptureAdapter::newCaptureRect( lua_State *L )
 
 		lua_remove( L, 1 ); // ...
 		
-		if ( !( entry && CoronaObjectsPushRect( L, entry, &sParams ) ) ) // ...[, rect]
+		InputDrawData input;
+		
+		input.capture = entry;
+		input.display = &Rtt::LuaContext::GetRuntime( L )->GetDisplay();
+		
+		if ( !( entry && CoronaObjectsPushRect( L, &input, &sParams ) ) ) // ...[, rect]
 		{
 			lua_pushnil( L ); // ..., nil
 		}

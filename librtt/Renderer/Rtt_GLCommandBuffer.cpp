@@ -992,20 +992,17 @@ GLCommandBuffer::Execute( bool measureGPU )
 				GLTexture* texture = Read<GLTexture*>();
 				Rect rect = Read<Rect>();
 				
-				int w = rect.xMax - rect.xMin; 
-				int h = rect.yMax - rect.yMin;
-				
 				if (!texture)
 				{
 					// TODO: allow some flexibility for downsampling etc.
 					
-					GLFrameBufferObject::Blit( rect.xMin, rect.yMin, w, h, rect.xMin, rect.yMin, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+					GLFrameBufferObject::Blit( rect.xMin, rect.yMin, rect.xMax, rect.yMax, rect.xMin, rect.yMin, rect.xMax, rect.yMax, GL_COLOR_BUFFER_BIT, GL_NEAREST );
 				}
 				else
 				{
 					texture->Bind( 0 );
 					
-					glCopyTexSubImage2D( GL_TEXTURE_2D, 0, rect.xMin, rect.yMin, rect.xMin, rect.yMin, w, h );
+					glCopyTexSubImage2D( GL_TEXTURE_2D, 0, rect.xMin, rect.yMin, rect.xMin, rect.yMin, rect.xMax - rect.xMin, rect.yMax - rect.yMin );
 					
 					if (lastTexture0)
 					{
@@ -1013,7 +1010,7 @@ GLCommandBuffer::Execute( bool measureGPU )
 					}
 				}
 				
-				DEBUG_PRINT( "Capture Rect: (%i, %i, %i, %i), using FBO = %s", rect.xMin, rect.yMin, w, h, !texture ? "true" : "false" );
+				DEBUG_PRINT( "Capture Rect: (%i, %i, %i, %i), using FBO = %s", rect.xMin, rect.yMin, rect.xMax, rect.yMax, !texture ? "true" : "false" );
 				CHECK_ERROR_AND_BREAK;
 			}
 		// /STEVE CHANGE
