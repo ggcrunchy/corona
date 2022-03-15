@@ -489,7 +489,7 @@ GLCommandBuffer::BindFrameBufferObject(FrameBufferObject* fbo, bool asDrawBuffer
 
 // STEVE CHANGE
 void
-GLCommandBuffer::CaptureRect( FrameBufferObject* fbo, Texture& texture, const Rect& rect )
+GLCommandBuffer::CaptureRect( FrameBufferObject* fbo, Texture& texture, const Rect& rect, const Rect& unclipped, S32 height )
 {
 	WRITE_COMMAND( kCommandCaptureRect );
 	
@@ -504,6 +504,8 @@ GLCommandBuffer::CaptureRect( FrameBufferObject* fbo, Texture& texture, const Re
 	}
 	
 	Write<Rect>( rect );
+	Write<Rect>( unclipped );
+	Write<S32>( height );
 }
 // /STEVE CHANGE
 
@@ -991,18 +993,36 @@ GLCommandBuffer::Execute( bool measureGPU )
 			{
 				GLTexture* texture = Read<GLTexture*>();
 				Rect rect = Read<Rect>();
+				Rect unclipped = Read<Rect>();
+				S32 x = 0, w = rect.xMax - rect.xMin;
+				S32 y = 0, h = rect.yMax - rect.yMin;
+				S32 height = Read<S32>();
+				
+				if (unclipped.xMin < 0)
+				{
+					x = -unclipped.xMin;
+				}
+				
+				if (unclipped.yMax > rect.yMax)
+				{
+					y = unclipped.yMax - rect.yMax;
+				}
 				
 				if (!texture)
 				{
 					// TODO: allow some flexibility for downsampling etc.
 					
-					GLFrameBufferObject::Blit( rect.xMin, rect.yMin, rect.xMax, rect.yMax, rect.xMin, rect.yMin, rect.xMax, rect.yMax, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+					GLFrameBufferObject::Blit( rect.xMin, height - rect.yMax, rect.xMax, height - rect.yMin, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT, GL_NEAREST );
 				}
 				else
 				{
 					texture->Bind( 0 );
 					
-					glCopyTexSubImage2D( GL_TEXTURE_2D, 0, rect.xMin, rect.yMin, rect.xMin, rect.yMin, rect.xMax - rect.xMin, rect.yMax - rect.yMin );
+					// TODO: top / bottom
+					
+					glCopyTexSubImage2D( GL_TEXTURE_2D, 0, x, y, rect.xMin, (height - h) - rect.yMin, w, h );
+					
+					GL_CHECK_ERROR();
 					
 					if (lastTexture0)
 					{
@@ -1010,7 +1030,7 @@ GLCommandBuffer::Execute( bool measureGPU )
 					}
 				}
 				
-				DEBUG_PRINT( "Capture Rect: (%i, %i, %i, %i), using FBO = %s", rect.xMin, rect.yMin, rect.xMax, rect.yMax, !texture ? "true" : "false" );
+				DEBUG_PRINT( "Capture Rect: (%f, %f, %f, %f), using FBO = %s", rect.xMin, rect.yMin, rect.xMax, rect.yMax, !texture ? "true" : "false" );
 				CHECK_ERROR_AND_BREAK;
 			}
 		// /STEVE CHANGE

@@ -398,7 +398,7 @@ Renderer::GetFrameBufferObject() const
 }
 
 void
-Renderer::SetFrameBufferObject( FrameBufferObject* fbo, bool asDrawBuffer ) // <- STEVE CHANGE
+Renderer::SetFrameBufferObject( FrameBufferObject* fbo )
 {
     fFrameBufferObject = fbo;
 
@@ -417,7 +417,7 @@ Renderer::SetFrameBufferObject( FrameBufferObject* fbo, bool asDrawBuffer ) // <
             QueueCreate( fbo );
         }
     }
-    fBackCommandBuffer->BindFrameBufferObject( fbo, asDrawBuffer ); // <- STEVE CHANGE
+    fBackCommandBuffer->BindFrameBufferObject( fbo );
     
     DEBUG_PRINT( "Bind FrameBufferObject: %p\n", fbo );
 }

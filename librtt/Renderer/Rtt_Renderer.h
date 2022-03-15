@@ -107,7 +107,7 @@ class Renderer
 
         // Set the FrameBufferObject. All subsequently inserted RenderData will
         // be drawn to this FBO until SetFrameBufferObject() is called again.
-        void SetFrameBufferObject( FrameBufferObject* fbo, bool asDrawBuffer = false ); // <- STEVE CHANGE
+        void SetFrameBufferObject( FrameBufferObject* fbo );
 
     // STEVE CHANGE
         struct ExtraClearOptions {
@@ -224,7 +224,7 @@ class Renderer
         // This is primarily useful as a debugging tool. By increasing the count
         // over time, users can visualize render order, batching, etc.
         void SetMaximumRenderDataCount( U32 count );
-        
+	
         void SetCPUResourceObserver(MCPUResourceObserver *resourceObserver);
         void ReleaseGPUResources();
 

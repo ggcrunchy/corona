@@ -20,6 +20,7 @@
 #include "Rtt_ObjectBoxList.h"
 #include "Renderer/Rtt_Renderer.h"
 #include "Renderer/Rtt_CommandBuffer.h"
+#include "Renderer/Rtt_FrameBufferObject.h"
 
 #include "CoronaObjects.h"
 #include "CoronaGraphics.h"
@@ -402,7 +403,8 @@ TextureResourceCaptureAdapter::newCaptureRect( lua_State *L )
 		struct CaptureState {
 			U32 counter;
 			TextureResourceCapture * capture;
-			Rect rect;
+			Rect rect, rawRect;
+			S32 height;
 		};
 		
 		CoronaStateBlock captureState = {};
@@ -418,23 +420,23 @@ TextureResourceCaptureAdapter::newCaptureRect( lua_State *L )
 				Rtt_ASSERT( rendererObject );
 				
 				FrameBufferObject * fbo = state.capture->GetFBO(), * oldFBO = NULL;
-				
-				if (fbo)
-				{
-					oldFBO = rendererObject->GetFrameBufferObject();
-					
-					rendererObject->SetFrameBufferObject( fbo, true );
-				}
 
 				CommandBuffer * commandBufferObject = OBJECT_BOX_LOAD( CommandBuffer, commandBuffer );
 				
 				Rtt_ASSERT( commandBufferObject );
 				
-				commandBufferObject->CaptureRect( fbo, state.capture->GetTexture(), state.rect );
+				if (fbo)
+				{
+					oldFBO = rendererObject->GetFrameBufferObject();
+					
+					commandBufferObject->BindFrameBufferObject( fbo, true );
+				}
+				
+				commandBufferObject->CaptureRect( fbo, state.capture->GetTexture(), state.rect, state.rawRect, state.height );
 
 				if (fbo)
 				{
-					rendererObject->SetFrameBufferObject( oldFBO );
+					commandBufferObject->BindFrameBufferObject( oldFBO, false );
 				}
 			}
 		};
@@ -483,41 +485,71 @@ TextureResourceCaptureAdapter::newCaptureRect( lua_State *L )
 				CaptureState state = {};
 				
 				state.capture = &capture;
-				state.counter = sCounter++;
-				state.rect = displayObject->StageBounds();
-		
-				S32 x = floorf( state.rect.xMin );
-				S32 y = floorf( state.rect.yMin );
-				S32 w = ceilf( state.rect.xMax + Rtt_REAL_HALF ) - x;
-				S32 h = ceilf( state.rect.yMax + Rtt_REAL_HALF ) - y;
+				S32 screenWidth = drawData->fDisplay->ScreenWidth();
+				S32 screenHeight = drawData->fDisplay->ScreenHeight();
+				S32 windowWidth = drawData->fDisplay->WindowWidth();
+				S32 windowHeight = drawData->fDisplay->WindowHeight();
 				
-				drawData->fDisplay->ContentToScreen( x, y, w, h );
+				float screenToWindowX = (float)windowWidth / screenWidth;
+				float screenToWindowY = (float)windowHeight / screenHeight;
 				
-				state.rect.xMin = x;
-				state.rect.yMin = y;
-				state.rect.xMax = x + w;
-				state.rect.yMax = y + h;
+				Vertex2 center;
+				
+				displayObject->StageBounds().GetCenter( center );
+				
+				S32 x = center.x;
+				S32 y = center.y;
+				
+				drawData->fDisplay->ContentToScreen( x, y );
 				
 				Rect texBounds;
 				
-				texBounds.xMin = texBounds.yMin = 0;
-				texBounds.xMax = state.capture->GetContentWidth();
-				texBounds.yMax = state.capture->GetContentHeight();
+				texBounds.xMin = -state.capture->GetTexWidth() / 2;
+				texBounds.yMin = -state.capture->GetTexHeight() / 2;
+				texBounds.xMax = state.capture->GetTexWidth() / 2;
+				texBounds.yMax = state.capture->GetTexHeight() / 2;
 				
-				state.rect.Intersect( texBounds );
+				texBounds.Translate( x * screenToWindowX, y * screenToWindowY );
+								
+				texBounds.xMin = floorf( texBounds.xMin );
+				texBounds.yMin = floorf( texBounds.yMin );
+				texBounds.xMax = ceilf( texBounds.xMax - Rtt_REAL_HALF );
+				texBounds.yMax = ceilf( texBounds.yMax - Rtt_REAL_HALF );
 
-				Renderer * rendererObject = OBJECT_BOX_LOAD( Renderer, renderer );
+				state.rawRect = texBounds;				
+
+				Rect bounds;
 				
-				Rtt_ASSERT( rendererObject );
+				bounds.xMin = bounds.yMin = 0;
+				bounds.xMax = windowWidth;
+				bounds.yMax = windowHeight;
 				
-				FrameBufferObject * fbo = capture.GetFBO();
-				
-				if (!fbo && NULL == state.capture->GetTexture().GetGPUResource())
+				texBounds.Intersect( bounds );
+
+				if (texBounds.NotEmpty())
 				{
-					rendererObject->QueueCreate( &state.capture->GetTexture() );
+					state.counter = sCounter++;
+					state.rect = texBounds;
+					state.height = windowHeight;
+					
+					Renderer * rendererObject = OBJECT_BOX_LOAD( Renderer, renderer );
+					
+					Rtt_ASSERT( rendererObject );
+					
+					FrameBufferObject * fbo = capture.GetFBO();
+										
+					if (NULL == state.capture->GetTexture().GetGPUResource())
+					{
+						rendererObject->QueueCreate( &state.capture->GetTexture() );
+					}
+					
+					if (fbo && NULL == fbo->GetGPUResource())
+					{
+						rendererObject->QueueCreate( fbo );
+					}
+					
+					CoronaRendererWriteStateBlock( renderer, sStateBlockID, &state, sizeof(CaptureState) );
 				}
-				
-				CoronaRendererWriteStateBlock( renderer, sStateBlockID, &state, sizeof(CaptureState) );
 			}
 		};
    

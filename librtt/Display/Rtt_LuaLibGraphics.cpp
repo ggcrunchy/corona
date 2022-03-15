@@ -1275,9 +1275,14 @@ SharedPtr<TextureResource> CreateResourceCaptureFromTable(Rtt::TextureFactory &f
 		
 		if (pixelWidth <= 0 || pixelHeight <= 0)
 		{
+			S32 unused = 0; // n.b. ContentToScreen(x,y) NOT okay for dimensions!
+			
 			pixelWidth = Rtt_RealToInt( width );
 			pixelHeight = Rtt_RealToInt( height );
-		//	display.ContentToScreen( pixelWidth, pixelHeight );
+			display.ContentToScreen( unused, unused, pixelWidth, pixelHeight );
+
+			pixelWidth *= (float)display.WindowWidth() / display.ScreenWidth();
+			pixelHeight *= (float)display.WindowHeight() / display.ScreenHeight();
 		}
 		
 		int texSize = display.GetMaxTextureSize();
