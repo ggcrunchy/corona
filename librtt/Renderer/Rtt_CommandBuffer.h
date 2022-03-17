@@ -60,7 +60,6 @@ class CommandBuffer
         static bool GetGpuSupportsHighPrecisionFragmentShaders();
     // STEVE CHANGE
         virtual void GetVertexAttributes( VertexAttributeSupport & support ) const = 0;
-		virtual bool HasFramebufferBlit() const = 0;
     // /STEVE CHANGE
 
     public:
@@ -80,10 +79,7 @@ class CommandBuffer
         // Derived classes are responsible for taking state changes specified
         // here and transcribing them into equivalent, buffered commands used
         // by the underlying rendering API.
-        virtual void BindFrameBufferObject( FrameBufferObject* fbo, bool asDrawBuffer = false ) = 0; // <- STEVE CHANGE
-	// STEVE CHANGE
-		virtual void CaptureRect( FrameBufferObject* fbo, Texture& texture, const Rect& rect, const Rect& rawRect ) = 0;
-	// /STEVE CHANGE
+        virtual void BindFrameBufferObject( FrameBufferObject* fbo ) = 0;
         virtual void BindGeometry( Geometry* geometry ) = 0;
         virtual void BindTexture( Texture* texture, U32 unit ) = 0;
         virtual void BindUniform( Uniform* uniform, U32 unit ) = 0;

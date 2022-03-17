@@ -263,10 +263,6 @@ class Display
         virtual void SetScaleMode( ScaleMode mode, Rtt_Real screenWidth, Rtt_Real screenHeight );
         virtual ScaleMode GetScaleMode() const;
 	
-	// STEVE CHANGE
-		void ContentToScreenUnrounded( float& x, float& y ) const;
-		void ContentToScreenUnrounded( float& x, float& y, float& w, float& h ) const;
-	// /STEVE CHANGE
         virtual void ContentToScreen( S32& x, S32& y ) const;
         virtual void ContentToScreen( S32& x, S32& y, S32& w, S32& h ) const;
         virtual void ContentToPixels( S32& x, S32& y, S32& w, S32& h ) const;
@@ -335,7 +331,6 @@ class Display
         static U32 GetMaxVertexTextureUnits();
     // STEVE CHANGE
         void GetVertexAttributes( VertexAttributeSupport & support ) const;
-		bool HasFramebufferBlit() const;
     // /STEVE CHANGE
 
     public:

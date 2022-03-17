@@ -45,9 +45,6 @@ namespace /*anonymous*/
     {
         kCommandBindFrameBufferObject,
         kCommandUnBindFrameBufferObject,
-	// STEVE CHANGE
-		kCommandCaptureRect,
-	// /STEVE CHANGE
         kCommandBindGeometry,
         kCommandBindTexture,
         kCommandBindProgram,
@@ -345,12 +342,6 @@ GLCommandBuffer::GetVertexAttributes( VertexAttributeSupport & support ) const
     support.hasPerInstance = support.hasDivisors; // divisor == 1
     support.suffix = GLGeometry::InstanceIDSuffix();
 }
-
-bool
-GLCommandBuffer::HasFramebufferBlit() const
-{
-	return GLFrameBufferObject::HasFramebufferBlit();
-}
 // /STEVE CHANGE
 
 GLCommandBuffer::GLCommandBuffer( Rtt_Allocator* allocator )
@@ -473,40 +464,18 @@ GLCommandBuffer::ClearUserUniforms()
 }
 
 void
-GLCommandBuffer::BindFrameBufferObject(FrameBufferObject* fbo, bool asDrawBuffer) // <- STEVE CHANGE
+GLCommandBuffer::BindFrameBufferObject(FrameBufferObject* fbo)
 {
     if( fbo )
     {
         WRITE_COMMAND( kCommandBindFrameBufferObject );
         Write<GPUResource*>( fbo->GetGPUResource() );
-		Write<bool>( asDrawBuffer ); // <- STEVE CHANGE
     }
     else
     {
         WRITE_COMMAND( kCommandUnBindFrameBufferObject );
     }
 }
-
-// STEVE CHANGE
-void
-GLCommandBuffer::CaptureRect( FrameBufferObject* fbo, Texture& texture, const Rect& rect, const Rect& unclipped )
-{
-	WRITE_COMMAND( kCommandCaptureRect );
-	
-	if (!fbo)
-	{
-		Write<GPUResource*>( texture.GetGPUResource() );
-	}
-	
-	else
-	{
-		Write<GPUResource*>( NULL );
-	}
-	
-	Write<Rect>( rect );
-	Write<Rect>( unclipped );
-}
-// /STEVE CHANGE
 
 void
 GLCommandBuffer::BindGeometry( Geometry* geometry )
@@ -958,7 +927,6 @@ GLCommandBuffer::Execute( bool measureGPU )
     Geometry::Vertex* instancingData = NULL;
     U32 currentAttributeCount = 0, instanceCount = 0, vertexOffset = 0;
     bool formatDirty = false, clearingDepth = false, clearingStencil = false;
-	S32 windowHeight;
     // /STEVE CHANGE
 
     for( U32 i = 0; i < fNumCommands; ++i )
@@ -973,12 +941,10 @@ GLCommandBuffer::Execute( bool measureGPU )
             case kCommandBindFrameBufferObject:
             {
                 GLFrameBufferObject* fbo = Read<GLFrameBufferObject*>();
-				bool asDrawBuffer = Read<bool>(); // <- STEVE CHANGE
-                fbo->Bind( asDrawBuffer ); // <- STEVE CHANGE
-                DEBUG_PRINT( "Bind FrameBufferObject (as draw buffer = %s): OpenGL name: %i, OpenGL Texture name, if any: %d",
-								asDrawBuffer ? "true" : "false",
-                                fbo->GetName(),
-                                fbo->GetTextureName() ); // <- STEVE CHANGE
+				fbo->Bind();
+                DEBUG_PRINT( "Bind FrameBufferObject: OpenGL name: %i, OpenGL Texture name, if any: %d",
+								fbo->GetName(),
+                                fbo->GetTextureName() );
                 CHECK_ERROR_AND_BREAK;
             }
             case kCommandUnBindFrameBufferObject:
@@ -987,44 +953,6 @@ GLCommandBuffer::Execute( bool measureGPU )
                 DEBUG_PRINT( "Unbind FrameBufferObject: OpenGL name: %i (fDefaultFBO)", fDefaultFBO );
                 CHECK_ERROR_AND_BREAK;
             }
-		// STEVE CHANGE
-			case kCommandCaptureRect:
-			{
-				GLTexture* texture = Read<GLTexture*>();
-				Rect rect = Read<Rect>();
-				Rect unclipped = Read<Rect>();
-				S32 x = 0, w = rect.xMax - rect.xMin;
-				S32 y = 0, h = rect.yMax - rect.yMin;
-				
-				if (unclipped.xMin < 0)
-				{
-					x = -unclipped.xMin;
-				}
-				
-				if (unclipped.yMax > rect.yMax)
-				{
-					y = unclipped.yMax - rect.yMax;
-				}
-				
-				if (!texture)
-				{
-					// TODO: allow some flexibility for downsampling etc.
-					
-					GLFrameBufferObject::Blit( rect.xMin, windowHeight - rect.yMax, rect.xMax, windowHeight - rect.yMin, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT, GL_NEAREST );
-				}
-				else
-				{
-					texture->Bind( 0 );
-					
-					glCopyTexSubImage2D( GL_TEXTURE_2D, 0, x, y, rect.xMin, (windowHeight - h) - rect.yMin, w, h );
-					
-					GL_CHECK_ERROR();
-				}
-				
-				DEBUG_PRINT( "Capture Rect: (%f, %f, %f, %f), using FBO = %s", rect.xMin, rect.yMin, rect.xMax, rect.yMax, !texture ? "true" : "false" );
-				CHECK_ERROR_AND_BREAK;
-			}
-		// /STEVE CHANGE
             case kCommandBindGeometry:
             {
                 /*GLGeometry* */geometry = Read<GLGeometry*>(); // <- STEVE CHANGE
@@ -1285,7 +1213,6 @@ GLCommandBuffer::Execute( bool measureGPU )
                 GLsizei width = Read<GLsizei>();
                 GLsizei height = Read<GLsizei>();
                 glViewport( x, y, width, height );
-				windowHeight = height; // <- STEVE CHANGE
                 DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );
                 CHECK_ERROR_AND_BREAK;
             }
