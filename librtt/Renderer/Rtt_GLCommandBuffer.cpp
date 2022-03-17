@@ -489,7 +489,7 @@ GLCommandBuffer::BindFrameBufferObject(FrameBufferObject* fbo, bool asDrawBuffer
 
 // STEVE CHANGE
 void
-GLCommandBuffer::CaptureRect( FrameBufferObject* fbo, Texture& texture, const Rect& rect, const Rect& unclipped, S32 height )
+GLCommandBuffer::CaptureRect( FrameBufferObject* fbo, Texture& texture, const Rect& rect, const Rect& unclipped )
 {
 	WRITE_COMMAND( kCommandCaptureRect );
 	
@@ -505,7 +505,6 @@ GLCommandBuffer::CaptureRect( FrameBufferObject* fbo, Texture& texture, const Re
 	
 	Write<Rect>( rect );
 	Write<Rect>( unclipped );
-	Write<S32>( height );
 }
 // /STEVE CHANGE
 
@@ -956,10 +955,10 @@ GLCommandBuffer::Execute( bool measureGPU )
     //GL_CHECK_ERROR();
     // STEVE CHANGE
     GLGeometry* geometry = NULL;
-	GLTexture* lastTexture0 = NULL;
     Geometry::Vertex* instancingData = NULL;
     U32 currentAttributeCount = 0, instanceCount = 0, vertexOffset = 0;
     bool formatDirty = false, clearingDepth = false, clearingStencil = false;
+	S32 windowHeight;
     // /STEVE CHANGE
 
     for( U32 i = 0; i < fNumCommands; ++i )
@@ -996,7 +995,6 @@ GLCommandBuffer::Execute( bool measureGPU )
 				Rect unclipped = Read<Rect>();
 				S32 x = 0, w = rect.xMax - rect.xMin;
 				S32 y = 0, h = rect.yMax - rect.yMin;
-				S32 height = Read<S32>();
 				
 				if (unclipped.xMin < 0)
 				{
@@ -1012,22 +1010,15 @@ GLCommandBuffer::Execute( bool measureGPU )
 				{
 					// TODO: allow some flexibility for downsampling etc.
 					
-					GLFrameBufferObject::Blit( rect.xMin, height - rect.yMax, rect.xMax, height - rect.yMin, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+					GLFrameBufferObject::Blit( rect.xMin, windowHeight - rect.yMax, rect.xMax, windowHeight - rect.yMin, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT, GL_NEAREST );
 				}
 				else
 				{
 					texture->Bind( 0 );
 					
-					// TODO: top / bottom
-					
-					glCopyTexSubImage2D( GL_TEXTURE_2D, 0, x, y, rect.xMin, (height - h) - rect.yMin, w, h );
+					glCopyTexSubImage2D( GL_TEXTURE_2D, 0, x, y, rect.xMin, (windowHeight - h) - rect.yMin, w, h );
 					
 					GL_CHECK_ERROR();
-					
-					if (lastTexture0)
-					{
-						lastTexture0->Bind( 0 );
-					}
 				}
 				
 				DEBUG_PRINT( "Capture Rect: (%f, %f, %f, %f), using FBO = %s", rect.xMin, rect.yMin, rect.xMax, rect.yMax, !texture ? "true" : "false" );
@@ -1046,12 +1037,6 @@ GLCommandBuffer::Execute( bool measureGPU )
                 U32 unit = Read<U32>();
                 GLTexture* texture = Read<GLTexture*>();
                 texture->Bind( unit );
-			// STEVE CHANGE
-				if (0 == unit)
-				{
-					lastTexture0 = texture;
-				}
-			// /STEVE CHANGE
                 DEBUG_PRINT( "Bind Texture: texture=%p unit=%i OpenGL name=%d",
                                 texture,
                                 unit,
@@ -1300,6 +1285,7 @@ GLCommandBuffer::Execute( bool measureGPU )
                 GLsizei width = Read<GLsizei>();
                 GLsizei height = Read<GLsizei>();
                 glViewport( x, y, width, height );
+				windowHeight = height; // <- STEVE CHANGE
                 DEBUG_PRINT( "Set viewport: x=%i, y=%i, width=%i, height=%i", x, y, width, height );
                 CHECK_ERROR_AND_BREAK;
             }

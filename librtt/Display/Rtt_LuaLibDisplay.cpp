@@ -131,7 +131,7 @@ class DisplayLibrary
 
     public:
         static Self *ToLibrary( lua_State *L );
-
+	
     protected:
         static int ValueForKey( lua_State *L );
 
@@ -545,8 +545,8 @@ DisplayLibrary::ValueForKey( lua_State *L )
 
 // ----------------------------------------------------------------------------
 
-static GroupObject*
-GetParent( lua_State *L, int& nextArg )
+/*static */GroupObject* // <- STEVE CHANGE
+LuaLibDisplay::GetParent( lua_State *L, int& nextArg ) // <- STEVE CHANGE
 {
     GroupObject* parent = NULL;
 
@@ -731,7 +731,7 @@ DisplayLibrary::newCircle( lua_State *L )
     Display& display = library->GetDisplay();
 
     int nextArg = 1;
-    GroupObject *parent = GetParent( L, nextArg );
+    GroupObject *parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
 
     Real x = luaL_checkreal( L, nextArg++ );
     Real y = luaL_checkreal( L, nextArg++ );
@@ -774,7 +774,7 @@ DisplayLibrary::newPolygon( lua_State *L )
     Display& display = library->GetDisplay();
 
     int nextArg = 1;
-    GroupObject *parent = GetParent( L, nextArg );
+    GroupObject *parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
 
     Real x = luaL_checkreal( L, nextArg++ );
     Real y = luaL_checkreal( L, nextArg++ );
@@ -830,7 +830,7 @@ DisplayLibrary::newMesh( lua_State *L )
     
     if ( lua_istable( L, nextArg ) && LuaProxy::IsProxy(L, nextArg))
     {
-        parent = GetParent( L, nextArg );
+        parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
     }
     
     if(lua_type(L, nextArg) == LUA_TNUMBER && lua_type(L, nextArg+1) == LUA_TNUMBER)
@@ -845,7 +845,7 @@ DisplayLibrary::newMesh( lua_State *L )
         if ( lua_istable( L, -1) )
         {
             int parentArg = Lua::Normalize( L, -1 );
-            parent = GetParent( L, parentArg );
+            parent = LuaLibDisplay::GetParent( L, parentArg ); // <- STEVE CHANGE
         }
         lua_pop( L, 1 );
         
@@ -922,7 +922,7 @@ DisplayLibrary::newRect( lua_State *L )
     Display& display = library->GetDisplay();
 
     int nextArg = 1;
-    GroupObject *parent = GetParent( L, nextArg );
+    GroupObject *parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
 
     Real x = luaL_checkreal( L, nextArg++ );
     Real y = luaL_checkreal( L, nextArg++ );
@@ -953,7 +953,7 @@ DisplayLibrary::newRoundedRect( lua_State *L )
     Display& display = library->GetDisplay();
 
     int nextArg = 1;
-    GroupObject *parent = GetParent( L, nextArg );
+    GroupObject *parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
 
     Real x = luaL_checkreal( L, nextArg++ );
     Real y = luaL_checkreal( L, nextArg++ );
@@ -994,7 +994,7 @@ DisplayLibrary::newLine( lua_State *L )
     Rtt_Allocator *pAllocator = runtime.Allocator();
 
     int nextArg = 1;
-    GroupObject *parent = GetParent( L, nextArg );
+    GroupObject *parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
 
     // number of parameters (excluding self)
     int numArgs = lua_gettop( L );
@@ -1080,7 +1080,7 @@ DisplayLibrary::newImage( lua_State *L )
 #endif
     // [parentGroup,]
     int nextArg = 1;
-    GroupObject *parent = GetParent( L, nextArg );
+    GroupObject *parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
 
     // Only required param is "filename"
     // filename [, baseDirectory]
@@ -1202,7 +1202,7 @@ DisplayLibrary::newImageRect( lua_State *L )
     int nextArg = 1;
 
     // NOTE: GetParent() increments nextArg if parent found
-    GroupObject *parent = GetParent( L, nextArg );
+    GroupObject *parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
 
     // Only required param is "filename"
     // filename [, baseDirectory]
@@ -1390,7 +1390,7 @@ static int CreateTextObject( lua_State *L, bool isEmbossed )
             if ( lua_istable( L, -1) )
             {
                 int parentArg = Lua::Normalize( L, -1 );
-                parent = GetParent( L, parentArg );
+                parent = LuaLibDisplay::GetParent( L, parentArg ); // <- STEVE CHANGE
             }
             else if (lua_type( L, -1 ) != LUA_TNIL)
             {
@@ -1490,7 +1490,7 @@ static int CreateTextObject( lua_State *L, bool isEmbossed )
         //Legacy support
         
         // NOTE: GetParent() increments nextArg if parent found
-        parent = GetParent( L, nextArg );
+        parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
         
         str = luaL_checkstring( L, nextArg++ );
         if ( Rtt_VERIFY( str ) )
@@ -1689,7 +1689,7 @@ DisplayLibrary::_newContainer( lua_State *L )
     int nextArg = 1;
 
     // NOTE: GetParent() increments nextArg if parent found
-    GroupObject *parent = GetParent( L, nextArg );
+    GroupObject *parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
 
     Real w = luaL_checkreal( L, nextArg++ );
     Real h = luaL_checkreal( L, nextArg++ );
@@ -1728,7 +1728,7 @@ DisplayLibrary::newSnapshot( lua_State *L )
     int nextArg = 1;
 
     // NOTE: GetParent() increments nextArg if parent found
-    GroupObject *parent = GetParent( L, nextArg );
+    GroupObject *parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
 
     Real w = luaL_checkreal( L, nextArg++ );
     Real h = luaL_checkreal( L, nextArg++ );
@@ -1755,7 +1755,7 @@ DisplayLibrary::newSprite( lua_State *L )
     int result = 0;
 
     int nextArg = 1;
-    GroupObject *parent = GetParent( L, nextArg );
+    GroupObject *parent = LuaLibDisplay::GetParent( L, nextArg ); // <- STEVE CHANGE
     ImageSheetUserdata *ud = ImageSheet::ToUserdata( L, nextArg );
 
     if ( ud )

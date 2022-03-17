@@ -268,6 +268,12 @@ class Renderer
     public:
         // STEVE CHANGE remove GetClearOps, GetEndFrameOps
 
+	// STEVE CHANGE
+	public:
+		void InsertCaptureRect( FrameBufferObject * fbo, Texture * texture, const Rect & clipped, const Rect & unclipped );
+		void IssueCaptures( Texture * fill0 );
+	// /STEVE CHANGE
+
     protected:
         // Destroys all queued GPU resources passed into the DestroyQueue() method.
         void DestroyQueuedGPUResources();
@@ -392,6 +398,24 @@ class Renderer
     
         U16 fCommandCount;
 
+	// STEVE CHANGE
+		struct RectPair {
+			Rect fClipped;
+			Rect fUnclipped;
+			RectPair * fNext;
+		};
+	
+		struct CaptureGroup {
+			FrameBufferObject * fFBO;
+			Texture * fTexture;
+			RectPair * fFirst;
+			RectPair * fLast;
+		};
+	
+		Array< CaptureGroup > fCaptureGroups;
+		Array< RectPair > fCaptureRects;
+	// /STEVE CHANGE
+	
     // STEVE CHANGE
         Array< StateBlockInfo > fStateBlocks;
         Array< U8 > fDefaultState;

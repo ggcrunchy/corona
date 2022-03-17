@@ -74,7 +74,7 @@ class TextureResourceCaptureAdapter : public TextureResourceAdapter
 		virtual StringHash *GetHash( lua_State *L ) const override;
 		
 	private:
-		static int newCaptureRect( lua_State *L );
+		static int newCaptureEvent( lua_State *L );
 
 };
 // /STEVE CHANGE

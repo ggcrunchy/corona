@@ -1480,6 +1480,22 @@ Display::GetScaleMode() const
     return fStream->GetScaleMode();
 }
 
+// STEVE CHANGE
+void
+Display::ContentToScreenUnrounded( float& x, float& y ) const
+{
+    float w = 0;
+    float h = 0;
+    ContentToScreenUnrounded( x, y, w, h );
+}
+
+void
+Display::ContentToScreenUnrounded( float& x, float& y, float& w, float& h ) const
+{
+    fStream->ContentToScreenUnrounded( x, y, w, h );
+}
+// /STEVE CHANGE
+
 void
 Display::ContentToScreen( S32& x, S32& y ) const
 {
