@@ -112,8 +112,14 @@ GLFrameBufferObject::Destroy()
 }
 
 // STEVE CHANGE
-typedef void (*BlitFramebufferPtr)( GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter );
-typedef void (*BindFramebufferPtr)( GLenum target, GLuint framebuffer );
+#if defined( Rtt_WIN_ENV )
+    #define GL_TYPE_PREFIX GLAPIENTRY
+#else
+    #define GL_TYPE_PREFIX
+#endif
+
+typedef void (GL_TYPE_PREFIX *BlitFramebufferPtr)( GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter );
+typedef void (GL_TYPE_PREFIX *BindFramebufferPtr)( GLenum target, GLuint framebuffer );
 
 static BlitFramebufferPtr sBlitFramebuffer;
 static BindFramebufferPtr sBindFramebuffer;
@@ -211,6 +217,7 @@ GLFrameBufferObject::HasFramebufferBlit()
 }
 
 #undef GL_GET_PROC
+#undef GL_TYPE_PREFIX
 
 void
 GLFrameBufferObject::Blit( int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, GLbitfield mask, GLenum filter )

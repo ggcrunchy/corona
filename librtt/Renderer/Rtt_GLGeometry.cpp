@@ -265,11 +265,17 @@ GLGeometry::GLGeometry()
 }
 
 // STEVE CHANGE
-typedef void (*DrawArraysInstancedPtr)( GLenum mode, GLint first, GLsizei count,
+#if defined( Rtt_WIN_ENV )
+    #define GL_TYPE_PREFIX GLAPIENTRY
+#else
+    #define GL_TYPE_PREFIX
+#endif
+
+typedef void (GL_TYPE_PREFIX *DrawArraysInstancedPtr)( GLenum mode, GLint first, GLsizei count,
                            GLsizei primcount );
-typedef void (*DrawElementsInstancedPtr)( GLenum mode, GLsizei count, GLenum type,
+typedef void (GL_TYPE_PREFIX *DrawElementsInstancedPtr)( GLenum mode, GLsizei count, GLenum type,
                 const GLvoid *indices, GLsizei primcount );
-typedef void (*VertexAttribDivisorPtr)( GLuint index, GLuint divisor);
+typedef void (GL_TYPE_PREFIX *VertexAttribDivisorPtr)( GLuint index, GLuint divisor);
 
 static DrawArraysInstancedPtr sDrawArraysInstanced;
 static DrawElementsInstancedPtr sDrawElementsInstanced;
@@ -380,6 +386,7 @@ GLGeometry::InstanceIDSuffix()
 #undef GL_GET_PROC
 #undef GL_RESET
 #undef GL_HAS_SUPPORT
+#undef GL_TYPE_PREFIX
 
 void
 GLGeometry::DrawArraysInstanced( GLenum mode, GLint first, GLsizei count,

@@ -395,7 +395,7 @@ class CaptureObject : public RectObject
 		static CaptureObject *NewCapture( Rtt_Allocator*, TextureResourceCapture* capture );
 	
 		virtual void Draw( Renderer& renderer ) const;
-		virtual bool HitTest( Rtt_Real, Rtt_Real ) const {}
+		virtual bool HitTest( Rtt_Real, Rtt_Real ) const { return false; }
 
 	protected:
 		CaptureObject( RectPath *path, TextureResourceCapture* capture );

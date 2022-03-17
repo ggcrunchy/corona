@@ -34,6 +34,7 @@
 #include "Rtt_SimulatorAnalytics.h"
 #include "Rtt_JavaHost.h"   // GetJavaHome()
 
+#include <iostream>
 
 #ifdef _DEBUG
 #	define new DEBUG_NEW
