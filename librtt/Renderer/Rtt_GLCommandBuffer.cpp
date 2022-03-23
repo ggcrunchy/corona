@@ -1253,7 +1253,7 @@ GLCommandBuffer::Execute( bool measureGPU )
             case kCommandClearDepth:
             {
                 GLfloat depth = Read<GLfloat>();
-                glClearDepth( depth );
+                Rtt_glClearDepth( depth );
                 clearingDepth = true;
                 DEBUG_PRINT( "Clear Depth: value=%f", depth );
                 CHECK_ERROR_AND_BREAK;

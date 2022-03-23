@@ -267,6 +267,8 @@ GLGeometry::GLGeometry()
 // STEVE CHANGE
 #if defined( Rtt_WIN_ENV )
     #define GL_TYPE_PREFIX GLAPIENTRY
+#elif defined( Rtt_IPHONE_ENV )
+	#define GL_TYPE_PREFIX GL_APIENTRY
 #else
     #define GL_TYPE_PREFIX
 #endif
@@ -282,14 +284,14 @@ static DrawElementsInstancedPtr sDrawElementsInstanced;
 static VertexAttribDivisorPtr sVertexAttribDivisor;
 static const char * sSuffix;
 
-#if defined( Rtt_OPENGLES )
-    #define GL_GET_PROC(name, suffix) (PFNGL ## name ## suffix ## PROC) eglGetProcAddress( "gl" #name #suffix )
+#if defined( Rtt_EGL )
+	#define GL_GET_PROC(name, suffix) (name ## Ptr) eglGetProcAddress( "gl" #name #suffix )
 #else
     #define GL_GET_PROC(name, suffix) gl ## name ## suffix
 #endif
 
 #define GL_RESET() DrawArrays = NULL; DrawElements = NULL; AttribDivisor = NULL; Suffix = NULL
-#define GL_HAS_SUPPORT() (NULL != DrawArrays) && (NULL != DrawElements)
+#define GL_HAS_SUPPORT() ((NULL != DrawArrays) && (NULL != DrawElements))
 
 bool
 GLGeometry::SupportsInstancing()
@@ -317,8 +319,10 @@ GLGeometry::SupportsInstancing()
         #endif
     #endif
         
+		const char * extensions = (const char *)glGetString( GL_EXTENSIONS );
+		
     #if defined( GL_EXT_instanced_arrays )
-        if (!GL_HAS_SUPPORT())
+        if (strstr( extensions, "GL_EXT_instanced_arrays" ) && !GL_HAS_SUPPORT())
         {
             GL_RESET();
         
@@ -329,7 +333,7 @@ GLGeometry::SupportsInstancing()
     #endif
 
     #if defined( GL_ANGLE_instanced_arrays )
-        if (!GL_HAS_SUPPORT())
+        if (strstr( extensions, "GL_ANGLE_instanced_arrays" ) && !GL_HAS_SUPPORT())
         {
             GL_RESET();
         
@@ -340,7 +344,7 @@ GLGeometry::SupportsInstancing()
     #endif
         
     #if defined( GL_EXT_draw_instanced ) // extension notes suggest not ES-only...
-        if (!GL_HAS_SUPPORT())
+        if (strstr( extensions, "GL_EXT_draw_instanced" ) && !GL_HAS_SUPPORT())
         {
             GL_RESET();
             
