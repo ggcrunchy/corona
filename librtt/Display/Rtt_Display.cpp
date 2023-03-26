@@ -217,6 +217,25 @@ Display::Display( Runtime& owner )
 {
 }
 
+int
+Display::GrabOutput( lua_State *L )
+{
+    char *output = new char[1024 * 1024];
+    
+    if ( output )
+    {
+        fRenderer->GrabOutput( output );
+    
+        lua_pushstring( L, output );
+    
+        delete [] output;
+    
+        return 1;
+    }
+    
+    return 0;
+}
+
 Display::~Display()
 {
     CameraPaint::Finalize();

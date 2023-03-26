@@ -107,6 +107,10 @@ class CommandBuffer
         virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
         virtual S32 GetCachedParam( CommandBuffer::QueryableParams param ) = 0;
 
+		virtual int LogToBuffer( const char *format, ... ) = 0;
+		virtual U32 GetBufferCount() const = 0;
+		virtual void GetBufferData( char *buffer, U32 count ) const = 0;
+	
         virtual void AddCommand( const CoronaCommand & command ) = 0;
         virtual void IssueCommand( U16 id, const void * data, U32 size ) = 0;
 
@@ -135,6 +139,8 @@ class CommandBuffer
         U32 fNumCommands;
         U32 fBytesAllocated;
         U32 fBytesUsed;
+		char* fBigBuffer;
+		U32 fBufferOffset;
 };
 
 // ----------------------------------------------------------------------------

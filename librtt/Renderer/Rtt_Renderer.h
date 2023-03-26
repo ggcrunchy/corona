@@ -287,6 +287,9 @@ class Renderer
         // this is called in response to a change in render state.
         void CheckAndInsertDrawCommand();
 
+	public:
+ 		void GrabOutput( char * output );
+	
     private:
         U32 EnumerateDirtyBlocks( ArrayS32& dirtyIndices );
         void UpdateDirtyBlocks( const ArrayS32& dirtyIndices, U32 largestDirtySize );

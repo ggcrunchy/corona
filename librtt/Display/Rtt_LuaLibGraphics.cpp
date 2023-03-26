@@ -116,6 +116,13 @@ GraphicsLibrary::~GraphicsLibrary()
 {
 }
 
+static int
+GrabOutput( lua_State *L )
+{
+	GraphicsLibrary *library = GraphicsLibrary::ToLibrary( L );
+	return library->GetDisplay().GrabOutput( L );
+}
+
 int
 GraphicsLibrary::Open( lua_State *L )
 {
@@ -143,6 +150,7 @@ GraphicsLibrary::Open( lua_State *L )
         { "releaseTextures", releaseTextures },
         { "undefineEffect", undefineEffect },
         { "getFontMetrics", getFontMetrics },
+		{ "grabOutput", GrabOutput },
 
         { NULL, NULL }
     };

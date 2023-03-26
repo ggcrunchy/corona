@@ -1599,6 +1599,12 @@ Renderer::InsertInstancing( const Geometry::ExtensionBlock* block, const FormatE
 }
 
 void
+Renderer::GrabOutput( char * output )
+{
+	fBackCommandBuffer->GetBufferData( output, fBackCommandBuffer->GetBufferCount() );
+}
+
+void
 Renderer::FlushBatch()
 {
     bool storedOnGPU = fPrevious.fGeometry && fPrevious.fGeometry->GetStoredOnGPU();

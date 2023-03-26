@@ -336,6 +336,8 @@ class Display
         bool HasFramebufferBlit( bool * canScale ) const;
         void GetVertexAttributes( VertexAttributeSupport & support ) const;
 
+		int GrabOutput( lua_State *L );
+	
     public:
         Scene& GetScene() { return *fScene; }
         const Scene& GetScene() const { return *fScene; }
