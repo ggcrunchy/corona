@@ -302,15 +302,16 @@ ShapeObject::SetSelfBounds( Real width, Real height )
 void
 ShapeObject::DidSetMask( BitmapMask *mask, Uniform *uniform )
 {
-	BitmapPaint *paint = mask ? mask->GetPaint() : NULL;
-	Texture *maskTexture = ( /*mask ? mask->GetPaint()*/paint ? paint->GetTexture() : NULL );
+	Rtt_ASSERT( !mask || mask->GetPaint() || mask->GetOnlyForHitTests() );
+	
+	Texture *maskTexture = ( mask && !mask->GetOnlyForHitTests() ? mask->GetPaint()->GetTexture() : NULL );
 
 	fFillData.fMaskTexture = maskTexture;
 	fFillData.fMaskUniform = uniform;
 	fStrokeData.fMaskTexture = maskTexture;
 	fStrokeData.fMaskUniform = uniform;
 	
-	if ( mask && !paint )
+	if ( mask && !mask->GetPaint() )
 	{
 		const BitmapPaint *bitmapPaint = GetBitmapPaint();
 		
