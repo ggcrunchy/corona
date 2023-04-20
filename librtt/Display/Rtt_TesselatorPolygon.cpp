@@ -197,10 +197,74 @@ TesselatorPolygon::TesselatorPolygon( Rtt_Allocator *allocator )
 	fFill( allocator ),
 	fSelfBounds(),
 	fCenter( kVertexOrigin ),
+	fConvexity( kUnknown ),
 	fIsFillValid( false ),
 	fIsBadPolygon( false ),
+	fIsStrip( false ),
 	fFillCount( -1 )
 {
+}
+
+static void
+ConvertListToStrip( const ArrayVertex2& fill, ArrayVertex2& temp )
+{
+	S32 length = fill.Length();
+
+	Rtt_ASSERT( length % 3 == 0 );
+
+	const Vertex2* verts = fill.ReadAccess();
+	bool ccw = false;
+
+	temp.Reserve( length + ( length / 3 - 1 ) * 2 );
+
+	Vertex2 v3;
+
+	for ( S32 i = 0; i < length; i += 3, ccw = !ccw )
+	{
+		if ( i > 0 ) // degenerate
+		{
+			temp.Append( v3 );
+		}
+
+		Vertex2 v2 = verts[i + 1], v1;
+
+		if ( ccw )
+		{
+			v3 = verts[i];
+			v1 = verts[i + 2];
+		}
+
+		else
+		{
+			v1 = verts[i];
+			v3 = verts[i + 2];
+		}
+
+		if ( i > 0 ) // degenerate
+		{
+			temp.Append( v1 );
+		}
+
+		temp.Append( v1 );
+		temp.Append( v2 );
+		temp.Append( v3 );
+	}
+}
+
+static const ArrayVertex2*
+GetVertexData( const ArrayVertex2& fill, ArrayVertex2& temp, bool isStrip )
+{
+	if ( isStrip )
+	{
+		ConvertListToStrip( fill, temp );
+
+		return &temp;
+	}
+
+	else
+	{
+		return &fill;
+	}
 }
 
 void
@@ -208,8 +272,13 @@ TesselatorPolygon::GenerateFill( ArrayVertex2& vertices )
 {
 	Update();
 
-	for (int i=0; i<fFill.Length(); i++) {
-		vertices.Append(fFill[i]);
+	Rtt_ASSERT( !fIsStrip || fIsFillValid );
+
+	ArrayVertex2 temp( fFill.Allocator() );
+	const ArrayVertex2* fill = GetVertexData( fFill, temp, fIsStrip );
+
+	for (int i=0; i<fill->Length(); i++) {
+		vertices.Append((*fill)[i]);
 	}
 }
 
@@ -224,7 +293,12 @@ TesselatorPolygon::GenerateFillTexture( ArrayVertex2& texCoords, const Transform
 	Real invW = Rtt_RealDiv( Rtt_REAL_1, w );
 	Real invH = Rtt_RealDiv( Rtt_REAL_1, h );
 
-	const ArrayVertex2& src = fFill;
+	Rtt_ASSERT( !fIsStrip || fIsFillValid );
+
+	ArrayVertex2 temp( fFill.Allocator() );
+	const ArrayVertex2* fill = GetVertexData( fFill, temp, fIsStrip );
+
+	const ArrayVertex2& src = *fill;
 	ArrayVertex2& vertices = texCoords;
 
 	// Transform
@@ -279,7 +353,7 @@ TesselatorPolygon::GetSelfBounds( Rect& rect )
 Geometry::PrimitiveType
 TesselatorPolygon::GetFillPrimitive() const
 {
-	return Geometry::kTriangles;
+	return fIsStrip ? Geometry::kTriangleStrip : Geometry::kTriangles;
 }
 
 U32
@@ -301,7 +375,14 @@ TesselatorPolygon::FillVertexCount() const
 		fFillCount = S32( dummy.fFill.Length() );
 	}
 
-	return U32( fFillCount );
+	U32 count = U32( fFillCount );
+
+	if ( fIsStrip && count > 0 )
+	{
+		count += ( count / 3 - 1 ) * 2;
+	}
+
+	return count;
 }
 
 U32
@@ -313,8 +394,127 @@ TesselatorPolygon::StrokeVertexCount() const
 void
 TesselatorPolygon::Invalidate()
 {
+	SetTypeChanged( fIsStrip );
+
+	fFillCount = -1;
+	fConvexity = kUnknown;
+
 	fIsFillValid = false;
 	fIsBadPolygon = false;
+	fIsStrip = false;
+}
+
+// Convexity checks, used in Process(): https://math.stackexchange.com/a/1745427
+#define PROCESS_EPSILON 1e-2
+#define PROCESS_NOT_EQUAL_ZERO( x ) ( x < -PROCESS_EPSILON || x > +PROCESS_EPSILON )
+#define PROCESS_LESS_THAN_ZERO( x ) ( x < -PROCESS_EPSILON )
+#define PROCESS_GREATER_THAN_ZERO( x ) ( x > +PROCESS_EPSILON )
+
+static bool
+HandleFlips( Real v, int &firstSign, int &sign, int &flips )
+{
+	if ( PROCESS_GREATER_THAN_ZERO( v ) )
+	{
+		if ( 0 == sign )
+		{
+			firstSign = +1;
+		}
+		else if ( sign < 0 )
+		{
+			++flips;
+		}
+
+		sign = +1;
+	}
+	else if ( PROCESS_LESS_THAN_ZERO( v ) )
+	{
+		if ( 0 == sign )
+		{
+			firstSign = -1;
+		}
+		else if ( sign > 0 )
+		{
+			++flips;
+		}
+
+		sign = -1;
+	}
+
+	return flips <= 2;
+}
+
+static bool
+CheckConvexity( const ArrayVertex2 &contour )
+{
+	S32 n = contour.Length();
+	int detSign = 0; // First nonzero orientation (positive or negative)
+	int xSign = 0, ySign = 0;
+    int xFirstSign = 0, yFirstSign = 0; // Sign of first nonzero edge vector x, y
+    int xFlips = 0, yFlips = 0; // Number of sign changes in x, y
+	Vertex2 vp1 = contour[n - 2], vp2 = contour[n - 1];
+
+	for ( S32 i = 0; i < n; ++i )
+	{
+		Vertex2 vp3 = contour[i];
+ 
+		// Previous, next edge vectors ("before", "after"):
+		Real bx = vp2.x - vp1.x, ax = vp3.x - vp2.x;
+		Real by = vp2.y - vp1.y, ay = vp3.y - vp2.y; 
+
+		// Calculate sign flips using the next edge vector ("after"), recording the first sign.
+		if ( !HandleFlips( ax, xFirstSign, xSign, xFlips ) || !HandleFlips( ay, yFirstSign, ySign, yFlips ) )
+		{
+			return false;
+		}
+
+		// Find out the orientation of this pair of edges,
+		// and ensure it does not differ from previous ones.
+		Real det = bx*ay - ax*by;
+		if ( 0 == detSign && PROCESS_NOT_EQUAL_ZERO( det ) )
+		{
+			detSign = det;
+		}
+		else if ( detSign > 0 && PROCESS_LESS_THAN_ZERO( det ) )
+		{
+			return false;
+		}
+		else if ( detSign < 0 && PROCESS_GREATER_THAN_ZERO( det ) )
+		{
+			return false;
+		}
+
+		vp1 = vp2;
+		vp2 = vp3;
+	}
+
+	// Final / wraparound sign flips:
+	if ( 0 != xSign && 0 != xFirstSign && xSign != xFirstSign )
+	{
+		++xFlips;
+	}
+	if ( 0 != ySign && 0 != yFirstSign && ySign != yFirstSign )
+	{
+		++yFlips;
+	}
+
+	// Concave polygons have two sign flips along each axis.
+	return 2 == xFlips && 2 == yFlips;
+}
+
+#undef PROCESS_EPSILON
+#undef PROCESS_NOT_EQUAL_ZERO
+#undef PROCESS_LESS_THAN_ZERO
+#undef PROCESS_GREATER_THAN_ZERO
+
+bool
+TesselatorPolygon::IsConvex() const
+{
+	if ( kUnknown == fConvexity )
+	{
+		fConvexity = CheckConvexity( fContour ) ? kConvex : kConcave;
+	}
+
+	return kConvex == fConvexity;
 }
 
 void

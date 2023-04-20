@@ -48,6 +48,9 @@ class TesselatorShape : public Tesselator
 
 		void SetNormalizationScaleX( Real newValue ) { fScaleX = newValue; }
 		void SetNormalizationScaleY( Real newValue ) { fScaleY = newValue; }
+		
+		void SetTypeChanged( bool newValue ) { fTypeChanged = newValue; }
+		bool GetTypeChanged() const { return fTypeChanged; }
 
 	protected:
 		Real GetScaleX() const { return fScaleX; }
@@ -56,6 +59,7 @@ class TesselatorShape : public Tesselator
 	private:
 		Real fScaleX;
 		Real fScaleY;
+		bool fTypeChanged;
 };
 
 // ----------------------------------------------------------------------------

@@ -36,8 +36,7 @@ class ShapeAdapterPolygon : public ShapeAdapter
 		ShapeAdapterPolygon();
 
 	public:
-// No properties (except inherited ones), so disabling for now.
-#if 0
+
 		virtual int ValueForKey(
 			const LuaUserdataProxy& sender,
 			lua_State *L,
@@ -48,9 +47,11 @@ class ShapeAdapterPolygon : public ShapeAdapter
 			lua_State *L,
 			const char *key,
 			int valueIndex ) const;
-#endif
 
         virtual StringHash *GetHash( lua_State *L ) const;
+
+	private:
+		static int convertToStrip( lua_State *L );
 };
 
 // ----------------------------------------------------------------------------

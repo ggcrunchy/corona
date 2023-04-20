@@ -22,6 +22,14 @@ namespace Rtt
 class TesselatorPolygon : public TesselatorShape
 {
 	public:
+		typedef enum _Convexity
+		{
+			kUnknown,
+			kConvex,
+			kConcave
+		}
+		Convexity;
+
 		typedef TesselatorShape Super;
 
 	public:
@@ -45,6 +53,12 @@ class TesselatorPolygon : public TesselatorShape
 		void Invalidate();
 
 		ArrayVertex2& GetContour() { return fContour; }
+		
+		bool IsConvex() const;
+
+		bool GetIsValid() const { return fIsFillValid; }
+		bool GetIsStrip() const { return fIsStrip; }
+		void SetIsStrip( bool newValue ) { fIsStrip = newValue; }
 
 	protected:
 		// Update the polygons
@@ -57,6 +71,8 @@ class TesselatorPolygon : public TesselatorShape
 		Vertex2 fCenter;
 		bool fIsFillValid;
 		bool fIsBadPolygon;
+		bool fIsStrip;
+		mutable Convexity fConvexity;
 		mutable S32 fFillCount;
 };
 

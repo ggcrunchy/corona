@@ -19,6 +19,7 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 TesselatorShape::TesselatorShape()
+:	fTypeChanged( false )
 {
 	ResetNormalization();
 }

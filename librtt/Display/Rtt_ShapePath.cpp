@@ -272,6 +272,13 @@ ShapePath::UpdateFill( RenderData& data, const Matrix& srcToDstSpace )
 		{
 			fDelegate->UpdateGeometry( * fFillGeometry, fFillSource, srcToDstSpace, flags );
 		}
+
+		TesselatorShape* tesselator = GetTesselator();
+        if ( tesselator->GetTypeChanged() )
+        {
+            fFillGeometry->SetPrimitiveType( tesselator->GetFillPrimitive() );
+        }
+
 		data.fGeometry = fFillGeometry;
 
 		SetValid( kFill | kFillTexture | kFillIndices );
@@ -431,7 +438,7 @@ ShapePath::GetFillVertexCount() const
 {
 	U32 count = fFillGeometry->GetVerticesAllocated();
 
-	if (0U == count)
+	if ( 0U == count || fTesselator->GetTypeChanged() )
 	{
 		return fTesselator->FillVertexCount();
 	}
@@ -444,7 +451,7 @@ ShapePath::GetStrokeVertexCount() const
 {
 	U32 count = fStrokeGeometry->GetVerticesAllocated();
 
-	if (0U == count)
+	if ( 0U == count || fTesselator->GetTypeChanged() )
 	{
 		return fTesselator->StrokeVertexCount();
 	}

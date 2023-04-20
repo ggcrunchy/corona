@@ -12,6 +12,7 @@
 #include "Display/Rtt_ShapeAdapterPolygon.h"
 
 #include "Core/Rtt_StringHash.h"
+#include "Display/Rtt_DisplayObject.h"
 #include "Display/Rtt_DisplayTypes.h"
 #include "Display/Rtt_ShapePath.h"
 #include "Display/Rtt_TesselatorPolygon.h"
@@ -93,14 +94,14 @@ ShapeAdapterPolygon::GetHash( lua_State *L ) const
 {
 	static const char *keys[] = 
 	{
-		"",
+		"convertToStrip", // 0
+		"isConvex",       // 1
+		"isStrip"         // 2
 	};
-	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 1, 0, 0, __FILE__, __LINE__ );
+	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, sizeof( keys ) / sizeof( const char * ), 3, 0, 1, __FILE__, __LINE__ );
 	return &sHash;
 }
 
-// No properties (except inherited ones), so disabling for now.
-#if 0
 int
 ShapeAdapterPolygon::ValueForKey(
 	const LuaUserdataProxy& sender,
@@ -123,6 +124,15 @@ ShapeAdapterPolygon::ValueForKey(
 	int index = GetHash( L )->Lookup( key );
 	switch ( index )
 	{
+		case 0:
+			Lua::PushCachedFunction( L, convertToStrip );
+			break;
+		case 1:
+			lua_pushboolean( L, tesselator->IsConvex() );
+			break;
+		case 2:
+			lua_pushboolean( L, tesselator->GetIsStrip() );
+			break;
 		default:
 			result = 0; // No Lua values pushed
 			break;
@@ -161,7 +171,33 @@ ShapeAdapterPolygon::SetValueForKey(
 
 	return result;
 }
-#endif
+
+int ShapeAdapterPolygon::convertToStrip( lua_State *L )
+{
+	int result = 0;
+	int nextArg = 1;
+	LuaUserdataProxy* sender = LuaUserdataProxy::ToProxy( L, nextArg++ );
+	if(!sender) { return result; }
+	
+	ShapePath *path = (ShapePath *)sender->GetUserdata();
+	if ( ! path ) { return result; }
+	
+	TesselatorPolygon *tesselator = static_cast< TesselatorPolygon * >( path->GetTesselator() );
+	if ( ! tesselator ) { return result; }
+
+	if ( tesselator->GetIsValid() && !tesselator->GetIsStrip() )
+	{
+		path->Invalidate( ClosedPath::kFillSource |
+						 ClosedPath::kStrokeSource );
+		path->Invalidate( ClosedPath::kFillSourceTexture );
+		path->GetObserver()->Invalidate( DisplayObject::kGeometryFlag );
+
+		tesselator->SetIsStrip( true );
+		tesselator->SetTypeChanged( true );
+	}
+
+	return 0;
+}
 
 // ----------------------------------------------------------------------------
 
