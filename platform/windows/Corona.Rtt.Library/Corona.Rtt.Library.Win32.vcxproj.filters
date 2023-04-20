@@ -903,6 +903,9 @@
     <ClCompile Include="..\..\..\librtt\Corona\CoronaMemory.cpp">
       <Filter>librtt\Corona</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\shared\Rtt_WuffsLoader.cpp">
+      <Filter>platform\shared</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\external\ALmixer\luaal.h">
@@ -1807,6 +1810,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\librtt\Corona\CoronaMemory.h">
       <Filter>librtt\Corona</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\shared\Rtt_WuffsLoader.h">
+      <Filter>platform\shared</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

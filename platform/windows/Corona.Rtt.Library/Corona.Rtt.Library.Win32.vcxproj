@@ -272,6 +272,7 @@
     <ClCompile Include="..\..\..\librtt\Rtt_Resource.cpp" />
     <ClCompile Include="..\..\..\librtt\Rtt_Runtime.cpp" />
     <ClCompile Include="..\..\..\librtt\Rtt_HTTPClientCommon.cpp" />
+    <ClCompile Include="..\..\shared\Rtt_WuffsLoader.cpp" />
     <ClCompile Include="Rtt_HTTPClientWindows.cpp" />
     <ClCompile Include="..\..\..\librtt\Rtt_RuntimeDelegate.cpp" />
     <ClCompile Include="..\..\..\librtt\Rtt_RuntimeDelegatePlayer.cpp">
@@ -603,6 +604,7 @@
     <ClInclude Include="..\..\shared\Rtt_NativeWindowMode.h" />
     <ClInclude Include="..\..\shared\Rtt_ProjectSettings.h" />
     <ClInclude Include="..\..\shared\Rtt_ReadOnlyProjectSettings.h" />
+    <ClInclude Include="..\..\shared\Rtt_WuffsLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <LuaToCpp Include="..\..\..\external\lpeg\re.lua">

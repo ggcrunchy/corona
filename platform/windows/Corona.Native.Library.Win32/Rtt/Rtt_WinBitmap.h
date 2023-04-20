@@ -39,6 +39,8 @@ namespace Rtt
 namespace Rtt
 {
 
+class WuffsLoader;
+
 class WinBitmap : public PlatformBitmap
 {
 	public:
@@ -118,6 +120,7 @@ class WinFileBitmap : public WinBitmap
 		};
 
 	private:
+		WuffsLoader* fLoader; // n.b. takes ownership
 		float fScale;
 		U8 fProperties;
 		S8 fOrientation;

@@ -24,6 +24,7 @@ using std::max;
 #include <gdiplus.h>
 #include <objidl.h>
 
+#include "Rtt_WuffsLoader.h"
 
 namespace Rtt
 {
@@ -284,24 +285,90 @@ static U8* LockBitmapData( Rtt_Allocator& allocator, Gdiplus::Bitmap* src, U32* 
 	}
 }
 
-static U8* LoadMaskDataFromStream( Rtt_Allocator& allocator, IStream* pStream, U32* width, U32* height, const char* inPath )
+struct MaskObject
 {
-	using namespace Gdiplus;
-	Bitmap src( pStream, FALSE );
-
-	if ( src.GetLastStatus() != Ok )
+	MaskObject( WinFileBitmap::FileView& view )
+	:	fWuffs( NULL ),
+		fData( NULL ),
+		fView( view )
 	{
-		Rtt_TRACE(( "LoadImageDataFromStream: failed to create bitmap for '%S'\n", inPath ));
-		return NULL;
 	}
 
-	return LockBitmapData( allocator, &src, width, height, inPath );
-}
+	~MaskObject()
+	{
+		if ( fWuffs )
+		{
+			Rtt_DELETE( fWuffs );
+		}
 
-static Gdiplus::Bitmap* LoadBitmap( Rtt_Allocator& context, IStream* pStream, U32*, U32*, const char* )
+		else
+		{
+			Rtt_FREE( fData );
+		}
+	}
+
+	U8* fData;
+	WuffsLoader* fWuffs;
+	WinFileBitmap::FileView& fView;
+	U32 fWidth;
+	U32 fHeight;
+
+	void SetLoader( WuffsLoader* loader )
+	{
+		fWuffs = loader;
+		fWidth = loader->GetWidth();
+		fHeight = loader->GetHeight();
+	}
+
+	void OnStream( BitmapStream* stream, Rtt_Allocator& context, const char* path )
+	{
+		Gdiplus::Bitmap src( stream, FALSE );
+
+		if ( Gdiplus::Ok == src.GetLastStatus() )
+		{
+			fData = LockBitmapData( context, &src, &fWidth, &fHeight, path );
+		}
+
+		else
+		{
+			Rtt_TRACE(( "LoadMaskDataFromStream: failed to create bitmap for '%S'\n", path ));
+		}
+	}
+
+	bool KeepView() const
+	{
+		return false;
+	}
+};
+
+struct BitmapObject
 {
-	return Rtt_NEW( context, Gdiplus::Bitmap( pStream, FALSE ) );
-}
+	BitmapObject( WinFileBitmap::FileView& view )
+	:	fWuffs( NULL ),
+		fBitmap( NULL ),
+		fView( view )
+	{
+	}
+
+	WuffsLoader* fWuffs;
+	Gdiplus::Bitmap* fBitmap;
+	WinFileBitmap::FileView& fView;
+
+	void SetLoader( WuffsLoader* loader )
+	{
+		fWuffs = loader;
+	}
+
+	void OnStream( BitmapStream* stream, Rtt_Allocator& context, const char* )
+	{
+		fBitmap = Rtt_NEW( context, Gdiplus::Bitmap( stream, FALSE ) );
+	}
+
+	bool KeepView() const
+	{
+		return NULL != fBitmap;
+	}
+};
 
 static HANDLE
 FileFromPath( const char *inPath )
@@ -311,14 +378,22 @@ FileFromPath( const char *inPath )
 	return CreateFile( wPath.GetTCHAR(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL );
 }
 
-template<typename R, typename F>
-R* LoadBitmapData( HANDLE hFile, Rtt_Allocator &context, F && func, const char *inPath, U32* width, U32* height, WinFileBitmap::FileView* pView = NULL )
+/*
+	T is a type with the following methods:
+
+	void SetLoader( WuffsLoader* loader )
+	void OnStream( BitmapStream* stream, Rtt_Allocator& context, const char* path )
+	bool KeepView()
+*/
+
+template<typename T>
+void LoadBitmapData( HANDLE hFile, Rtt_Allocator &context, const char *inPath, T& object )
 {
 	if (INVALID_HANDLE_VALUE == hFile)
 	{
 		Rtt_TRACE(( "LoadBitmapData: unable to load bitmap '%S'\n", inPath ));
 
-		return NULL;
+		return;
 	}
 
 	WinFileBitmap::FileView view;
@@ -332,24 +407,47 @@ R* LoadBitmapData( HANDLE hFile, Rtt_Allocator &context, F && func, const char *
 	{
 		Rtt_TRACE(( "LoadBitmapData: unable to map file into memory for '%S'\n", inPath ));
 
-		return NULL;
+		return;
 	}
 
-	R* result = NULL;
-	BitmapStream* pStream = Rtt_NEW( context, BitmapStream( view.fData, size ) );
+	WuffsLoader* loader = Rtt_NEW( context, WuffsLoader );
 
-	if ( NULL != pStream )
+	loader->SetSource( view.fData, size );
+
+	const U8* data = loader->GetData();
+	bool keepView = false;
+
+	if ( data )
 	{
-		result = func( context, pStream, width, height, inPath );
-
-		pStream->Release();
+		object.SetLoader( loader );
 	}
 
 	else
 	{
-		Rtt_TRACE(( "LoadBitmapData: unable to create memory stream for '%S'\n", inPath ));
+		Rtt_DELETE( loader );
+
+		BitmapStream* pStream = Rtt_NEW( context, BitmapStream( view.fData, size ) );
+
+		if ( NULL != pStream )
+		{
+			object.OnStream( pStream, context, inPath );
+
+			pStream->Release();
+
+			keepView = object.KeepView();
+		}
+
+		else
+		{
+			Rtt_TRACE(( "LoadBitmapData: unable to create memory stream for '%S'\n", inPath ));
+		}
 	}
-	
+
+	if ( !keepView )
+	{
+		view.Close();
+	}
+	/*
 	if ( NULL != result && NULL != pView )
 	{
 		*pView = view;
@@ -358,9 +456,7 @@ R* LoadBitmapData( HANDLE hFile, Rtt_Allocator &context, F && func, const char *
 	else
 	{
 		view.Close();
-	}
-
-	return result;
+	}*/
 }
 
 WinBitmap::WinBitmap() 
@@ -372,7 +468,6 @@ WinBitmap::WinBitmap()
 WinBitmap::~WinBitmap()
 {
 	Self::FreeBits();
-
 
 	Rtt_DELETE( fBitmap );
 }
@@ -427,28 +522,38 @@ GetInitialPropertiesValue()
 }
 
 WinFileBitmap::WinFileBitmap( Rtt_Allocator &context )
+:	fLoader( NULL )
 #ifdef Rtt_DEBUG
-	: fPath(&context)
+	, fPath(&context)
 #endif
 {
 	InitializeMembers();
 }
 
 WinFileBitmap::WinFileBitmap( const char * inPath, Rtt_Allocator &context )
+:	fLoader( NULL )
 #ifdef Rtt_DEBUG
-	: fPath(&context)
+	, fPath(&context)
 #endif
 {
 	// Initialize all member variables.
 	InitializeMembers();
 
 	// Load bitmap from file.
-	HANDLE global = NULL;
-	Gdiplus::Bitmap *bm = LoadBitmapData<Gdiplus::Bitmap>( FileFromPath( inPath ), context, LoadBitmap, inPath, NULL, NULL, &fView );
+	BitmapObject bo( fView );
 
-	if ( bm != NULL && bm->GetLastStatus() == Gdiplus::Ok )
+	LoadBitmapData( FileFromPath( inPath ), context, inPath, bo );
+
+	if ( bo.fWuffs )
 	{
-		fBitmap = bm;
+		fLoader = bo.fWuffs;
+		fWidth = bo.fWuffs->GetWidth();
+		fHeight = bo.fWuffs->GetHeight();
+	}
+
+	else if ( NULL != bo.fBitmap && bo.fBitmap->GetLastStatus() == Gdiplus::Ok )
+	{
+		fBitmap = bo.fBitmap;
 #ifdef Rtt_DEBUG
 		fPath.Set( inPath );
 #endif
@@ -457,7 +562,7 @@ WinFileBitmap::WinFileBitmap( const char * inPath, Rtt_Allocator &context )
 	{
 		fView.Close();
 
-		delete bm;
+		Rtt_DELETE( bo.fBitmap );
 	}
 }
 
@@ -465,7 +570,15 @@ WinFileBitmap::~WinFileBitmap()
 {
 	fView.Close();
 
-	Rtt_FREE( fData );
+	if ( fLoader )
+	{
+		Rtt_DELETE( fLoader );
+	}
+
+	else
+	{
+		Rtt_FREE( fData ); // owned by loader, if it exists
+	}
 }
 
 void
@@ -494,21 +607,26 @@ WinFileBitmap::CalculateScale() const
 void
 WinFileBitmap::Lock( Rtt_Allocator* context )
 {
-	if ( fBitmap == NULL )
-		return;
+	if ( fLoader )
+	{
+		fData = const_cast<U8*>( fLoader->GetData() );
+	}
 
-	fData = LockBitmapData( *context, fBitmap, &fWidth, &fHeight,
-	#ifdef Rtt_DEBUG
-		fPath.GetString() );
-	#else
-		"?" );
-	#endif
+	else if ( NULL == fBitmap )
+	{
+		fData = LockBitmapData( *context, fBitmap, &fWidth, &fHeight,
+		#ifdef Rtt_DEBUG
+			fPath.GetString() );
+		#else
+			"?" );
+		#endif
 
-	Rtt_DELETE( fBitmap );
+		Rtt_DELETE( fBitmap );
 
-	fBitmap = NULL;
+		fBitmap = NULL;
 
-	fView.Close();
+		fView.Close();
+	}
 }
 
 U32
@@ -587,9 +705,12 @@ WinFileGrayscaleBitmap::WinFileGrayscaleBitmap( const char *inPath, Rtt_Allocato
 	fPath.Set( inPath );
 #endif
 
-	U8* data = LoadBitmapData<U8>( FileFromPath( inPath ), context, LoadMaskDataFromStream, inPath, &fWidth, &fHeight );
+	FileView view;
+	MaskObject bo( view );
 
-	if ( NULL == data )
+	LoadBitmapData( FileFromPath( inPath ), context, inPath, bo );
+
+	if ( NULL == bo.fData )
 	{
 		return;
 	}
@@ -614,7 +735,7 @@ WinFileGrayscaleBitmap::WinFileGrayscaleBitmap( const char *inPath, Rtt_Allocato
 		}
 
 		U8*out = bitmapBuffer;
-		const U8* colors = data;
+		const U8* colors = bo.fData;
 		U32 rowBase = 0;
 
 		for ( int yIndex = 0; yIndex < fHeight; ++yIndex )
@@ -644,8 +765,6 @@ WinFileGrayscaleBitmap::WinFileGrayscaleBitmap( const char *inPath, Rtt_Allocato
 		// for pitch then this will have to do for now.
 		fWidth = pitch;
 	}
-
-	Rtt_FREE( data );
 }
 
 WinFileGrayscaleBitmap::~WinFileGrayscaleBitmap()
