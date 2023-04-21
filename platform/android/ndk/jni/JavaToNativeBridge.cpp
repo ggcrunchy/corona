@@ -129,10 +129,6 @@ JavaToNativeBridge::Init(
 	}
 	else
 	{
-		fView = new AndroidGLView();
-
-		fView->CreateFramebuffer( width, height, (Rtt::DeviceOrientation::Type)orientation );
-
 		jstringResult packageName( env, packageJ );
 		jstringResult documentsDir( env, documentsDirJ );
 		jstringResult applicationSupportDir( env, applicationSupportDirJ );
@@ -148,11 +144,21 @@ JavaToNativeBridge::Init(
 		cachesDir.setNotLocal();
 		systemCachesDir.setNotLocal();
 		expansionFileDir.setNotLocal();
-		fNativeToJavaBridge = NativeToJavaBridge::InitInstance( env, fRuntime, fCoronaRuntime );
+		fNativeToJavaBridge = NativeToJavaBridge::InitInstance( env, fRuntime, fCoronaRuntime ); // TODO: fRuntime not yet created?
 		fPlatform = new Rtt::AndroidPlatform(
-							fView, packageName.getUTF8(), documentsDir.getUTF8(), applicationSupportDir.getUTF8(),
+							/*fView, */packageName.getUTF8(), documentsDir.getUTF8(), applicationSupportDir.getUTF8(),
 							temporaryDir.getUTF8(), cachesDir.getUTF8(), systemCachesDir.getUTF8(), expansionFileDir.getUTF8(),
 							fNativeToJavaBridge );
+
+		Runtime::PreloadedConfig config;
+
+		// if ( !GetPreloadConfig( config ) )
+
+		fView = new AndroidGLView(); // <- pass config.buffer bits
+
+		fView->CreateFramebuffer( width, height, (Rtt::DeviceOrientation::Type)orientation );
+
+		fPlatform.SetView( fView );
 
 		fRuntime = Rtt_NEW( & fPlatform->GetAllocator(), Rtt::Runtime( * fPlatform ) );
 

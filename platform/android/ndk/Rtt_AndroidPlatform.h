@@ -47,7 +47,7 @@ class AndroidPlatform : public MPlatform
 
 	public:
 		AndroidPlatform(
-				AndroidGLView * pView, const char * package, const char * documentsDir, const char * applicationSupportDir,
+				/*AndroidGLView * pView, */const char * package, const char * documentsDir, const char * applicationSupportDir,
 				const char * temporaryDir, const char * cachesDir, const char * systemCachesDir, const char * expansionFileDir,
 				NativeToJavaBridge *ntjb);
 		~AndroidPlatform();
@@ -61,6 +61,9 @@ class AndroidPlatform : public MPlatform
 		virtual MPlatformDevice& GetDevice() const;
 		virtual PlatformSurface* CreateScreenSurface() const;
 		virtual PlatformSurface* CreateOffscreenSurface( const PlatformSurface& parent ) const;
+
+	public:
+		void SetView( AndroidGLView * pView ) { fView = pView; }
 
     public:
         virtual Rtt_Allocator& GetAllocator() const;

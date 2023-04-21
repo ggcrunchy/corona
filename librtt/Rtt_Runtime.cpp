@@ -614,7 +614,26 @@ Runtime::WindowHeight() const
 {
 	return fDisplay->WindowHeight();
 }
+// STEVE CHANGE
+Runtime::PreloadedConfig::PreloadedConfig()
+:	fDepthBits( 0 ),
+	fStencilBits( 0 )
+{
+}
 
+bool
+Runtime::GetPreloadConfig( PreloadedConfig& config )
+{
+	lua_State *L = luaL_newstate();
+	int status = LUA_ERRFILE;
+
+	// LoadConfig( L, GetAllocator(), ???, &archive, notArchived, status );
+
+	lua_close( L );
+
+	return true;
+}
+// /STEVE CHANGE
 void
 Runtime::InitializeArchive( const char *filePath )
 {
@@ -775,6 +794,38 @@ Runtime::InitializeMetadata( lua_State *L, int index )
 	lua_pop( L, 1 );
 }
 
+// STEVE CHANGE
+void 
+Runtime::LoadConfig( lua_State* L, Rtt_Allocator* allocator, const MPlatform& platform, Archive* archive, bool notArchived, int& status )
+{
+	if ( notArchived )
+	{
+		// Load from individual Lua file
+		const char kConfig[] = Rtt_LUA_SCRIPT_FILE( "config" );
+
+		String filePath( allocator );
+		platform.PathForFile( kConfig, MPlatform::kResourceDir, MPlatform::kTestFileExists, filePath );
+		const char *path = filePath.GetString();
+		if ( path )
+		{
+			status = LuaContext::DoFile( L, path, 0, true );
+		}
+		else
+		{
+			// other cases assume a non-zero status means there's an error msg on the stack
+			// so push a "fake" error msg on the stack so we are consistent with those cases
+			lua_pushnil( L );
+		}
+	}
+	else
+	{
+		// Load from resource.car
+		const char kConfig[] = Rtt_LUA_OBJECT_FILE( "config" );
+		status = archive->DoResource( L, kConfig, 0 );
+	}
+}
+// /STEVE CHANGE
+
 bool
 Runtime::PushConfig( lua_State *L, bool shouldRestrictLibs )
 {
@@ -802,8 +853,9 @@ Runtime::PushConfig( lua_State *L, bool shouldRestrictLibs )
 			VMContext().DoCall( L, 1, 0 );
 		}
 	#endif
-
-		if ( IsProperty( kIsApplicationNotArchived ) )
+// STEVE CHANGE
+		Runtime::LoadConfig( VMContext().L(), GetAllocator(), fPlatform, GetArchive(), IsProperty( kIsApplicationNotArchived ), status );
+		/*if ( IsProperty( kIsApplicationNotArchived ) )
 		{
 			// Load from individual Lua file
 			const char kConfig[] = Rtt_LUA_SCRIPT_FILE( "config" );
@@ -827,7 +879,8 @@ Runtime::PushConfig( lua_State *L, bool shouldRestrictLibs )
 			// Load from resource.car
 			const char kConfig[] = Rtt_LUA_OBJECT_FILE( "config" );
 			status = GetArchive()->DoResource( L, kConfig, 0 );
-		}
+		}*/
+// /STEVE CHANGE
 	}
 	// [Lua] initializeMetadata = nil
 	lua_pushnil( L );

@@ -178,6 +178,22 @@ class Runtime : public MCallback,
 
 		//const AutoPtr< GPUBitmapTexture >& CreateOrFindTextureWithFilename( const char* filename );
 
+	public:
+		// STEVE CHANGE
+		static void LoadConfig( lua_State* L, Rtt_Allocator* allocator, const MPlatform& platform, Archive* archive, bool notArchived, int& status );
+
+		// These settings might need to be known before the runtime exists.
+		struct PreloadedConfig
+		{
+			PreloadedConfig();
+
+			U32 fDepthBits;
+			U32 fStencilBits;
+		};
+
+		static bool GetPreloadConfig( PreloadedConfig& config );
+		// /STEVE CHANGE
+
 	protected:
 		void InitializeArchive( const char *filePath );
 		bool VerifyApplication( const char *filePath );

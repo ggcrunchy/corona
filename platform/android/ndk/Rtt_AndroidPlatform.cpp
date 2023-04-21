@@ -65,10 +65,10 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 AndroidPlatform::AndroidPlatform(
-	AndroidGLView * pView, const char * package, const char * documentsDir, const char * applicationSupportDir, const char * temporaryDir,
+	/*AndroidGLView * pView, */const char * package, const char * documentsDir, const char * applicationSupportDir, const char * temporaryDir,
 	const char * cachesDir, const char * systemCachesDir, const char * expansionFileDir, NativeToJavaBridge *ntjb )
   :	fAllocator( Rtt_AllocatorCreate() ),
-	fView( pView ),
+	fView( NULL ),//pView ),
 	fDevice( *fAllocator, ntjb ),
 	fAudioPlayer( NULL ),
 	fVideoPlayer( NULL ),
