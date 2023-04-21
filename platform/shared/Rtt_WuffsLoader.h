@@ -29,10 +29,13 @@ class WuffsLoader
 		void SetSource( const void* data, U32 size );
 
 	public:
+		static void DeleteLoaderElseFreeData( WuffsLoader* loader, void* data );
+
+	public:
 		U32 GetWidth() const;
 		U32 GetHeight() const;
 
-		const U8* GetData() const { return fData; }
+		U8* GetData() const { return fData; }
 
 	private:
 		void Reset();

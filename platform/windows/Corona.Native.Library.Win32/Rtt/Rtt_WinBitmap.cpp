@@ -224,6 +224,12 @@ bool WinFileBitmap::FileView::Map( HANDLE hFile )
 	}
 }
 
+void WinFileBitmap::FileView::Clear()
+{
+	fMapping = NULL;
+	fData = NULL;
+}
+
 void WinFileBitmap::FileView::Close()
 {
 	if ( fData )
@@ -236,8 +242,7 @@ void WinFileBitmap::FileView::Close()
 		CloseHandle( fMapping );
 	}
 
-	fMapping = NULL;
-	fData = NULL;
+	Clear();
 }
 
 static U8* LockBitmapData( Rtt_Allocator& allocator, Gdiplus::Bitmap* src, U32* width, U32* height, const char* inPath )
@@ -287,35 +292,28 @@ static U8* LockBitmapData( Rtt_Allocator& allocator, Gdiplus::Bitmap* src, U32* 
 
 struct MaskObject
 {
-	MaskObject( WinFileBitmap::FileView& view )
+	MaskObject( U32& width, U32& height )
 	:	fWuffs( NULL ),
 		fData( NULL ),
-		fView( view )
+		fWidth( width ),
+		fHeight( height )
 	{
 	}
 
 	~MaskObject()
 	{
-		if ( fWuffs )
-		{
-			Rtt_DELETE( fWuffs );
-		}
-
-		else
-		{
-			Rtt_FREE( fData );
-		}
+		WuffsLoader::DeleteLoaderElseFreeData( fWuffs, fData );
 	}
 
 	U8* fData;
 	WuffsLoader* fWuffs;
-	WinFileBitmap::FileView& fView;
-	U32 fWidth;
-	U32 fHeight;
+	U32& fWidth;
+	U32& fHeight;
 
 	void SetLoader( WuffsLoader* loader )
 	{
 		fWuffs = loader;
+		fData = loader->GetData();
 		fWidth = loader->GetWidth();
 		fHeight = loader->GetHeight();
 	}
@@ -335,9 +333,8 @@ struct MaskObject
 		}
 	}
 
-	bool KeepView() const
+	void OnView( WinFileBitmap::FileView& )
 	{
-		return false;
 	}
 };
 
@@ -364,9 +361,14 @@ struct BitmapObject
 		fBitmap = Rtt_NEW( context, Gdiplus::Bitmap( stream, FALSE ) );
 	}
 
-	bool KeepView() const
+	void OnView( WinFileBitmap::FileView& other ) const
 	{
-		return NULL != fBitmap;
+		if ( NULL != fBitmap )
+		{
+			fView = other;
+
+			other.Clear();
+		}
 	}
 };
 
@@ -415,7 +417,6 @@ void LoadBitmapData( HANDLE hFile, Rtt_Allocator &context, const char *inPath, T
 	loader->SetSource( view.fData, size );
 
 	const U8* data = loader->GetData();
-	bool keepView = false;
 
 	if ( data )
 	{
@@ -431,10 +432,9 @@ void LoadBitmapData( HANDLE hFile, Rtt_Allocator &context, const char *inPath, T
 		if ( NULL != pStream )
 		{
 			object.OnStream( pStream, context, inPath );
+			object.OnView( view );
 
 			pStream->Release();
-
-			keepView = object.KeepView();
 		}
 
 		else
@@ -443,20 +443,7 @@ void LoadBitmapData( HANDLE hFile, Rtt_Allocator &context, const char *inPath, T
 		}
 	}
 
-	if ( !keepView )
-	{
-		view.Close();
-	}
-	/*
-	if ( NULL != result && NULL != pView )
-	{
-		*pView = view;
-	}
-
-	else
-	{
-		view.Close();
-	}*/
+	view.Close();
 }
 
 WinBitmap::WinBitmap() 
@@ -570,15 +557,7 @@ WinFileBitmap::~WinFileBitmap()
 {
 	fView.Close();
 
-	if ( fLoader )
-	{
-		Rtt_DELETE( fLoader );
-	}
-
-	else
-	{
-		Rtt_FREE( fData ); // owned by loader, if it exists
-	}
+	WuffsLoader::DeleteLoaderElseFreeData( fLoader, fData );
 }
 
 void
@@ -609,10 +588,10 @@ WinFileBitmap::Lock( Rtt_Allocator* context )
 {
 	if ( fLoader )
 	{
-		fData = const_cast<U8*>( fLoader->GetData() );
+		fData = fLoader->GetData();
 	}
 
-	else if ( NULL == fBitmap )
+	else if ( NULL != fBitmap )
 	{
 		fData = LockBitmapData( *context, fBitmap, &fWidth, &fHeight,
 		#ifdef Rtt_DEBUG
@@ -705,8 +684,7 @@ WinFileGrayscaleBitmap::WinFileGrayscaleBitmap( const char *inPath, Rtt_Allocato
 	fPath.Set( inPath );
 #endif
 
-	FileView view;
-	MaskObject bo( view );
+	MaskObject bo( fWidth, fHeight );
 
 	LoadBitmapData( FileFromPath( inPath ), context, inPath, bo );
 
@@ -727,7 +705,7 @@ WinFileGrayscaleBitmap::WinFileGrayscaleBitmap( const char *inPath, Rtt_Allocato
 		// GDI can only create 8-bit bitmaps with color palettes. So we have to create the bitmap binary ourselves.
 		// --------------------------------------------------------------------------------------------------------
 		int byteCount = pitch * fHeight;
-		U8* bitmapBuffer = new U8[byteCount];
+		U8* bitmapBuffer = (U8*)Rtt_MALLOC( context, byteCount );
 
 		if (pitch > fWidth)
 		{
@@ -769,11 +747,6 @@ WinFileGrayscaleBitmap::WinFileGrayscaleBitmap( const char *inPath, Rtt_Allocato
 
 WinFileGrayscaleBitmap::~WinFileGrayscaleBitmap()
 {
-	if (fData)
-	{
-		delete fData;
-		fData = nullptr;
-	}
 }
 
 void

@@ -24,6 +24,7 @@
 #define WUFFS_CONFIG__MODULE__ZLIB
 
 #include "Rtt_WuffsLoader.h"
+#include "Core/Rtt_Allocator.h"
 #include <utility>
 
 // ----------------------------------------------------------------------------
@@ -84,6 +85,19 @@ void WuffsLoader::SetSource( const void* data, U32 size )
 	fData = tab.ptr;
 }
 
+void WuffsLoader::DeleteLoaderElseFreeData( WuffsLoader* loader, void* data )
+{
+	if ( loader )
+	{
+		Rtt_DELETE( loader );
+	}
+
+	else
+	{
+		Rtt_FREE( data ); // data not owned by loader
+	}
+}
+
 U32 WuffsLoader::GetWidth() const
 {
 	return fData ? fPixbuf.pixcfg.width() : 0;
@@ -100,64 +114,6 @@ void WuffsLoader::Reset()
 
 	fData = NULL;
 }
-
-/*
-TryNotBitmapLoad:
-
-	// MAP FILE
-
-	+
-	+	Wuffs_Load_RW_Callbacks callbacks( WUFFS_BASE__PIXEL_FORMAT__BGRA_PREMUL );
-	+	wuffs_aux::sync_io::MemoryInput input( data, size );
-	+
-	+	wuffs_aux::DecodeImageResult res = wuffs_aux::DecodeImage( callbacks, input, WUFFS_BASE__PIXEL_BLEND__SRC );
-	
-	// UNMAP FILE
-
-	+	if (!res.pixbuf.pixcfg.pixel_format().is_interleaved())
-	+	{
-	+		return false;
-	+	}
-	+	wuffs_base__table_u8 tab = res.pixbuf.plane(0);
-	+	if (tab.width != tab.stride)
-	+	{
-	+		return false;
-	+	}
-	+	if (NULL == tab.ptr)
-	+	{
-	+		return false;
- 		}
-
-	+	fWidth = res.pixbuf.pixcfg.width();
-	+	fHeight = res.pixbuf.pixcfg.height();
-	+	fData = tab.ptr;
-	+
-	+	Wuffs* wuffs = new Wuffs;
-	+
-	+	wuffs->fMemOwner = std::move(res.pixbuf_mem_owner);
-	+	wuffs->fPixbuf = res.pixbuf;
-	+
-	+	fWuffs = wuffs;
-	+
-
-
-~WinBitmap:
-
-	+	if ( fWuffs )
-	+	{
-	+		delete static_cast<Wuffs*>( fWuffs );
-	+	}
-	+
-
-WinGrayscaleBitmap:
-
-	+if (fData)
-	+{
-	+	delete static_cast<Wuffs*>(fWuffs);
- 
-	+	fWuffs = NULL;
-	+}
-*/
 
 // ----------------------------------------------------------------------------
 

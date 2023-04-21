@@ -113,6 +113,7 @@ class WinFileBitmap : public WinBitmap
 			FileView();
 			
 			bool Map( HANDLE hFile );
+			void Clear();
 			void Close();
 
 			HANDLE fMapping;
