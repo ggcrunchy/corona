@@ -108,6 +108,106 @@ static void PngInputRequestCallback(png_structp pngReaderPointer, png_bytep byte
 // Protected Member Functions
 // ----------------------------------------------------------------------------
 
+Rtt_INLINE static void Gray(char* imageBytes, png_byte* byteBuffer, int byteIndex)
+{
+	*imageBytes = (char) (
+			((int) byteBuffer[byteIndex] * (int) byteBuffer[byteIndex + 1]) >> 8);
+}
+
+Rtt_INLINE static void GrayAlpha(char* imageBytes, png_byte* byteBuffer, int byteIndex)
+{
+	*imageBytes = (char) (
+			((int) byteBuffer[byteIndex] * (int) byteBuffer[byteIndex + 1]) >> 8);
+}
+
+Rtt_INLINE static void RGB(char* imageBytes, png_byte* byteBuffer, int byteIndex)
+{
+	imageBytes[0] = byteBuffer[byteIndex];
+	imageBytes[1] = byteBuffer[byteIndex + 1];
+	imageBytes[2] = byteBuffer[byteIndex + 2];
+	imageBytes[3] = (char) 255;
+}
+
+Rtt_INLINE static void RGBAlpha(char* imageBytes, png_byte* byteBuffer, int byteIndex)
+{
+	int alpha = byteBuffer[byteIndex + 3];
+	imageBytes[0] = (char) (((int) byteBuffer[byteIndex] * alpha) >> 8);
+	imageBytes[1] = (char) (((int) byteBuffer[byteIndex + 1] * alpha) >> 8);
+	imageBytes[2] = (char) (((int) byteBuffer[byteIndex + 2] * alpha) >> 8);
+	imageBytes[3] = (char) alpha;
+}
+
+template<int sourceStep, int targetStep, typename F>
+void FillBytes (png_structp& pngReaderPointer, char* imageBytes, png_byte* byteBuffer, int nrows, int ncols, int bytesPerRow, int pixelFrequency, F&& func)
+{
+	int pixelStep = sourceStep * pixelFrequency;
+
+	if (bytesPerRow > ncols * sourceStep)
+	{
+		bytesPerRow = ncols * sourceStep;
+	}
+
+	for (int sourceRowIndex = 0; sourceRowIndex < nrows; sourceRowIndex++) {
+		// Decode the next row of pixels.
+		png_read_row(pngReaderPointer, byteBuffer, NULL);
+
+		// Copy the row of pixels to the bitmap.
+		for (int byteIndex = 0; byteIndex < bytesPerRow; byteIndex += pixelStep) {
+			// Convert the decoded pixel to the expected color format and copy it to the bitmap.
+			func(imageBytes, byteBuffer, byteIndex);
+
+			imageBytes += targetStep;
+		}
+
+		// Do not copy these rows' pixels to the bitmap if they're downsampled out.
+		for (int i = 1; i < pixelFrequency; i++) {
+			png_read_row(pngReaderPointer, byteBuffer, NULL);
+		}
+	}
+}
+
+static void CopyBytes(png_structp& pngReaderPointer, png_infop& pngInfoPointer, char* imageBytes, int nrows, int ncols, int pixelSampleFrequency, int colorType)
+{
+	int bytesPerRow = png_get_rowbytes(pngReaderPointer, pngInfoPointer);
+
+	if (PNG_COLOR_TYPE_GRAY == colorType && 1 == pixelSampleFrequency)
+	{
+		for (int i = 0; i < nrows; i++, imageBytes += bytesPerRow) {
+			png_read_row(pngReaderPointer, reinterpret_cast<png_byte *>(imageBytes), NULL);
+		}
+	}
+
+	else {
+		png_byte *byteBuffer = new png_byte[bytesPerRow];
+
+		switch (colorType)
+		{
+			case PNG_COLOR_TYPE_GRAY:
+				FillBytes<1, 1>(pngReaderPointer, imageBytes, byteBuffer,
+					nrows, ncols, bytesPerRow, pixelSampleFrequency, Gray);
+				break;
+			case PNG_COLOR_TYPE_GRAY_ALPHA:
+				FillBytes<2, 1>(pngReaderPointer, imageBytes, byteBuffer,
+								nrows, ncols, bytesPerRow, pixelSampleFrequency, GrayAlpha);
+				break;
+			case PNG_COLOR_TYPE_RGB:
+				FillBytes<3, 4>(pngReaderPointer, imageBytes, byteBuffer,
+								nrows, ncols, bytesPerRow, pixelSampleFrequency, RGB);
+				break;
+			case PNG_COLOR_TYPE_RGB_ALPHA:
+			default:
+				FillBytes<4, 4>(pngReaderPointer, imageBytes, byteBuffer,
+								nrows, ncols, bytesPerRow, pixelSampleFrequency, RGBAlpha);
+				break;
+		}
+
+		delete [] byteBuffer;
+	}
+
+	// Destroy the reader and its objects.
+	png_destroy_read_struct(&pngReaderPointer, &pngInfoPointer, NULL);
+}
+
 /// Decodes an image from the given reader/stream and copies its data to the targeted image data object
 /// assigned to this decoder via the SetTarget() function.
 /// @param reader The reader which stream's the image's bytes to this decoder.
@@ -328,6 +428,7 @@ AndroidOperationResult AndroidNativePngDecoder::OnDecodeFrom(AndroidBinaryReader
 	png_read_update_info(pngReaderPointer, pngInfoPointer);
 
 	// Determine the number of bytes in one pixel.
+	/*
 	int sourcePixelSizeInBytes;
 	switch (colorType)
 	{
@@ -345,7 +446,7 @@ AndroidOperationResult AndroidNativePngDecoder::OnDecodeFrom(AndroidBinaryReader
 			sourcePixelSizeInBytes = 4;
 			break;
 	}
-
+*/
 	// Create the image buffer that will store the image in decompressed bitmap form.
 	imageDataPointer->CreateImageByteBuffer();
 	char *imageBytes = (char*)imageDataPointer->GetImageByteBuffer();
@@ -356,9 +457,20 @@ AndroidOperationResult AndroidNativePngDecoder::OnDecodeFrom(AndroidBinaryReader
 		return AndroidOperationResult::FailedWith(GetAllocator(), message);
 	}
 
+	// (sourceRowIndex < sourcePixelHeight) && (targetRowIndex < targetPixelHeight);
+	int nrows = targetPixelHeight;
+
+	if (nrows * pixelSampleFrequency > sourcePixelHeight)
+	{
+		nrows = sourcePixelHeight / pixelSampleFrequency;
+	}
+	
+	CopyBytes(pngReaderPointer, pngInfoPointer, imageBytes, nrows, targetPixelWidth, pixelSampleFrequency, colorType);
+/*
 	// Decode the PNG to an uncompressed bitmap.
 	int bytesPerRow = png_get_rowbytes(pngReaderPointer, pngInfoPointer);
 	png_byte *byteBuffer = new png_byte[bytesPerRow];
+
 	for (int sourceRowIndex = 0, targetRowIndex = 0;
 	     (sourceRowIndex < sourcePixelHeight) && (targetRowIndex < targetPixelHeight);
 	     sourceRowIndex++)
@@ -439,7 +551,7 @@ AndroidOperationResult AndroidNativePngDecoder::OnDecodeFrom(AndroidBinaryReader
 	// Destroy the reader and its objects.
 	delete [] byteBuffer;
 	png_destroy_read_struct(&pngReaderPointer, &pngInfoPointer, NULL);
-
+*/
 	// Return a success result.
 	return AndroidOperationResult::Succeeded(GetAllocator());
 }
