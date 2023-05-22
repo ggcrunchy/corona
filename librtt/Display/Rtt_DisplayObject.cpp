@@ -829,7 +829,7 @@ DisplayObject::PropagateImplicitSrcToDstInvalidation()
 	bool isParentValid = true;
 
 	DisplayObject* parent = GetParent();
-	if ( parent )
+	if ( parent && !parent->IsProperty( kIsAreaAgnostic ) ) // <- STEVE CHANGE
 	{
 		parent->PropagateImplicitSrcToDstInvalidation();
 		isParentValid = parent->IsValid( kTransformFlag );
@@ -1185,6 +1185,13 @@ DisplayObject::InvalidateStageBounds()
 				&& ancestor != canvas;
 			  ancestor = ancestor->GetParent() )
 		{
+			// STEVE CHANGE
+			if (ancestor->IsProperty( kIsAreaAgnostic ))
+			{
+				break;
+			}
+			// /STEVE CHANGE
+
 			ancestor->SetDirty( kStageBoundsFlag );
 		}
 	}
@@ -1421,6 +1428,8 @@ DisplayObject::ResetTransform()
 void
 DisplayObject::SetSelfBounds( Real width, Real height )
 {
+	// STEVE CHANGE TODO? kIsAreaAgnostic
+
 	if ( width > Rtt_REAL_0 )
 	{
 		Real currentValue = GetGeometricProperty( kWidth );
@@ -1701,6 +1710,18 @@ DisplayObject::SetAnchorChildren( bool newValue )
 	
 	Invalidate( flags );
 }
+
+// STEVE CHANGE
+void
+DisplayObject::SetAreaAgnostic( bool newValue )
+{
+	if ( IsProperty( kIsAreaAgnostic ) != newValue )
+	{
+		SetProperty( kIsAreaAgnostic, newValue );
+		Invalidate( kGeometryFlag | kTransformFlag | kStageBoundsFlag );
+	}
+}
+// /STEVE CHANGE
 
 void
 DisplayObject::SetAlpha( U8 newValue )

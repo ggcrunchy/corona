@@ -235,6 +235,13 @@ GroupObject::GetSelfBounds( Rect& rect ) const
 {
 	rect.SetEmpty();
 
+	// STEVE CHANGE
+	if (fProperties & kIsAreaAgnostic)
+	{
+		return;
+	}
+	// /STEVE CHANGE
+
 	for ( S32 i = 0, iMax = fChildren.Length(); i < iMax; i++ )
 	{
 		Rect childRect;

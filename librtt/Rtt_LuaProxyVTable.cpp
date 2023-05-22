@@ -3901,10 +3901,11 @@ LuaGroupObjectProxyVTable::PushMethod( lua_State *L, const GroupObject& o, const
 		"insert",			// 0
 		"remove",			// 1
 		"numChildren",		// 2
-		"anchorChildren"	// 3
+		"anchorChildren",	// 3
+		"areaAgnostic"		// 4 (STEVE CHANGE)
 	};
     static const int numKeys = sizeof( keys ) / sizeof( const char * );
-	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, numKeys, 4, 0, 1, __FILE__, __LINE__ );
+	static StringHash sHash( *LuaContext::GetAllocator( L ), keys, numKeys, /*4, 0, 1*/0, 0, 0, __FILE__, __LINE__ ); // <- STEVE CHANGE
 	StringHash *hash = &sHash;
 
 	int index = hash->Lookup( key );
@@ -3935,6 +3936,13 @@ LuaGroupObjectProxyVTable::PushMethod( lua_State *L, const GroupObject& o, const
 			result = 1;
 		}
 		break;
+		// STEVE CHANGE
+	case 4:
+		{
+			lua_pushboolean( L, o.IsAreaAgnostic() );
+			result = 1;
+		}
+		// /STEVE CHANGE
 	default:
 		{
             result = 0;
@@ -4006,6 +4014,14 @@ LuaGroupObjectProxyVTable::SetValueForKey( lua_State *L, MLuaProxyable& object, 
         }
 #endif
 	}
+	// STEVE CHANGE
+	else if ( 0 == strcmp( key, "areaAgnostic" ) )
+	{
+		GroupObject& o = static_cast< GroupObject& >( object );
+
+		o.SetAreaAgnostic( !! lua_toboolean( L, valueIndex ) );
+	}
+	// /STEVE CHANGE
 	else
 	{
 		result = Super::SetValueForKey( L, object, key, valueIndex );

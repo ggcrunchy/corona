@@ -118,6 +118,7 @@ class DisplayObject : public MDrawable, public MLuaProxyable
 			kIsAnchorChildren = 0x200, // Group-specific property
 			kIsRenderedOffscreen = 0x400,
 			kIsRestricted = 0x800,
+			kIsAreaAgnostic = 0x1000, // <- STEVE CHANGE
 
 			// NOTE: Current maximum of 16 PropertyMasks!!!
 		};
@@ -369,6 +370,11 @@ class DisplayObject : public MDrawable, public MLuaProxyable
 
 		void SetAnchorChildren( bool newValue );
 		bool IsAnchorChildren() const { return IsProperty( kIsAnchorChildren ); }
+
+		// STEVE CHANGE
+		void SetAreaAgnostic( bool newValue );
+		bool IsAreaAgnostic() const { return IsProperty( kIsAreaAgnostic ); }
+		// /STEVE CHANGE
 
 		U8 Alpha() const { return fAlpha; }
 		void SetAlpha( U8 newValue );
