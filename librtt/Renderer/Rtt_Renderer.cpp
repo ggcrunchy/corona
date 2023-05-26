@@ -874,7 +874,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
         
             if (effectCallbacks && effectCallbacks->shaderBind)
             {
-                ObjectBoxList list;
+                OBJECT_BOX_SCOPE();
                 
                 OBJECT_BOX_STORE( Renderer, renderer, this );
                 
@@ -1479,12 +1479,19 @@ Renderer::EnumerateDirtyBlocks( ArrayS32& dirtyIndices )
 void
 Renderer::UpdateDirtyBlocks( const ArrayS32& dirtyIndices, U32 largestDirtySize )
 {
+    S32 iMax = dirtyIndices.Length();
+
+    if ( 0 == iMax )
+    {
+        return;
+    }
+
     Array<U8> newContents( fAllocator ), oldContents( fAllocator );
     
     newContents.Reserve( largestDirtySize );
     oldContents.Reserve( largestDirtySize );
  
-    ObjectBoxList list;
+    OBJECT_BOX_SCOPE();
     
     OBJECT_BOX_STORE( CommandBuffer, commandBuffer, fBackCommandBuffer );
     OBJECT_BOX_STORE( Renderer, renderer, this );
@@ -1492,7 +1499,7 @@ Renderer::UpdateDirtyBlocks( const ArrayS32& dirtyIndices, U32 largestDirtySize 
     const U8* workingState = fWorkingState.ReadAccess();
     U8* currentState = fCurrentState.WriteAccess();
     
-    for (S32 i = 0, iMax = dirtyIndices.Length(); i < iMax; ++i)
+    for (S32 i = 0; i < iMax; ++i)
     {
         const StateBlockInfo* info = fCustomInfo->fStateBlocks[dirtyIndices[i]];
         
@@ -1507,7 +1514,14 @@ Renderer::UpdateDirtyBlocks( const ArrayS32& dirtyIndices, U32 largestDirtySize 
 void
 Renderer::RestoreDefaultBlocks()
 {
-    ObjectBoxList list;
+    S32 iMax = fCustomInfo->fStateBlocks.Length();
+
+    if ( 0 == iMax )
+    {
+        return;
+    }
+
+    OBJECT_BOX_SCOPE();
     
     OBJECT_BOX_STORE( CommandBuffer, commandBuffer, fBackCommandBuffer );
     OBJECT_BOX_STORE( Renderer, renderer, this );
@@ -1517,7 +1531,7 @@ Renderer::RestoreDefaultBlocks()
     const U8* currentState = fCurrentState.ReadAccess();
     bool anyChanged = false;
     
-    for (S32 i = 0, iMax = fCustomInfo->fStateBlocks.Length(); i < iMax; ++i)
+    for (S32 i = 0; i < iMax; ++i)
     {
         const StateBlockInfo* info = fCustomInfo->fStateBlocks[i];
         

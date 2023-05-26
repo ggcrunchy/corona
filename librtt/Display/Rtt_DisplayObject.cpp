@@ -782,6 +782,12 @@ DisplayObject::AsGroupObject()
     return NULL;
 }
 
+const GroupObject*
+DisplayObject::AsGroupObject() const
+{
+    return NULL;
+}
+
 void
 DisplayObject::LocalToContent( Vertex2& v ) const
 {
