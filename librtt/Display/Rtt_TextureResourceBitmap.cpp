@@ -21,6 +21,8 @@
 #include "Renderer/Rtt_VideoTexture.h"
 #include "Rtt_TextureResourceBitmapAdapter.h"
 
+#include "Display/Rtt_DisplayDefaults.h"
+
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -157,6 +159,7 @@ TextureResourceBitmap::Create(
 		Rtt_NEW( display.GetAllocator(), TextureResourceBitmap( factory, texture, bitmap ) );
 
 	texture->SetRetina( isRetina );
+	texture->SetWantToCompress( display.GetDefaults().WantsToCompress() );
 
 	return result;
 }

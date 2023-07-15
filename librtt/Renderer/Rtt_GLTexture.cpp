@@ -17,6 +17,11 @@
 
 #include "Rtt_Profiling.h"
 
+extern "C" {
+	#include "SOIL2.h"
+	#include "image_DXT.h"
+}
+
 // ----------------------------------------------------------------------------
 
 #define ENABLE_DEBUG_PRINT	0
@@ -96,6 +101,121 @@ namespace Rtt
 {
 
 // ----------------------------------------------------------------------------
+	
+static int GetChannelCount( Texture::Format format )
+{
+	switch ( format )
+	{
+	case Texture::kAlpha:
+	case Texture::kLuminance:
+		return 1;
+	case Texture::kRGB:
+		return 3;
+	default:
+		return 4;
+	}
+}
+
+static void GetSteps( GLenum format, int steps[] )
+{
+	switch ( format )
+	{
+		case GL_RGBA:
+			steps[0] = 0; steps[1] = 1; steps[2] = 2; steps[3] = 3;
+			break;
+	#if defined( Rtt_WIN_PHONE_ENV )
+		case GL_BGRA_EXT:
+			steps[0] = 2; steps[1] = 1; steps[2] = 0; steps[3] = 3;
+			// n.b.fallthrough
+	#elif !defined( Rtt_OPENGLES )
+		case GL_BGRA:
+			steps[0] = 2; steps[1] = 1; steps[2] = 0; steps[3] = 3;
+			break;
+		case GL_ABGR_EXT:
+			steps[0] = 3; steps[1] = 2; steps[2] = 1; steps[3] = 0;
+			break;
+	#endif
+		default:
+			Rtt_ASSERT_NOT_REACHED();
+	}
+}
+
+static void UploadSubImage( Texture* texture, const U32 w, const U32 h, GLenum format, GLenum type, const U8* data, int channels )
+{
+	if ( texture->GetWantToCompress() && query_DXT_capability() )
+	{
+		int size;
+		unsigned char *ddsData = NULL;
+
+		if ( channels % 2 == 0 )
+		{
+			int steps[4];
+
+			GetSteps( format, steps );
+
+			ddsData = convert_image_to_DXT5( data, w, h, channels, &size, steps );
+		}
+
+		else
+		{
+			ddsData = convert_image_to_DXT1( data, w, h, channels, &size );
+		}
+
+		if ( ddsData )
+		{
+			glCompressedTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, size, ddsData );
+
+			SOIL_free_image_data( ddsData );
+		}
+	}
+
+	else
+	{
+		glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, type, data );
+	}
+}
+/*
+#define SOIL_RGB_S3TC_DXT1		0x83F0
+#define SOIL_RGBA_S3TC_DXT1		0x83F1
+#define SOIL_RGBA_S3TC_DXT3		0x83F2
+#define SOIL_RGBA_S3TC_DXT5		0x83F3
+*/
+static void UploadImage( Texture* texture, GLenum internalFormat, const U32 w, const U32 h, GLenum format, GLenum type, const U8* data, int channels )
+{
+	if ( texture->GetWantToCompress() && query_DXT_capability() )
+	{
+		int size;
+		unsigned char *ddsData = NULL;
+
+		if ( channels % 2 == 0 )
+		{
+			int steps[4];
+
+			GetSteps( format, steps );
+
+			ddsData = convert_image_to_DXT5( data, w, h, channels, &size, steps );
+			internalFormat = 0x83F3;
+		}
+
+		else
+		{
+			ddsData = convert_image_to_DXT1( data, w, h, channels, &size );
+			internalFormat = 0x83F0;
+		}
+
+		if ( ddsData )
+		{
+			glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, size, ddsData );
+
+			SOIL_free_image_data( ddsData );
+		}
+	}
+
+	else
+	{
+		glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
+	}
+}
 
 void 
 GLTexture::Create( CPUResource* resource )
@@ -141,7 +261,8 @@ GLTexture::Create( CPUResource* resource )
 #endif
 
 		// It is valid to pass a NULL pointer, so allocation is done either way
-		glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
+	//	glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
+		UploadImage( texture, internalFormat, w, h, format, type, data, GetChannelCount( textureFormat ) );
 		GL_CHECK_ERROR();
 		
 		fCachedFormat = internalFormat;
@@ -176,11 +297,13 @@ GLTexture::Update( CPUResource* resource )
 		glBindTexture( GL_TEXTURE_2D, GetName() );
 		if (internalFormat == fCachedFormat && w == fCachedWidth && h == fCachedHeight )
 		{
-			glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, type, data );
+		//	glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, type, data );
+			UploadSubImage( texture, w, h, format, type, data, GetChannelCount( texture->GetFormat() ) );
 		}
 		else
 		{
-			glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
+		//	glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
+			UploadImage( texture, internalFormat, w, h, format, type, data, GetChannelCount( texture->GetFormat() ) );
 			fCachedFormat = internalFormat;
 			fCachedWidth = w;
 			fCachedHeight = h;

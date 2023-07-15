@@ -33,9 +33,10 @@ class GLTexture : public GPUResource
 		virtual void Bind( U32 unit );
 
 		virtual GLuint GetName();
-private:
-	GLint fCachedFormat;
-	unsigned long fCachedWidth, fCachedHeight;
+
+	private:
+		GLint fCachedFormat;
+		unsigned long fCachedWidth, fCachedHeight;
 };
 
 // ----------------------------------------------------------------------------

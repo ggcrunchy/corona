@@ -50,7 +50,8 @@ DisplayDefaults::DisplayDefaults()
 	fIsAnchorClamped( true ),
 	fIsImageSheetSampledInsideFrame( false ),
 	fIsImageSheetFrameTrimCorrected( false ),
-	fIsExternalTextureRetina( true )
+	fIsExternalTextureRetina( true ),
+	fWantsToCompress( false )
 {
 }
 

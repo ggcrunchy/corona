@@ -130,6 +130,9 @@
     <Filter Include="external\remdebug-1.0\src">
       <UniqueIdentifier>{8902cd3f-285c-41da-b8b9-53800540d898}</UniqueIdentifier>
     </Filter>
+    <Filter Include="external\SOIL2">
+      <UniqueIdentifier>{6f1bd08c-c9f8-4423-9a89-c802d2688ac2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\external\ALmixer\luaal.c">
@@ -905,6 +908,18 @@
     </ClCompile>
     <ClCompile Include="..\..\..\librtt\Rtt_Profiling.cpp">
       <Filter>librtt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\SOIL2\image_DXT.c">
+      <Filter>external\SOIL2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\SOIL2\SOIL2.c">
+      <Filter>external\SOIL2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\SOIL2\image_helper.c">
+      <Filter>external\SOIL2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\SOIL2\wfETC.c">
+      <Filter>external\SOIL2</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1813,6 +1828,63 @@
     </ClInclude>
     <ClInclude Include="..\..\..\librtt\Rtt_Profiling.h">
       <Filter>librtt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\image_DXT.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\SOIL2.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\image_helper.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\pkm_helper.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\pvr_helper.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stb_image.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stb_image_write.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_DDS.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_DDS_c.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_ext.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_ext_c.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_pkm.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_pkm_c.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_pvr.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_pvr_c.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_qoi.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_qoi_c.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_qoi_write.h">
+      <Filter>external\SOIL2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\SOIL2\wfETC.h">
+      <Filter>external\SOIL2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

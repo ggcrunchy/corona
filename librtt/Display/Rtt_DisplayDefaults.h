@@ -67,8 +67,11 @@ class DisplayDefaults
 		bool IsImageSheetFrameTrimCorrected() const { return fIsImageSheetFrameTrimCorrected;}
 		void SetImageSheetFrameTrimCorrected( bool newValue ) { fIsImageSheetFrameTrimCorrected = newValue; }
 
-    bool IsExternalTextureRetina() const { return fIsExternalTextureRetina;}
+		bool IsExternalTextureRetina() const { return fIsExternalTextureRetina;}
 		void SetExternalTextureRetina( bool newValue ) { fIsExternalTextureRetina = newValue; }
+
+		bool WantsToCompress() const { return fWantsToCompress; }
+		void SetWantsToCompress( bool newValue ) { fWantsToCompress = newValue; }
 
 	public:
 		bool IsV1Compatibility() const { return fV1Compatibility; }
@@ -109,6 +112,7 @@ class DisplayDefaults
 		bool fIsImageSheetSampledInsideFrame;
 		bool fIsImageSheetFrameTrimCorrected;
 		bool fIsExternalTextureRetina;
+		bool fWantsToCompress;
 };
 
 // ----------------------------------------------------------------------------

@@ -35,6 +35,10 @@
     <ClCompile Include="..\..\..\external\luafilesystem\src\lfs.c" />
     <ClCompile Include="..\..\..\external\LuaHashMap\LuaHashMap.c" />
     <ClCompile Include="..\..\..\external\smoothpolygon\SmoothPolygon.cpp" />
+    <ClCompile Include="..\..\..\external\SOIL2\image_DXT.c" />
+    <ClCompile Include="..\..\..\external\SOIL2\image_helper.c" />
+    <ClCompile Include="..\..\..\external\SOIL2\SOIL2.c" />
+    <ClCompile Include="..\..\..\external\SOIL2\wfETC.c" />
     <ClCompile Include="..\..\..\librtt\b2GLESDebugDraw.cpp" />
     <ClCompile Include="..\..\..\librtt\Core\Rtt_Allocator.cpp" />
     <ClCompile Include="..\..\..\librtt\Core\Rtt_Array.cpp" />
@@ -310,6 +314,25 @@
     <ClInclude Include="..\..\..\external\luafilesystem\src\lfs.h" />
     <ClInclude Include="..\..\..\external\LuaHashMap\LuaHashMap.h" />
     <ClInclude Include="..\..\..\external\smoothpolygon\SmoothPolygon.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\image_DXT.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\image_helper.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\pkm_helper.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\pvr_helper.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\SOIL2.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_DDS.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_DDS_c.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_ext.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_ext_c.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_pkm.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_pkm_c.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_pvr.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_pvr_c.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_qoi.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_qoi_c.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stbi_qoi_write.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stb_image.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\stb_image_write.h" />
+    <ClInclude Include="..\..\..\external\SOIL2\wfETC.h" />
     <ClInclude Include="..\..\..\librtt\b2GLESDebugDraw.h" />
     <ClInclude Include="..\..\..\librtt\Core\Rtt_Allocator.h" />
     <ClInclude Include="..\..\..\librtt\Core\Rtt_Array.h" />
@@ -908,6 +931,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\external\SOIL2;..\..\..\external\b2Separator-cpp;..\..\..\external\fft;..\..\..\external\LuaHashMap;..\..\..\external\smoothpolygon;..\..\..\plugins\shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -920,6 +944,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\external\SOIL2;..\..\..\external\b2Separator-cpp;..\..\..\external\fft;..\..\..\external\LuaHashMap;..\..\..\external\smoothpolygon;..\..\..\plugins\shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -936,6 +961,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <WholeProgramOptimization>false</WholeProgramOptimization>
+      <AdditionalIncludeDirectories>..\..\..\external\SOIL2;..\..\..\external\b2Separator-cpp;..\..\..\external\fft;..\..\..\external\LuaHashMap;..\..\..\external\smoothpolygon;..\..\..\plugins\shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -954,6 +980,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <WholeProgramOptimization>false</WholeProgramOptimization>
+      <AdditionalIncludeDirectories>..\..\..\external\SOIL2;..\..\..\external\b2Separator-cpp;..\..\..\external\fft;..\..\..\external\LuaHashMap;..\..\..\external\smoothpolygon;..\..\..\plugins\shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -974,6 +1001,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
+      <AdditionalIncludeDirectories>..\..\..\external\SOIL2;..\..\..\external\b2Separator-cpp;..\..\..\external\fft;..\..\..\external\LuaHashMap;..\..\..\external\smoothpolygon;..\..\..\plugins\shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

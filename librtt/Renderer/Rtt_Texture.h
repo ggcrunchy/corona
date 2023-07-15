@@ -99,8 +99,12 @@ class Texture : public CPUResource
 		void SetRetina( bool newValue ){ fIsRetina = newValue; }
 		bool IsRetina(){ return fIsRetina; }
 
+		void SetWantToCompress( bool newValue ) { fWantToCompress = newValue; }
+		bool GetWantToCompress() { return fWantToCompress; }
+
 	private:
 		bool fIsRetina;
+		bool fWantToCompress;
 };
 
 // ----------------------------------------------------------------------------
