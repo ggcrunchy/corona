@@ -202,6 +202,7 @@ OBJECTS := \
 	$(OBJDIR)/Rtt_LineObject.o \
 	$(OBJDIR)/Rtt_LuaLibDisplay.o \
 	$(OBJDIR)/Rtt_LuaLibGraphics.o \
+	$(OBJDIR)/Rtt_ObjectHandle.o \
 	$(OBJDIR)/Rtt_OpenPath.o \
 	$(OBJDIR)/Rtt_Paint.o \
 	$(OBJDIR)/Rtt_PaintAdapter.o \
@@ -994,6 +995,10 @@ $(OBJDIR)/Rtt_LuaLibDisplay.o: ../../../librtt/Display/Rtt_LuaLibDisplay.cpp
 	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF $(@:%.o=%.d) -c "$<"
 
 $(OBJDIR)/Rtt_LuaLibGraphics.o: ../../../librtt/Display/Rtt_LuaLibGraphics.cpp
+	@echo $(notdir $<)
+	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF $(@:%.o=%.d) -c "$<"
+
+$(OBJDIR)/Rtt_ObjectHandle.o: ../../../librtt/Display/Rtt_ObjectHandle.cpp
 	@echo $(notdir $<)
 	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF $(@:%.o=%.d) -c "$<"
 
