@@ -27,7 +27,6 @@
 #include "Display/Rtt_ImageFrame.h"
 #include "Display/Rtt_ImageSheet.h"
 #include "Rtt_LuaUserdataProxy.h"
-#include "Rtt_Profiling.h"
 
 // ----------------------------------------------------------------------------
 
@@ -61,8 +60,6 @@ ShapeObject::UpdateTransform( const Matrix& parentToDstSpace )
 {
 	bool shouldUpdate = Super::UpdateTransform( parentToDstSpace );
 
-	SUMMED_TIMING( sut, "ShapeObject: post-Super::UpdateTransform" );
-
 	if ( shouldUpdate )
 	{
 		fPath->Invalidate( ClosedPath::kFill | ClosedPath::kStroke );
@@ -75,8 +72,6 @@ void
 ShapeObject::Prepare( const Display& display )
 {
 	Super::Prepare( display );
-
-	SUMMED_TIMING( sp, "ShapeObject: post-Super::Prepare" );
 
 	if ( ShouldPrepare() )
 	{
@@ -161,8 +156,6 @@ ShapeObject::Draw( Renderer& renderer ) const
 	if ( ShouldDraw() )
 	{
 		Rtt_ASSERT( fPath );
-
-		SUMMED_TIMING( sd, "ShapeObject: Draw" );
 
 		fPath->UpdateResources( renderer );
 

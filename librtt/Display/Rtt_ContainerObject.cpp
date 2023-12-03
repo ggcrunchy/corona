@@ -21,8 +21,6 @@
 #include "Rtt_Resource.h"
 #include "Rtt_Runtime.h"
 
-#include "Rtt_Profiling.h"
-
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -71,15 +69,11 @@ ContainerObject::Initialize( Display& display )
 bool
 ContainerObject::UpdateTransform( const Matrix& parentToDstSpace )
 {
-	SUMMED_TIMING( cut, "ContainerObject: UpdateTransform" );
-
 	bool shouldUpdate = Super::UpdateTransform( parentToDstSpace );
 
 	if ( shouldUpdate || ! IsValid( kContainerFlag ) )
 	{
 		Rtt_ASSERT( fContainerMaskUniform );
-
-		SUMMED_TIMING( cutps, "ContainerObject: post-Super::UpdateTransform" );
 
 		Matrix dstToMask;
 
@@ -119,8 +113,6 @@ ContainerObject::Draw( Renderer& renderer ) const
 	if ( ShouldDraw()
 		 && ( fWidth > Rtt_REAL_0 && fHeight > Rtt_REAL_0 ) )
 	{
-		SUMMED_TIMING( cd, "Container: Draw" );
-
 		Rtt_ASSERT( ! IsDirty() );
 		Rtt_ASSERT( ! IsOffScreen() );
 

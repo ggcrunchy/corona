@@ -20,8 +20,6 @@
 #include "Rtt_LuaProxyVTable.h"
 #include "Rtt_Runtime.h"
 
-#include "Rtt_Profiling.h"
-
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -193,8 +191,6 @@ EmbossedTextObject::UseDefaultShadowColor()
 void
 EmbossedTextObject::Prepare( const Display& display )
 {
-	SUMMED_TIMING( etp, "EmbossedText: Prepare" );
-
 	Real offsetX;
 	Real offsetY;
 	RGBA backColor;
@@ -296,8 +292,6 @@ EmbossedTextObject::Draw( Renderer& renderer ) const
 {
 	if ( ShouldDraw() )
 	{
-		SUMMED_TIMING( etd, "EmbossedText: Draw" );
-
 		// Draw the highlight text.
 		RenderData highlightData = GetFillData();
 		highlightData.fGeometry = fHighlightGeometry;

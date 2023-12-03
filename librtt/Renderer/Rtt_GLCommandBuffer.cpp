@@ -91,9 +91,7 @@ namespace /*anonymous*/
     struct Mat3 { Rtt::Real data[9]; };
     struct Mat4 { Rtt::Real data[16]; };
 
-#ifdef ENABLE_GPU_TIMER_QUERIES
-    const Rtt::Real kNanosecondsToMilliseconds = 1.0f / 1000000.0f;
-#endif
+    // NOT USED: const Rtt::Real kNanosecondsToMilliseconds = 1.0f / 1000000.0f;
     const U32 kTimerQueryCount = 3;
     
     // The Uniform timestamp counter must be the same for both the

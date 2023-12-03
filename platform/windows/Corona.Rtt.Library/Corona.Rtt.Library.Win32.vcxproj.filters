@@ -950,8 +950,6 @@
     </ClCompile>
     <ClCompile Include="..\..\..\librtt\Display\Rtt_ObjectHandle.cpp">
       <Filter>librtt\Display</Filter>
-    <ClCompile Include="..\..\..\librtt\Rtt_Profiling.cpp">
-      <Filter>librtt</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1911,8 +1909,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\external\wyhash\wyhash.h">
       <Filter>external\wyhash</Filter>
-    <ClInclude Include="..\..\..\librtt\Rtt_Profiling.h">
-      <Filter>librtt</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

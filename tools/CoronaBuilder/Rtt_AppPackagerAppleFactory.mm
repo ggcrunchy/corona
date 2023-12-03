@@ -219,11 +219,6 @@ AppPackagerFactory::CreatePackagerParamsApple(
 			break;
 	}
 	
-	if ( ! result )
-	{
-		fprintf( stderr, "ERROR: Unsupported platform: %s\n", TargetDevice::StringForPlatform( targetPlatform ) );
-	}
-	
 	lua_getfield(L, index, "customTemplate" );
 	if(lua_type(L, -1) == LUA_TSTRING)
 	{
@@ -231,12 +226,10 @@ AppPackagerFactory::CreatePackagerParamsApple(
 	}
 	lua_pop(L, 1);
 
-	lua_getfield(L, index, "includeStandardResources");
-	if(lua_type(L, -1) == LUA_TBOOLEAN)
+	if ( ! result )
 	{
-		result->SetIncludeStandardResources(lua_toboolean(L, -1));
+		fprintf( stderr, "ERROR: Unsupported platform: %s\n", TargetDevice::StringForPlatform( targetPlatform ) );
 	}
-	lua_pop(L, 1);
 
 	return result;
 }

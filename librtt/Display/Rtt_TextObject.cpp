@@ -25,8 +25,6 @@
 #include "Display/Rtt_PlatformBitmap.h"
 #include "Rtt_PlatformFont.h"
 #include "Rtt_Runtime.h"
-#include "Rtt_Profiling.h"
-
 #ifdef Rtt_WIN_PHONE_ENV
 #	include <vector>
 #endif
@@ -342,8 +340,6 @@ TextObject::Reset()
 bool
 TextObject::UpdateTransform( const Matrix& parentToDstSpace )
 {
-	SUMMED_TIMING( tut, "Text: UpdateTransform" );
-
 	bool result = false;
 	
 	// First, attempt to scale the font, if necessary.
@@ -390,9 +386,6 @@ TextObject::Prepare( const Display& display )
 	// The base display object must be prepared first.
 	// This generates/updates its text bitmap and updates its transformation matrix.
 	Super::Prepare( display );
-
-	SUMMED_TIMING( tp, "Text: post-Super::Prepare" );
-
 	if ( IsInitialized() == false )
 	{
 		return;
@@ -458,8 +451,6 @@ TextObject::Draw( Renderer& renderer ) const
 #ifdef Rtt_RENDER_TEXT_TO_NEAREST_PIXEL
 	if ( ShouldDraw() )
 	{
-		SUMMED_TIMING( td, "Text: Draw" );
-
 		RenderData fillData = GetFillData();
 		fillData.fGeometry = fGeometry;
 		fillData.fMaskUniform = fMaskUniform;

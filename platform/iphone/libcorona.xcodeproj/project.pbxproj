@@ -741,10 +741,6 @@
 		AAF34A9329F9DF3600076706 /* Rtt_TextureResourceCapture.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AAF34A8F29F9DF3600076706 /* Rtt_TextureResourceCapture.cpp */; };
 		AAF34A9429F9DF3600076706 /* Rtt_TextureResourceCapture.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF34A9029F9DF3600076706 /* Rtt_TextureResourceCapture.h */; };
 		AAF34A9529F9DF3600076706 /* Rtt_TextureResourceCaptureAdapter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AAF34A9129F9DF3600076706 /* Rtt_TextureResourceCaptureAdapter.cpp */; };
-		AA2C6AB6291C37320093B0BE /* CoronaMemory.h in Headers */ = {isa = PBXBuildFile; fileRef = AA2C6AB4291C37320093B0BE /* CoronaMemory.h */; };
-		AA2C6AB7291C37320093B0BE /* CoronaMemory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA2C6AB5291C37320093B0BE /* CoronaMemory.cpp */; };
-		AAF349AB29EFC53300076706 /* Rtt_Profiling.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AAF349A929EFC53300076706 /* Rtt_Profiling.cpp */; };
-		AAF349AC29EFC53300076706 /* Rtt_Profiling.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF349AA29EFC53300076706 /* Rtt_Profiling.h */; };
 		C20EF66F1C0E832B00DF0532 /* launchpad.lua in Sources */ = {isa = PBXBuildFile; fileRef = C20EF66E1C0E824000DF0532 /* launchpad.lua */; };
 		C22711D518D1646A005AE714 /* composer_scene.lua in Sources */ = {isa = PBXBuildFile; fileRef = C24FA4FC18D14D50002039FB /* composer_scene.lua */; };
 		C26B11D218775CC300C3F259 /* composer.lua in Sources */ = {isa = PBXBuildFile; fileRef = C26B11D118775A9E00C3F259 /* composer.lua */; };
@@ -1674,10 +1670,6 @@
 		AAF34A8F29F9DF3600076706 /* Rtt_TextureResourceCapture.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Rtt_TextureResourceCapture.cpp; path = Display/Rtt_TextureResourceCapture.cpp; sourceTree = "<group>"; };
 		AAF34A9029F9DF3600076706 /* Rtt_TextureResourceCapture.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Rtt_TextureResourceCapture.h; path = Display/Rtt_TextureResourceCapture.h; sourceTree = "<group>"; };
 		AAF34A9129F9DF3600076706 /* Rtt_TextureResourceCaptureAdapter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Rtt_TextureResourceCaptureAdapter.cpp; path = Display/Rtt_TextureResourceCaptureAdapter.cpp; sourceTree = "<group>"; };
-		AA2C6AB4291C37320093B0BE /* CoronaMemory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CoronaMemory.h; path = Corona/CoronaMemory.h; sourceTree = "<group>"; };
-		AA2C6AB5291C37320093B0BE /* CoronaMemory.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CoronaMemory.cpp; path = Corona/CoronaMemory.cpp; sourceTree = "<group>"; };
-		AAF349A929EFC53300076706 /* Rtt_Profiling.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Rtt_Profiling.cpp; sourceTree = "<group>"; };
-		AAF349AA29EFC53300076706 /* Rtt_Profiling.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Rtt_Profiling.h; sourceTree = "<group>"; };
 		C20EF66E1C0E824000DF0532 /* launchpad.lua */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = launchpad.lua; path = ../platform/resources/launchpad.lua; sourceTree = "<group>"; };
 		C23D8DEA1954F27D00D6555E /* widget_theme_android_holo_dark_sheet.lua */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = widget_theme_android_holo_dark_sheet.lua; path = ../subrepos/widget/widget_theme_android_holo_dark_sheet.lua; sourceTree = "<group>"; };
 		C23D8DED1954F27D00D6555E /* widget_theme_android_holo_dark.lua */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = widget_theme_android_holo_dark.lua; path = ../subrepos/widget/widget_theme_android_holo_dark.lua; sourceTree = "<group>"; };
@@ -2079,8 +2071,6 @@
 				03D1C5271D70C15E00DB02EE /* Rtt_PreferenceCollection.h */,
 				03D1C5281D70C15E00DB02EE /* Rtt_PreferenceValue.cpp */,
 				03D1C5291D70C15E00DB02EE /* Rtt_PreferenceValue.h */,
-				AAF349A929EFC53300076706 /* Rtt_Profiling.cpp */,
-				AAF349AA29EFC53300076706 /* Rtt_Profiling.h */,
 				000DCB5212B05F3E00042A5E /* Rtt_RenderingStream.cpp */,
 				000DCB5312B05F3E00042A5E /* Rtt_RenderingStream.h */,
 				000DCB5412B05F3E00042A5E /* Rtt_Resource.cpp */,
@@ -3201,7 +3191,6 @@
 				000DCC1012B05F3E00042A5E /* Rtt_PlatformEventSound.h in Headers */,
 				000DCC1212B05F3E00042A5E /* Rtt_PlatformFBConnect.h in Headers */,
 				000DCC1412B05F3E00042A5E /* Rtt_PlatformFont.h in Headers */,
-				AAF349AC29EFC53300076706 /* Rtt_Profiling.h in Headers */,
 				000DCC1612B05F3E00042A5E /* Rtt_PlatformImageProvider.h in Headers */,
 				000DCC1A12B05F3E00042A5E /* Rtt_PlatformLocation.h in Headers */,
 				000DCC1C12B05F3E00042A5E /* Rtt_PlatformModalInteraction.h in Headers */,
@@ -3897,7 +3886,6 @@
 				00622ED113AA927700886E28 /* Rtt_PlatformAudioSessionManager.cpp in Sources */,
 				A4B71B8F13F4A8A1009428CF /* Rtt_LuaResourceOwner.cpp in Sources */,
 				A43FE9D014F2DD1B0042FA41 /* Rtt_ArrayTuple.cpp in Sources */,
-				AAF349AB29EFC53300076706 /* Rtt_Profiling.cpp in Sources */,
 				F5EEB6E41B74027F00D34C41 /* Rtt_TextureResourceCanvasAdapter.cpp in Sources */,
 				AAF34A9329F9DF3600076706 /* Rtt_TextureResourceCapture.cpp in Sources */,
 				A43FE9D214F2DD1B0042FA41 /* Rtt_ArrayTupleStruct.cpp in Sources */,

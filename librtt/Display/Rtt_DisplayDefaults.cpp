@@ -42,7 +42,6 @@ DisplayDefaults::DisplayDefaults()
 	fMinTextureFilter( RenderTypes::kLinearTextureFilter ),
 	fWrapX( RenderTypes::kClampToEdgeWrap ),
 	fWrapY( RenderTypes::kClampToEdgeWrap ),
-	fEmitterMapping( 0 ),
 	fV1Compatibility( false ),
 	fPreloadTextures( true ),
 	fIsNativeTextFieldFontSizeScaled( true ),

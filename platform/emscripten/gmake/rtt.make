@@ -144,7 +144,6 @@ OBJECTS := \
 	$(OBJDIR)/Rtt_PlatformVideoPlayer.o \
 	$(OBJDIR)/Rtt_PlatformVideoProvider.o \
 	$(OBJDIR)/Rtt_PlatformWebPopup.o \
-	$(OBJDIR)/Rtt_Profiling.o \
 	$(OBJDIR)/Rtt_RenderingStream.o \
 	$(OBJDIR)/Rtt_Resource.o \
 	$(OBJDIR)/Rtt_Runtime.o \
@@ -764,10 +763,6 @@ $(OBJDIR)/Rtt_PlatformVideoProvider.o: ../../../librtt/Rtt_PlatformVideoProvider
 	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF $(@:%.o=%.d) -c "$<"
 
 $(OBJDIR)/Rtt_PlatformWebPopup.o: ../../../librtt/Rtt_PlatformWebPopup.cpp
-	@echo $(notdir $<)
-	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF $(@:%.o=%.d) -c "$<"
-
-$(OBJDIR)/Rtt_Profiling.o: ../../../librtt/Rtt_Profiling.cpp
 	@echo $(notdir $<)
 	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF $(@:%.o=%.d) -c "$<"
 

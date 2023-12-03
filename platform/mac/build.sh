@@ -19,6 +19,9 @@ echo "### Full xcodebuild output can be found in $FULL_LOG_FILE"
 uname -a >> "$FULL_LOG_FILE"
 xcodebuild -version >> "$FULL_LOG_FILE"
 
+# Build XMLRPC framework
+xcodebuild -project ../../external/osx-xmlrpc/XMLRPC/XMLRPC.xcodeproj -target XMLRPC -configuration Release 2>&1 | tee -a "$FULL_LOG_FILE" | egrep -v "$XCODE_LOG_FILTERS"
+
 # Corona Simulator
 
 if [ "$CUSTOM_ID" ]
@@ -33,3 +36,4 @@ if [ $? -ne 0 ]
 then
 	exit -1
 fi
+

@@ -18,8 +18,6 @@
 #include "Renderer/Rtt_Renderer.h"
 #include "Rtt_LuaProxyVTable.h"
 
-#include "Rtt_Profiling.h"
-
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -80,8 +78,6 @@ LineObject::Prepare( const Display& display )
 	Rtt_ASSERT( fPath );
 
 	Super::Prepare( display );
-
-	SUMMED_TIMING( lp, "Line: post-Super::Prepare" );
 
 	if ( ShouldPrepare() )
 	{
@@ -158,8 +154,6 @@ LineObject::Draw( Renderer& renderer ) const
 {
 	if ( ShouldDraw() )
 	{
-		SUMMED_TIMING( ld, "Line: Draw" );
-
 		Rtt_ASSERT( fPath );
 
 		fPath->UpdateResources( renderer );
