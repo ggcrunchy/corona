@@ -735,8 +735,16 @@
 		AA2ED7D72708264E00CEE021 /* CoronaObjects.h in Headers */ = {isa = PBXBuildFile; fileRef = AA2ED7D42708264E00CEE021 /* CoronaObjects.h */; };
 		AA2ED7D82708264E00CEE021 /* CoronaObjects.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA2ED7D52708264E00CEE021 /* CoronaObjects.cpp */; };
 		AA2ED7D92708264E00CEE021 /* CoronaPublicTypes.h in Headers */ = {isa = PBXBuildFile; fileRef = AA2ED7D62708264E00CEE021 /* CoronaPublicTypes.h */; };
+<<<<<<< HEAD
 		AAD3E2052B0BEC3A000A4D45 /* Rtt_ObjectHandle.h in Headers */ = {isa = PBXBuildFile; fileRef = AAD3E2032B0BEC3A000A4D45 /* Rtt_ObjectHandle.h */; };
 		AAD3E2062B0BEC3A000A4D45 /* Rtt_ObjectHandle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AAD3E2042B0BEC3A000A4D45 /* Rtt_ObjectHandle.cpp */; };
+		AA2C6AB6291C37320093B0BE /* CoronaMemory.h in Headers */ = {isa = PBXBuildFile; fileRef = AA2C6AB4291C37320093B0BE /* CoronaMemory.h */; };
+		AA2C6AB7291C37320093B0BE /* CoronaMemory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA2C6AB5291C37320093B0BE /* CoronaMemory.cpp */; };
+		AAF349AB29EFC53300076706 /* Rtt_Profiling.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AAF349A929EFC53300076706 /* Rtt_Profiling.cpp */; };
+		AAF349AC29EFC53300076706 /* Rtt_Profiling.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF349AA29EFC53300076706 /* Rtt_Profiling.h */; };
+=======
+		AAA5812B270D393F002A51A7 /* Rtt_ObjectBoxList.h in Headers */ = {isa = PBXBuildFile; fileRef = AAA5812A270D393F002A51A7 /* Rtt_ObjectBoxList.h */; };
+>>>>>>> parent of 255c0481... Some #include fixes for Mac
 		AAF34A9229F9DF3600076706 /* Rtt_TextureResourceCaptureAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF34A8E29F9DF3600076706 /* Rtt_TextureResourceCaptureAdapter.h */; };
 		AAF34A9329F9DF3600076706 /* Rtt_TextureResourceCapture.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AAF34A8F29F9DF3600076706 /* Rtt_TextureResourceCapture.cpp */; };
 		AAF34A9429F9DF3600076706 /* Rtt_TextureResourceCapture.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF34A9029F9DF3600076706 /* Rtt_TextureResourceCapture.h */; };
@@ -1664,8 +1672,16 @@
 		AA2ED7D42708264E00CEE021 /* CoronaObjects.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CoronaObjects.h; path = Corona/CoronaObjects.h; sourceTree = "<group>"; };
 		AA2ED7D52708264E00CEE021 /* CoronaObjects.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CoronaObjects.cpp; path = Corona/CoronaObjects.cpp; sourceTree = "<group>"; };
 		AA2ED7D62708264E00CEE021 /* CoronaPublicTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CoronaPublicTypes.h; path = Corona/CoronaPublicTypes.h; sourceTree = "<group>"; };
+<<<<<<< HEAD
 		AAD3E2032B0BEC3A000A4D45 /* Rtt_ObjectHandle.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Rtt_ObjectHandle.h; path = Display/Rtt_ObjectHandle.h; sourceTree = "<group>"; };
 		AAD3E2042B0BEC3A000A4D45 /* Rtt_ObjectHandle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Rtt_ObjectHandle.cpp; path = Display/Rtt_ObjectHandle.cpp; sourceTree = "<group>"; };
+		AA2C6AB4291C37320093B0BE /* CoronaMemory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CoronaMemory.h; path = Corona/CoronaMemory.h; sourceTree = "<group>"; };
+		AA2C6AB5291C37320093B0BE /* CoronaMemory.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CoronaMemory.cpp; path = Corona/CoronaMemory.cpp; sourceTree = "<group>"; };
+		AAF349A929EFC53300076706 /* Rtt_Profiling.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Rtt_Profiling.cpp; sourceTree = "<group>"; };
+		AAF349AA29EFC53300076706 /* Rtt_Profiling.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Rtt_Profiling.h; sourceTree = "<group>"; };
+=======
+		AAA5812A270D393F002A51A7 /* Rtt_ObjectBoxList.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Rtt_ObjectBoxList.h; path = Display/Rtt_ObjectBoxList.h; sourceTree = "<group>"; };
+>>>>>>> parent of 255c0481... Some #include fixes for Mac
 		AAF34A8E29F9DF3600076706 /* Rtt_TextureResourceCaptureAdapter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Rtt_TextureResourceCaptureAdapter.h; path = Display/Rtt_TextureResourceCaptureAdapter.h; sourceTree = "<group>"; };
 		AAF34A8F29F9DF3600076706 /* Rtt_TextureResourceCapture.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Rtt_TextureResourceCapture.cpp; path = Display/Rtt_TextureResourceCapture.cpp; sourceTree = "<group>"; };
 		AAF34A9029F9DF3600076706 /* Rtt_TextureResourceCapture.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Rtt_TextureResourceCapture.h; path = Display/Rtt_TextureResourceCapture.h; sourceTree = "<group>"; };
@@ -2703,8 +2719,7 @@
 				0724699817DA43BA000A1641 /* Rtt_MCPUResourceObserver.h */,
 				A474286617694EB000C63853 /* Rtt_MDisplayDelegate.h */,
 				A474286717694EB000C63853 /* Rtt_MDrawable.h */,
-				AAD3E2042B0BEC3A000A4D45 /* Rtt_ObjectHandle.cpp */,
-				AAD3E2032B0BEC3A000A4D45 /* Rtt_ObjectHandle.h */,
+				AAA5812A270D393F002A51A7 /* Rtt_ObjectBoxList.h */,
 				A474286817694EB000C63853 /* Rtt_OpenPath.cpp */,
 				A474286917694EB000C63853 /* Rtt_OpenPath.h */,
 				A474286A17694EB000C63853 /* Rtt_Paint.cpp */,
@@ -3121,7 +3136,6 @@
 				000DCB7C12B05F3E00042A5E /* Rtt_Build.h in Headers */,
 				000DCB7D12B05F3E00042A5E /* Rtt_Config.h in Headers */,
 				000DCB7E12B05F3E00042A5E /* Rtt_Data.h in Headers */,
-				AAD3E2052B0BEC3A000A4D45 /* Rtt_ObjectHandle.h in Headers */,
 				000DCB7F12B05F3E00042A5E /* Rtt_Finalizer.h in Headers */,
 				AAF34A9429F9DF3600076706 /* Rtt_TextureResourceCapture.h in Headers */,
 				000DCB8112B05F3E00042A5E /* Rtt_Fixed.h in Headers */,
@@ -3253,6 +3267,7 @@
 				A47428B217694EB000C63853 /* Rtt_DisplayV2.h in Headers */,
 				A47428B417694EB000C63853 /* Rtt_GroupObject.h in Headers */,
 				A47428B617694EB000C63853 /* Rtt_ImageFrame.h in Headers */,
+				AAA5812B270D393F002A51A7 /* Rtt_ObjectBoxList.h in Headers */,
 				A47428B817694EB000C63853 /* Rtt_ImageSheet.h in Headers */,
 				F5EEB6E51B74027F00D34C41 /* Rtt_TextureResourceCanvasAdapter.h in Headers */,
 				A47428BA17694EB000C63853 /* Rtt_ImageSheetPaint.h in Headers */,
@@ -3679,7 +3694,6 @@
 				C2C2194B1954F8DC00981B66 /* widget_theme_android_holo_light.lua in Sources */,
 				508D56B4195B8AA500556891 /* kernel_filter_step_gl.lua in Sources */,
 				508D56B5195B8AA500556891 /* kernel_filter_water_gl.lua in Sources */,
-				AAD3E2062B0BEC3A000A4D45 /* Rtt_ObjectHandle.cpp in Sources */,
 				0790F87418B6DFE800D0E6B1 /* loader_ccdata.lua in Sources */,
 				C22711D518D1646A005AE714 /* composer_scene.lua in Sources */,
 				C26B11D218775CC300C3F259 /* composer.lua in Sources */,
