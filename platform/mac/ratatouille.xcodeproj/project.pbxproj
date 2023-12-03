@@ -705,6 +705,15 @@
 		AAF34A8329F9CAA800076706 /* Rtt_TextureResourceCaptureAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF34A7C29F9CAA800076706 /* Rtt_TextureResourceCaptureAdapter.h */; };
 		AAF34A8429F9CAA800076706 /* Rtt_TextureResourceCapture.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF34A7D29F9CAA800076706 /* Rtt_TextureResourceCapture.h */; };
 		AAF34A8529F9CAA800076706 /* Rtt_TextureResourceCapture.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF34A7D29F9CAA800076706 /* Rtt_TextureResourceCapture.h */; };
+		AA2C69AC291478430093B0BE /* kernel_filter_blurGaussianLinear_gl.lua in Sources */ = {isa = PBXBuildFile; fileRef = AA2C69A0291476D90093B0BE /* kernel_filter_blurGaussianLinear_gl.lua */; };
+		AA2C69AD291478430093B0BE /* kernel_filter_blurLinearHorizontal_gl.lua in Sources */ = {isa = PBXBuildFile; fileRef = AA2C69A7291476D90093B0BE /* kernel_filter_blurLinearHorizontal_gl.lua */; };
+		AA2C69AE291478430093B0BE /* kernel_filter_blurLinearVertical_gl.lua in Sources */ = {isa = PBXBuildFile; fileRef = AA2C69A8291476D90093B0BE /* kernel_filter_blurLinearVertical_gl.lua */; };
+		AA2C6AAB291C35A90093B0BE /* CoronaMemory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA2C6AA3291C35A90093B0BE /* CoronaMemory.cpp */; };
+		AA2C6AAD291C35A90093B0BE /* CoronaMemory.h in Headers */ = {isa = PBXBuildFile; fileRef = AA2C6AAA291C35A90093B0BE /* CoronaMemory.h */; };
+		AAF348FD29DF9BA800076706 /* Rtt_Profiling.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF348FC29DF9BA800076706 /* Rtt_Profiling.h */; };
+		AAF348FE29DF9BA800076706 /* Rtt_Profiling.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF348FC29DF9BA800076706 /* Rtt_Profiling.h */; };
+		AAF3490029DF9BDD00076706 /* Rtt_Profiling.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AAF348FF29DF9BDD00076706 /* Rtt_Profiling.cpp */; };
+		AAF3490129DF9BDD00076706 /* Rtt_Profiling.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AAF348FF29DF9BDD00076706 /* Rtt_Profiling.cpp */; };
 		C200AAEA19626D86005828AA /* CoronaPListSupport.lua in Resources */ = {isa = PBXBuildFile; fileRef = C200AAE919626D86005828AA /* CoronaPListSupport.lua */; };
 		C200AAEB19627074005828AA /* CoronaPListSupport.lua in Sources */ = {isa = PBXBuildFile; fileRef = C200AAE919626D86005828AA /* CoronaPListSupport.lua */; };
 		C2038B101DDCF1970071594F /* AnalyticsProvider.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2038B0F1DDCF1970071594F /* AnalyticsProvider.mm */; };
@@ -3231,6 +3240,10 @@
 		AAF34A7B29F9CAA800076706 /* Rtt_TextureResourceCapture.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Rtt_TextureResourceCapture.cpp; path = Display/Rtt_TextureResourceCapture.cpp; sourceTree = "<group>"; };
 		AAF34A7C29F9CAA800076706 /* Rtt_TextureResourceCaptureAdapter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Rtt_TextureResourceCaptureAdapter.h; path = Display/Rtt_TextureResourceCaptureAdapter.h; sourceTree = "<group>"; };
 		AAF34A7D29F9CAA800076706 /* Rtt_TextureResourceCapture.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Rtt_TextureResourceCapture.h; path = Display/Rtt_TextureResourceCapture.h; sourceTree = "<group>"; };
+		AA2C6AA3291C35A90093B0BE /* CoronaMemory.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CoronaMemory.cpp; path = Corona/CoronaMemory.cpp; sourceTree = "<group>"; };
+		AA2C6AAA291C35A90093B0BE /* CoronaMemory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CoronaMemory.h; path = Corona/CoronaMemory.h; sourceTree = "<group>"; };
+		AAF348FC29DF9BA800076706 /* Rtt_Profiling.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Rtt_Profiling.h; sourceTree = "<group>"; };
+		AAF348FF29DF9BDD00076706 /* Rtt_Profiling.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Rtt_Profiling.cpp; sourceTree = "<group>"; };
 		C200AAE919626D86005828AA /* CoronaPListSupport.lua */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = CoronaPListSupport.lua; path = ../platform/resources/CoronaPListSupport.lua; sourceTree = "<group>"; };
 		C2038B0F1DDCF1970071594F /* AnalyticsProvider.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = AnalyticsProvider.mm; sourceTree = "<group>"; };
 		C2038B111DDCF1BD0071594F /* AnalyticsProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AnalyticsProvider.h; sourceTree = "<group>"; };
@@ -4076,6 +4089,8 @@
 				03C89D551D6FE7B2004CD668 /* Rtt_PreferenceCollection.h */,
 				03C89D561D6FE7B2004CD668 /* Rtt_PreferenceValue.cpp */,
 				03C89D571D6FE7B2004CD668 /* Rtt_PreferenceValue.h */,
+				AAF348FC29DF9BA800076706 /* Rtt_Profiling.h */,
+				AAF348FF29DF9BDD00076706 /* Rtt_Profiling.cpp */,
 				000CE74612B73EE300D9B6A4 /* Rtt_RenderingStream.cpp */,
 				000CE74712B73EE300D9B6A4 /* Rtt_RenderingStream.h */,
 				000CE74812B73EE300D9B6A4 /* Rtt_Resource.cpp */,
@@ -5601,6 +5616,7 @@
 				000CE7EB12B73EE300D9B6A4 /* Rtt_PlatformTimer.h in Headers */,
 				000CE7ED12B73EE300D9B6A4 /* Rtt_PlatformVideoPlayer.h in Headers */,
 				03D1C55E1D70CCB200DB02EE /* Rtt_PreferenceValue.h in Headers */,
+				AAF348FD29DF9BA800076706 /* Rtt_Profiling.h in Headers */,
 				C2DA96481B46460F00DAF684 /* Rtt_PlatformVideoProvider.h in Headers */,
 				000CE7EF12B73EE300D9B6A4 /* Rtt_PlatformWebPopup.h in Headers */,
 				C2DA96291B46460F00DAF684 /* Rtt_Real.h in Headers */,
@@ -5834,6 +5850,7 @@
 				C229DFFE1B32221B00D87A7C /* Rtt_Display.h in Headers */,
 				C229DFFF1B32221B00D87A7C /* Rtt_DisplayDefaults.h in Headers */,
 				C229E0001B32221B00D87A7C /* Rtt_DisplayObject.h in Headers */,
+				AAF348FE29DF9BA800076706 /* Rtt_Profiling.h in Headers */,
 				C229E0011B32221B00D87A7C /* Rtt_DisplayObjectExtensions.h in Headers */,
 				C229E0021B32221B00D87A7C /* Rtt_DisplayPath.h in Headers */,
 				03D1C5611D70CCCC00DB02EE /* Rtt_OperationResult.h in Headers */,
@@ -6989,6 +7006,7 @@
 				A432888E176A621200ACB6FF /* Rtt_SpriteSourceFrame.cpp in Sources */,
 				A4328890176A621200ACB6FF /* Rtt_StageObject.cpp in Sources */,
 				00B73C0812B71BF20057F594 /* Rtt_String.cpp in Sources */,
+				AAF3490029DF9BDD00076706 /* Rtt_Profiling.cpp in Sources */,
 				00B73C0A12B71BF20057F594 /* Rtt_StringHash.cpp in Sources */,
 				03D1C5601D70CCCA00DB02EE /* Rtt_OperationResult.cpp in Sources */,
 				000CE80212B73EE300D9B6A4 /* Rtt_StrokeTesselatorStream.cpp in Sources */,
@@ -7509,6 +7527,7 @@
 				C229E1091B32221B00D87A7C /* Rtt_LuaProxy.cpp in Sources */,
 				C229E10A1B32221B00D87A7C /* Rtt_LuaProxyVTable.cpp in Sources */,
 				C229E10B1B32221B00D87A7C /* Rtt_LuaResource.cpp in Sources */,
+				AAF3490129DF9BDD00076706 /* Rtt_Profiling.cpp in Sources */,
 				C229E10C1B32221B00D87A7C /* Rtt_LuaResourceOwner.cpp in Sources */,
 				C229E10D1B32221B00D87A7C /* Rtt_LuaTableIterator.cpp in Sources */,
 				C229E10E1B32221B00D87A7C /* Rtt_LuaUserdataProxy.cpp in Sources */,
@@ -8382,13 +8401,12 @@
 					"../../external/b2Separator-cpp",
 					../../external/Box2D,
 					../../external/smoothpolygon,
-					"../../external/osx-xmlrpc",
 					"../../external/tiny-aes128-c",
 					/System/Library/Frameworks/OpenAL.framework/Headers,
 					"$(SRCROOT)/../../external/SDL_sound.framework/Headers",
 					"$(SRCROOT)/../../external/SDL.framework/Headers",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				MACOSX_DEPLOYMENT_TARGET = "$(S2D_MIN_VER_MACOS:default=10.13)";
 				OTHER_CFLAGS = "-DNS_BLOCK_ASSERTIONS=1";
 				OTHER_CODE_SIGN_FLAGS = "--deep --timestamp";
 				SDKROOT = macosx;
@@ -8431,7 +8449,6 @@
 					"../../external/b2Separator-cpp",
 					../../external/Box2D,
 					../../external/smoothpolygon,
-					"../../external/osx-xmlrpc",
 					/System/Library/Frameworks/OpenAL.framework/Headers,
 					"../../external/kelan-yrk-spinning-progress-indicator-layer/Code",
 					"../../external/Simple-NSAlert-with-Blocks",
@@ -8542,7 +8559,6 @@
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.7;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -8566,7 +8582,6 @@
 				GCC_PREPROCESSOR_DEFINITIONS = "$(inherited)";
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.7;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -8588,7 +8603,6 @@
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.7;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = "Release-template";
@@ -8680,7 +8694,6 @@
 					"../../external/b2Separator-cpp",
 					../../external/Box2D,
 					../../external/smoothpolygon,
-					"../../external/osx-xmlrpc",
 					/System/Library/Frameworks/OpenAL.framework/Headers,
 				);
 				MTL_ENABLE_DEBUG_INFO = YES;
@@ -8711,7 +8724,6 @@
 					"../../external/b2Separator-cpp",
 					../../external/Box2D,
 					../../external/smoothpolygon,
-					"../../external/osx-xmlrpc",
 					/System/Library/Frameworks/OpenAL.framework/Headers,
 				);
 				MTL_ENABLE_DEBUG_INFO = NO;
@@ -8738,7 +8750,6 @@
 					"../../external/b2Separator-cpp",
 					../../external/Box2D,
 					../../external/smoothpolygon,
-					"../../external/osx-xmlrpc",
 					/System/Library/Frameworks/OpenAL.framework/Headers,
 				);
 				MTL_ENABLE_DEBUG_INFO = NO;
@@ -8775,7 +8786,6 @@
 					"../../external/b2Separator-cpp",
 					../../external/Box2D,
 					../../external/smoothpolygon,
-					"../../external/osx-xmlrpc",
 					/System/Library/Frameworks/OpenAL.framework/Headers,
 					"../../external/kelan-yrk-spinning-progress-indicator-layer/Code",
 					"../../external/Simple-NSAlert-with-Blocks",
@@ -8835,7 +8845,6 @@
 					"../../external/b2Separator-cpp",
 					../../external/Box2D,
 					../../external/smoothpolygon,
-					"../../external/osx-xmlrpc",
 					/System/Library/Frameworks/OpenAL.framework/Headers,
 					"../../external/kelan-yrk-spinning-progress-indicator-layer/Code",
 					"../../external/Simple-NSAlert-with-Blocks",
@@ -8916,13 +8925,12 @@
 					"../../external/b2Separator-cpp",
 					../../external/Box2D,
 					../../external/smoothpolygon,
-					"../../external/osx-xmlrpc",
 					"../../external/tiny-aes128-c",
 					/System/Library/Frameworks/OpenAL.framework/Headers,
 					"$(SRCROOT)/../../external/SDL_sound.framework/Headers",
 					"$(SRCROOT)/../../external/SDL.framework/Headers",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				MACOSX_DEPLOYMENT_TARGET = "$(S2D_MIN_VER_MACOS:default=10.13)";
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CODE_SIGN_FLAGS = "--deep --timestamp";
 				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
@@ -8992,13 +9000,12 @@
 					"../../external/b2Separator-cpp",
 					../../external/Box2D,
 					../../external/smoothpolygon,
-					"../../external/osx-xmlrpc",
 					"../../external/tiny-aes128-c",
 					/System/Library/Frameworks/OpenAL.framework/Headers,
 					"$(SRCROOT)/../../external/SDL_sound.framework/Headers",
 					"$(SRCROOT)/../../external/SDL.framework/Headers",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				MACOSX_DEPLOYMENT_TARGET = "$(S2D_MIN_VER_MACOS:default=10.13)";
 				OTHER_CFLAGS = "-DNS_BLOCK_ASSERTIONS=1";
 				OTHER_CODE_SIGN_FLAGS = "--deep --timestamp";
 				SDKROOT = macosx;
