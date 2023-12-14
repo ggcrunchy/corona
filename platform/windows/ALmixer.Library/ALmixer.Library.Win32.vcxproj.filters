@@ -31,6 +31,42 @@
     <ClCompile Include="..\..\..\external\ALmixer\Isolated\LGPL\oggvorbis.c">
       <Filter>Isolated\LGPL</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\commands.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\commands_mod.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\commands_s3m.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\core.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\load_dsm.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\load_mod.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\load_s3m.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\mixer_software.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\module.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\osutil.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\pattern.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\external\ALmixer\Isolated\Armoda\mixer_solar.c">
+      <Filter>Isolated\Armoda</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\external\ALmixer\CircularQueue.h" />
@@ -57,6 +93,42 @@
     <ClInclude Include="..\..\..\external\ALmixer\Isolated\LGPL\SDL_endian_minimal.h">
       <Filter>Isolated\LGPL</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\commands.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\commands_mod.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\commands_s3m.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\load_dsm.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\load_mod.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\load_s3m.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\mixer.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\mixer_software.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\module.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\osutil.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\pattern.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\external\ALmixer\Isolated\Armoda\tracker.h">
+      <Filter>Isolated\Armoda</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Isolated">
@@ -64,6 +136,9 @@
     </Filter>
     <Filter Include="Isolated\LGPL">
       <UniqueIdentifier>{bbc425b8-f2d1-4061-8e52-c452cc713f6a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Isolated\Armoda">
+      <UniqueIdentifier>{dbc009b8-6707-4486-9d44-cdb85f265df8}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

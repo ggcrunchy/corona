@@ -53,6 +53,10 @@ static const SoundDecoder_DecoderInfo** s_availableDecoders = NULL;
 	extern const Sound_DecoderFunctions __Sound_DecoderFunctions_OGG;
 #endif
 
+// #ifdef SOUND_SUPPORTS_ARMODA
+	extern const Sound_DecoderFunctions __Sound_DecoderFunctions_Armoda;
+// #endif
+
 typedef struct
 {
     int available;
@@ -79,6 +83,7 @@ static SoundElement s_linkedDecoders[] =
 		{ 0, &__Sound_DecoderFunctions_OPUS },
 	#endif
 #endif
+	{ 0, &__Sound_DecoderFunctions_Armoda }, // <- STEVE CHANGE
 /* Note: Make sure to link only Vorbis xor Tremor, not both. */		
 #ifdef SOUND_SUPPORTS_OGG
     { 0, &__Sound_DecoderFunctions_OGG },
