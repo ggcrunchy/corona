@@ -242,6 +242,7 @@ int ARM_LoadModule_DSM(ARM_Module* mod, ALmixer_RWops* rw_ops)//const char *file
 
 	    int row;
 	    ARM_Pattern *pat;
+		ARM_Note dummy = {0}; // <- STEVE CHANGE (following libopenmpt)
 
 	    printf("Reading pattern %i.\n", pattern);
 
@@ -260,7 +261,10 @@ int ARM_LoadModule_DSM(ARM_Module* mod, ALmixer_RWops* rw_ops)//const char *file
 		fread(&present, 1, 1, f);
 		if (present) {
 		    note = ARM_GetPatternNote(pat, row, present & 0x0F);
-
+			// STEVE CHANGE
+			if (!note)
+				note = &dummy;
+			// /STEVE CHANGE
 		    /* Note present? */
 		    if (present & 0x80) {
 			fread(&raw_note, 1, 1, f);
