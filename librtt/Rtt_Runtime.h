@@ -198,6 +198,9 @@ class Runtime : public MCallback,
 				int downloadablePluginsIndex, bool isSupportedOnThisPlatform, const char *pluginEntryJSON);
 
 	public:
+		bool LoadCallbacks( lua_State *L );
+
+	public:
 		void FindDownloadablePlugins( const char *simPlatformName );
 		void PushDownloadablePlugins( lua_State *L );
 		bool RequiresDownloadablePlugins() const;
@@ -385,6 +388,10 @@ class Runtime : public MCallback,
 		int fDownloadablePluginsCount;
 		const MRuntimeDelegate *fDelegate;
 		mutable bool fShowingTrialMessages;
+
+#ifdef Rtt_AUTHORING_SIMULATOR
+		Array<U8> fSimulatorStartFunc;
+#endif
 
 	private:
 		friend class LoadMainTask;

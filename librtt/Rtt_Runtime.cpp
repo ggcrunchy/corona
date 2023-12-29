@@ -181,6 +181,9 @@ Runtime::Runtime(const MPlatform& platform, MCallback* viewCallback)
 	fDelegate(NULL),
 	fShowingTrialMessages(false),
 #ifdef Rtt_AUTHORING_SIMULATOR
+	fSimulatorStartFunc(Allocator()),
+#endif
+#ifdef Rtt_AUTHORING_SIMULATOR
 	m_fAsyncListener(nullptr),
 	m_fAsyncResultStr(nullptr),
 	m_fAsyncThread(nullptr),
@@ -974,6 +977,92 @@ Runtime::AddDownloadablePlugin(
 	lua_rawseti( L, downloadablePluginsIndex, fDownloadablePluginsCount );
 }
 
+static int
+WriteToArray( lua_State *L, const void* p, size_t sz, void* ud )
+{
+	Array<U8> *arr = static_cast<Array<U8>*>( ud );
+	const U8 *bytes = static_cast<const U8*>( p );
+
+	for ( size_t i = 0; i < sz; i++ )
+	{
+		arr->Append( bytes[i] );
+	}
+
+	return 0;
+}
+
+static bool
+LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *key, Array<U8> *out )
+{
+	lua_getfield( L, -1, key );
+	if ( lua_isfunction( L, -1 ) || lua_isstring( L, -1 ) )
+	{
+		if ( lua_isstring( L, -1 ) )
+		{
+			const char *filename = lua_tostring( L, -1 );
+
+			if ( !Rtt_StringEndsWith( filename, ".lua" ) )
+			{
+				Rtt_LogException( "Error: %s is not a Lua file" );
+				return false;
+			}
+
+			String resourcePath;
+			platform.PathForFile( filename, MPlatform::kResourceDir, MPlatform::kTestFileExists, resourcePath );
+
+			const char *path = resourcePath.GetString();
+			if ( !path )
+			{
+				Rtt_LogException( "Error: unable to find %s", filename );
+				return false;
+			}
+
+			int loaded = luaL_loadfile( L, path );
+			if ( 0 != loaded )
+			{
+				Rtt_LogException( "Error: failure while loading %s: %s", filename, lua_tostring( L, -1 ) );
+				return false;
+			}
+
+			lua_replace( L, -2 );
+		}
+
+		if ( out )
+		{
+			lua_dump( L, WriteToArray, out );
+		}
+	}
+	lua_pop( L, 1 );
+
+	return true;
+}
+
+// Load callbacks once plugins have been fetched
+bool
+Runtime::LoadCallbacks( lua_State *L )
+{
+	#ifdef Rtt_AUTHORING_SIMULATOR
+		if ( !LoadFuncOrFilename( fPlatform, L, "simulatorStart", &fSimulatorStartFunc ) )
+		{
+			return false;
+		}
+	
+		// unused until a build, but done here to detect early errors:
+		if ( !LoadFuncOrFilename( fPlatform, L, "appStart", NULL ) )
+		{
+			return false;
+		}
+
+		// ditto
+		if ( !LoadFuncOrFilename( fPlatform, L, "preBuild", NULL ) )
+		{
+			return false;
+		}
+	#endif
+
+		return true;
+}
+
 // Determine list of plugins that the project is using based on build.settings
 void
 Runtime::FindDownloadablePlugins( const char *simPlatformName )
@@ -1115,6 +1204,20 @@ Runtime::FindDownloadablePlugins( const char *simPlatformName )
 				lua_pop(runtimeL, 1); // pop downloadablePlugins table
 			}
 			lua_pop(L, 1); // pop plugins
+
+			lua_getfield(L, -1, "callbacks");
+			if (lua_istable(L, -1))
+			{
+				int top = lua_gettop(L);
+				if (!LoadCallbacks(L))
+				{
+		#ifdef Rtt_AUTHORING_SIMULATOR
+					fSimulatorStartFunc.Clear();
+		#endif
+					lua_settop(L, top);
+				}
+			}
+			lua_pop(L, 1); // pop callbacks
 		}
 	}
 
@@ -1232,9 +1335,9 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 			}
 			InitializeArchive( filePath.GetString() );
 		}
-		
+			
 		// ---------------------------------------------------------------
-
+				
 		lua_State *L = VMContext().L();
 		bool shouldRestrictLibs = ! ( launchOptions & kUnlockFeatures );
 		bool hasConfig = PushConfig( L, shouldRestrictLibs );
@@ -1286,6 +1389,55 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 		}
 
 		PopAndClearConfig( L );
+
+		// ---------------------------------------------------------------
+
+		int top = lua_gettop( L );
+
+		lua_getglobal( L, "_callStartFunction" );
+
+		if ( !lua_isfunction( L, -1 ) )
+		{
+			Rtt_LogException( "Error: failed to find valid '_callStartFunction'" );
+		}
+		else
+		{
+		#ifdef Rtt_AUTHORING_SIMULATOR
+			if ( fSimulatorStartFunc.Length() > 0 )
+			{
+				const char *code = reinterpret_cast<const char*>( fSimulatorStartFunc.ReadAccess() );
+				if ( 0 == luaL_loadbuffer( L, code, fSimulatorStartFunc.Length(), "simulatorStart" ) )
+				{
+					if ( 0 == fVMContext->DoCall( L, 1, 1 ) )
+					{
+						// TODO: use results?
+					}
+				}
+				else
+				{
+					Rtt_LogException( "Error: failed to load '_callStartFunction': %s", lua_tostring( L, -1 ) );
+				}
+
+				fSimulatorStartFunc.Clear();
+			}
+		#else
+			const char kAppStart[] = Rtt_LUA_OBJECT_FILE( "_appStart_" );
+			int result = GetArchive()->LoadResource( L, kAppStart );
+			if ( LUA_ERRFILE != result ) // resource found?
+			{
+				lua_pushboolean( L, 0 == result ); // load succeeded?
+
+				if ( 0 == fVMContext->DoCall( L, 1, 1 ) )
+				{
+					// TODO: use results?
+				}
+			}
+		#endif
+		}
+
+		lua_pushnil( L );
+		lua_setglobal( L, "_callStartFunction");
+		lua_settop( L, top );
 		
 		// ---------------------------------------------------------------
 		

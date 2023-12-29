@@ -1495,6 +1495,24 @@ PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 				lua_pop( L, 1 ); // pop settings.splashScreen.{platform}
 			}
 			lua_pop( L, 1 ); // pop settings.splashScreen
+
+			lua_getfield( L, -1, "callbacks" ); // push settings.callbacks
+			if ( lua_istable( L, -1 ) )
+			{
+				lua_getfield( L, -1, "preBuild" ); // push settings.callbacks.prebuild
+
+				#if !defined( Rtt_NO_GUI )
+					LuaContext::InitializeLuaPath( L, fServices.Platform() ); // <- could we move this into Lua:: ?
+
+					// TODO: fixup "plugin." -> "plugin_"?
+					// TODO: load file or func...
+						// want to execute on the spot?
+				#endif
+
+				lua_pop( L, 1 ); // pop settings.callbacks.preBuild
+			}
+
+			lua_pop( L, 1 ); // pop 
 		}
 		lua_pop( L, 1 ); // pop settings
 		

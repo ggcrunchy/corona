@@ -281,6 +281,10 @@ settings =
 		},
 	},
 
+	callbacks =
+	{
+	},
+
 	plugins =
 	{
 	},

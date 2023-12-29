@@ -1258,6 +1258,29 @@ end
 -- luacheck: pop
 
 --------------------------------------------------------------------------------
+-- Startup Scripts
+--------------------------------------------------------------------------------
+
+if system.getInfo("environment") == "simulator" then
+	function _callStartFunction( startFunc )
+		local args = {}
+		startFunc(args)
+
+		return {}
+	end
+else
+	function _callStartFunction( startFuncOrError, ok )
+		assert( ok, startFuncOrError )
+		assert( type( startFuncOrError ) == "function" )
+
+		local args = {}
+		startFuncOrError(args)
+
+		return {}
+	end
+end
+
+--------------------------------------------------------------------------------
 -- Startup Logging
 --------------------------------------------------------------------------------
 
