@@ -351,6 +351,8 @@ class Runtime : public MCallback,
 #if defined(Rtt_AUTHORING_SIMULATOR)
 	public:
 		static int ShellPluginCollector_Async(lua_State* L);
+
+		void RemoveStartFunction();
 	private:
 		static void FinalizeWorkingThreadWithEvent(Runtime *runtime, lua_State *L);
 		std::atomic<std::string*> m_fAsyncResultStr;
@@ -390,7 +392,8 @@ class Runtime : public MCallback,
 		mutable bool fShowingTrialMessages;
 
 #ifdef Rtt_AUTHORING_SIMULATOR
-		Array<U8> fSimulatorStartFunc;
+		void *fSimulatorStartFunc;
+		size_t fStartFuncLength;
 #endif
 
 	private:

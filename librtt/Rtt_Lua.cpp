@@ -26,6 +26,9 @@
 #include <signal.h>
 #include <string.h>
 
+#include "Rtt_MPlatform.h"
+#include "Rtt_LuaFile.h"
+
 // ----------------------------------------------------------------------------
 
 #include "Rtt_LuaFrameworks.h"
@@ -101,6 +104,247 @@ Lua::GetCoronaThread( lua_State *coroutine )
 	lua_State *result = (lua_State *)lua_touserdata( L, -1 );
 	lua_pop( L, 1 ); // pop Corona's L
 	return result;
+}
+
+void
+Lua::InitializeLuaPath( lua_State* L, const MPlatform& platform )
+{
+	// Note 1: WinRT does not support environment variables. So, we must add paths to Lua's package path instead.
+	// Note 2: On Win32, we also push paths to Lua's package path so that we can support multiple runtime instances.
+	// Note 3: We should actually do this on *all* plaforms so that we can support multiple Corona instances as well.
+#if defined( Rtt_WIN_PHONE_ENV ) || (defined( Rtt_WIN_ENV ) && ( _MSC_VER >= 1800 ))
+#	define Rtt_LUA_CONTEXT_SET_PACKAGE_PATH 
+#endif
+
+	Rtt_ASSERT( 0 == lua_gettop( L ) );
+
+	int numPushed = 0;
+
+#if defined( Rtt_LUA_CONTEXT_SET_PACKAGE_PATH )
+	// Push the Lua package table to the top of the stack, if currently available.
+	// The intent is to add the paths below to Lua's package path.
+	lua_getglobal(L, "package");
+	int luaPackageTableIndex = lua_gettop(L);
+	if (lua_isnil(L, -1))
+	{
+		lua_pop(L, 1);
+		return;
+	}
+#endif
+
+	// Default search paths
+	// For platform-specific changes, DO NOT MODIFY this.  Instead, set the
+	// environment variable BEFORE this --- note we call setenv with the 
+	// overwrite param set to false.
+	String absoluteBase( & platform.GetAllocator() );
+	platform.PathForFile( NULL, MPlatform::kSystemResourceDir, MPlatform::kDefaultPathFlags, absoluteBase );
+
+	String pluginsBase( & platform.GetAllocator() );
+	platform.PathForFile( NULL, MPlatform::kPluginsDir, MPlatform::kDefaultPathFlags, pluginsBase );
+	const char *pluginsBaseStr = pluginsBase.GetString();
+
+#if defined( Rtt_MAC_ENV ) && ! defined( Rtt_AUTHORING_SIMULATOR )
+	// kSystemResourceDir and kResourceDir are the same for CoronaSDK for OS X apps so don't add both
+	String sysResourceDir( & platform.GetAllocator() );
+	platform.PathForFile( NULL, MPlatform::kSystemResourceDir, MPlatform::kDefaultPathFlags, sysResourceDir );
+	lua_pushfstring( L, "%s" LUA_DIRSEP LUA_PATH_MARK "." Rtt_LUA_SCRIPT_FILE_EXTENSION LUA_PATHSEP,
+					absoluteBase.GetString() );
+#else
+		// Simulator can look in both system and user-selected resource directory
+		// (e.g. the one they choose in the Open dialog). It only loads .lua script files.
+		// Looks in the user resource dir first.
+		String absoluteBaseUser( & platform.GetAllocator() );
+		platform.PathForFile( NULL, MPlatform::kResourceDir, MPlatform::kDefaultPathFlags, absoluteBaseUser );
+		lua_pushfstring( L, "%s" LUA_DIRSEP LUA_PATH_MARK "." Rtt_LUA_SCRIPT_FILE_EXTENSION LUA_PATHSEP
+							"%s" LUA_DIRSEP LUA_PATH_MARK "." Rtt_LUA_SCRIPT_FILE_EXTENSION LUA_PATHSEP, 
+							absoluteBaseUser.GetString(), absoluteBase.GetString() );
+#endif
+	++numPushed;
+
+	// Prepend pluginsBaseDir
+	if ( pluginsBaseStr )
+	{
+		lua_pushfstring( L, "%s" LUA_DIRSEP LUA_PATH_MARK "." Rtt_LUA_SCRIPT_FILE_EXTENSION LUA_PATHSEP "%s",
+						pluginsBaseStr, lua_tostring( L, -1 ) );
+		++numPushed;
+
+#if defined( Rtt_MAC_ENV ) && ! defined( Rtt_AUTHORING_SIMULATOR )
+		// For CoronaSDK for OS X apps, also add ".lu" to the plugin search
+		lua_pushfstring( L, "%s" LUA_DIRSEP LUA_PATH_MARK "." Rtt_LUA_OBJECT_FILE_EXTENSION LUA_PATHSEP "%s",
+						pluginsBaseStr, lua_tostring( L, -1 ) );
+		++numPushed;
+#endif
+	}
+
+#if defined( Rtt_LUA_CONTEXT_SET_PACKAGE_PATH )
+	lua_getfield( L, luaPackageTableIndex, "path" );
+	lua_concat( L, 2 );
+	lua_setfield(L, luaPackageTableIndex, "path");
+	numPushed--;		// Setting the above field pops off the last string.
+#elif defined( Rtt_WIN_ENV ) || defined( Rtt_POWERVR_ENV )
+	_putenv_s( LUA_PATH, lua_tostring( L, -1 ) );
+#else
+	Rtt_TRACE(( "LUA_PATH = %s\n", lua_tostring( L, -1 ) ));
+	setenv( LUA_PATH, lua_tostring( L, -1 ), 1 );
+#endif
+
+	// Set "cpath" for plugins
+	//
+	//   -- Example for 'dll'. Similar for .dylib or .so
+	//   package.cpath =
+	//      "?.dll" .. ";" .. system.pathForFile( system.SystemResourceDirectory ) .. "/?.dll"
+	//
+	// NOTE: Assumes C modules reside in system resource directory
+#if defined(Rtt_NXS_ENV)
+	lua_pushfstring(L,
+		"%s" LUA_DIRSEP LUA_PATH_MARK "." Rtt_LUA_C_MODULE_FILE_EXTENSION LUA_PATHSEP,
+		absoluteBase.GetString());
+	++numPushed;
+#else
+	lua_pushfstring( L,
+		"." LUA_DIRSEP LUA_PATH_MARK "." Rtt_LUA_C_MODULE_FILE_EXTENSION
+		LUA_PATHSEP "%s" LUA_DIRSEP LUA_PATH_MARK "." Rtt_LUA_C_MODULE_FILE_EXTENSION LUA_PATHSEP,
+			absoluteBase.GetString() );
+	++numPushed;
+#endif
+
+#if defined( Rtt_MAC_ENV ) && ! defined( Rtt_AUTHORING_SIMULATOR )
+	const char *coronaCardsFrameworksDir = "../../Frameworks/CoronaCards.framework/Versions/A/Frameworks";
+	lua_pushfstring( L, "%s" LUA_DIRSEP "%s" LUA_DIRSEP LUA_PATH_MARK "." Rtt_LUA_C_MODULE_FILE_EXTENSION LUA_PATHSEP "%s",
+					sysResourceDir.GetString(), coronaCardsFrameworksDir, lua_tostring( L, -1 ) );
+	++numPushed;
+#endif
+#if defined( Rtt_MAC_ENV )
+    std::string res = absoluteBase.GetString();
+    res = res.substr(0, res.find_last_of("/"));
+	lua_pushfstring( L, "%s" LUA_DIRSEP "%s" LUA_DIRSEP LUA_PATH_MARK "." Rtt_LUA_C_MODULE_FILE_EXTENSION LUA_PATHSEP "%s",
+					res.c_str(), "Frameworks", lua_tostring( L, -1 ) );
+	++numPushed;
+#endif
+
+	// Prepend pluginsBaseDir
+	if ( pluginsBaseStr )
+	{
+		lua_pushfstring( L, "%s" LUA_DIRSEP LUA_PATH_MARK "." Rtt_LUA_C_MODULE_FILE_EXTENSION LUA_PATHSEP
+							"%s", pluginsBaseStr, lua_tostring( L, -1 ) );
+		++numPushed;
+	}
+
+#if defined( Rtt_LUA_CONTEXT_SET_PACKAGE_PATH )
+	lua_getfield( L, luaPackageTableIndex, "cpath" );
+	lua_concat( L, 2 );
+	lua_setfield( L, luaPackageTableIndex, "cpath" );
+	numPushed--;		// Setting the above field pops off the last string.
+#elif defined( Rtt_WIN_ENV ) || defined( Rtt_POWERVR_ENV )
+	_putenv_s( LUA_CPATH, lua_tostring( L, -1 ) );
+#else
+	Rtt_TRACE(( "LUA_CPATH = %s\n", lua_tostring( L, -1 ) ));
+	setenv( LUA_CPATH, lua_tostring( L, -1 ), 1 );
+#endif
+
+	// Pop the above strings off the Lua stack.
+	if ( numPushed > 0 )
+	{
+		lua_pop( L, numPushed );
+	}
+
+#if defined( Rtt_LUA_CONTEXT_SET_PACKAGE_PATH )
+	// Pop the "package" table off the Lua stack.
+	lua_pop( L, 1 );
+#endif
+
+	Rtt_ASSERT( 0 == lua_gettop( L ) );
+}	
+
+static int
+WriteFunctionToBuffer( lua_State *L, const void* p, size_t sz, void* ud )
+{
+	luaL_Buffer *b = static_cast<luaL_Buffer*>( ud );
+	const U8 *bytes = static_cast<const U8*>( p );
+
+	luaL_addlstring( b, reinterpret_cast<const char*>( p ), sz );
+
+	return 0;
+}
+
+bool
+Lua::LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *key )
+{
+	bool noError = false;
+
+	lua_getfield( L, -1, key );
+	if ( lua_isfunction( L, -1 ) || lua_isstring( L, -1 ) )
+	{
+		if ( lua_isstring( L, -1 ) )
+		{
+			do {
+				const char *filename = lua_tostring( L, -1 );
+
+				if ( !Rtt_StringEndsWith( filename, ".lua" ) )
+				{
+					Rtt_LogException( "Error: string at key '%s' is not a Lua file", key );
+					break;
+				}
+
+				String resourcePath;
+				platform.PathForFile( filename, MPlatform::kResourceDir, MPlatform::kTestFileExists, resourcePath );
+
+				const char *path = resourcePath.GetString();
+				if ( !path )
+				{
+					Rtt_LogException( "Error: unable to find file %s from key '%s'", filename, key );
+					break;
+				}
+
+				if ( 0 != luaL_loadfile( L, path ) )
+				{
+					Rtt_LogException( "Error: failure while loading file %s from key '%s': %s", filename, key, lua_tostring( L, -1 ) );
+					lua_pop( L, 1 ); // remove error
+					break;
+				}
+
+				Rtt_ASSERT( lua_isfunction( L, -1 ) );
+
+				lua_replace( L, -2 ); // remove filename; new func now on top
+			} while ( 0 );
+		}
+
+		if ( lua_isfunction( L, -1 ) )
+		{
+			if ( !lua_iscfunction( L, -1 ) )
+			{
+				luaL_Buffer b;
+				luaL_buffinit( L, &b );
+				lua_dump( L, WriteFunctionToBuffer, &b );
+				luaL_pushresult( &b );
+
+				noError = true;
+			}
+			else
+			{
+				Rtt_LogException( "Error: expected Lua function under key '%s'", key );
+			}
+		}
+	}
+	else
+	{
+		if ( !lua_isnil( L, -1 ) )
+		{
+			Rtt_LogException( "Warning: expected filename or function under key '%s', got '%s'", key, luaL_typename( L, -1 ) );
+		}
+
+		lua_pushnil( L );
+
+		noError = true;
+	}
+
+	if ( noError )
+	{
+		lua_insert( L, -2 ); // pop function, leaving dumped string or nil
+	}
+	lua_pop( L, 1 );
+
+	return noError;
 }
 
 lua_State*

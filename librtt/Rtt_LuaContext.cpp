@@ -554,7 +554,7 @@ LuaContext::GetDefaultErrorHandler()
 }
 
 // ----------------------------------------------------------------------------
-
+/*
 void
 LuaContext::InitializeLuaPath( lua_State* L, const MPlatform& platform )
 {
@@ -704,7 +704,7 @@ LuaContext::InitializeLuaPath( lua_State* L, const MPlatform& platform )
 
 	Rtt_ASSERT( 0 == lua_gettop( L ) );
 }	
-
+*/
 void
 LuaContext::InitializeLibraries( lua_State* L, Runtime *runtime )
 {
@@ -1214,7 +1214,7 @@ LuaContext::Initialize( const MPlatform& platform, Runtime* runtime )
 
 	lua_atpanic( L, & LuaContext::Panic );
 
-	Self::InitializeLuaPath( L, platform );
+	/*Self::*/Lua::InitializeLuaPath( L, platform );
 
 #ifdef Rtt_DEBUG
 	sLuaContext = L;

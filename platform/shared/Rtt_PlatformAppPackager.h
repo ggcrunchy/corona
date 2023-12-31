@@ -59,6 +59,7 @@ class AppPackagerParams
 		bool fUsesMonetization;
 		bool fLiveBuild;
         bool fIncludeStandardResources = true;
+		int fVisitProjectTreeRef;
 		String fCoronaUser;
 
 	public:
@@ -115,6 +116,9 @@ class AppPackagerParams
 
 		const char * GetCoronaUser() const { return fCoronaUser.GetString(); }
 		void SetCoronaUser(const char* user) { fCoronaUser.Set(user); }
+
+		int GetVisitProjectTreeRef() const { return fVisitProjectTreeRef; }
+		void SetVisitProjectTreeRef( int ref ) { fVisitProjectTreeRef = ref; }
 
 	public:
 		void SetBuildSettingsPath( const char *path ) { fBuildSettingsPath.Set( path ); }
@@ -278,6 +282,7 @@ class PlatformAppPackager
 		String fSplashImageFile;
         bool fNeverStripDebugInfo;
 		TargetDevice::Platform fTargetPlatform;
+		int fVisitProjectTreeRef;
 };
 
 Rtt_EXPORT int Rtt_LuaCompile( lua_State *L, int numSources, const char** sources, const char* dstFile, int stripDebug );

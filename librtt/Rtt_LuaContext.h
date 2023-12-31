@@ -73,7 +73,7 @@ class LuaContext
 		static void l_message( const char *pname, const char *msg );
 
 	public:
-		static void InitializeLuaPath( lua_State* L, const MPlatform& platform );
+	//	static void InitializeLuaPath( lua_State* L, const MPlatform& platform );
 
 	protected:
 		static void InitializeLibraries( lua_State* L, Runtime *runtime );

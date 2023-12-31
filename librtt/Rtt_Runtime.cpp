@@ -139,6 +139,14 @@ int Runtime::ShellPluginCollector_Async(lua_State* L)
 	return 1;
 }
 
+void Runtime::RemoveStartFunction()
+{
+	Rtt_FREE( fSimulatorStartFunc );
+
+	fSimulatorStartFunc = NULL;
+	fStartFuncLength = 0;
+}
+
 #endif
 // ----------------------------------------------------------------------------
 
@@ -181,7 +189,8 @@ Runtime::Runtime(const MPlatform& platform, MCallback* viewCallback)
 	fDelegate(NULL),
 	fShowingTrialMessages(false),
 #ifdef Rtt_AUTHORING_SIMULATOR
-	fSimulatorStartFunc(Allocator()),
+	fSimulatorStartFunc(NULL),
+	fStartFuncLength(0),
 #endif
 #ifdef Rtt_AUTHORING_SIMULATOR
 	m_fAsyncListener(nullptr),
@@ -269,6 +278,7 @@ Runtime::~Runtime()
 	fResourcesHead->Release();
 #if defined(Rtt_AUTHORING_SIMULATOR)
 	FinalizeWorkingThreadWithEvent(this, nullptr);
+	RemoveStartFunction();
 #endif
 }
 
@@ -976,7 +986,7 @@ Runtime::AddDownloadablePlugin(
 	++fDownloadablePluginsCount;
 	lua_rawseti( L, downloadablePluginsIndex, fDownloadablePluginsCount );
 }
-
+/*
 static int
 WriteToArray( lua_State *L, const void* p, size_t sz, void* ud )
 {
@@ -1036,28 +1046,38 @@ LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *key, Ar
 
 	return true;
 }
-
+*/
 // Load callbacks once plugins have been fetched
 bool
 Runtime::LoadCallbacks( lua_State *L )
 {
 	#ifdef Rtt_AUTHORING_SIMULATOR
-		if ( !LoadFuncOrFilename( fPlatform, L, "simulatorStart", &fSimulatorStartFunc ) )
-		{
-			return false;
-		}
-	
-		// unused until a build, but done here to detect early errors:
-		if ( !LoadFuncOrFilename( fPlatform, L, "appStart", NULL ) )
+		if ( !Lua::LoadFuncOrFilename( fPlatform, L, "simulatorStart" ) )
 		{
 			return false;
 		}
 
-		// ditto
-		if ( !LoadFuncOrFilename( fPlatform, L, "preBuild", NULL ) )
+		if ( lua_isstring( L, -1 ) )
+		{
+			fSimulatorStartFunc = Rtt_MALLOC( Allocator(), lua_objlen( L, -1 ) );
+			fStartFuncLength = lua_objlen( L, -1 );
+
+			memcpy( fSimulatorStartFunc, lua_tostring( L, -1 ), fStartFuncLength );
+		}
+		lua_pop( L, 1 );
+	
+		if ( !Lua::LoadFuncOrFilename( fPlatform, L, "appStart" ) )
 		{
 			return false;
 		}
+		lua_pop( L, 1 ); // result unused until a build, but load done to detect early errors
+
+		// ditto
+		if ( !Lua::LoadFuncOrFilename( fPlatform, L, "preBuild" ) )
+		{
+			return false;
+		}
+		lua_pop( L, 1 ); // ditto
 	#endif
 
 		return true;
@@ -1208,13 +1228,11 @@ Runtime::FindDownloadablePlugins( const char *simPlatformName )
 			lua_getfield(L, -1, "callbacks");
 			if (lua_istable(L, -1))
 			{
-				int top = lua_gettop(L);
 				if (!LoadCallbacks(L))
 				{
-		#ifdef Rtt_AUTHORING_SIMULATOR
-					fSimulatorStartFunc.Clear();
-		#endif
-					lua_settop(L, top);
+				#ifdef Rtt_AUTHORING_SIMULATOR
+					RemoveStartFunction();
+				#endif
 				}
 			}
 			lua_pop(L, 1); // pop callbacks
@@ -1403,10 +1421,9 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 		else
 		{
 		#ifdef Rtt_AUTHORING_SIMULATOR
-			if ( fSimulatorStartFunc.Length() > 0 )
+			if ( fSimulatorStartFunc )
 			{
-				const char *code = reinterpret_cast<const char*>( fSimulatorStartFunc.ReadAccess() );
-				if ( 0 == luaL_loadbuffer( L, code, fSimulatorStartFunc.Length(), "simulatorStart" ) )
+				if ( 0 == luaL_loadbuffer( L, static_cast<const char*>( fSimulatorStartFunc ), fStartFuncLength, "simulatorStart" ) )
 				{
 					if ( 0 == fVMContext->DoCall( L, 1, 1 ) )
 					{
@@ -1418,7 +1435,7 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 					Rtt_LogException( "Error: failed to load '_callStartFunction': %s", lua_tostring( L, -1 ) );
 				}
 
-				fSimulatorStartFunc.Clear();
+				RemoveStartFunction();
 			}
 		#else
 			const char kAppStart[] = Rtt_LUA_OBJECT_FILE( "_appStart_" );

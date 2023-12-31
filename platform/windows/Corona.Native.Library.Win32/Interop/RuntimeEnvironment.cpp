@@ -2565,7 +2565,7 @@ void RuntimeEnvironment::RuntimeDelegate::DidInitLuaLibraries(const Rtt::Runtime
 	lua_State *L = sender.VMContext().L();
 	if (sender.IsProperty(Rtt::Runtime::kIsApplicationNotArchived))
 	{
-		Rtt::LuaContext::InitializeLuaPath(L, sender.Platform());
+		Rtt::Lua/*Context*/::InitializeLuaPath(L, sender.Platform());
 	}
 
 	// Push in Corona's other Lua libraries such as "socket", "mime", and "ltn12".

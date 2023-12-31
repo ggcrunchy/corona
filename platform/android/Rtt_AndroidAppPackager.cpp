@@ -243,6 +243,8 @@ AndroidAppPackager::Build( AppPackagerParams * params, const char * tmpDirBase )
     // This is not as foolproof as mkdtemp() but has the advantage of working on Win32
     if ( mkdir( mktemp(tmpDir) ) )
 	{
+		params->SetVisitProjectTreeRef( fVisitProjectTreeRef );
+		
 		char* inputFile = Prepackage( params, tmpDir );
 
 		if (inputFile) //offline build

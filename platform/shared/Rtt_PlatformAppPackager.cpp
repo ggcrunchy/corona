@@ -108,7 +108,8 @@ AppPackagerParams::AppPackagerParams( const char* appName,
 	fTargetDevice( targetDevice ),
 	fIsStripDebug( true ),
 	fDeviceBuildData( NULL ),
-	fIncludeBuildSettings( false )
+	fIncludeBuildSettings( false ),
+	fVisitProjectTreeRef( LUA_NOREF )
 ,   fLiveBuild( false )
 {
 	fAppName.Set(appName);
@@ -257,7 +258,8 @@ PlatformAppPackager::PlatformAppPackager( const MPlatformServices& services,
 	fCustomBuildId( & fServices.Platform().GetAllocator() ),
 	fGlobalCustomBuildId( & fServices.Platform().GetAllocator() ),
 	fAppSettingsCustomBuildId( & fServices.Platform().GetAllocator() ),
-    fNeverStripDebugInfo( false )
+    fNeverStripDebugInfo( false ),
+	fVisitProjectTreeRef( LUA_NOREF )
 {
 	fCustomBuildId.Set( "" );
 	fGlobalCustomBuildId.Set( "" );
@@ -376,6 +378,8 @@ PlatformAppPackager::Prepackage( AppPackagerParams * params, const char* tmpDir 
 			return NULL;
 		}
 	}
+
+	params->SetVisitProjectTreeRef( fVisitProjectTreeRef );
 
 	// Build *.lu into tmpDir
 	if ( CompileScripts( params, tmpDir ) )
@@ -555,6 +559,20 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 				Rtt_STATIC_ASSERT( sizeof( Rtt_LUA_OBJECT_FILE_EXTENSION ) <= sizeof( Rtt_LUA_SCRIPT_FILE_EXTENSION ) );
 
 				result = true;
+
+				if ( LUA_NOREF != params.GetVisitProjectTreeRef() )
+				{
+					lua_rawgeti( L, LUA_REGISTRYINDEX, params.GetVisitProjectTreeRef() );
+					lua_pushliteral( L, "enterDirectory" );
+					lua_pushstring( L, srcDir );
+
+					if ( 0 != Lua::DoCall( L, 2, 0 ) )
+					{
+						params.SetBuildMessage("Error with preBuild(\"enterDirectory\") while doing CompileScripts().");
+						result = false;
+					}
+				}
+
 				for( ; dirp && result; dirp = readdir( dp ) )
 				{
 					// Fetch the next file/directory name.
@@ -575,6 +593,18 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 					{
 						result = CompileScriptsInDirectory( L, params, dstDir, srcPath );
 						continue;
+					}
+					else if ( LUA_NOREF != params.GetVisitProjectTreeRef() )
+					{
+						lua_rawgeti( L, LUA_REGISTRYINDEX, params.GetVisitProjectTreeRef() );
+						lua_pushliteral( L, "file" );
+						lua_pushstring( L, srcPath );
+
+						if ( 0 != Lua::DoCall( L, 2, 0 ) )
+						{
+							params.SetBuildMessage("Error with preBuild(\"file\") while doing CompileScripts().");
+							result = false;
+						}
 					}
 
 					// This is a file. Compile this file if:
@@ -645,6 +675,18 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 #endif
 
 
+					}
+				}
+
+				if ( LUA_NOREF != params.GetVisitProjectTreeRef() )
+				{
+					lua_rawgeti( L, LUA_REGISTRYINDEX, params.GetVisitProjectTreeRef() );
+					lua_pushliteral( L, "leaveDirectory" );
+
+					if ( 0 != Lua::DoCall( L, 1, 0 ) )
+					{
+						params.SetBuildMessage("Error with preBuild(\"leaveDirectory\") while doing CompileScripts().");
+						result = false;
 					}
 				}
 
@@ -1403,6 +1445,158 @@ PlatformAppPackager::OpenBuildSettings( const char * srcDir )
 	return status;
 }
 
+/*
+The following bytecode is adapted from `require` in init.lua (sans comments):
+
+return function(settings)
+	local preservedRequire = require
+	local plugins = (settings and settings.plugins) or {}
+	require = function (modname)
+		if string.find(modname, "/") then
+			error("Error calling 'require(\"" .. modname .. "\")'. Lua requires package names to use '.' as path separators, not '/'. Replace the '/' characters with '.' and try again.")
+		elseif ( "simulator" == system.getInfo( "environment" ) ) or ( "win32" == system.getInfo( "platform" ) ) or ( "macos" == system.getInfo( "platform" ) ) then
+			local prefix = "plugin."
+			if ( string.sub( modname, 1, string.len( prefix ) ) == prefix )
+				or ( nil ~= string.match( modname, 'CoronaProvider%.(.*)%.(.*)' ) ) then
+				if ( "simulator" == system.getInfo( "environment" )
+					and not string.starts(modname, "CoronaProvider.") ) then
+					if plugins[modname] == nil then
+						local guardedRequiredName = modname .. '.'
+						local submodule = false
+						for key, _ in pairs(plugins) do
+							local guardedSettingsName = key .. "."
+							if guardedRequiredName:starts(guardedSettingsName) or guardedSettingsName:starts(guardedRequiredName) then
+								submodule = true
+								break
+							end
+						end
+						if not submodule then
+							local output = "WARNING: "..modname.." is not configured in build.settings"
+							output = output .. "\nstack traceback:\n"
+							local stackdesc = debug.traceback()
+							for line in stackdesc:gmatch("[^\r\n]+") do 
+								if string.ends(line, "in main chunk") then
+									output = output .. line .. "\n"
+								end
+							end
+							print(output)
+						end
+					end
+				end
+				local result, mod = pcall( preservedRequire, modname )
+				if ( result ) then
+					return mod -- traditional require works fine
+				elseif ( "string" == type( mod ) ) then
+					if string.starts( mod, "error loading module" ) then
+						error( mod, 2 )
+					end
+				end
+				modname = string.gsub( modname, '%.', '_' )
+			end
+		end
+		return preservedRequire( modname )
+	end
+end
+
+An alternate approach would be to have this in a Lua file in the build process
+and then used by (the compiled) init.lua.
+*/
+static const U8 kRequireWithSettings[] = {
+ 27, 76,117, 97, 81,  0,  1,  4,  4,  4,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+  0,  0,  0,  0,  0,  0,  2,  2,  3,  0,  0,  0, 36,  0,  0,  0, 30,  0,  0,  1,
+ 30,  0,128,  0,  0,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  1,  0,  0,  0,
+ 71,  0,  0,  0,  0,  1,  0,  4, 12,  0,  0,  0, 69,  0,  0,  0, 26,  0,  0,  0,
+ 22,128,  0,128,134, 64, 64,  0,154, 64,  0,  0, 22,  0,  0,128,138,  0,  0,  0,
+228,  0,  0,  0,  0,  0,  0,  1,  0,  0,128,  0,199,  0,  0,  0, 30,  0,128,  0,
+  2,  0,  0,  0,  4,  8,  0,  0,  0,114,101,113,117,105,114,101,  0,  4,  8,  0,
+  0,  0,112,108,117,103,105,110,115,  0,  1,  0,  0,  0,  0,  0,  0,  0,  4,  0,
+  0,  0, 70,  0,  0,  0,  2,  1,  0, 13,161,  0,  0,  0, 69,  0,  0,  0, 70, 64,
+192,  0,128,  0,  0,  0,193,128,  0,  0, 92,128,128,  1, 90,  0,  0,  0, 22,128,
+  1,128, 69,192,  0,  0,129,  0,  1,  0,192,  0,  0,  0,  1, 65,  1,  0,149,  0,
+  1,  1, 92, 64,  0,  1, 22, 64, 35,128, 69,192,  1,  0, 70,  0,194,  0,129, 64,
+  2,  0, 92,128,  0,  1, 87, 64,  0,131, 22,192,  2,128, 69,192,  1,  0, 70,  0,
+194,  0,129,192,  2,  0, 92,128,  0,  1, 87, 64,  0,133, 22, 64,  1,128, 69,192,
+  1,  0, 70,  0,194,  0,129,192,  2,  0, 92,128,  0,  1, 23, 64,  0,134, 22,192,
+ 30,128, 65, 64,  3,  0,133,  0,  0,  0,134,128, 67,  1,192,  0,  0,  0,  1,193,
+  3,  0, 69,  1,  0,  0, 70,  1,196,  2,128,  1,128,  0, 92,  1,  0,  1,156,128,
+  0,  0, 87, 64,  0,  1, 22,128,  1,128,133,  0,  0,  0,134,128, 68,  1,192,  0,
+  0,  0,  1,193,  4,  0,156,128,128,  1, 87,128,128,136, 22,  0, 26,128,133,192,
+  1,  0,134,  0, 66,  1,193, 64,  2,  0,156,128,  0,  1, 23,128,  0,131, 22,192,
+ 16,128,133,  0,  0,  0,134,  0, 69,  1,192,  0,  0,  0,  1, 65,  5,  0,156,128,
+128,  1,154, 64,  0,  0, 22,  0, 15,128,132,  0,  0,  0,134,  0,  0,  1, 23, 64,
+ 68,  1, 22,  0, 14,128,128,  0,  0,  0,193,128,  5,  0,149,192,  0,  1,194,  0,
+  0,  0,  5,193,  5,  0, 68,  1,  0,  0, 28,  1,  1,  1, 22,128,  3,128, 64,  2,
+128,  3,129,130,  5,  0, 85,130,130,  4,139,  2, 69,  1,  0,  3,128,  4,156,130,
+128,  1,154, 66,  0,  0, 22,  0,  1,128,139,  2,197,  4,  0,  3,  0,  1,156,130,
+128,  1,154,  2,  0,  0, 22, 64,  0,128,194,  0,128,  0, 22, 64,  0,128, 33,129,
+  0,  0, 22,128,251,127,218, 64,  0,  0, 22, 64,  7,128,  1,  1,  6,  0, 64,  1,
+  0,  0,129, 65,  6,  0, 21,129,  1,  2, 64,  1,  0,  2,129,129,  6,  0, 21,129,
+129,  2, 69,193,  6,  0, 70,  1,199,  2, 92,129,128,  0,139, 65,199,  2,  1,130,
+  7,  0,156,  1,129,  1, 22,128,  2,128,133,  2,  0,  0,134,194, 71,  5,192,  2,
+128,  4,  1,  3,  8,  0,156,130,128,  1,154,  2,  0,  0, 22,192,  0,128,128,  2,
+  0,  2,192,  2,128,  4,  1, 67,  8,  0, 21,  1,  3,  5,161, 65,  0,  0, 22,128,
+252,127,133,129,  8,  0,192,  1,  0,  2,156, 65,  0,  1,133,192,  8,  0,196,  0,
+128,  0,  0,  1,  0,  0,156,192,128,  1,154,  0,  0,  0, 22, 64,  0,128,222,  0,
+  0,  1, 22,192,  3,128,  5,  1,  9,  0, 64,  1,128,  1, 28,129,  0,  1, 23,  0,
+  1,128, 22,128,  2,128,  5,  1,  0,  0,  6,  1, 69,  2, 64,  1,128,  1,129, 65,
+  9,  0, 28,129,128,  1, 26,  1,  0,  0, 22,192,  0,128,  5,193,  0,  0, 64,  1,
+128,  1,129,129,  9,  0, 28, 65,128,  1,  5,  1,  0,  0,  6,193, 73,  2, 64,  1,
+  0,  0,129,  1, 10,  0,193, 65, 10,  0, 28,129,  0,  2,  0,  0,  0,  2, 68,  0,
+128,  0,128,  0,  0,  0, 93,  0,  0,  1, 94,  0,  0,  0, 30,  0,128,  0, 42,  0,
+  0,  0,  4,  7,  0,  0,  0,115,116,114,105,110,103,  0,  4,  5,  0,  0,  0,102,
+105,110,100,  0,  4,  2,  0,  0,  0, 47,  0,  4,  6,  0,  0,  0,101,114,114,111,
+114,  0,  4, 25,  0,  0,  0, 69,114,114,111,114, 32, 99, 97,108,108,105,110,103,
+ 32, 39,114,101,113,117,105,114,101, 40, 34,  0,  4,123,  0,  0,  0, 34, 41, 39,
+ 46, 32, 76,117, 97, 32,114,101,113,117,105,114,101,115, 32,112, 97, 99,107, 97,
+103,101, 32,110, 97,109,101,115, 32,116,111, 32,117,115,101, 32, 39, 46, 39, 32,
+ 97,115, 32,112, 97,116,104, 32,115,101,112, 97,114, 97,116,111,114,115, 44, 32,
+110,111,116, 32, 39, 47, 39, 46, 32, 82,101,112,108, 97, 99,101, 32,116,104,101,
+ 32, 39, 47, 39, 32, 99,104, 97,114, 97, 99,116,101,114,115, 32,119,105,116,104,
+ 32, 39, 46, 39, 32, 97,110,100, 32,116,114,121, 32, 97,103, 97,105,110, 46,  0,
+  4, 10,  0,  0,  0,115,105,109,117,108, 97,116,111,114,  0,  4,  7,  0,  0,  0,
+115,121,115,116,101,109,  0,  4,  8,  0,  0,  0,103,101,116, 73,110,102,111,  0,
+  4, 12,  0,  0,  0,101,110,118,105,114,111,110,109,101,110,116,  0,  4,  6,  0,
+  0,  0,119,105,110, 51, 50,  0,  4,  9,  0,  0,  0,112,108, 97,116,102,111,114,
+109,  0,  4,  6,  0,  0,  0,109, 97, 99,111,115,  0,  4,  8,  0,  0,  0,112,108,
+117,103,105,110, 46,  0,  4,  4,  0,  0,  0,115,117, 98,  0,  3,  0,  0,  0,  0,
+  0,  0,240, 63,  4,  4,  0,  0,  0,108,101,110,  0,  0,  4,  6,  0,  0,  0,109,
+ 97,116, 99,104,  0,  4, 27,  0,  0,  0, 67,111,114,111,110, 97, 80,114,111,118,
+105,100,101,114, 37, 46, 40, 46, 42, 41, 37, 46, 40, 46, 42, 41,  0,  4,  7,  0,
+  0,  0,115,116, 97,114,116,115,  0,  4, 16,  0,  0,  0, 67,111,114,111,110, 97,
+ 80,114,111,118,105,100,101,114, 46,  0,  4,  2,  0,  0,  0, 46,  0,  4,  6,  0,
+  0,  0,112, 97,105,114,115,  0,  4, 10,  0,  0,  0, 87, 65, 82, 78, 73, 78, 71,
+ 58, 32,  0,  4, 37,  0,  0,  0, 32,105,115, 32,110,111,116, 32, 99,111,110,102,
+105,103,117,114,101,100, 32,105,110, 32, 98,117,105,108,100, 46,115,101,116,116,
+105,110,103,115,  0,  4, 19,  0,  0,  0, 10,115,116, 97, 99,107, 32,116,114, 97,
+ 99,101, 98, 97, 99,107, 58, 10,  0,  4,  6,  0,  0,  0,100,101, 98,117,103,  0,
+  4, 10,  0,  0,  0,116,114, 97, 99,101, 98, 97, 99,107,  0,  4,  7,  0,  0,  0,
+103,109, 97,116, 99,104,  0,  4,  7,  0,  0,  0, 91, 94, 13, 10, 93, 43,  0,  4,
+  5,  0,  0,  0,101,110,100,115,  0,  4, 14,  0,  0,  0,105,110, 32,109, 97,105,
+110, 32, 99,104,117,110,107,  0,  4,  2,  0,  0,  0, 10,  0,  4,  6,  0,  0,  0,
+112,114,105,110,116,  0,  4,  6,  0,  0,  0,112, 99, 97,108,108,  0,  4,  5,  0,
+  0,  0,116,121,112,101,  0,  4, 21,  0,  0,  0,101,114,114,111,114, 32,108,111,
+ 97,100,105,110,103, 32,109,111,100,117,108,101,  0,  3,  0,  0,  0,  0,  0,  0,
+  0, 64,  4,  5,  0,  0,  0,103,115,117, 98,  0,  4,  3,  0,  0,  0, 37, 46,  0,
+  4,  2,  0,  0,  0, 95,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+  0,  0,  0,  0,  0,  0,  0
+};
+
+
+static int
+luaload_require_with_settings(lua_State *L)
+{
+	return luaL_loadbuffer(L,(const char*)kRequireWithSettings,sizeof(kRequireWithSettings),"require_with_settings");
+}
+
+static bool
+InitLuaForBuild( lua_State *L, const MPlatform &platform )
+{
+	Lua::InitializeLuaPath( L, platform );
+					
+	return 0 == Lua::DoBuffer( L, &luaload_require_with_settings, NULL ); // TODO: error message?
+}
+
 bool
 PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 {
@@ -1499,17 +1693,68 @@ PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 			lua_getfield( L, -1, "callbacks" ); // push settings.callbacks
 			if ( lua_istable( L, -1 ) )
 			{
-				lua_getfield( L, -1, "preBuild" ); // push settings.callbacks.prebuild
+				bool didPreBuild = false;
 
-				#if !defined( Rtt_NO_GUI )
-					LuaContext::InitializeLuaPath( L, fServices.Platform() ); // <- could we move this into Lua:: ?
+				lua_getfield( L, -1, "preBuild" ); // push settings.callbacks.preBuild
+				if ( lua_isfunction( L, -2 ) )
+				{
+					int top = lua_gettop( L );
+					if ( !InitLuaForBuild( L, fServices.Platform() ) )
+					{
+						retflag = false;
+					}
+					else if ( 0 == luaL_loadbuffer( L, lua_tostring( L, -1 ), lua_objlen( L, -1 ), "preBuild" ) )
+					{
+						if ( 0 == Lua::DoCall( L, 1, 1 ) )
+						{
+							if ( lua_istable( L, -1 ) )
+							{
+								lua_getfield( L, -1, "visitProjectTree" );
 
-					// TODO: fixup "plugin." -> "plugin_"?
-					// TODO: load file or func...
-						// want to execute on the spot?
-				#endif
+								if ( lua_isfunction( L, -1 ) )
+								{
+									fVisitProjectTreeRef = luaL_ref( L, LUA_REGISTRYINDEX );
+								}
+							}
+						}
+						else
+						{
+							retflag = false;
+						}
+					}
+					else
+					{
+						retflag = false;
+					}
 
+					lua_settop( L, top );
+
+					didPreBuild = true;
+				}
 				lua_pop( L, 1 ); // pop settings.callbacks.preBuild
+
+				lua_getfield( L, -1, "postBuild" ); // push settings.callbacks.postBuild
+				if ( retflag && lua_isfunction( L, -1 ) )
+				{
+					if ( !didPreBuild && !InitLuaForBuild( L, fServices.Platform() ) )
+					{
+						retflag = false;
+					}
+					else if ( 0 == luaL_loadbuffer( L, lua_tostring( L, -1 ), lua_objlen( L, -1 ), "postBuild" ) )
+					{
+						lua_newuserdata( L, 0 );
+						lua_createtable( L, 0, 1 );
+						lua_pushvalue( L, -3 );
+						lua_setfield( L, -2, "__gc" ); // TODO: what if build fails?
+						lua_setmetatable( L, -2 );
+						luaL_ref( L, LUA_REGISTRYINDEX ); // keep until state closed
+					}
+					else
+					{
+						retflag = false;
+					}
+				}
+				lua_pop( L, 1 ); // pop settings.callbacks.postBuild
 			}
 
 			lua_pop( L, 1 ); // pop 

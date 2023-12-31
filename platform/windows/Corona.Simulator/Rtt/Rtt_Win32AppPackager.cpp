@@ -384,6 +384,29 @@ int Win32AppPackager::DoLocalBuild(const Win32AppPackager::BuildSettings& buildS
 	WinString binDirectoryPath;
 	binDirectoryPath.SetUTF8(buildSettings.BinDirectoryPath);
 
+	if ( LUA_NOREF != fVisitProjectTreeRef )
+	{
+		lua_rawgeti( fVM, LUA_REGISTRYINDEX, fVisitProjectTreeRef );
+		lua_pushliteral( fVM, "intermediateDir" );
+		lua_pushstring( fVM, buildSettings.IntermediateDirectoryPath );
+
+		if ( 0 != Lua::DoCall( fVM, 2, 0 ) )
+		{
+			buildSettings.ParamsPointer->SetBuildMessage("Error with preBuild(\"intermediateDir\") while doing DoLocalBuild().");
+			return 40;
+		}
+
+		lua_rawgeti( fVM, LUA_REGISTRYINDEX, fVisitProjectTreeRef );
+		lua_pushliteral( fVM, "binDir" );
+		lua_pushstring( fVM, buildSettings.BinDirectoryPath );
+
+		if ( 0 != Lua::DoCall( fVM, 2, 0 ) )
+		{
+			buildSettings.ParamsPointer->SetBuildMessage("Error with preBuild(\"binDir\") while doing DoLocalBuild().");
+			return 41;
+		}
+	}
+
 #if !defined( Rtt_NO_GUI )
 	// Extract the project's plugins to the "bin" directory.
 	// This must be done before extracting the Win32 app template so that plugins can't overwrite Corona's DLLs.
@@ -409,6 +432,7 @@ int Win32AppPackager::DoLocalBuild(const Win32AppPackager::BuildSettings& buildS
 		pluginParamsSettings.SourceDirectoryPath = intermediatePluginDirectoryPath.GetUTF8();
 		pluginParamsSettings.VersionString = buildSettings.ParamsPointer->GetVersion();
 		Win32AppPackagerParams pluginParams(pluginParamsSettings);
+		pluginParams.SetVisitProjectTreeRef(fVisitProjectTreeRef);
 		bool wasCompiled = CompileScripts(&pluginParams, buildSettings.IntermediateDirectoryPath);
 		if (!wasCompiled)
 		{
@@ -545,6 +569,7 @@ int Win32AppPackager::DoLocalBuild(const Win32AppPackager::BuildSettings& buildS
 	}
 
 	// Compile the Corona project's Lua scripts to the intermediate directory.
+	buildSettings.ParamsPointer->SetVisitProjectTreeRef(fVisitProjectTreeRef);
 	bool wasCompiled = CompileScripts(buildSettings.ParamsPointer, buildSettings.IntermediateDirectoryPath);
 	if (!wasCompiled)
 	{
@@ -553,6 +578,18 @@ int Win32AppPackager::DoLocalBuild(const Win32AppPackager::BuildSettings& buildS
 			buildSettings.ParamsPointer->SetBuildMessage("Failed to compile Lua scripts.");
 		}
 		return 5;
+	}
+
+	if ( LUA_NOREF != fVisitProjectTreeRef )
+	{
+		lua_rawgeti( fVM, LUA_REGISTRYINDEX, fVisitProjectTreeRef );
+		lua_pushliteral( fVM, "readyToArchive" );
+
+		if ( 0 != Lua::DoCall( fVM, 1, 0 ) )
+		{
+			buildSettings.ParamsPointer->SetBuildMessage("Error with preBuild(\"readyToArchive\") while doing DoLocalBuild().");
+			return 42;
+		}
 	}
 
 	// Bundle all of the compiled Lua scripts in the intermediate directory into a "resource.car" file.

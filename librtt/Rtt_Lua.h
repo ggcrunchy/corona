@@ -28,6 +28,7 @@ namespace Rtt
 {
 
 class MCriticalSection;
+class MPlatform;
 class String;
 
 // ----------------------------------------------------------------------------
@@ -45,6 +46,11 @@ class Lua
 		// Lua state. If 'coroutine' happens to be Corona's main Lua state, then
 		// returns itself.
 		static lua_State* GetCoronaThread( lua_State *coroutine );
+
+	public:
+		static void InitializeLuaPath( lua_State* L, const MPlatform& platform );
+
+		static bool LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *key );
 
 	public:
 		static lua_State* New( bool shouldOpenLibs );
