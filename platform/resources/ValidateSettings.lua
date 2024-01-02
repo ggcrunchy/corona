@@ -68,6 +68,13 @@ function validateSettings(arg1, arg2)
 		return false
 	end
 
+	function alternatives( value )
+		if choices and choices[value] then
+			return ipairs( choices[value] )
+		else
+			return ipairs{ value }
+		end
+	end
 
 	function string:split( inSplitPattern, outResults )
 
@@ -111,10 +118,14 @@ function validateSettings(arg1, arg2)
 				item = prefix .. "." .. key
 				subItem = genTableOutline(t[key], stoplist, item)
 				outline = outline .. subItem
-			elseif type(key) == "number" and key == 1 then
-				outline = outline .. prefix .."[] (".. type(value)..")".. handleTags(value) .."\n"
-			elseif type(key) ~= "number" then
-				outline = outline .. prefix ..".".. key .." (".. type(value) .. ")".. handleTags(value) .."\n"
+			else
+				for _, value in alternatives(value) do
+					if type(key) == "number" and key == 1 then
+						outline = outline .. prefix .."[] (".. type(value)..")".. handleTags(value) .."\n"
+					elseif type(key) ~= "number" then
+						outline = outline .. prefix ..".".. key .." (".. type(value) .. ")".. handleTags(value) .."\n"
+					end
+				end
 			end
 		end
 

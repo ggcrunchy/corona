@@ -63,8 +63,18 @@
 
 // ----------------------------------------------------------------------------
 
+extern "C" {
+	#if !defined(Rtt_NO_GUI)
+		int luaopen_coronabaselib(lua_State *L);
+	#endif
+
+	int luaopen_lfs(lua_State *L);
+}
+
 namespace Rtt
 {
+
+int luaload_json(lua_State* L);
 
 static const char *kUserPreferenceCustomBuildID = "userPreferenceCustomBuildID";
 static const char *kUserPreferenceCustomDailyBuild = "userPreferenceCustomDailyBuild";
@@ -1592,8 +1602,62 @@ luaload_require_with_settings(lua_State *L)
 static bool
 InitLuaForBuild( lua_State *L, const MPlatform &platform )
 {
+	int top = lua_gettop( L ), ref;
+
+	if ( top > 0 ) // InitializeLuaPath() expects empty stack
+	{
+		lua_createtable( L, top, 0 );
+
+		for ( int i = 1; i <= top; i++ )
+		{
+			lua_pushvalue( L, i );
+			lua_rawseti( L, -2, i );
+		}
+
+		ref = luaL_ref( L, LUA_REGISTRYINDEX );
+
+		lua_settop( L, 0 );
+	}
+
+#if !defined(Rtt_NO_GUI)
+	lua_pushcfunction( L, luaopen_coronabaselib );
+	lua_pushstring( L, "coronabaselib" );
+	lua_call( L, 1, 0 );
+	lua_getglobal( L, "coronabaselib" );
+
+	Rtt_ASSERT( !lua_isnil( L, -1 ) );
+	
+	lua_getfield( L, -1, "print" );
+	
+	Rtt_ASSERT( lua_isfunction( L, -1 ) );
+	
+	lua_setglobal( L, "print" );
+	lua_pop( L, 1 );
+#endif
+
+	lua_pushcfunction( L, luaopen_lfs );
+	lua_pushstring( L, "lfs" );
+	lua_call( L, 1, 0 );
+
+	Lua::RegisterModuleLoader( L, "json", Lua::Open< luaload_json > );
+
 	Lua::InitializeLuaPath( L, platform );
-					
+	
+	if ( top > 0 ) // restore stack
+	{
+		lua_rawgeti( L, LUA_REGISTRYINDEX, ref );
+		
+		Rtt_ASSERT( !lua_isnil( L, -1 ) );
+
+		for ( int i = 1; i <= top; i++ )
+		{
+			lua_rawgeti( L, 1, i );
+		}
+
+		lua_remove( L, 1 );
+		luaL_unref( L, LUA_REGISTRYINDEX, ref );
+	}
+
 	return 0 == Lua::DoBuffer( L, &luaload_require_with_settings, NULL ); // TODO: error message?
 }
 
@@ -1693,54 +1757,44 @@ PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 			lua_getfield( L, -1, "callbacks" ); // push settings.callbacks
 			if ( lua_istable( L, -1 ) )
 			{
+				int top = lua_gettop( L );
 				bool didPreBuild = false;
+				bool preBuildOK = Lua::LoadFuncOrFilename( fServices.Platform(), L, "preBuild", true ); // push settings.callbacks.preBuild or nil
 
-				lua_getfield( L, -1, "preBuild" ); // push settings.callbacks.preBuild
-				if ( lua_isfunction( L, -2 ) )
+				if ( preBuildOK && lua_isfunction( L, -1 ) )
 				{
-					int top = lua_gettop( L );
 					if ( !InitLuaForBuild( L, fServices.Platform() ) )
 					{
 						retflag = false;
 					}
-					else if ( 0 == luaL_loadbuffer( L, lua_tostring( L, -1 ), lua_objlen( L, -1 ), "preBuild" ) )
+					else if ( 0 == Lua::DoCall( L, 0, 1 ) )
 					{
-						if ( 0 == Lua::DoCall( L, 1, 1 ) )
+						if ( lua_istable( L, -1 ) )
 						{
-							if ( lua_istable( L, -1 ) )
-							{
-								lua_getfield( L, -1, "visitProjectTree" );
+							lua_getfield( L, -1, "visitProjectTree" );
 
-								if ( lua_isfunction( L, -1 ) )
-								{
-									fVisitProjectTreeRef = luaL_ref( L, LUA_REGISTRYINDEX );
-								}
+							if ( lua_isfunction( L, -1 ) )
+							{
+								fVisitProjectTreeRef = luaL_ref( L, LUA_REGISTRYINDEX );
 							}
-						}
-						else
-						{
-							retflag = false;
 						}
 					}
 					else
 					{
 						retflag = false;
 					}
-
-					lua_settop( L, top );
-
 					didPreBuild = true;
 				}
-				lua_pop( L, 1 ); // pop settings.callbacks.preBuild
+				lua_settop( L, top ); // pop settings.callbacks.preBuild
 
-				lua_getfield( L, -1, "postBuild" ); // push settings.callbacks.postBuild
-				if ( retflag && lua_isfunction( L, -1 ) )
+				bool postBuildOK = retflag && Lua::LoadFuncOrFilename( fServices.Platform(), L, "postBuild", true ); // push settings.callbacks.postBuild
+				if ( postBuildOK && lua_isfunction( L, -1 ) )
 				{
 					if ( !didPreBuild && !InitLuaForBuild( L, fServices.Platform() ) )
 					{
 						retflag = false;
 					}
-					else if ( 0 == luaL_loadbuffer( L, lua_tostring( L, -1 ), lua_objlen( L, -1 ), "postBuild" ) )
+					else
 					{
 						lua_newuserdata( L, 0 );
 						lua_createtable( L, 0, 1 );
@@ -1749,12 +1803,8 @@ PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 						lua_setmetatable( L, -2 );
 						luaL_ref( L, LUA_REGISTRYINDEX ); // keep until state closed
 					}
-					else
-					{
-						retflag = false;
-					}
 				}
-				lua_pop( L, 1 ); // pop settings.callbacks.postBuild
+				lua_settop( L, top ); // pop settings.callbacks.postBuild
 			}
 
 			lua_pop( L, 1 ); // pop 

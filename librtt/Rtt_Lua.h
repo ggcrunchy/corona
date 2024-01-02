@@ -50,7 +50,7 @@ class Lua
 	public:
 		static void InitializeLuaPath( lua_State* L, const MPlatform& platform );
 
-		static bool LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *key );
+		static bool LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *key, bool resultNotDumped = false );
 
 	public:
 		static lua_State* New( bool shouldOpenLibs );

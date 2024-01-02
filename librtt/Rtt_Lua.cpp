@@ -268,7 +268,7 @@ WriteFunctionToBuffer( lua_State *L, const void* p, size_t sz, void* ud )
 }
 
 bool
-Lua::LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *key )
+Lua::LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *key, bool resultNotDumped )
 {
 	bool noError = false;
 
@@ -313,10 +313,17 @@ Lua::LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *ke
 		{
 			if ( !lua_iscfunction( L, -1 ) )
 			{
-				luaL_Buffer b;
-				luaL_buffinit( L, &b );
-				lua_dump( L, WriteFunctionToBuffer, &b );
-				luaL_pushresult( &b );
+				if ( resultNotDumped )
+				{
+					lua_pushvalue( L, -1 ); // keep on stack
+				}
+				else
+				{
+					luaL_Buffer b;
+					luaL_buffinit( L, &b );
+					lua_dump( L, WriteFunctionToBuffer, &b );
+					luaL_pushresult( &b );
+				}
 
 				noError = true;
 			}
@@ -338,7 +345,7 @@ Lua::LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *ke
 		noError = true;
 	}
 
-	if ( noError )
+	if ( noError && !resultNotDumped )
 	{
 		lua_insert( L, -2 ); // pop function, leaving dumped string or nil
 	}

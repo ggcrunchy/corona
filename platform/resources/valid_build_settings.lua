@@ -26,6 +26,10 @@ stoplist = {
 	"xcassets",
 }
 
+choices = {
+	["?FS"] = { "", function() end }
+}
+
 settings =
 {
 	android =
@@ -283,6 +287,9 @@ settings =
 
 	callbacks =
 	{
+		simulatorStart = "?FS",
+		preBuild = "?FS",
+		postBuild = "?FS"
 	},
 
 	plugins =
