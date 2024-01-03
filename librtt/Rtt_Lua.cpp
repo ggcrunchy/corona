@@ -268,7 +268,7 @@ WriteFunctionToBuffer( lua_State *L, const void* p, size_t sz, void* ud )
 }
 
 bool
-Lua::LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *key, bool resultNotDumped )
+Lua::LoadFuncOrFilename( const char *projectPath, lua_State *L, const char *key, bool resultNotDumped )
 {
 	bool noError = false;
 
@@ -286,11 +286,12 @@ Lua::LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *ke
 					break;
 				}
 
-				String resourcePath;
-				platform.PathForFile( filename, MPlatform::kResourceDir, MPlatform::kTestFileExists, resourcePath );
-
+				String resourcePath( projectPath );
+				resourcePath.Append( LUA_DIRSEP );
+				resourcePath.Append( filename );
 				const char *path = resourcePath.GetString();
-				if ( !path )
+
+				if ( !Rtt_FileExists( path ) )
 				{
 					Rtt_LogException( "Error: unable to find file %s from key '%s'", filename, key );
 					break;

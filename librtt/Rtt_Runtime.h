@@ -198,7 +198,7 @@ class Runtime : public MCallback,
 				int downloadablePluginsIndex, bool isSupportedOnThisPlatform, const char *pluginEntryJSON);
 
 	public:
-		bool LoadCallbacks( lua_State *L );
+		bool LoadCallbacks( lua_State *L, const char *resourcePath );
 
 	public:
 		void FindDownloadablePlugins( const char *simPlatformName );

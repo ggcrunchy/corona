@@ -119,7 +119,7 @@ AppPackagerParams::AppPackagerParams( const char* appName,
 	fIsStripDebug( true ),
 	fDeviceBuildData( NULL ),
 	fIncludeBuildSettings( false ),
-	fVisitProjectTreeRef( LUA_NOREF )
+	fBuildCallbacksRef( LUA_NOREF )
 ,   fLiveBuild( false )
 {
 	fAppName.Set(appName);
@@ -269,7 +269,7 @@ PlatformAppPackager::PlatformAppPackager( const MPlatformServices& services,
 	fGlobalCustomBuildId( & fServices.Platform().GetAllocator() ),
 	fAppSettingsCustomBuildId( & fServices.Platform().GetAllocator() ),
     fNeverStripDebugInfo( false ),
-	fVisitProjectTreeRef( LUA_NOREF )
+	fBuildCallbacksRef( LUA_NOREF )
 {
 	fCustomBuildId.Set( "" );
 	fGlobalCustomBuildId.Set( "" );
@@ -389,7 +389,7 @@ PlatformAppPackager::Prepackage( AppPackagerParams * params, const char* tmpDir 
 		}
 	}
 
-	params->SetVisitProjectTreeRef( fVisitProjectTreeRef );
+	params->SetBuildCallbacksRef( fBuildCallbacksRef );
 
 	// Build *.lu into tmpDir
 	if ( CompileScripts( params, tmpDir ) )
@@ -570,15 +570,14 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 
 				result = true;
 
-				if ( LUA_NOREF != params.GetVisitProjectTreeRef() )
+				if ( PlatformAppPackager::PushBuildCallback( L, params.GetBuildCallbacksRef(), "visitProjectTree" ) )
 				{
-					lua_rawgeti( L, LUA_REGISTRYINDEX, params.GetVisitProjectTreeRef() );
 					lua_pushliteral( L, "enterDirectory" );
 					lua_pushstring( L, srcDir );
 
 					if ( 0 != Lua::DoCall( L, 2, 0 ) )
 					{
-						params.SetBuildMessage("Error with preBuild(\"enterDirectory\") while doing CompileScripts().");
+						params.SetBuildMessage("Error with visitProjectTree(\"enterDirectory\") while doing CompileScripts().");
 						result = false;
 					}
 				}
@@ -603,18 +602,6 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 					{
 						result = CompileScriptsInDirectory( L, params, dstDir, srcPath );
 						continue;
-					}
-					else if ( LUA_NOREF != params.GetVisitProjectTreeRef() )
-					{
-						lua_rawgeti( L, LUA_REGISTRYINDEX, params.GetVisitProjectTreeRef() );
-						lua_pushliteral( L, "file" );
-						lua_pushstring( L, srcPath );
-
-						if ( 0 != Lua::DoCall( L, 2, 0 ) )
-						{
-							params.SetBuildMessage("Error with preBuild(\"file\") while doing CompileScripts().");
-							result = false;
-						}
 					}
 
 					// This is a file. Compile this file if:
@@ -672,6 +659,18 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 							tmpString.Append("\n\nCheck Simulator console for error messages.");
 							params.SetBuildMessage(tmpString.GetString());
 						}
+						else if ( PlatformAppPackager::PushBuildCallback( L, params.GetBuildCallbacksRef(), "visitProjectTree" ) )
+						{
+							lua_pushliteral( L, "compiledFile" );
+							lua_pushstring( L, srcPath );
+							lua_pushstring( L, dstPath );
+
+							if ( 0 != Lua::DoCall( L, 3, 0 ) )
+							{
+								params.SetBuildMessage("Error with visitProjectTree(\"compiledFile\") while doing CompileScripts().");
+								result = false;
+							}
+						}
 
 #if defined(Rtt_WIN_ENV) && !defined( Rtt_NO_GUI ) && !defined(Rtt_LINUX_ENV)
 						CSimulatorApp *pApp = ((CSimulatorApp *)AfxGetApp());
@@ -686,16 +685,26 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 
 
 					}
+					else if ( PlatformAppPackager::PushBuildCallback( L, params.GetBuildCallbacksRef(), "visitProjectTree" ) )
+					{
+						lua_pushliteral( L, "skippedFile" );
+						lua_pushstring( L, srcPath );
+
+						if ( 0 != Lua::DoCall( L, 2, 0 ) )
+						{
+							params.SetBuildMessage("Error with visitProjectTree(\"skippedFile\") while doing CompileScripts().");
+							result = false;
+						}
+					}
 				}
 
-				if ( LUA_NOREF != params.GetVisitProjectTreeRef() )
+				if ( PlatformAppPackager::PushBuildCallback( L, params.GetBuildCallbacksRef(), "visitProjectTree" ) )
 				{
-					lua_rawgeti( L, LUA_REGISTRYINDEX, params.GetVisitProjectTreeRef() );
 					lua_pushliteral( L, "leaveDirectory" );
 
 					if ( 0 != Lua::DoCall( L, 1, 0 ) )
 					{
-						params.SetBuildMessage("Error with preBuild(\"leaveDirectory\") while doing CompileScripts().");
+						params.SetBuildMessage("Error with visitProjectTree(\"leaveDirectory\") while doing CompileScripts().");
 						result = false;
 					}
 				}
@@ -908,7 +917,7 @@ ReplaceMainLuaWithLiveDebug( lua_State *L, AppPackagerParams& params, const char
 }
 
 bool
-PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmpDir )
+PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmpDir, bool doPostCompile )
 {
 #if 0
 	const char* srcDir = params->GetSrcDir();
@@ -948,6 +957,11 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 
 	if(result)
 	{
+		if ( doPostCompile )
+		{
+			DoPostCompile( dstDir, params->IsStripDebug() );
+		}
+
 		result = ReplaceMainLuaWithLiveDebug(fVM, *params, dstDir);
 	}
 
@@ -1661,6 +1675,23 @@ InitLuaForBuild( lua_State *L, const MPlatform &platform )
 	return 0 == Lua::DoBuffer( L, &luaload_require_with_settings, NULL ); // TODO: error message?
 }
 
+static void
+AddToRegistryOrPop( lua_State *L, const char* key )
+{
+	if ( lua_isstring( L, -1 ) )
+	{
+		lua_setfield( L, LUA_REGISTRYINDEX, key );
+	}
+	else
+	{
+		lua_pop( L, 1 );
+	}
+}
+
+static const char kBuildSettingsStartFuncCode[] = "CoronaBuildSettingsStartFuncCode";
+static const char kBuildSettingsStartScriptName[] = "CoronaBuildSettingsStartScriptName";
+static const char kBuildSettingsBuildScriptName[] = "CoronaBuildSettingsBuildScriptName";
+
 bool
 PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 {
@@ -1755,14 +1786,29 @@ PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 			lua_pop( L, 1 ); // pop settings.splashScreen
 
 			lua_getfield( L, -1, "callbacks" ); // push settings.callbacks
-			if ( lua_istable( L, -1 ) )
+			if ( lua_istable( L, -1 ) && LUA_NOREF == fBuildCallbacksRef )
 			{
+				// prevent multiple loads
+				lua_pushnil( L );
+				fBuildCallbacksRef = luaL_ref( L, LUA_REGISTRYINDEX );
+				
 				int top = lua_gettop( L );
-				bool didPreBuild = false;
-				bool preBuildOK = Lua::LoadFuncOrFilename( fServices.Platform(), L, "preBuild", true ); // push settings.callbacks.preBuild or nil
+				bool startOK = Lua::LoadFuncOrFilename( srcDir, L, "start" ); // push settings.callbacks.start or nil
 
-				if ( preBuildOK && lua_isfunction( L, -1 ) )
+				if ( startOK )
 				{
+					AddToRegistryOrPop( L, kBuildSettingsStartFuncCode );
+					lua_getfield( L, -1, "start" ); // was it a filename?
+					AddToRegistryOrPop( L, kBuildSettingsStartScriptName );
+				}
+
+				bool buildOK = startOK && Lua::LoadFuncOrFilename( srcDir, L, "build", true ); // push settings.callbacks.build or nil
+
+				if ( buildOK && lua_isfunction( L, -1 ) )
+				{
+					lua_getfield( L, -2, "build" ); // was it a filename?
+					AddToRegistryOrPop( L, kBuildSettingsBuildScriptName );
+
 					if ( !InitLuaForBuild( L, fServices.Platform() ) )
 					{
 						retflag = false;
@@ -1771,40 +1817,27 @@ PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 					{
 						if ( lua_istable( L, -1 ) )
 						{
-							lua_getfield( L, -1, "visitProjectTree" );
-
+							lua_getfield( L, -1, "close" ); // push close or nil
 							if ( lua_isfunction( L, -1 ) )
 							{
-								fVisitProjectTreeRef = luaL_ref( L, LUA_REGISTRYINDEX );
+								lua_newuserdata( L, 0 );
+								lua_createtable( L, 0, 1 );
+								lua_pushvalue( L, -3 );
+								lua_setfield( L, -2, "__gc" ); // TODO: what if build fails?
+								lua_setmetatable( L, -2 );
+								luaL_ref( L, LUA_REGISTRYINDEX ); // keep until state closed
 							}
+							lua_pop( L, 1 ); // pop close
+
+							fBuildCallbacksRef = luaL_ref( L, LUA_REGISTRYINDEX );
 						}
 					}
 					else
 					{
 						retflag = false;
 					}
-					didPreBuild = true;
 				}
-				lua_settop( L, top ); // pop settings.callbacks.preBuild
-
-				bool postBuildOK = retflag && Lua::LoadFuncOrFilename( fServices.Platform(), L, "postBuild", true ); // push settings.callbacks.postBuild
-				if ( postBuildOK && lua_isfunction( L, -1 ) )
-				{
-					if ( !didPreBuild && !InitLuaForBuild( L, fServices.Platform() ) )
-					{
-						retflag = false;
-					}
-					else
-					{
-						lua_newuserdata( L, 0 );
-						lua_createtable( L, 0, 1 );
-						lua_pushvalue( L, -3 );
-						lua_setfield( L, -2, "__gc" ); // TODO: what if build fails?
-						lua_setmetatable( L, -2 );
-						luaL_ref( L, LUA_REGISTRYINDEX ); // keep until state closed
-					}
-				}
-				lua_settop( L, top ); // pop settings.callbacks.postBuild
+				lua_settop( L, top ); // pop settings.callbacks.build
 			}
 
 			lua_pop( L, 1 ); // pop 
@@ -1953,6 +1986,145 @@ PlatformAppPackager::IsAppSettingsEmpty( const MPlatform& platform )
 	}
 
 	return result;
+}
+
+bool
+PlatformAppPackager::PushBuildCallback( lua_State *L, int ref, const char* name )
+{
+	if ( LUA_NOREF != ref && LUA_REFNIL != ref )
+	{
+		lua_rawgeti( L, LUA_REGISTRYINDEX, ref );
+
+		Rtt_ASSERT( lua_istable( L, -1 ) );
+
+		lua_getfield( L, -1, name );
+		lua_remove( L, -2 );
+
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+bool
+PlatformAppPackager::PrepareToCompile( AppPackagerParams &params, const void *extra )
+{
+	if ( PushBuildCallback( fVM, fBuildCallbacksRef, "prepareToCompile" ) )
+	{
+		lua_newtable( fVM );
+
+		int top = lua_gettop( fVM );
+
+		lua_pushliteral( fVM, LUA_DIRSEP );
+		lua_setfield( fVM, -2, "separator" );
+
+		AddToCompileArgsTable( extra );
+
+		Rtt_ASSERT( lua_gettop( fVM ) == top );
+
+		if ( 0 != Lua::DoCall( fVM, 1, 0 ) )
+		{
+			params.SetBuildMessage("Error with prepareToCompile while doing DoLocalBuild().");
+			return false;
+		}
+	}
+	return true;
+}
+
+bool
+PlatformAppPackager::ReadyToArchive( AppPackagerParams &params )
+{
+	if ( PushBuildCallback( fVM, fBuildCallbacksRef, "readyToArchive" ) )
+	{
+		if ( 0 != Lua::DoCall( fVM, 1, 0 ) )
+		{
+			params.SetBuildMessage("Error with readyToArchive while doing DoLocalBuild().");
+			return false;
+		}
+	}
+	return true;
+}
+
+static
+void AddFile( lua_State *L, const char *key, const char *root, const char *dstDir, int stripDebug )
+{
+	const char kScriptSuffix[] = "." Rtt_LUA_SCRIPT_FILE_EXTENSION;
+	const size_t kScriptSuffixLen = sizeof( kScriptSuffix ) - 1;
+
+	lua_getfield( L, LUA_REGISTRYINDEX, key );
+	if ( lua_isstring( L, -1 ) )
+	{
+		const char *code = lua_tostring( L, -1 );
+		size_t codeLength = lua_objlen( L, -1 );
+
+		lua_pushfstring( L, "%s" LUA_DIRSEP "%s." Rtt_LUA_SCRIPT_FILE_EXTENSION, dstDir, root );
+
+		const char *scriptName = lua_tostring( L, -1 );
+
+		FILE *fp = fopen( scriptName, "wb" );
+		if ( Rtt_VERIFY( fp ) )
+		{
+			fwrite( code, 1, codeLength, fp );
+			fclose( fp );
+		}
+
+		lua_pushfstring( L, "%s" LUA_DIRSEP "%s." Rtt_LUA_OBJECT_FILE_EXTENSION, dstDir, root );
+
+		const char *compiledName = lua_tostring( L, -1 );
+
+		int status = Rtt_LuaCompile( L, 1, &scriptName, compiledName, stripDebug );
+
+		if ( !Rtt_VERIFY( 0 == status ) )
+		{
+			// TODO: error?
+		}
+
+		unlink( scriptName );
+
+		lua_pop( L, 2 );
+	}
+	lua_pop( L, 1 );
+}
+
+static
+void RemoveFiles( lua_State *L, const char *key, const char *dstDir )
+{
+	const char kScriptSuffix[] = "." Rtt_LUA_SCRIPT_FILE_EXTENSION;
+	const size_t kScriptSuffixLen = sizeof( kScriptSuffix ) - 1;
+
+	lua_getfield( L, LUA_REGISTRYINDEX, key );
+	if ( lua_isstring( L, -1 ) )
+	{
+		const char *name = lua_tostring( L, -1 );
+		Rtt_ASSERT( HasSuffix( name, kScriptSuffix, kScriptSuffixLen ) );
+
+		name = luaL_gsub( L, name, "/", "." );
+		name = luaL_gsub( L, name, "\\", "." );
+
+		const char *normalized = lua_tostring( L, -1 );
+
+		lua_pushfstring( L, "%s" LUA_DIRSEP, dstDir );
+		lua_pushlstring( L, normalized, lua_objlen( L, -2 ) - ( kScriptSuffixLen - 1 ) );
+		lua_pushliteral( L, Rtt_LUA_OBJECT_FILE_EXTENSION );
+		lua_concat( L, 3 );
+
+		const char *compiledName = lua_tostring( L, -1 );
+
+		unlink( compiledName );
+
+		lua_pop( L, 3 );
+	}
+	lua_pop( L, 1 );
+}
+
+void
+PlatformAppPackager::DoPostCompile( const char *dstDir, int stripDebug )
+{
+	AddFile( fVM, kBuildSettingsStartFuncCode, "_appStart_", dstDir, stripDebug );
+	RemoveFiles( fVM, kBuildSettingsStartScriptName, dstDir );
+	RemoveFiles( fVM, kBuildSettingsBuildScriptName, dstDir );
 }
 
 /// Returns a copy of the input string, escaping characters as needed such as apostrophies and double quotes.

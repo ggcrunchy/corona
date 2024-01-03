@@ -986,73 +986,13 @@ Runtime::AddDownloadablePlugin(
 	++fDownloadablePluginsCount;
 	lua_rawseti( L, downloadablePluginsIndex, fDownloadablePluginsCount );
 }
-/*
-static int
-WriteToArray( lua_State *L, const void* p, size_t sz, void* ud )
-{
-	Array<U8> *arr = static_cast<Array<U8>*>( ud );
-	const U8 *bytes = static_cast<const U8*>( p );
 
-	for ( size_t i = 0; i < sz; i++ )
-	{
-		arr->Append( bytes[i] );
-	}
-
-	return 0;
-}
-
-static bool
-LoadFuncOrFilename( const MPlatform &platform, lua_State *L, const char *key, Array<U8> *out )
-{
-	lua_getfield( L, -1, key );
-	if ( lua_isfunction( L, -1 ) || lua_isstring( L, -1 ) )
-	{
-		if ( lua_isstring( L, -1 ) )
-		{
-			const char *filename = lua_tostring( L, -1 );
-
-			if ( !Rtt_StringEndsWith( filename, ".lua" ) )
-			{
-				Rtt_LogException( "Error: %s is not a Lua file" );
-				return false;
-			}
-
-			String resourcePath;
-			platform.PathForFile( filename, MPlatform::kResourceDir, MPlatform::kTestFileExists, resourcePath );
-
-			const char *path = resourcePath.GetString();
-			if ( !path )
-			{
-				Rtt_LogException( "Error: unable to find %s", filename );
-				return false;
-			}
-
-			int loaded = luaL_loadfile( L, path );
-			if ( 0 != loaded )
-			{
-				Rtt_LogException( "Error: failure while loading %s: %s", filename, lua_tostring( L, -1 ) );
-				return false;
-			}
-
-			lua_replace( L, -2 );
-		}
-
-		if ( out )
-		{
-			lua_dump( L, WriteToArray, out );
-		}
-	}
-	lua_pop( L, 1 );
-
-	return true;
-}
-*/
 // Load callbacks once plugins have been fetched
 bool
-Runtime::LoadCallbacks( lua_State *L )
+Runtime::LoadCallbacks( lua_State *L, const char *resourcePath )
 {
 	#ifdef Rtt_AUTHORING_SIMULATOR
-		if ( !Lua::LoadFuncOrFilename( fPlatform, L, "simulatorStart" ) )
+		if ( !Lua::LoadFuncOrFilename( resourcePath, L, "start" ) )
 		{
 			return false;
 		}
@@ -1066,18 +1006,11 @@ Runtime::LoadCallbacks( lua_State *L )
 		}
 		lua_pop( L, 1 );
 	
-		if ( !Lua::LoadFuncOrFilename( fPlatform, L, "appStart" ) )
+		if ( !Lua::LoadFuncOrFilename( resourcePath, L, "build" ) )
 		{
 			return false;
 		}
 		lua_pop( L, 1 ); // result unused until a build, but load done to detect early errors
-
-		// ditto
-		if ( !Lua::LoadFuncOrFilename( fPlatform, L, "preBuild" ) )
-		{
-			return false;
-		}
-		lua_pop( L, 1 ); // ditto
 	#endif
 
 		return true;
@@ -1228,7 +1161,9 @@ Runtime::FindDownloadablePlugins( const char *simPlatformName )
 			lua_getfield(L, -1, "callbacks");
 			if (lua_istable(L, -1))
 			{
-				if (!LoadCallbacks(L))
+				String projectPath( filePath.GetString() );
+				projectPath.RemovePathComponent();
+				if (!LoadCallbacks(L, projectPath.GetString() ))
 				{
 				#ifdef Rtt_AUTHORING_SIMULATOR
 					RemoveStartFunction();
@@ -1423,7 +1358,7 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 		#ifdef Rtt_AUTHORING_SIMULATOR
 			if ( fSimulatorStartFunc )
 			{
-				if ( 0 == luaL_loadbuffer( L, static_cast<const char*>( fSimulatorStartFunc ), fStartFuncLength, "simulatorStart" ) )
+				if ( 0 == luaL_loadbuffer( L, static_cast<const char*>( fSimulatorStartFunc ), fStartFuncLength, "start" ) )
 				{
 					if ( 0 == fVMContext->DoCall( L, 1, 1 ) )
 					{
@@ -1444,7 +1379,7 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 			{
 				lua_pushboolean( L, 0 == result ); // load succeeded?
 
-				if ( 0 == fVMContext->DoCall( L, 1, 1 ) )
+				if ( 0 == fVMContext->DoCall( L, 2, 1 ) )
 				{
 					// TODO: use results?
 				}

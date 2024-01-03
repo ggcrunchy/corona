@@ -59,7 +59,7 @@ class AppPackagerParams
 		bool fUsesMonetization;
 		bool fLiveBuild;
         bool fIncludeStandardResources = true;
-		int fVisitProjectTreeRef;
+		int fBuildCallbacksRef;
 		String fCoronaUser;
 
 	public:
@@ -117,8 +117,8 @@ class AppPackagerParams
 		const char * GetCoronaUser() const { return fCoronaUser.GetString(); }
 		void SetCoronaUser(const char* user) { fCoronaUser.Set(user); }
 
-		int GetVisitProjectTreeRef() const { return fVisitProjectTreeRef; }
-		void SetVisitProjectTreeRef( int ref ) { fVisitProjectTreeRef = ref; }
+		int GetBuildCallbacksRef() const { return fBuildCallbacksRef; }
+		void SetBuildCallbacksRef( int ref ) { fBuildCallbacksRef = ref; }
 
 	public:
 		void SetBuildSettingsPath( const char *path ) { fBuildSettingsPath.Set( path ); }
@@ -189,7 +189,7 @@ class PlatformAppPackager
 
 	protected:
 		virtual char* Prepackage( AppPackagerParams * params, const char* tmpDir );
-		bool CompileScripts( AppPackagerParams * params, const char* tmpDir );
+		bool CompileScripts( AppPackagerParams * params, const char* tmpDir, bool doPostCompile = false );
 
 		/**
 		 * Archives all files in a given directory tree to a "resource.car" file.
@@ -271,6 +271,17 @@ class PlatformAppPackager
 	public:
 		static bool IsAppSettingsEmpty( const MPlatform& platform );
 
+	public:		
+		static bool PushBuildCallback( lua_State *L, int ref, const char* name );
+
+	protected:
+		virtual void AddToCompileArgsTable( const void *extra ) {}
+
+		bool PrepareToCompile( AppPackagerParams &params, const void *extra = NULL );
+		bool ReadyToArchive( AppPackagerParams &params );
+
+		void DoPostCompile( const char *dstDir, int stripDebug );
+
 	protected:
 		const MPlatformServices& fServices;
 		lua_State *fVM;
@@ -282,7 +293,7 @@ class PlatformAppPackager
 		String fSplashImageFile;
         bool fNeverStripDebugInfo;
 		TargetDevice::Platform fTargetPlatform;
-		int fVisitProjectTreeRef;
+		int fBuildCallbacksRef;
 };
 
 Rtt_EXPORT int Rtt_LuaCompile( lua_State *L, int numSources, const char** sources, const char* dstFile, int stripDebug );

@@ -287,9 +287,8 @@ settings =
 
 	callbacks =
 	{
-		simulatorStart = "?FS",
-		preBuild = "?FS",
-		postBuild = "?FS"
+		start = "?FS",
+		build = "?FS"
 	},
 
 	plugins =

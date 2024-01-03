@@ -121,6 +121,9 @@ class Win32AppPackager : public PlatformAppPackager
 		/// </returns>
 		bool ArePathsOnSameVolume(const wchar_t* path1, const wchar_t* path2);
 
+	protected:
+		virtual void AddToCompileArgsTable( const void* extra );
+
 	private:
 		/// <summary>
 		///  <para>Stores a collection of "excludeFiles" patterns read from the "build.settings" file.</para>
