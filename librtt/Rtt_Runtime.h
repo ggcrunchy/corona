@@ -348,11 +348,14 @@ class Runtime : public MCallback,
 		// MDisplayDelegate
 		virtual void WillDispatchFrameEvent( const Display& sender );
 
+	public:
+		void RemoveStartFunction();
+		void SetStartFunction( const void *code, size_t codeLength );
+
 #if defined(Rtt_AUTHORING_SIMULATOR)
 	public:
 		static int ShellPluginCollector_Async(lua_State* L);
 
-		void RemoveStartFunction();
 	private:
 		static void FinalizeWorkingThreadWithEvent(Runtime *runtime, lua_State *L);
 		std::atomic<std::string*> m_fAsyncResultStr;
@@ -391,10 +394,8 @@ class Runtime : public MCallback,
 		const MRuntimeDelegate *fDelegate;
 		mutable bool fShowingTrialMessages;
 
-#ifdef Rtt_AUTHORING_SIMULATOR
-		void *fSimulatorStartFunc;
+		void *fStartFunc;
 		size_t fStartFuncLength;
-#endif
 
 	private:
 		friend class LoadMainTask;

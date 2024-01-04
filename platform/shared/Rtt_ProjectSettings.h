@@ -345,6 +345,11 @@ class ProjectSettings
 		 */
 		bool IsWindowTitleShown() const;
 
+		/**
+		 * TODO etc.
+		*/
+		const std::string &GetStartFunc() const;
+
 	protected:
 		/**
 		 * Called after the LoadFromDirectory() method has successfully loaded information from the
@@ -482,6 +487,9 @@ class ProjectSettings
 
 		/** Set to true if the Corona window should display its title. False to not show it.*/
 		bool fIsWindowTitleShown;
+
+		/** TODO etc. */
+		std::string fStartFunc;
 };
 
 } // namespace Rtt

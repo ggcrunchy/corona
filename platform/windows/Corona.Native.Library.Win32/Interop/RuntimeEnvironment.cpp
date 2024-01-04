@@ -1358,6 +1358,13 @@ OperationResult RuntimeEnvironment::RunUsing(const RuntimeEnvironment::CreationS
 	fRuntimePointer->SetProperty(Rtt::Runtime::kRenderAsync, true);
 	fRuntimePointer->SetProperty(Rtt::Runtime::kShouldVerifyLicense, true);
 
+	const std::string& startFunc = fProjectSettings.GetStartFunc();
+
+	if ( !startFunc.empty() )
+	{
+		fRuntimePointer->SetStartFunction( startFunc.data(), startFunc.size() );
+	}
+
 	// Load and run the Corona project.
 	fRuntimeState = RuntimeState::kStarting;
 	fLastOrientation = fProjectSettings.GetDefaultOrientation();

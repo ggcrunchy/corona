@@ -139,15 +139,26 @@ int Runtime::ShellPluginCollector_Async(lua_State* L)
 	return 1;
 }
 
+#endif
+
 void Runtime::RemoveStartFunction()
 {
-	Rtt_FREE( fSimulatorStartFunc );
+	Rtt_FREE( fStartFunc );
 
-	fSimulatorStartFunc = NULL;
+	fStartFunc = NULL;
 	fStartFuncLength = 0;
 }
 
-#endif
+void Runtime::SetStartFunction( const void *code, size_t codeLength )
+{
+	RemoveStartFunction();
+
+	fStartFunc = Rtt_MALLOC( Allocator(), codeLength );
+	fStartFuncLength = codeLength;
+
+	memcpy( fStartFunc, code, codeLength );
+}
+
 // ----------------------------------------------------------------------------
 
 // These iterations are reasonable default values. See http://www.box2d.org/forum/viewtopic.php?f=8&t=4396 for discussion.
@@ -188,10 +199,8 @@ Runtime::Runtime(const MPlatform& platform, MCallback* viewCallback)
 	fDownloadablePluginsCount(0),
 	fDelegate(NULL),
 	fShowingTrialMessages(false),
-#ifdef Rtt_AUTHORING_SIMULATOR
-	fSimulatorStartFunc(NULL),
+	fStartFunc(NULL),
 	fStartFuncLength(0),
-#endif
 #ifdef Rtt_AUTHORING_SIMULATOR
 	m_fAsyncListener(nullptr),
 	m_fAsyncResultStr(nullptr),
@@ -278,8 +287,8 @@ Runtime::~Runtime()
 	fResourcesHead->Release();
 #if defined(Rtt_AUTHORING_SIMULATOR)
 	FinalizeWorkingThreadWithEvent(this, nullptr);
-	RemoveStartFunction();
 #endif
+	RemoveStartFunction();
 }
 
 // ----------------------------------------------------------------------------
@@ -991,29 +1000,29 @@ Runtime::AddDownloadablePlugin(
 bool
 Runtime::LoadCallbacks( lua_State *L, const char *resourcePath )
 {
-	#ifdef Rtt_AUTHORING_SIMULATOR
-		if ( !Lua::LoadFuncOrFilename( resourcePath, L, "start" ) )
-		{
-			return false;
-		}
+	if ( !Lua::LoadFuncOrFilename( resourcePath, L, "start" ) )
+	{
+		return false;
+	}
 
-		if ( lua_isstring( L, -1 ) )
-		{
-			fSimulatorStartFunc = Rtt_MALLOC( Allocator(), lua_objlen( L, -1 ) );
-			fStartFuncLength = lua_objlen( L, -1 );
+	if ( lua_isstring( L, -1 ) )
+	{
+		fStartFunc = Rtt_MALLOC( Allocator(), lua_objlen( L, -1 ) );
+		fStartFuncLength = lua_objlen( L, -1 );
 
-			memcpy( fSimulatorStartFunc, lua_tostring( L, -1 ), fStartFuncLength );
-		}
-		lua_pop( L, 1 );
-	
-		if ( !Lua::LoadFuncOrFilename( resourcePath, L, "build" ) )
-		{
-			return false;
-		}
-		lua_pop( L, 1 ); // result unused until a build, but load done to detect early errors
-	#endif
+		memcpy( fStartFunc, lua_tostring( L, -1 ), fStartFuncLength );
+	}
+	lua_pop( L, 1 );
 
-		return true;
+#ifdef Rtt_AUTHORING_SIMULATOR
+	if ( !Lua::LoadFuncOrFilename( resourcePath, L, "build" ) )
+	{
+		return false;
+	}
+	lua_pop( L, 1 ); // result unused until a build, but load done to detect early errors
+#endif
+
+	return true;
 }
 
 // Determine list of plugins that the project is using based on build.settings
@@ -1157,7 +1166,7 @@ Runtime::FindDownloadablePlugins( const char *simPlatformName )
 				lua_pop(runtimeL, 1); // pop downloadablePlugins table
 			}
 			lua_pop(L, 1); // pop plugins
-
+			/*
 			lua_getfield(L, -1, "callbacks");
 			if (lua_istable(L, -1))
 			{
@@ -1165,12 +1174,11 @@ Runtime::FindDownloadablePlugins( const char *simPlatformName )
 				projectPath.RemovePathComponent();
 				if (!LoadCallbacks(L, projectPath.GetString() ))
 				{
-				#ifdef Rtt_AUTHORING_SIMULATOR
 					RemoveStartFunction();
-				#endif
 				}
 			}
 			lua_pop(L, 1); // pop callbacks
+			*/
 		}
 	}
 
@@ -1355,10 +1363,24 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 		}
 		else
 		{
-		#ifdef Rtt_AUTHORING_SIMULATOR
-			if ( fSimulatorStartFunc )
+			int result = LUA_ERRFILE;
+			if ( ! IsProperty( kIsApplicationNotArchived ) )
 			{
-				if ( 0 == luaL_loadbuffer( L, static_cast<const char*>( fSimulatorStartFunc ), fStartFuncLength, "start" ) )
+				const char kAppStart[] = Rtt_LUA_OBJECT_FILE( "_appStart_" );
+				result = GetArchive()->LoadResource( L, kAppStart );
+			}
+			if ( LUA_ERRFILE != result ) // resource found?
+			{
+				lua_pushboolean( L, 0 == result ); // load succeeded?
+
+				if ( 0 == fVMContext->DoCall( L, 2, 1 ) )
+				{
+					// TODO: use results?
+				}
+			}
+			else if ( fStartFunc )
+			{
+				if ( 0 == luaL_loadbuffer( L, static_cast<const char*>( fStartFunc ), fStartFuncLength, "start" ) )
 				{
 					if ( 0 == fVMContext->DoCall( L, 1, 1 ) )
 					{
@@ -1372,19 +1394,6 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 
 				RemoveStartFunction();
 			}
-		#else
-			const char kAppStart[] = Rtt_LUA_OBJECT_FILE( "_appStart_" );
-			int result = GetArchive()->LoadResource( L, kAppStart );
-			if ( LUA_ERRFILE != result ) // resource found?
-			{
-				lua_pushboolean( L, 0 == result ); // load succeeded?
-
-				if ( 0 == fVMContext->DoCall( L, 2, 1 ) )
-				{
-					// TODO: use results?
-				}
-			}
-		#endif
 		}
 
 		lua_pushnil( L );

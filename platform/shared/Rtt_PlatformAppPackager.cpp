@@ -2089,10 +2089,11 @@ void AddFile( lua_State *L, const char *key, const char *root, const char *dstDi
 }
 
 static
-void RemoveFiles( lua_State *L, const char *key, const char *dstDir )
+bool RemoveFile( lua_State *L, const char *key, const char *dstDir, const char *newName = NULL )
 {
 	const char kScriptSuffix[] = "." Rtt_LUA_SCRIPT_FILE_EXTENSION;
 	const size_t kScriptSuffixLen = sizeof( kScriptSuffix ) - 1;
+	bool wasRenamed = false;
 
 	lua_getfield( L, LUA_REGISTRYINDEX, key );
 	if ( lua_isstring( L, -1 ) )
@@ -2112,19 +2113,35 @@ void RemoveFiles( lua_State *L, const char *key, const char *dstDir )
 
 		const char *compiledName = lua_tostring( L, -1 );
 
-		unlink( compiledName );
+		if ( newName )
+		{
+			lua_pushfstring( L, "%s" LUA_DIRSEP "%s." Rtt_LUA_OBJECT_FILE_EXTENSION, dstDir, newName );
+		
+			const char *fullNewName = lua_tostring( L, -1 );
+			rename( compiledName, fullNewName );
+			lua_pop( L, 1 );
+
+			wasRenamed = true;
+		}
+		else
+		{
+			unlink( compiledName );
+		}
 
 		lua_pop( L, 3 );
 	}
 	lua_pop( L, 1 );
+	return wasRenamed;
 }
 
 void
 PlatformAppPackager::DoPostCompile( const char *dstDir, int stripDebug )
 {
-	AddFile( fVM, kBuildSettingsStartFuncCode, "_appStart_", dstDir, stripDebug );
-	RemoveFiles( fVM, kBuildSettingsStartScriptName, dstDir );
-	RemoveFiles( fVM, kBuildSettingsBuildScriptName, dstDir );
+	if ( !RemoveFile( fVM, kBuildSettingsStartScriptName, dstDir, "_appStart_" ) )
+	{
+		AddFile( fVM, kBuildSettingsStartFuncCode, "_appStart_", dstDir, stripDebug );
+	}
+	RemoveFile( fVM, kBuildSettingsBuildScriptName, dstDir );
 }
 
 /// Returns a copy of the input string, escaping characters as needed such as apostrophies and double quotes.

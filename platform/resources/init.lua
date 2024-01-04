@@ -1261,23 +1261,16 @@ end
 -- Startup Scripts
 --------------------------------------------------------------------------------
 
-if system.getInfo("environment") == "simulator" then
-	function _callStartFunction( startFunc )
-		local args = {}
-		startFunc(args)
-
-		return {}
+function _callStartFunction( startFuncOrError, ok )
+	if not ( ok == nil or ok ) then
+		assert( false, startFuncOrError )
 	end
-else
-	function _callStartFunction( startFuncOrError, ok )
-		assert( ok, startFuncOrError )
-		assert( type( startFuncOrError ) == "function" )
+	assert( type( startFuncOrError ) == "function" )
 
-		local args = {}
-		startFuncOrError(args)
+	local args = {}
+	startFuncOrError(args)
 
-		return {}
-	end
+	return {}
 end
 
 --------------------------------------------------------------------------------

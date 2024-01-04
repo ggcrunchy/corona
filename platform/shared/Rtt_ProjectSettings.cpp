@@ -328,6 +328,25 @@ bool ProjectSettings::LoadFromDirectory(const char* directoryPath)
 		{
 			fOrientationsSupportedSet.insert(fDefaultOrientation);
 		}
+
+		lua_getfield(luaStatePointer, -1, "callbacks");
+		if (lua_istable(luaStatePointer, -1))
+		{
+			String resourcePath( directoryPathWithSlash.c_str() );
+			resourcePath.RemovePathSeparator();
+			if ( !Lua::LoadFuncOrFilename( resourcePath, luaStatePointer, "start" ) )
+			{
+				// TODO: error
+
+				return false;
+			}
+
+			if ( lua_isstring( luaStatePointer, -1 ) )
+			{
+				fStartFunc.assign( lua_tostring( luaStatePointer, -1 ), lua_objlen( luaStatePointer, -1 ) );
+			}
+		}
+		lua_pop( luaStatePointer, 1 );
 	}
 	lua_pop(luaStatePointer, 1);
 
@@ -736,6 +755,11 @@ double ProjectSettings::GetImageSuffixScaleByIndex(int index) const
 bool ProjectSettings::IsWindowTitleShown() const
 {
 	return fIsWindowTitleShown;
+}
+
+const std::string &ProjectSettings::GetStartFunc() const
+{
+	return fStartFunc;
 }
 
 void ProjectSettings::OnLoadedFrom(lua_State* luaStatePointer)
