@@ -996,35 +996,6 @@ Runtime::AddDownloadablePlugin(
 	lua_rawseti( L, downloadablePluginsIndex, fDownloadablePluginsCount );
 }
 
-// Load callbacks once plugins have been fetched
-bool
-Runtime::LoadCallbacks( lua_State *L, const char *resourcePath )
-{
-	if ( !Lua::LoadFuncOrFilename( resourcePath, L, "start" ) )
-	{
-		return false;
-	}
-
-	if ( lua_isstring( L, -1 ) )
-	{
-		fStartFunc = Rtt_MALLOC( Allocator(), lua_objlen( L, -1 ) );
-		fStartFuncLength = lua_objlen( L, -1 );
-
-		memcpy( fStartFunc, lua_tostring( L, -1 ), fStartFuncLength );
-	}
-	lua_pop( L, 1 );
-
-#ifdef Rtt_AUTHORING_SIMULATOR
-	if ( !Lua::LoadFuncOrFilename( resourcePath, L, "build" ) )
-	{
-		return false;
-	}
-	lua_pop( L, 1 ); // result unused until a build, but load done to detect early errors
-#endif
-
-	return true;
-}
-
 // Determine list of plugins that the project is using based on build.settings
 void
 Runtime::FindDownloadablePlugins( const char *simPlatformName )
@@ -1166,19 +1137,6 @@ Runtime::FindDownloadablePlugins( const char *simPlatformName )
 				lua_pop(runtimeL, 1); // pop downloadablePlugins table
 			}
 			lua_pop(L, 1); // pop plugins
-			/*
-			lua_getfield(L, -1, "callbacks");
-			if (lua_istable(L, -1))
-			{
-				String projectPath( filePath.GetString() );
-				projectPath.RemovePathComponent();
-				if (!LoadCallbacks(L, projectPath.GetString() ))
-				{
-					RemoveStartFunction();
-				}
-			}
-			lua_pop(L, 1); // pop callbacks
-			*/
 		}
 	}
 
