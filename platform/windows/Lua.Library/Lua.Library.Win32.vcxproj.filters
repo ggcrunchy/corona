@@ -32,6 +32,7 @@
     <ClCompile Include="..\..\..\external\lua-5.1.3\src\lvm.c" />
     <ClCompile Include="..\..\..\external\lua-5.1.3\src\lzio.c" />
     <ClCompile Include="..\..\..\external\lua-5.1.3\src\luac.c" />
+    <ClCompile Include="..\..\..\external\lua-5.1.3\src\lnum.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\external\lua-5.1.3\src\lapi.h" />
@@ -57,5 +58,6 @@
     <ClInclude Include="..\..\..\external\lua-5.1.3\src\lundump.h" />
     <ClInclude Include="..\..\..\external\lua-5.1.3\src\lvm.h" />
     <ClInclude Include="..\..\..\external\lua-5.1.3\src\lzio.h" />
+    <ClInclude Include="..\..\..\external\lua-5.1.3\src\lnum.h" />
   </ItemGroup>
 </Project>

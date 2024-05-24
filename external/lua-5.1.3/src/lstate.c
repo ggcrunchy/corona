@@ -7,6 +7,12 @@
 
 #include <stddef.h>
 
+/* LNUM */
+#include <stdlib.h>
+#include <stdio.h>
+/* for nan check */
+/* /LNUM */
+
 #define lstate_c
 #define LUA_CORE
 
@@ -22,7 +28,7 @@
 #include "lstring.h"
 #include "ltable.h"
 #include "ltm.h"
-
+#include "lnum.h" /* LNUM */
 
 #define state_size(x)	(sizeof(x) + LUAI_EXTRASPACE)
 #define fromstate(l)	(cast(lu_byte *, (l)) - LUAI_EXTRASPACE)

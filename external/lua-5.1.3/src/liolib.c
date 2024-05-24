@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h> /* LNUM */
 
 #define liolib_c
 #define LUA_LIB
@@ -17,6 +18,11 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+
+/* LNUM */
+#include "lnum.h"
+#include "llex.h"
+/* /LNUM */
 
  #if defined( Rtt_ANDROID_ENV ) && defined( Rtt_DEBUG )
 	#include <android/log.h>
@@ -307,9 +313,27 @@ static int io_lines (lua_State *L) {
 */
 
 
+/* LNUM */
+/*
+* NOTE: Lua's usual '*n' format specifier reads numbers as floating point,
+*       and converts to integer if they are. IN ORDER TO NOT LOSE ACCURACY,
+*       a new '*i' format specifier is added (will also be speedier, on non-
+*       FPU systems).
+*/
+/* /LNUM */
+
 static int read_number (lua_State *L, FILE *f) {
   lua_Number d;
   if (fscanf(f, LUA_NUMBER_SCAN, &d) == 1) {
+/* LNUM */
+#ifdef LUA_TINT
+      lua_Integer tmp;
+      lua_number2integer(tmp, d);
+      if (cast_num(tmp) == d)
+          lua_pushinteger(L, tmp);
+      else
+#endif
+/* /LNUM */
     lua_pushnumber(L, d);
     return 1;
   }
@@ -318,6 +342,46 @@ static int read_number (lua_State *L, FILE *f) {
     return 0;  /* read fails */
   }
 }
+
+
+/* LNUM */
+static int read_integer(lua_State* L, FILE* f) {
+    lua_Integer i;
+    if (fscanf(f, LUA_INTEGER_SCAN, &i) == 1) {
+        lua_pushinteger(L, i);
+        return 1;
+    }
+    else return 0;  /* read fails */
+}
+
+#ifdef LNUM_COMPLEX
+static int read_complex(lua_State* L, FILE* f) {
+    /* NNN / NNNi / NNN+MMMi / NNN-MMMi */
+    lua_Number a, b;
+    if (fscanf(f, LUA_NUMBER_SCAN, &a) == 1) {
+        int c = fgetc(f);
+        switch (c) {
+        case 'i':
+            lua_pushcomplex(L, a * I);
+            return 1;
+        case '+':
+        case '-':
+            /* "i" is consumed if at the end; just 'NNN+MMM' will most likely
+             * behave as if "i" was there? (TBD: test)
+             */
+            if (fscanf(f, LUA_NUMBER_SCAN "i", &b) == 1) {
+                lua_pushcomplex(L, a + (c == '+' ? b : -b) * I);
+                return 1;
+            }
+        }
+        ungetc(c, f);
+        lua_pushnumber(L, a);  /*real part only*/
+        return 1;
+    }
+    return 0;  /* read fails */
+}
+#endif
+/* /LNUM */
 
 
 static int test_eof (lua_State *L, FILE *f) {
@@ -392,6 +456,16 @@ static int g_read (lua_State *L, FILE *f, int first) {
           case 'n':  /* number */
             success = read_number(L, f);
             break;
+        /* LNUM */
+          case 'i':  /* integer (full accuracy) */
+              success = read_integer(L, f);
+              break;
+#ifdef LNUM_COMPLEX
+          case 'c':  /* complex */
+              success = read_complex(L, f);
+              break;
+#endif
+        /* /LNUM */
           case 'l':  /* line */
             success = read_line(L, f);
             break;
@@ -452,9 +526,17 @@ static int g_write (lua_State *L, FILE *f, int arg) {
   int status = 1;
   for (; nargs--; arg++) {
     if (lua_type(L, arg) == LUA_TNUMBER) {
+      /* LNUM */
+#if 0
       /* optimization: could be done exactly as for strings */
       status = status &&
           fprintf(f, LUA_NUMBER_FMT, lua_tonumber(L, arg)) > 0;
+#endif
+      if (lua_isinteger(L, arg))
+          status = status && fprintf(f, LUA_INTEGER_FMT, lua_tointeger(L, arg)) > 0;
+      else
+          status = status && fprintf(f, LUA_NUMBER_FMT, lua_tonumber(L, arg)) > 0;
+      /* /LNUM */
     }
     else {
       size_t l;
@@ -497,7 +579,8 @@ static int f_setvbuf (lua_State *L) {
   static const char *const modenames[] = {"no", "full", "line", NULL};
   FILE *f = tofile(L);
   int op = luaL_checkoption(L, 2, NULL, modenames);
-  lua_Integer sz = luaL_optinteger(L, 3, LUAL_BUFFERSIZE);
+  // lua_Integer sz = luaL_optinteger(L, 3, LUAL_BUFFERSIZE); /* LNUM */
+  size_t sz = luaL_optint32(L, 3, LUAL_BUFFERSIZE); /* LNUM */
   int res = setvbuf(f, NULL, mode[op], sz);
   return pushresult(L, res == 0, NULL);
 }

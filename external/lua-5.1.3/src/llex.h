@@ -29,7 +29,15 @@ enum RESERVED {
   TK_RETURN, TK_THEN, TK_TRUE, TK_UNTIL, TK_WHILE,
   /* other terminal symbols */
   TK_CONCAT, TK_DOTS, TK_EQ, TK_GE, TK_LE, TK_NE, TK_NUMBER,
-  TK_NAME, TK_STRING, TK_EOS
+  TK_NAME, TK_STRING, TK_EOS,
+
+/* LNUM */
+    TK_INT
+ #ifdef LNUM_COMPLEX
+ , TK_NUMBER2   /* imaginary constants: Ni */
+ #endif
+
+/* /LNUM */
 };
 
 /* number of reserved words */
@@ -42,6 +50,7 @@ LUAI_DATA const char *const luaX_tokens [];
 
 typedef union {
   lua_Number r;
+  lua_Integer i; /* LNUM */
   TString *ts;
 } SemInfo;  /* semantics information */
 

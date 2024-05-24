@@ -22,7 +22,10 @@
 #include "lstring.h"
 #include "lvm.h"
 
-
+/* LNUM */
+#include "llex.h"
+#include "lnum.h"
+/* /LNUM */
 
 const TValue luaO_nilobject_ = {{NULL}, LUA_TNIL};
 
@@ -68,7 +71,8 @@ int luaO_log2 (unsigned int x) {
 
 }
 
-
+/* LNUM */
+#if 0
 int luaO_rawequalObj (const TValue *t1, const TValue *t2) {
   if (ttype(t1) != ttype(t2)) return 0;
   else switch (ttype(t1)) {
@@ -86,20 +90,59 @@ int luaO_rawequalObj (const TValue *t1, const TValue *t2) {
   }
 }
 
-
-int luaO_str2d (const char *s, lua_Number *result) {
-  char *endptr;
-  *result = lua_str2number(s, &endptr);
-  if (endptr == s) return 0;  /* conversion failed */
-  if (*endptr == 'x' || *endptr == 'X')  /* maybe an hexadecimal constant? */
-    *result = cast_num(strtoul(s, &endptr, 16));
-  if (*endptr == '\0') return 1;  /* most common case */
-  while (isspace(cast(unsigned char, *endptr))) endptr++;
-  if (*endptr != '\0') return 0;  /* invalid trailing characters? */
-  return 1;
+int luaO_str2d(const char* s, lua_Number* result) {
+    char* endptr;
+    *result = lua_str2number(s, &endptr);
+    if (endptr == s) return 0;  /* conversion failed */
+    if (*endptr == 'x' || *endptr == 'X')  /* maybe an hexadecimal constant? */
+        *result = cast_num(strtoul(s, &endptr, 16));
+    if (*endptr == '\0') return 1;  /* most common case */
+    while (isspace(cast(unsigned char, *endptr))) endptr++;
+    if (*endptr != '\0') return 0;  /* invalid trailing characters? */
+    return 1;
 }
-
-
+#endif
+int luaO_rawequalObj(const TValue* l, const TValue* r) {
+    int tl = ttype(l), tr = ttype(r);
+    if (tl == tr) {
+        switch (tl) {
+        case LUA_TNIL:
+            return 1;
+#ifdef LUA_TINT
+        case LUA_TINT:
+            return ivalue(l) == ivalue(r);
+#endif
+        case LUA_TNUMBER:
+#ifdef LNUM_COMPLEX
+            if (!luai_numeq(nvalue_img_fast(l), nvalue_img_fast(r))) return 0;
+#endif
+            return luai_numeq(nvalue_fast(l), nvalue_fast(r));
+        case LUA_TBOOLEAN:
+            return bvalue(l) == bvalue(r);  /* boolean true must be 1 !! */
+        case LUA_TLIGHTUSERDATA:
+            return pvalue(l) == pvalue(r);
+        default:
+            lua_assert(iscollectable(l));
+            return gcvalue(l) == gcvalue(r);
+        }
+    }
+#ifdef LUA_TINT
+    else if (tl == LUA_TINT && tr == LUA_TNUMBER) {
+# ifdef LNUM_COMPLEX
+        if (nvalue_img_fast(r) != 0) return 0;
+# endif
+        /* Avoid doing accuracy losing cast, if possible. */
+        lua_Integer tmp;
+        return tt_integer_valued(r, &tmp) ? (ivalue(l) == tmp)
+            : luai_numeq(cast_num(ivalue(l)), nvalue_fast(r));
+    }
+    else if (tl == LUA_TNUMBER && tr == LUA_TINT) {
+        return luaO_rawequalObj(r, l);
+    }
+#endif
+    return 0;
+}
+/* /LNUM */
 
 static void pushstr (lua_State *L, const char *str) {
   setsvalue2s(L, L->top, luaS_new(L, str));
@@ -131,7 +174,14 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
         break;
       }
       case 'd': {
-        setnvalue(L->top, cast_num(va_arg(argp, int)));
+        // setnvalue(L->top, cast_num(va_arg(argp, int))); /* LNUM */
+        /* LNUM */
+        /* This is tricky for 64-bit integers; maybe they even cannot be
+        * supported on all compilers; depends on the conversions applied to
+        * variable argument lists. TBD: test!
+        */
+        setivalue(L->top, (lua_Integer)va_arg(argp, l_uacInteger));
+        /* /LNUM */
         incr_top(L);
         break;
       }
