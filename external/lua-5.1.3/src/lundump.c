@@ -223,7 +223,14 @@ static void LoadHeader(LoadState* S)
  char s[LUAC_HEADERSIZE];
  luaU_header(h);
  LoadBlock(S,s,LUAC_HEADERSIZE);
- IF (memcmp(h,s,LUAC_HEADERSIZE)!=0, "bad header");
+
+ /* LNUM */
+ size_t n = LUAC_HEADERSIZE;
+ if (h[LUAC_HEADERSIZE - 1] > 1)
+	 n--;
+ /* /LNUM */
+
+ IF (memcmp(h,s,n/*LUAC_HEADERSIZE*/)!=0, "bad header");
 }
 
 /*
