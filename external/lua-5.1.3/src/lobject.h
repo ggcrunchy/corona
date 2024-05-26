@@ -68,7 +68,7 @@ typedef union {
 ** Tagged Values
 */
 
-#if LUA_PACK_VALUE == 0 /* NaN-boxing */
+#if LUA_PACK_VALUE == 0 /* !NaN-boxing */
 
 #define TValuefields	Value value; int tt
 #define LUA_TVALUE_NIL { NULL }, LUA_TNIL /* NaN-boxing */
@@ -77,33 +77,62 @@ typedef struct lua_TValue {
   TValuefields;
 } TValue;
 
-/* NaN-boxing */
+/* NaN-boxing64 */
 #else
 
+#if LUA_PACK_VALUE == 32
+
 #define TValuefields	union { \
-  struct { \
+    struct { \
     int _pad0; \
     int tt_sig; \
-  } _ts; \
-  struct { \
+    } _ts; \
+    struct { \
     int _pad; \
     short tt; \
     short sig; \
-  } _t; \
-  Value value; \
+    } _t; \
+    Value value; \
 }
 #define LUA_NOTNUMBER_SIG (-1)
 #define add_sig(tt) ( 0xffff0000 | (tt) )
+
+#elif LUA_PACK_VALUE == 64
+
+/* Some good commentary may be found at https://craftinginterpreters.com/optimization.html#nan-boxing */
+
+#define TValuefields	union { \
+    uint64_t u; \
+    Value value; \
+}
+
+#define LUA_NAN_SIGN_MASK ((uint64_t)0x8000000000000000)
+#define LUA_NOTNUMBER_SIG ((uint64_t)0x7FFC000000000000) /* 11 exponent bits, quiet NaN bit, IND bit */
+
+#define LUA_NAN_TYPE_MASK ((uint64_t)0x3C00000000000) /* type is > 0 and < 16, so 4 bits (0 can be used for actual NaNs) */
+#define LUA_NAN_PAYLOAD_MASK ((uint64_t)0x3FFFFFFFFFFF) /* remaining bits */
+
+#define LUA_NAN_TYPE_SHIFT 46
+
+static const int STATIC_ASSERT_TYPE_SHIFT[LUA_NAN_TYPE_MASK == (0xF << LUA_NAN_TYPE_SHIFT)] = { 0 };
+static const int STATIC_ASSERT_FULL_PAYLOAD[LUA_NAN_PAYLOAD_MASK == (1LL << LUA_NAN_TYPE_SHIFT) - 1LL] = { 0 };
+
+#define add_sig(tt) ( LUA_NOTNUMBER_SIG | ((tt) << LUA_NAN_TYPE_SHIFT) )
+
+#else /* One-time check */
+    error "Bad NaN packing #define constant"
+#endif
+
 #define LUA_TVALUE_NIL {0, add_sig(LUA_TNIL)}
 
 typedef TValuefields TValue;
 
 #endif
-/* /NaN-boxing */
+/* /NaN-boxing64 */
 
 /* Macros to test type */
 
-#if LUA_PACK_VALUE == 0 /* NaN-boxing */
+#if LUA_PACK_VALUE == 0 /* !NaN-boxing */
 
 #define ttisnil(o)	(ttype(o) == LUA_TNIL)
 #define ttisnumber(o)	(ttype(o) == LUA_TNUMBER)
@@ -133,18 +162,26 @@ typedef TValuefields TValue;
 
 
 /* Macros to access values */
-#if LUA_PACK_VALUE == 0 /* NaN-boxing */
+#if LUA_PACK_VALUE == 0 /* !NaN-boxing */
 
 #define ttype(o)	((o)->tt)
 
 /* NaN-boxing */
-#else
+#elif LUA_PACK_VALUE == 32 /* !Nan-boxing64 */
 
 #define ttype(o)	((o)->_t.sig == LUA_NOTNUMBER_SIG ? (o)->_t.tt : LUA_TNUMBER)
 #define ttype_sig(o)	((o)->_ts.tt_sig)
 
+#else
+
+#define ttype_sig(o)	((o)->u & LUA_NAN_TYPE_MASK)
+#define ttype(o)	(((o)->u & (LUA_NOTNUMBER_SIG | LUA_NAN_TYPE_MASK)) > LUA_NOTNUMBER_SIG ? ttype_sig(o) >> LUA_NAN_TYPE_SHIFT : LUA_TNUMBER)
+
 #endif
 /* /NaN-boxing */
+
+/* !Nan-boxing64 */
+#if LUA_PACK_VALUE < 64
 
 #define gcvalue(o)	check_exp(iscollectable(o), (o)->value.gc)
 #define pvalue(o)	check_exp(ttislightuserdata(o), (o)->value.p)
@@ -158,12 +195,51 @@ typedef TValuefields TValue;
 #define bvalue(o)	check_exp(ttisboolean(o), (o)->value.b)
 #define thvalue(o)	check_exp(ttisthread(o), &(o)->value.gc->th)
 
+#else
+
+    #define BIT_47 0x800000000000
+    #define BITS_ABOVE_47 0xFFFF000000000000
+    #define BIT_48 0x1000000000000
+    #define BITS_ABOVE_48 0xFFFE000000000000
+
+    static inline Value getpointervalue (const TValue* tv)
+    {
+        TValue copy = *tv;
+
+        copy.u &= LUA_NAN_PAYLOAD_MASK;
+        copy.u <<= 3;
+
+        https://stackoverflow.com/questions/6716946/why-do-x86-64-systems-have-only-a-48-bit-virtual-address-space/45525064#45525064
+        https://stackoverflow.com/a/66249936
+        #if defined(__x86_64__) || defined(_M_X64)
+            copy.u |= (copy.u & BIT_47) ? : 0;
+        #elif defined(__aarch64__) || defined(_M_ARM64)
+            copy.u |= (copy.u & BIT_48) ? : 0;
+        #endif
+
+        return copy.v;
+    }
+
+    #define gcvalue(o)	check_exp(iscollectable(o), getpointervalue(o).gc)
+    #define pvalue(o)	check_exp(ttislightuserdata(o), ((o)->u & LUA_NAN_SIGN_MASK) ? getpointervalue(o).gc->u->uv.env : getpointervalue(o).p)
+    #define nvalue(o)	check_exp(ttisnumber(o), (o)->value.n)
+    #define rawtsvalue(o)	check_exp(ttisstring(o), &getpointervalue(o).gc->ts)
+    #define tsvalue(o)	(&rawtsvalue(o)->tsv)
+    #define rawuvalue(o)	check_exp(ttisuserdata(o), &getpointervalue(o).gc->u)
+    #define uvalue(o)	(&rawuvalue(o)->uv)
+    #define clvalue(o)	check_exp(ttisfunction(o), &getpointervalue(o).gc->cl)
+    #define hvalue(o)	check_exp(ttistable(o), &getpointervalue(o).gc->h)
+    #define bvalue(o)	check_exp(ttisboolean(o), ((o)->value.b & 1))
+    #define thvalue(o)	check_exp(ttisthread(o), &getpointervalue(o).gc->th)
+
+#endif
+
 #define l_isfalse(o)	(ttisnil(o) || (ttisboolean(o) && bvalue(o) == 0))
 
 /*
 ** for internal debug only
 */
-#if LUA_PACK_VALUE == 0 /* NaN-boxing */
+#if LUA_PACK_VALUE == 0 /* !NaN-boxing */
 
 #define checkconsistency(obj) \
   lua_assert(!iscollectable(obj) || (ttype(obj) == (obj)->value.gc->gch.tt))
@@ -173,7 +249,7 @@ typedef TValuefields TValue;
   ((ttype(obj) == (obj)->value.gc->gch.tt) && !isdead(g, (obj)->value.gc)))
 
 /* NaN-boxing */
-#else
+#elif LUA_PACK_VALUE == 32 /* !Nan-boxing64 */
 
 #define checkconsistency(obj) \
   lua_assert(!iscollectable(obj) || (ttype(obj) == (obj)->value.gc->gch._t.tt))
@@ -181,13 +257,34 @@ typedef TValuefields TValue;
 #define checkliveness(g,obj) \
   lua_assert(!iscollectable(obj) || \
   ((ttype(obj) == (obj)->value.gc->gch._t.tt) && !isdead(g, (obj)->value.gc)))
+    // ^^ TODO: are these right?
+#else
+
+#define SUSERDATABIT	7 /* see lgc.h: 7th bit unused */
+#define STORED_IN_USERDATA (1 << SUSERDATABIT)
+
+static inline int islargeobjectboxed(const TValue* obj)
+{
+    Value pv = getpointervalue(obj);
+
+    return (obj->u & LUA_NAN_SIGN_MASK) && LUA_TUSERDATA == pv.gc->gch.tt && (pv.gc->gch.marked & STORED_IN_USERDATA);
+}
+
+#define checkconsistency(obj) \
+  lua_assert((!iscollectable(obj) || (ttype(obj) == getpointervalue(obj).gc->gch.tt))) || islargeobjectboxed(obj))
+
+#define checkliveness(g,obj) \
+  lua_assert(!iscollectable(obj) || \
+  (((ttype(obj) == getpointervalue(obj).gc->gch.tt) || islargeobjectboxed(obj)) && !isdead(g, getpointervalue(obj).gc)))
+
+  // ^^ TODO: seems wrong... should move boxed check up?
 
 #endif
 /* /NaN-boxing */
 
 
 /* Macros to set values */
-#if LUA_PACK_VALUE == 0 /* NaN-boxing */
+#if LUA_PACK_VALUE == 0 /* !NaN-boxing */
 
 #define setnilvalue(obj) ((obj)->tt=LUA_TNIL)
 
@@ -239,7 +336,7 @@ typedef TValuefields TValue;
     checkliveness(G(L),o1); }
 
 /* NaN-boxing */
-#else /* LUA_PACK_VALUE != 0 */
+#elif LUA_PACK_VALUE == 32 /* !Nan-boxing64 */ /* LUA_PACK_VALUE != 0 */
 
 #define setnilvalue(obj) ( ttype_sig(obj) = add_sig(LUA_TNIL) )
 
@@ -313,7 +410,7 @@ typedef TValuefields TValue;
 #define setobj2n	setobj
 #define setsvalue2n	setsvalue
 
-#if LUA_PACK_VALUE == 0 /* NaN-boxing */
+#if LUA_PACK_VALUE == 0 /* !NaN-boxing */
 
 #define setttype(obj, tt) (ttype(obj) = (tt))
 
@@ -462,7 +559,7 @@ typedef union Closure {
 ** Tables
 */
 
-#if LUA_PACK_VALUE == 0 /* NaN-boxing */
+#if LUA_PACK_VALUE == 0 /* !NaN-boxing */
 
 typedef union TKey {
   struct {
@@ -475,7 +572,7 @@ typedef union TKey {
 #define LUA_TKEY_NIL {LUA_TVALUE_NIL, NULL} /* NaN-boxing */
 
 /* NaN-boxing */
-#else
+#elif LUA_PACK_VALUE == 32 /* !Nan-boxing64 */
 
 typedef struct TKey {
     TValue tvk;

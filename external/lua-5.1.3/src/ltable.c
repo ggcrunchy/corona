@@ -429,7 +429,7 @@ static TValue *newkey (lua_State *L, Table *t, const TValue *key) {
       mp = n;
     }
   }
-  // gkey(mp)->value = key->value; gkey(mp)->tt = key->tt; /* NaN-boxing */
+  // gkey(mp)->value = key->value; gkey(mp)->tt = key->tt; /* !NaN-boxing */
   setobj2t(L, gkey(mp), key); /* NaN-boxing */
   luaC_barriert(L, t, key);
   lua_assert(ttisnil(gval(mp)));

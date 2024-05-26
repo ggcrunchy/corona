@@ -140,6 +140,18 @@ void RenderSurfaceControl::OnRaisedDestroyingEvent()
 #pragma endregion
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+__declspec(dllexport) DWORD NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+
+#ifdef __cplusplus
+}
+#endif
+
+
 #pragma region Private Methods
 void RenderSurfaceControl::CreateContext()
 {
@@ -220,6 +232,11 @@ void RenderSurfaceControl::CreateContext()
 
 	// Load OpenGL extensions.
 	glewInit();
+
+	if (WGLEW_EXT_swap_control)
+	{
+		wglSwapIntervalEXT(1);
+	}
 
 	// Fetch the OpenGL driver's version.
 	const char* versionString = (const char*)glGetString(GL_VERSION);

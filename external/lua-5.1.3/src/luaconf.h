@@ -620,17 +620,21 @@ union luai_Cast { double l_d; long l_l; };
 
 #endif
 
-/* NaN-boxing */
+/* NaN-boxing64 */
 #if !defined(LUA_PACK_VALUE)
 /* on platform with lua number double we could use nan packing for value */
-#if (defined(__i386) || defined (_M_IX86) || defined(__i386__)) && defined(LUA_NUMBER_DOUBLE)
+#if /*(defined(__i386) || defined (_M_IX86) || defined(__i386__)) &&*/ defined(LUA_NUMBER_DOUBLE)
 /* currently try it on known little endian platform :) */
-#define LUA_PACK_VALUE 1
+#if UINTPTR_MAX > (1LL << 32)
+#define LUA_PACK_VALUE 64
+#else
+#define LUA_PACK_VALUE 32
+#endif
 #else
 #define LUA_PACK_VALUE 0
 #endif
 #endif
-/* /NaN-boxing */
+/* /NaN-boxing64 */
 
 /* }================================================================== */
 
