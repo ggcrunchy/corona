@@ -99,7 +99,19 @@ Udata *luaS_newudata (lua_State *L, size_t s, Table *e) {
     luaM_toobig(L);
   u = cast(Udata *, luaM_malloc(L, s + sizeof(Udata)));
   u->uv.marked = luaC_white(G(L));  /* is not finalized */
+
+#if !defined(LUA_TBOX) /* !NaN-boxing64 */
+
   u->uv.tt = LUA_TUSERDATA;
+
+/* NaN-boxing64 */
+#else
+
+  u->uv.tt = e ? LUA_TUSERDATA : LUA_TBOX;
+
+#endif
+/* /NaN-boxing64 */
+
   u->uv.len = s;
   u->uv.metatable = NULL;
   u->uv.env = e;

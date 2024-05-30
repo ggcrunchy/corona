@@ -508,6 +508,20 @@ LUA_API void lua_pushboolean (lua_State *L, int b) {
 }
 
 
+/* NaN-boxing64 */
+#ifdef LUA_TBOX
+
+static void boxvalue (lua_State* L, TValue* tv)
+{
+    luaC_checkGC(L);
+    Udata* box = luaS_newudata(L, 0, NULL);
+    setlargepvalue(L, tv, box);
+}
+
+#endif
+/* /NaN-boxing64 */
+
+
 LUA_API void lua_pushlightuserdata (lua_State *L, void *p) {
   lua_lock(L);
   setpvalue(L->top, p);

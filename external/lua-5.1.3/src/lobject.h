@@ -30,6 +30,14 @@
 #define LUA_TDEADKEY	(LAST_TAG+3)
 
 
+/* NaN-boxing64 */
+#if LUA_PACK_VALUE == 64
+
+#define LUA_TBOX (LAST_TAG+4)
+
+#endif
+/* /NaN-boxing64 */
+
 /*
 ** Union of all collectable objects
 */
@@ -42,6 +50,11 @@ typedef union GCObject GCObject;
 */
 #define CommonHeader	GCObject *next; lu_byte tt; lu_byte marked
 
+/* NaN-boxing64 */
+// could pack `CommonHeader' stuff + bytes together with byte fields (with 45 bits for `next' could even get closures all in 64 bits...)
+// but we take address of these, so bitfields might be awkward
+// plus there is an `a = b = c` with `b' being `next'
+/* /NaN-boxing64 */
 
 /*
 ** Common header in struct form
@@ -108,16 +121,21 @@ typedef struct lua_TValue {
 
 #define LUA_NAN_SIGN_MASK ((uint64_t)0x8000000000000000)
 #define LUA_NOTNUMBER_SIG ((uint64_t)0x7FFC000000000000) /* 11 exponent bits, quiet NaN bit, IND bit */
+#define LUA_BOXED_PAYLOAD_MASK (LUA_NAN_SIGN_MASK | LUA_NOTNUMBER_SIG)
 
-#define LUA_NAN_TYPE_MASK ((uint64_t)0x3C00000000000) /* type is > 0 and < 16, so 4 bits (0 can be used for actual NaNs) */
-#define LUA_NAN_PAYLOAD_MASK ((uint64_t)0x3FFFFFFFFFFF) /* remaining bits */
+#define LUA_NAN_PAYLOAD_SHIFT 4 /* type is > 0 and < 16, so 4 bits (0 can be used for actual NaNs) */
+#define LUA_NAN_TAGGING_BITS 3
+#define LUA_NAN_TAGGING_MASK ((1ULL << LUA_NAN_TAGGING_BITS) - 1ULL)
 
-#define LUA_NAN_TYPE_SHIFT 46
+#define LUA_NAN_POINTER_SHIFT (LUA_NAN_PAYLOAD_SHIFT - LUA_NAN_TAGGING_BITS)
 
-static const int STATIC_ASSERT_TYPE_SHIFT[LUA_NAN_TYPE_MASK == (0xF << LUA_NAN_TYPE_SHIFT)] = { 0 };
-static const int STATIC_ASSERT_FULL_PAYLOAD[LUA_NAN_PAYLOAD_MASK == (1LL << LUA_NAN_TYPE_SHIFT) - 1LL] = { 0 };
+#define LUA_NAN_TYPE_MASK ((uint64_t)0xF) 
+#define LUA_NAN_PAYLOAD_MASK ((uint64_t)0x3FFFFFFFFFFF0) /* remaining bits */
 
-#define add_sig(tt) ( LUA_NOTNUMBER_SIG | ((tt) << LUA_NAN_TYPE_SHIFT) )
+static const int STATIC_ASSERT_FULL_PAYLOAD[LUA_NAN_TYPE_MASK == (1ULL << LUA_NAN_PAYLOAD_SHIFT) - 1ULL] = { 0 };
+static const int STATIC_ASSERT_USES_ALL_BITS[(uint64_t)(LUA_NAN_SIGN_MASK | LUA_NOTNUMBER_SIG | LUA_NAN_PAYLOAD_MASK | LUA_NAN_TYPE_MASK) == ~0ULL] = { 0 };
+
+#define add_sig(tt) ( LUA_NOTNUMBER_SIG | (tt) )
 
 #else /* One-time check */
     error "Bad NaN packing #define constant"
@@ -174,8 +192,8 @@ typedef TValuefields TValue;
 
 #else
 
-#define ttype_sig(o)	((o)->u & LUA_NAN_TYPE_MASK)
-#define ttype(o)	(((o)->u & (LUA_NOTNUMBER_SIG | LUA_NAN_TYPE_MASK)) > LUA_NOTNUMBER_SIG ? ttype_sig(o) >> LUA_NAN_TYPE_SHIFT : LUA_TNUMBER)
+#define ttype_sig(o)	((o)->u & (LUA_NOTNUMBER_SIG | LUA_NAN_TYPE_MASK))
+#define ttype(o)	(ttype_sig(o) > LUA_NOTNUMBER_SIG ? (o)->u & LUA_NAN_TYPE_MASK : LUA_TNUMBER)
 
 #endif
 /* /NaN-boxing */
@@ -202,25 +220,46 @@ typedef TValuefields TValue;
     #define BIT_48 0x1000000000000
     #define BITS_ABOVE_48 0xFFFE000000000000
 
+    https://stackoverflow.com/questions/6716946/why-do-x86-64-systems-have-only-a-48-bit-virtual-address-space/45525064#45525064
+    https://stackoverflow.com/a/66249936
+    #if defined(__x86_64__) || defined(_M_X64)
+    #define signextend(v) v.u |= (v.u & BIT_47) ? : 0
+    #elif defined(__aarch64__) || defined(_M_ARM64)
+    #define signextend(v) v.u |= (v.u & BIT_48) ? : 0
+    #else
+    #define signextend(v)
+    #endif
+
+    static inline Value getupointervalue (const TValue* tv)
+    {
+        TValue copy = *tv;
+
+        /* TODO: double-check this :D */
+        copy.u &= LUA_NAN_PAYLOAD_MASK;
+
+        int shift = (copy.u & (1ULL << LUA_NAN_PAYLOAD_SHIFT)) ? LUA_NAN_POINTER_SHIFT + 1 : LUA_NAN_PAYLOAD_SHIFT + 1;
+
+        copy.u &= ~(1ULL << LUA_NAN_PAYLOAD_SHIFT);
+        copy.u >>= shift;
+
+        signextend(copy);
+
+        return copy.v;
+    }
+
     static inline Value getpointervalue (const TValue* tv)
     {
         TValue copy = *tv;
 
         copy.u &= LUA_NAN_PAYLOAD_MASK;
-        copy.u <<= 3;
+        copy.u >>= LUA_NAN_POINTER_SHIFT;
 
-        https://stackoverflow.com/questions/6716946/why-do-x86-64-systems-have-only-a-48-bit-virtual-address-space/45525064#45525064
-        https://stackoverflow.com/a/66249936
-        #if defined(__x86_64__) || defined(_M_X64)
-            copy.u |= (copy.u & BIT_47) ? : 0;
-        #elif defined(__aarch64__) || defined(_M_ARM64)
-            copy.u |= (copy.u & BIT_48) ? : 0;
-        #endif
+        signextend(copy);
 
         return copy.v;
     }
 
-    #define gcvalue(o)	check_exp(iscollectable(o), getpointervalue(o).gc)
+    #define gcvalue(o)	check_exp(iscollectable(o), getpointervalue(o).gc) 
     #define pvalue(o)	check_exp(ttislightuserdata(o), ((o)->u & LUA_NAN_SIGN_MASK) ? getpointervalue(o).gc->u->uv.env : getpointervalue(o).p)
     #define nvalue(o)	check_exp(ttisnumber(o), (o)->value.n)
     #define rawtsvalue(o)	check_exp(ttisstring(o), &getpointervalue(o).gc->ts)
@@ -229,7 +268,7 @@ typedef TValuefields TValue;
     #define uvalue(o)	(&rawuvalue(o)->uv)
     #define clvalue(o)	check_exp(ttisfunction(o), &getpointervalue(o).gc->cl)
     #define hvalue(o)	check_exp(ttistable(o), &getpointervalue(o).gc->h)
-    #define bvalue(o)	check_exp(ttisboolean(o), ((o)->value.b & 1))
+    #define bvalue(o)	check_exp(ttisboolean(o), ((o)->value.b & LUA_NAN_PAYLOAD_MASK) != 0)
     #define thvalue(o)	check_exp(ttisthread(o), &getpointervalue(o).gc->th)
 
 #endif
@@ -257,27 +296,28 @@ typedef TValuefields TValue;
 #define checkliveness(g,obj) \
   lua_assert(!iscollectable(obj) || \
   ((ttype(obj) == (obj)->value.gc->gch._t.tt) && !isdead(g, (obj)->value.gc)))
-    // ^^ TODO: are these right?
-#else
+    // ^^ TODO: are these right? (gch has no _t, correct?)
 
-#define SUSERDATABIT	7 /* see lgc.h: 7th bit unused */
-#define STORED_IN_USERDATA (1 << SUSERDATABIT)
+#else
 
 static inline int islargeobjectboxed(const TValue* obj)
 {
     Value pv = getpointervalue(obj);
 
-    return (obj->u & LUA_NAN_SIGN_MASK) && LUA_TUSERDATA == pv.gc->gch.tt && (pv.gc->gch.marked & STORED_IN_USERDATA);
+    return (obj->u & LUA_NAN_SIGN_MASK) && LUA_TBOX == pv.gc->gch.tt;
+}
+
+static inline int typesmatch(const TValue* obj)
+{
+    return ttype(obj) == getpointervalue(obj).gc->gch.tt;
 }
 
 #define checkconsistency(obj) \
-  lua_assert((!iscollectable(obj) || (ttype(obj) == getpointervalue(obj).gc->gch.tt))) || islargeobjectboxed(obj))
+  lua_assert(!iscollectable(obj) || (typesmatch(obj) != islargeobjectboxed(obj)))
 
 #define checkliveness(g,obj) \
   lua_assert(!iscollectable(obj) || \
-  (((ttype(obj) == getpointervalue(obj).gc->gch.tt) || islargeobjectboxed(obj)) && !isdead(g, getpointervalue(obj).gc)))
-
-  // ^^ TODO: seems wrong... should move boxed check up?
+  (typesmatch(obj) != islargeobjectboxed(obj) && !isdead(g, getpointervalue(obj).gc)))
 
 #endif
 /* /NaN-boxing */
@@ -387,6 +427,86 @@ static inline int islargeobjectboxed(const TValue* obj)
     o1->value = o2->value; \
     checkliveness(G(L),o1); }
 
+#else
+
+#define setnilvalue(obj) ( ttype_sig(obj) = add_sig(LUA_TNIL) )
+
+// todo: if NaN, mask off type bits...
+static inline lua_Number canonicalizeifnan(lua_Number n)
+{
+    TValue tv;
+    tv.value.n = n;
+
+    if ((tv.u & LUA_NOTNUMBER_SIG) == LUA_NOTNUMBER_SIG)
+        tv.u &= ~LUA_NAN_TYPE_MASK;
+
+    return tv.value.n;
+}
+
+#define setnvalue(obj,x) \
+  { TValue *i_o=(obj); i_o->value.n= canonicalizeifnan(x); }
+
+#define LUA_BITS_UP_TO_48 ((uint64_t)~BITS_ABOVE_48)
+#define LUA_BITS_UP_TO_45 (LUA_BITS_UP_TO_48 >> 3)
+
+static inline uint64_t packlightuserdata (void* p)
+{
+    TValue tv;
+    tv.value.p = p;
+
+    if (tvalue.u <= LUA_BITS_UP_TO_45) /* raw value will fit */
+        tvalue.u <<= LUA_NAN_PAYLOAD_SHIFT + 1;
+    else if ((tvalue.u & LUA_NAN_TAGGING_MASK) == 0 && tvalue.u <= LUA_BITS_UP_TO_48) { /* will fit without tag  bits */
+        tvalue.u <<= LUA_NAN_POINTER_SHIFT + 1;
+        tvalue.u |= 1LL << LUA_NAN_PAYLOAD_SHIFT;
+    }
+    else /* too large */
+        return 0ULL;
+
+    return add_sig(LUA_TLIGHTUSERDATA) | tvalue.u;
+}
+
+#define setpvalue(obj,x) \
+  { TValue *i_o=(obj); if (!(i_o->u = packlightuserdata(x, &i_o->u))) boxvalue(L, obj, x); } /* n.b. only called in lapi.c, where declared */
+
+#define setbvalue(obj,x) \
+  { TValue *i_o=(obj); i_o->u = add_sig(LUA_TBOOLEAN) | ((x != 0) << LUA_NAN_PAYLOAD_SHIFT); }
+
+// tod: some inline for these:
+
+static inline uint64_t packgcvalue (const void * p)
+{
+    TValue tv;
+    tv.value.p = p;
+
+    lua_assert((tvalue.u & LUA_NAN_TAGGING_MASK) == 0);
+    lua_assert((tvalue.u & LUA_BITS_ABOVE_48) == 0);
+
+    return tvalue.u << LUA_NAN_POINTER_SHIFT;
+}
+
+#define setgctvalue(L,obj,x,t) \
+  { TValue *i_o=(obj); \
+    i_o->u = add_sig(t) | packgcvalue(x); \
+    checkliveness(G(L),i_o); }
+
+#define setlargepvalue(L,obj,x) setgctvalue(L,obj,x,LUA_TLIGHTUSERDATA)
+
+#define setsvalue(L,obj,x) setgctvalue(L,obj,x,LUA_TSTRING)
+#define setuvalue(L,obj,x) setgctvalue(L,obj,x,LUA_TUSERDATA)
+#define setthvalue(L,obj,x) setgctvalue(L,obj,x,LUA_TTHREAD)
+#define setclvalue(L,obj,x) setgctvalue(L,obj,x,LUA_TFUNCTION)
+#define sethvalue(L,obj,x) setgctvalue(L,obj,x,LUA_TTABLE)
+#define setptvalue(L,obj,x) setgctvalue(L,obj,x,LUA_TPROTO)
+
+
+
+
+#define setobj(L,obj1,obj2) \
+  { const TValue *o2=(obj2); TValue *o1=(obj1); \
+    o1->value = o2->value; \
+    checkliveness(G(L),o1); }
+
 #endif
 /* /NaN-boxing */
 
@@ -415,19 +535,31 @@ static inline int islargeobjectboxed(const TValue* obj)
 #define setttype(obj, tt) (ttype(obj) = (tt))
 
 /* NaN-boxing */
-#else
+#elif LUA_PACK_VALUE == 32 /* !NaN-boxing64 */ /* LUA_PACK_VALUE != 0 */
 
 /* considering it used only in lgc to set LUA_TDEADKEY */
 /* we could define it this way */
 #define setttype(obj, _tt) ( ttype_sig(obj) = add_sig(_tt) )
 
+#else
+
+/* per comment above */
+#define setttype(obj, _tt) ( (obj)->u = add_sig(_tt) )
+
 #endif
 /* /NaN-boxing */
 
+#if LUA_PACK_VALUE < 64 /* !NaN-boxing64 */
 
 #define iscollectable(o)	(ttype(o) >= LUA_TSTRING)
 
+/* NaN-boxing64 */
+#else
 
+#define iscollectable(o)	(ttype_sig(o) >= add_sig(LUA_TSTRING) || (((o)->u & LUA_BOXED_PAYLOAD_MASK) == LUA_BOXED_PAYLOAD_MASK))
+
+#endif
+/* /NaN-boxing64 */
 
 typedef TValue *StkId;  /* index to stack elements */
 
