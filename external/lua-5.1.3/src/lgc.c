@@ -70,6 +70,11 @@ static void reallymarkobject (global_State *g, GCObject *o) {
   lua_assert(iswhite(o) && !isdead(g, o));
   white2gray(o);
   switch (o->gch.tt) {
+/* NaN-boxing64 */
+#ifdef LUA_TBOX
+    case LUA_TBOX:
+#endif
+/* /NaN-boxing64 */
     case LUA_TSTRING: {
       return;
     }
@@ -391,6 +396,11 @@ static void freeobj (lua_State *L, GCObject *o) {
       luaM_freemem(L, o, sizestring(gco2ts(o)));
       break;
     }
+/* NaN-boxing64 */
+#ifdef LUA_TBOX
+    case LUA_TBOX:
+#endif
+/* /NaN-boxing64 */
     case LUA_TUSERDATA: {
       luaM_freemem(L, o, sizeudata(gco2u(o)));
       break;
