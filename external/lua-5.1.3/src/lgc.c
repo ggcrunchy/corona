@@ -59,6 +59,25 @@
 #define setthreshold(g)  (g->GCthreshold = (g->estimate/100) * g->gcpause)
 
 
+/* NaN-boxing64 */
+#if LUA_PACK_VALUE == 64
+
+static inline int islargeobjectboxed(const TValue* obj)
+{
+	Value pv = getpointervalue(obj);
+
+	return (obj->u & LUA_NAN_SIGN_MASK) && LUA_TBOX == pv.gc->gch.tt;
+}
+
+static inline int typesmatch(const TValue* obj)
+{
+	return ttype(obj) == getpointervalue(obj).gc->gch.tt;
+}
+
+#endif
+/* /NaN-boxing64 */
+
+
 static void removeentry (Node *n) {
   lua_assert(ttisnil(gval(n)));
   if (iscollectable(gkey(n)))

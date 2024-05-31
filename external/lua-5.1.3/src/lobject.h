@@ -168,7 +168,19 @@ typedef TValuefields TValue;
 #else
 
 #define ttisnil(o)	(ttype_sig(o) == add_sig(LUA_TNIL))
+
+#if LUA_PACK_VALUE == 32 /* !NaN-boxing64 */
+
 #define ttisnumber(o)	((o)->_t.sig != LUA_NOTNUMBER_SIG)
+
+/* NaN-boxing64 */
+#else
+
+#define ttisnumber(o)	(ttype_sig(o) <= LUA_NOTNUMBER_SIG)
+
+#endif
+/* /NaN-boxing64 */
+
 #define ttisstring(o)	(ttype_sig(o) == add_sig(LUA_TSTRING))
 #define ttistable(o)	(ttype_sig(o) == add_sig(LUA_TTABLE))
 #define ttisfunction(o)	(ttype_sig(o) == add_sig(LUA_TFUNCTION))
@@ -247,7 +259,7 @@ typedef TValuefields TValue;
 
         signextend(copy);
 
-        return copy.v;
+        return copy.value;
     }
 
     static inline Value getpointervalue (const TValue* tv)
@@ -259,11 +271,11 @@ typedef TValuefields TValue;
 
         signextend(copy);
 
-        return copy.v;
+        return copy.value;
     }
 
     #define gcvalue(o)	check_exp(iscollectable(o), getpointervalue(o).gc) 
-    #define pvalue(o)	check_exp(ttislightuserdata(o), ((o)->u & LUA_NAN_SIGN_MASK) ? getpointervalue(o).gc->u->uv.env : getpointervalue(o).p)
+    #define pvalue(o)	check_exp(ttislightuserdata(o), ((o)->u & LUA_NAN_SIGN_MASK) ? getpointervalue(o).gc->u.uv.env : getpointervalue(o).p)
     #define nvalue(o)	check_exp(ttisnumber(o), (o)->value.n)
     #define rawtsvalue(o)	check_exp(ttisstring(o), &getpointervalue(o).gc->ts)
     #define tsvalue(o)	(&rawtsvalue(o)->tsv)
@@ -303,17 +315,7 @@ typedef TValuefields TValue;
 
 #else
 
-static inline int islargeobjectboxed(const TValue* obj)
-{
-    Value pv = getpointervalue(obj);
-
-    return (obj->u & LUA_NAN_SIGN_MASK) && LUA_TBOX == pv.gc->gch.tt;
-}
-
-static inline int typesmatch(const TValue* obj)
-{
-    return ttype(obj) == getpointervalue(obj).gc->gch.tt;
-}
+/* methods defined in lgc.c */
 
 #define checkconsistency(obj) \
   lua_assert(!iscollectable(obj) || (typesmatch(obj) != islargeobjectboxed(obj)))
@@ -432,7 +434,7 @@ static inline int typesmatch(const TValue* obj)
 
 #else
 
-#define setnilvalue(obj) ( ttype_sig(obj) = add_sig(LUA_TNIL) )
+#define setnilvalue(obj) ( ((TValue *)(obj))->u = add_sig(LUA_TNIL) )
 
 // todo: if NaN, mask off type bits...
 static inline lua_Number canonicalizeifnan(lua_Number n)
@@ -447,7 +449,7 @@ static inline lua_Number canonicalizeifnan(lua_Number n)
 }
 
 #define setnvalue(obj,x) \
-  { TValue *i_o=(obj); i_o->value.n= canonicalizeifnan(x); }
+  { TValue *i_o=(obj); i_o->value.n = canonicalizeifnan(x); }
 
 #define LUA_BITS_UP_TO_48 ((uint64_t)~BITS_ABOVE_48)
 #define LUA_BITS_UP_TO_45 (LUA_BITS_UP_TO_48 >> 3)
@@ -457,20 +459,20 @@ static inline uint64_t packlightuserdata (void* p)
     TValue tv;
     tv.value.p = p;
 
-    if (tvalue.u <= LUA_BITS_UP_TO_45) /* raw value will fit */
-        tvalue.u <<= LUA_NAN_PAYLOAD_SHIFT + 1; /* leave one bit for 0 ("squeezed?") */
-    else if ((tvalue.u & LUA_NAN_TAGGING_MASK) == 0 && tvalue.u <= LUA_BITS_UP_TO_48) { /* would fit without tagging bits */
-        tvalue.u <<= LUA_NAN_POINTER_SHIFT + 1; /* leave one bit for 1 */
-        tvalue.u |= LUA_NAN_SQUEEZED_BIT;
+    if (tv.u <= LUA_BITS_UP_TO_45) /* raw value will fit */
+        tv.u <<= LUA_NAN_PAYLOAD_SHIFT + 1; /* leave one bit for 0 ("squeezed?") */
+    else if ((tv.u & LUA_NAN_TAGGING_MASK) == 0 && tv.u <= LUA_BITS_UP_TO_48) { /* would fit without tagging bits */
+        tv.u <<= LUA_NAN_POINTER_SHIFT + 1; /* leave one bit for 1 */
+        tv.u |= LUA_NAN_SQUEEZED_BIT;
     }
     else /* too large */
         return 0ULL;
 
-    return add_sig(LUA_TLIGHTUSERDATA) | tvalue.u;
+    return add_sig(LUA_TLIGHTUSERDATA) | tv.u;
 }
 
 #define setpvalue(obj,x) \
-  { TValue *i_o=(obj); if (!(i_o->u = packlightuserdata(x, &i_o->u))) boxpointer(L, obj, x); } /* n.b. only called in lapi.c, where declared */
+  { TValue *i_o=(obj); if (!(i_o->u = packlightuserdata(x))) boxpointer(L, obj, x); } /* n.b. only called in lapi.c, where declared */
 
 #define setbvalue(obj,x) \
   { TValue *i_o=(obj); i_o->u = add_sig(LUA_TBOOLEAN) | ((x != 0) << LUA_NAN_PAYLOAD_SHIFT); }
@@ -487,22 +489,22 @@ static inline uint64_t packlightuserdata (void* p)
 #define sehighbits(v) 0
 #endif
 
-static inline uint64_t packgcvalue (const void * p)
+static inline uint64_t packgcvalue (GCObject * gc)
 {
     TValue tv;
-    tv.value.p = p;
+    tv.value.gc = gc;
 
-    lua_assert((tvalue.u & LUA_NAN_TAGGING_MASK) == 0);
-    lua_assert((tvalue.u & sehighbits()) == 0 || (tvalue.u & sehighbits()) == sehighbits());
+    lua_assert((tv.u & LUA_NAN_TAGGING_MASK) == 0);
+    lua_assert((tv.u & sehighbits()) == 0 || (tv.u & sehighbits()) == sehighbits());
 
-    maskhighbits(tvalue);
+    maskhighbits(tv);
 
-    return tvalue.u << LUA_NAN_POINTER_SHIFT;
+    return tv.u << LUA_NAN_POINTER_SHIFT;
 }
 
 #define setgctvalue(L,obj,x,t) \
   { TValue *i_o=(obj); \
-    i_o->u = add_sig(t) | packgcvalue(x); \
+    i_o->u = add_sig(t) | packgcvalue(cast(GCObject *, (x))); \
     checkliveness(G(L),i_o); }
 
 #define setlargepvalue(L,obj,x) setgctvalue(L,obj,x,LUA_TLIGHTUSERDATA)
@@ -719,7 +721,7 @@ typedef union TKey {
 #define LUA_TKEY_NIL {LUA_TVALUE_NIL, NULL} /* NaN-boxing */
 
 /* NaN-boxing */
-#elif LUA_PACK_VALUE == 32 /* !Nan-boxing64 */
+#else
 
 typedef struct TKey {
     TValue tvk;
