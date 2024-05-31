@@ -129,6 +129,8 @@ typedef struct lua_TValue {
 
 #define LUA_NAN_POINTER_SHIFT (LUA_NAN_PAYLOAD_SHIFT - LUA_NAN_TAGGING_BITS)
 
+#define LUA_NAN_SQUEEZED_BIT (1ULL << LUA_NAN_PAYLOAD_SHIFT)
+
 #define LUA_NAN_TYPE_MASK ((uint64_t)0xF) 
 #define LUA_NAN_PAYLOAD_MASK ((uint64_t)0x3FFFFFFFFFFF0) /* remaining bits */
 
@@ -215,17 +217,19 @@ typedef TValuefields TValue;
 
 #else
 
-    #define BIT_47 0x800000000000
-    #define BITS_ABOVE_47 0xFFFF000000000000
     #define BIT_48 0x1000000000000
     #define BITS_ABOVE_48 0xFFFE000000000000
+    #define BIT_49 0x200000000000
+    #define BITS_ABOVE_49 0xFFFC000000000000
 
-    https://stackoverflow.com/questions/6716946/why-do-x86-64-systems-have-only-a-48-bit-virtual-address-space/45525064#45525064
-    https://stackoverflow.com/a/66249936
+    /*
+      https://stackoverflow.com/questions/6716946/why-do-x86-64-systems-have-only-a-48-bit-virtual-address-space/45525064#45525064
+      https://stackoverflow.com/a/66249936
+    */
     #if defined(__x86_64__) || defined(_M_X64)
-    #define signextend(v) v.u |= (v.u & BIT_47) ? : 0
+    #define signextend(v) v.u |= (v.u & BIT_48) ? BITS_ABOVE_48 : 0
     #elif defined(__aarch64__) || defined(_M_ARM64)
-    #define signextend(v) v.u |= (v.u & BIT_48) ? : 0
+    #define signextend(v) v.u |= (v.u & BIT_49) ? BITS_ABOVE_49 : 0
     #else
     #define signextend(v)
     #endif
@@ -234,12 +238,11 @@ typedef TValuefields TValue;
     {
         TValue copy = *tv;
 
-        /* TODO: double-check this :D */
         copy.u &= LUA_NAN_PAYLOAD_MASK;
 
-        int shift = (copy.u & (1ULL << LUA_NAN_PAYLOAD_SHIFT)) ? LUA_NAN_POINTER_SHIFT + 1 : LUA_NAN_PAYLOAD_SHIFT + 1;
+        int shift = (copy.u & LUA_NAN_SQUEEZED_BIT) ? LUA_NAN_POINTER_SHIFT + 1 : LUA_NAN_PAYLOAD_SHIFT + 1;
 
-        copy.u &= ~(1ULL << LUA_NAN_PAYLOAD_SHIFT);
+        copy.u &= ~LUA_NAN_SQUEEZED_BIT;
         copy.u >>= shift;
 
         signextend(copy);
@@ -455,10 +458,10 @@ static inline uint64_t packlightuserdata (void* p)
     tv.value.p = p;
 
     if (tvalue.u <= LUA_BITS_UP_TO_45) /* raw value will fit */
-        tvalue.u <<= LUA_NAN_PAYLOAD_SHIFT + 1;
-    else if ((tvalue.u & LUA_NAN_TAGGING_MASK) == 0 && tvalue.u <= LUA_BITS_UP_TO_48) { /* will fit without tag  bits */
-        tvalue.u <<= LUA_NAN_POINTER_SHIFT + 1;
-        tvalue.u |= 1LL << LUA_NAN_PAYLOAD_SHIFT;
+        tvalue.u <<= LUA_NAN_PAYLOAD_SHIFT + 1; /* leave one bit for 0 ("squeezed?") */
+    else if ((tvalue.u & LUA_NAN_TAGGING_MASK) == 0 && tvalue.u <= LUA_BITS_UP_TO_48) { /* would fit without tagging bits */
+        tvalue.u <<= LUA_NAN_POINTER_SHIFT + 1; /* leave one bit for 1 */
+        tvalue.u |= LUA_NAN_SQUEEZED_BIT;
     }
     else /* too large */
         return 0ULL;
@@ -467,12 +470,22 @@ static inline uint64_t packlightuserdata (void* p)
 }
 
 #define setpvalue(obj,x) \
-  { TValue *i_o=(obj); if (!(i_o->u = packlightuserdata(x, &i_o->u))) boxvalue(L, obj, x); } /* n.b. only called in lapi.c, where declared */
+  { TValue *i_o=(obj); if (!(i_o->u = packlightuserdata(x, &i_o->u))) boxpointer(L, obj, x); } /* n.b. only called in lapi.c, where declared */
 
 #define setbvalue(obj,x) \
   { TValue *i_o=(obj); i_o->u = add_sig(LUA_TBOOLEAN) | ((x != 0) << LUA_NAN_PAYLOAD_SHIFT); }
 
-// tod: some inline for these:
+// cf. note above for signextend()
+#if defined(__x86_64__) || defined(_M_X64)
+#define maskhighbits(v) v.u &= ~BITS_ABOVE_48
+#define sehighbits(v) BITS_ABOVE_48
+#elif defined(__aarch64__) || defined(_M_ARM64)
+#define maskhighbits(v) v.u &= ~BITS_ABOVE_49
+#define sehighbits(v) BITS_ABOVE_49
+#else
+#define maskhighbits(v)
+#define sehighbits(v) 0
+#endif
 
 static inline uint64_t packgcvalue (const void * p)
 {
@@ -480,7 +493,9 @@ static inline uint64_t packgcvalue (const void * p)
     tv.value.p = p;
 
     lua_assert((tvalue.u & LUA_NAN_TAGGING_MASK) == 0);
-    lua_assert((tvalue.u & LUA_BITS_ABOVE_48) == 0);
+    lua_assert((tvalue.u & sehighbits()) == 0 || (tvalue.u & sehighbits()) == sehighbits());
+
+    maskhighbits(tvalue);
 
     return tvalue.u << LUA_NAN_POINTER_SHIFT;
 }
