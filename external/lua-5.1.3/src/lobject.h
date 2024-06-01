@@ -109,6 +109,7 @@ typedef struct lua_TValue {
 }
 #define LUA_NOTNUMBER_SIG (-1)
 #define add_sig(tt) ( 0xffff0000 | (tt) )
+#define LUA_TVALUE_NIL {0, add_sig(LUA_TNIL)}
 
 #elif LUA_PACK_VALUE == 64
 
@@ -121,6 +122,7 @@ typedef struct lua_TValue {
 
 #define LUA_NAN_SIGN_MASK ((uint64_t)0x8000000000000000)
 #define LUA_NOTNUMBER_SIG ((uint64_t)0x7FFC000000000000) /* 11 exponent bits, quiet NaN bit, IND bit */
+#define LUA_NOTNUMBER_EXPONENTS ((uint64_t)0x7FF0000000000000) /* exponents only */
 #define LUA_BOXED_PAYLOAD_MASK (LUA_NAN_SIGN_MASK | LUA_NOTNUMBER_SIG)
 
 #define LUA_NAN_PAYLOAD_SHIFT 4 /* type is > 0 and < 16, so 4 bits (0 can be used for actual NaNs) */
@@ -137,13 +139,13 @@ typedef struct lua_TValue {
 static const int STATIC_ASSERT_FULL_PAYLOAD[LUA_NAN_TYPE_MASK == (1ULL << LUA_NAN_PAYLOAD_SHIFT) - 1ULL] = { 0 };
 static const int STATIC_ASSERT_USES_ALL_BITS[(uint64_t)(LUA_NAN_SIGN_MASK | LUA_NOTNUMBER_SIG | LUA_NAN_PAYLOAD_MASK | LUA_NAN_TYPE_MASK) == ~0ULL] = { 0 };
 
-#define add_sig(tt) ( LUA_NOTNUMBER_SIG | (tt) )
+#define add_sig(tt) ( LUA_NOTNUMBER_SIG | ((tt) + 1) ) /* LUA_TNIL is 0, but need non-0 mask to distinguish from actual NaN */
+#define LUA_TVALUE_NIL {add_sig(LUA_TNIL)}
 
 #else /* One-time check */
     error "Bad NaN packing #define constant"
 #endif
 
-#define LUA_TVALUE_NIL {0, add_sig(LUA_TNIL)}
 
 typedef TValuefields TValue;
 
@@ -176,7 +178,7 @@ typedef TValuefields TValue;
 /* NaN-boxing64 */
 #else
 
-#define ttisnumber(o)	(ttype_sig(o) <= LUA_NOTNUMBER_SIG)
+#define ttisnumber(o)	((((o)->u & LUA_NOTNUMBER_EXPONENTS) < LUA_NOTNUMBER_EXPONENTS) || ((o)->u & LUA_NAN_TYPE_MASK) == 0)
 
 #endif
 /* /NaN-boxing64 */
@@ -207,7 +209,7 @@ typedef TValuefields TValue;
 #else
 
 #define ttype_sig(o)	((o)->u & (LUA_NOTNUMBER_SIG | LUA_NAN_TYPE_MASK))
-#define ttype(o)	(ttype_sig(o) > LUA_NOTNUMBER_SIG ? (o)->u & LUA_NAN_TYPE_MASK : LUA_TNUMBER)
+#define ttype(o)	(ttype_sig(o) > LUA_NOTNUMBER_SIG ? ((o)->u & LUA_NAN_TYPE_MASK) - 1 : LUA_TNUMBER)
 
 #endif
 /* /NaN-boxing */
@@ -231,7 +233,7 @@ typedef TValuefields TValue;
 
     #define BIT_48 0x1000000000000
     #define BITS_ABOVE_48 0xFFFE000000000000
-    #define BIT_49 0x200000000000
+    #define BIT_49 0x2000000000000
     #define BITS_ABOVE_49 0xFFFC000000000000
 
     /*
@@ -257,12 +259,10 @@ typedef TValuefields TValue;
         copy.u &= ~LUA_NAN_SQUEEZED_BIT;
         copy.u >>= shift;
 
-        signextend(copy);
-
         return copy.value;
     }
 
-    static inline Value getpointervalue (const TValue* tv)
+    static inline GCObject *getgcobject (const TValue* tv)
     {
         TValue copy = *tv;
 
@@ -271,20 +271,20 @@ typedef TValuefields TValue;
 
         signextend(copy);
 
-        return copy.value;
+        return copy.value.gc;
     }
 
-    #define gcvalue(o)	check_exp(iscollectable(o), getpointervalue(o).gc) 
-    #define pvalue(o)	check_exp(ttislightuserdata(o), ((o)->u & LUA_NAN_SIGN_MASK) ? getpointervalue(o).gc->u.uv.env : getpointervalue(o).p)
+    #define gcvalue(o)	check_exp(iscollectable(o), getgcobject(o)) 
+    #define pvalue(o)	check_exp(ttislightuserdata(o), ((o)->u & LUA_NAN_SIGN_MASK) ? getgcobject(o)->u.uv.env : getupointervalue(o).p)
     #define nvalue(o)	check_exp(ttisnumber(o), (o)->value.n)
-    #define rawtsvalue(o)	check_exp(ttisstring(o), &getpointervalue(o).gc->ts)
+    #define rawtsvalue(o)	check_exp(ttisstring(o), &getgcobject(o)->ts)
     #define tsvalue(o)	(&rawtsvalue(o)->tsv)
-    #define rawuvalue(o)	check_exp(ttisuserdata(o), &getpointervalue(o).gc->u)
+    #define rawuvalue(o)	check_exp(ttisuserdata(o), &getgcobject(o)->u)
     #define uvalue(o)	(&rawuvalue(o)->uv)
-    #define clvalue(o)	check_exp(ttisfunction(o), &getpointervalue(o).gc->cl)
-    #define hvalue(o)	check_exp(ttistable(o), &getpointervalue(o).gc->h)
+    #define clvalue(o)	check_exp(ttisfunction(o), &getgcobject(o)->cl)
+    #define hvalue(o)	check_exp(ttistable(o), &getgcobject(o)->h)
     #define bvalue(o)	check_exp(ttisboolean(o), ((o)->value.b & LUA_NAN_PAYLOAD_MASK) != 0)
-    #define thvalue(o)	check_exp(ttisthread(o), &getpointervalue(o).gc->th)
+    #define thvalue(o)	check_exp(ttisthread(o), &getgcobject(o)->th)
 
 #endif
 
@@ -436,14 +436,13 @@ typedef TValuefields TValue;
 
 #define setnilvalue(obj) ( ((TValue *)(obj))->u = add_sig(LUA_TNIL) )
 
-// todo: if NaN, mask off type bits...
 static inline lua_Number canonicalizeifnan(lua_Number n)
 {
     TValue tv;
     tv.value.n = n;
 
-    if ((tv.u & LUA_NOTNUMBER_SIG) == LUA_NOTNUMBER_SIG)
-        tv.u &= ~LUA_NAN_TYPE_MASK;
+    if ((tv.u & LUA_NOTNUMBER_SIG) >= LUA_NOTNUMBER_EXPONENTS) /* actual NaN? */
+        tv.u &= ~LUA_NAN_TYPE_MASK; /* prevent impersonation of boxed value */
 
     return tv.value.n;
 }
@@ -454,7 +453,7 @@ static inline lua_Number canonicalizeifnan(lua_Number n)
 #define LUA_BITS_UP_TO_48 ((uint64_t)~BITS_ABOVE_48)
 #define LUA_BITS_UP_TO_45 (LUA_BITS_UP_TO_48 >> 3)
 
-static inline uint64_t packlightuserdata (void* p)
+static inline uint64_t packlightuserdata (void *p)
 {
     TValue tv;
     tv.value.p = p;
@@ -479,13 +478,10 @@ static inline uint64_t packlightuserdata (void* p)
 
 // cf. note above for signextend()
 #if defined(__x86_64__) || defined(_M_X64)
-#define maskhighbits(v) v.u &= ~BITS_ABOVE_48
 #define sehighbits(v) BITS_ABOVE_48
 #elif defined(__aarch64__) || defined(_M_ARM64)
-#define maskhighbits(v) v.u &= ~BITS_ABOVE_49
 #define sehighbits(v) BITS_ABOVE_49
 #else
-#define maskhighbits(v)
 #define sehighbits(v) 0
 #endif
 
@@ -497,14 +493,19 @@ static inline uint64_t packgcvalue (GCObject * gc)
     lua_assert((tv.u & LUA_NAN_TAGGING_MASK) == 0);
     lua_assert((tv.u & sehighbits()) == 0 || (tv.u & sehighbits()) == sehighbits());
 
-    maskhighbits(tv);
+	tv.u &= ~sehighbits();
 
     return tv.u << LUA_NAN_POINTER_SHIFT;
 }
 
+static inline uint64_t result (uint64_t u)
+{
+	return u;
+}
+
 #define setgctvalue(L,obj,x,t) \
   { TValue *i_o=(obj); \
-    i_o->u = add_sig(t) | packgcvalue(cast(GCObject *, (x))); \
+    i_o->u = result(add_sig(t) | packgcvalue(cast(GCObject *, (x)))); \
     checkliveness(G(L),i_o); }
 
 #define setlargepvalue(L,obj,x) setgctvalue(L,obj,x,LUA_TLIGHTUSERDATA)

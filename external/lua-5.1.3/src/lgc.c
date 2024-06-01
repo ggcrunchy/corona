@@ -64,14 +64,12 @@
 
 static inline int islargeobjectboxed(const TValue* obj)
 {
-	Value pv = getpointervalue(obj);
-
-	return (obj->u & LUA_NAN_SIGN_MASK) && LUA_TBOX == pv.gc->gch.tt;
+	return (obj->u & LUA_NAN_SIGN_MASK) && LUA_TBOX == getgcobject(obj)->gch.tt;
 }
 
 static inline int typesmatch(const TValue* obj)
 {
-	return ttype(obj) == getpointervalue(obj).gc->gch.tt;
+	return ttype(obj) == getgcobject(obj)->gch.tt;
 }
 
 #endif
