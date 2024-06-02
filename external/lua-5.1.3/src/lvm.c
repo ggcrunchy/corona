@@ -26,6 +26,11 @@
 #include "ltm.h"
 #include "lvm.h"
 
+/* LNUM */
+#include "llex.h"
+#include "lnum.h"
+/* /LNUM */
+
 
 
 /* limit for table tag-method chains (to avoid loops) */
@@ -883,11 +888,11 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         const TValue *rb = RB(i);
         switch (ttype(rb)) {
           case LUA_TTABLE: {
-            setnvalue(ra, luaH_getn(hvalue(rb))); // cast_num(luaH_getn(hvalue(rb)))); /* LNUM */
+            setivalue/*nvalue*/(ra, luaH_getn(hvalue(rb))); // cast_num(luaH_getn(hvalue(rb)))); /* LNUM */
             break;
           }
           case LUA_TSTRING: {
-            setnvalue(ra, tsvalue(rb)->len); // cast_num(tsvalue(rb)->len)); /* LNUM */
+            setivalue/*nvalue*/(ra, tsvalue(rb)->len); // cast_num(tsvalue(rb)->len)); /* LNUM */
             break;
           }
           default: {  /* try metamethod */

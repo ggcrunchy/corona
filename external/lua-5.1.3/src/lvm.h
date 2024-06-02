@@ -12,11 +12,6 @@
 #include "lobject.h"
 #include "ltm.h"
 
-/* LNUM */
-#include "llex.h"
-#include "lnum.h"
-/* /LNUM */
-
 #define tostring(L,o) ((ttype(o) == LUA_TSTRING) || (luaV_tostring(L, o)))
 
 /* LNUM */

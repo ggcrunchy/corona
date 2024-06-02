@@ -690,7 +690,7 @@ static int str_gsub (lua_State *L) {
 ** maximum size of each format specification (such as '%-099.99d')
 ** (+10 accounts for %99.99x plus margin of error)
 */
-#define MAX_FORMAT	(sizeof(FLAGS) + sizeof(LUA_INTEGER_FMT/*LUA_INTFRMLEN*/) + 10) /* LNUM */
+#define MAX_FORMAT	(sizeof(FLAGS) + sizeof(LUA_INTEGER_FMT/*LUA_INTFRMLEN*/) - 2 + 10) /* LNUM */
 
 
 static void addquoted (lua_State *L, luaL_Buffer *b, int arg) {

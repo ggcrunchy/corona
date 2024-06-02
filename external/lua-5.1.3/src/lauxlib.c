@@ -189,7 +189,14 @@ LUALIB_API lua_Number luaL_optnumber (lua_State *L, int narg, lua_Number def) {
 }
 
 
-LUALIB_API lua_Integer luaL_checkinteger (lua_State *L, int narg) {
+/* LNUM */
+LUALIB_API ptrdiff_t luaL_checkinteger (lua_State* L, int narg) { /* LNUM */
+    return (ptrdiff_t)luaL_checkintegerx(L, narg);
+}
+/* /LNUM */
+
+
+LUALIB_API lua_Integer luaL_checkintegerx (lua_State *L, int narg) { /* LNUM */
   lua_Integer d = lua_tointeger(L, narg);
   if (d == 0 && !lua_isinteger/*number*/(L, narg))  /* avoid extra test when d is not 0 */ /* LNUM */
     tag_error(L, narg, -1 /* integer */ /*LUA_TNUMBER*/); /* LNUM */
@@ -197,9 +204,16 @@ LUALIB_API lua_Integer luaL_checkinteger (lua_State *L, int narg) {
 }
 
 
-LUALIB_API lua_Integer luaL_optinteger (lua_State *L, int narg,
-                                                      lua_Integer def) {
-  return luaL_opt(L, luaL_checkinteger, narg, def);
+/* LNUM */
+LUALIB_API ptrdiff_t luaL_optinteger (lua_State* L, int narg,
+    ptrdiff_t def) { /* LNUM */
+    return (ptrdiff_t)luaL_optintegerx(L, narg, (lua_Integer)def);
+}
+/* /LNUM */
+
+LUALIB_API lua_Integer luaL_optintegerx (lua_State *L, int narg,
+                                                      lua_Integer def) { /* LNUM */
+  return luaL_opt(L, luaL_checkintegerx, narg, def);
 }
 
 

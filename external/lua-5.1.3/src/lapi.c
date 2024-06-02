@@ -349,7 +349,14 @@ LUA_API lua_Number lua_tonumber (lua_State *L, int idx) {
 }
 
 
-LUA_API lua_Integer lua_tointeger (lua_State *L, int idx) {
+/* LNUM */
+LUA_API ptrdiff_t lua_tointeger (lua_State* L, int idx) {
+    return (ptrdiff_t)lua_tointegerx(L, idx);
+}
+/* /LNUM */
+
+
+LUA_API lua_Integer lua_tointegerx (lua_State *L, int idx) { /* LNUM */
   TValue n;
   /* LNUM */
     /* Lua 5.1 documented behaviour is to return nonzero for non-integer:
@@ -518,14 +525,22 @@ LUA_API void lua_pushnumber (lua_State *L, lua_Number n) {
 }
 
 
-LUA_API void lua_pushinteger (lua_State *L, lua_Integer n) {
-  lua_lock(L);
-  // setnvalue(L->top, cast_num(n)); /* LNUM */
-  setivalue(L->top, n); /* LNUM */
-  api_incr_top(L);
-  lua_unlock(L);
+/* LNUM */
+LUA_API void lua_pushinteger (lua_State *L, ptrdiff_t n) {
+    lua_pushintegerx(L, (lua_Integer)n);
 }
+/* /LNUM */
 
+
+/* LNUM */
+LUA_API void lua_pushintegerx(lua_State* L, lua_Integer n) {
+    lua_lock(L);
+    // setnvalue(L->top, cast_num(n)); /* LNUM */
+    setivalue(L->top, n); /* LNUM */
+    api_incr_top(L);
+    lua_unlock(L);
+}
+/* /LNUM */
 
 /* LNUM */
 #ifdef LNUM_COMPLEX
