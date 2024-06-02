@@ -242,7 +242,7 @@ static int os_difftime (lua_State *L) {
 /* LNUM */
 #ifdef LNUM_FLOAT
     lua_Integer i = (lua_Integer)
-        difftime((time_t)(luaL_checkinteger(L, 1)),
+        difftime((time_t)(luaL_checkintegerx(L, 1)),
             (time_t)(luaL_optinteger(L, 2, 0)));
     lua_pushinteger(L, i);
 #else
