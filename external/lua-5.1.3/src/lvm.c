@@ -55,6 +55,7 @@ const TValue *luaV_tonumber (const TValue *obj, TValue *n) {
     lua_Number d;
     lua_Integer i;
 
+    if (ttisnumber(obj)) return obj;
     if (ttisstring(obj)) {
         switch (luaO_str2d(svalue(obj), &d, &i)) {
         case TK_INT:
