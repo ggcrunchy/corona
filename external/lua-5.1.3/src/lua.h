@@ -22,7 +22,7 @@
 #define LUA_VERSION	"Lua 5.1"
 #define LUA_RELEASE	"Lua 5.1.5"
 #define LUA_VERSION_NUM	501
-#define LUA_COPYRIGHT	"Copyright (C) 1994-2012 Lua.org, PUC-Rio" " (" LUA_LNUM ")" /* LNUM */
+#define LUA_COPYRIGHT	"Copyright (C) 1994-2012 Lua.org, PUC-Rio" " (" LUA_LNUM ")  (added | & << >> ~ //)" /* LNUM */ /* LUA_BITWISE_OPERATORS */
 #define LUA_AUTHORS 	"R. Ierusalimschy, L. H. de Figueiredo & W. Celes"
 
 
@@ -89,9 +89,7 @@ typedef void * (*lua_Alloc) (void *ud, void *ptr, size_t osize, size_t nsize);
  * -13 (0xff..f3) or 0x13: 'ttisnumber()' and 'ttype_ext()' can be reduced to
  *     bitmask operation instead of conditional (may be good for pipelined processors)
 */
-#if defined(LNUM_INT32) || defined(LNUM_INT64)
 # define LUA_TINT (-2)
-#endif
 /* /LNUM */
 
 #define LUA_TNIL		0
@@ -269,21 +267,6 @@ LUA_API void  (lua_concat) (lua_State *L, int n);
 
 LUA_API lua_Alloc (lua_getallocf) (lua_State *L, void **ud);
 LUA_API void lua_setallocf (lua_State *L, lua_Alloc f, void *ud);
-
-/* LNUM */
-/*
-* It is unnecessary to break Lua C API 'lua_tonumber()' compatibility, just
-* because the Lua number type is complex. Most C modules would use scalars
-* only. We'll introduce new 'lua_tocomplex' and 'lua_pushcomplex' for when
-* the module really wants to use them.
-*/
-#ifdef LNUM_COMPLEX
-#include <complex.h>
-typedef LUA_NUMBER complex lua_Complex;
-LUA_API lua_Complex(lua_tocomplex) (lua_State* L, int idx);
-LUA_API void (lua_pushcomplex)(lua_State* L, lua_Complex v);
-#endif
-/* /LNUM */
 
 /* 
 ** ===============================================================

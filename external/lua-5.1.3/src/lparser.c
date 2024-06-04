@@ -737,13 +737,6 @@ static void simpleexp (LexState *ls, expdesc *v) {
         v->u.ival = ls->t.seminfo.i;
         break;
     }
-#ifdef LNUM_COMPLEX
-    case TK_NUMBER2: {
-        init_exp(v, VKNUM2, 0);
-        v->u.nval = ls->t.seminfo.r;
-        break;
-    }
-#endif
     /* /LNUM */
     case TK_STRING: {
       codestring(ls, v, ls->t.seminfo.ts);
@@ -792,6 +785,9 @@ static UnOpr getunopr (int op) {
     case TK_NOT: return OPR_NOT;
     case '-': return OPR_MINUS;
     case '#': return OPR_LEN;
+#if defined(LUA_BITWISE_OPERATORS)
+    case '~': return OPR_BNOT;
+#endif
     default: return OPR_NOUNOPR;
   }
 }
@@ -805,6 +801,14 @@ static BinOpr getbinopr (int op) {
     case '/': return OPR_DIV;
     case '%': return OPR_MOD;
     case '^': return OPR_POW;
+#if defined(LUA_BITWISE_OPERATORS)
+    case '|': return OPR_BOR;
+    case '&': return OPR_BAND;
+    case '~': return OPR_BXOR;
+    case TK_SHL: return OPR_SHL;
+    case TK_SHR: return OPR_SHR;
+    case TK_IDIV: return OPR_IDIV;
+#endif
     case TK_CONCAT: return OPR_CONCAT;
     case TK_NE: return OPR_NE;
     case TK_EQ: return OPR_EQ;
@@ -823,14 +827,25 @@ static const struct {
   lu_byte left;  /* left priority for each binary operator */
   lu_byte right; /* right priority */
 } priority[] = {  /* ORDER OPR */
+#if defined(LUA_BITWISE_OPERATORS) /* cf. 5.3 source */
+    {10, 10}, {10, 10}, {11, 11}, {11, 11}, {11, 11}, {14, 13}, /* '+', '-', '*', '/', '%', '^' (right associative) */
+    {4, 4}, {6, 6}, {5, 5}, {7, 7}, {7, 7}, {11, 11}, /* '&', '|', '~', '<<', '>>', '//' */
+    {9, 8}, /* '..' (right associative) */
+#else
    {6, 6}, {6, 6}, {7, 7}, {7, 7}, {7, 7},  /* `+' `-' `/' `%' */
    {10, 9}, {5, 4},                 /* power and concat (right associative) */
+#endif /* LUA_BITWISE_OPERATORS */
+   // n.b. first two rows mixed up in LUA_BITWISE_OPERATORS, but values the same 
    {3, 3}, {3, 3},                  /* equality and inequality */
    {3, 3}, {3, 3}, {3, 3}, {3, 3},  /* order */
    {2, 2}, {1, 1}                   /* logical (and/or) */
 };
 
+#if defined(LUA_BITWISE_OPERATORS)
+#define UNARY_PRIORITY	12 /* cf. 5.3 source */
+#else
 #define UNARY_PRIORITY	8  /* priority for unary operators */
+#endif  /* LUA_BITWISE_OPERATORS */
 
 
 /*

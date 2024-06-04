@@ -334,16 +334,8 @@ LUA_API int lua_lessthan (lua_State *L, int index1, int index2) {
 LUA_API lua_Number lua_tonumber (lua_State *L, int idx) {
   TValue n;
   const TValue *o = index2adr(L, idx);
-  /* LNUM */
-  //if (tonumber(o, &n))
-  if (tonumber(o, &n)) {
-#ifdef LNUM_COMPLEX
-      if (nvalue_img(o) != 0)
-          luaG_runerror(L, "expecting a real number");
-#endif
-      return nvalue(o);
-  }
-  /* /LNUM */
+  if (tonumber(o, &n))
+    return nvalue(o);
   else
     return 0;
 }
@@ -378,10 +370,6 @@ LUA_API lua_Integer lua_tointegerx (lua_State *L, int idx) { /* LNUM */
 # ifdef LUA_TINT
       if (ttisint(o)) return ivalue(o);
 # endif
-# ifdef LNUM_COMPLEX
-      if (nvalue_img_fast(o) != 0)
-          luaG_runerror(L, "expecting a real number");
-# endif
       d = nvalue_fast(o);
       lua_number2integer(i, d);
       return i;
@@ -402,19 +390,6 @@ LUA_API lua_Integer lua_tointegerx (lua_State *L, int idx) { /* LNUM */
   return 0;
   /* /LNUM */
 }
-
-
-/* LNUM */
-#ifdef LNUM_COMPLEX
-LUA_API lua_Complex lua_tocomplex(lua_State* L, int idx) {
-    TValue tmp;
-    const TValue* o = index2adr(L, idx);
-    if (tonumber(o, &tmp))
-        return nvalue_complex(o);
-    return 0;
-}
-#endif
-/* /LNUM */
 
 
 LUA_API int lua_toboolean (lua_State *L, int idx) {
@@ -540,18 +515,6 @@ LUA_API void lua_pushintegerx(lua_State* L, lua_Integer n) {
     api_incr_top(L);
     lua_unlock(L);
 }
-/* /LNUM */
-
-/* LNUM */
-#ifdef LNUM_COMPLEX
-LUA_API void lua_pushcomplex(lua_State* L, lua_Complex v) {
-    lua_lock(L);
-    setnvalue(L->top, cast_num(n));
-    setnvalue_complex(L->top, v);
-    api_incr_top(L);
-    lua_unlock(L);
-}
-#endif
 /* /LNUM */
 
 
@@ -871,14 +834,14 @@ int lua_pushvalue_as_number(lua_State* L, int idx)
     lua_Integer i;
     if (ttisnumber(o)) {
         if ((!ttisint(o)) && tt_integer_valued(o, &i)) {
-            lua_pushinteger(L, i);
+            lua_pushintegerx(L, i);
             return 1;
         }
     }
     else if (!tonumber(o, &tmp)) {
         return 0;
     }
-    if (ttisint(o)) lua_pushinteger(L, ivalue(o));
+    if (ttisint(o)) lua_pushintegerx(L, ivalue(o));
     else lua_pushnumber(L, nvalue_fast(o));
     return 1;
 }

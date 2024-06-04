@@ -52,6 +52,15 @@ const char *const luaP_opnames[NUM_OPCODES+1] = {
   "CLOSE",
   "CLOSURE",
   "VARARG",
+#if defined(LUA_BITWISE_OPERATORS)
+  "BOR",
+  "BAND",
+  "BXOR",
+  "SHL",
+  "SHR",
+  "BNOT",
+  "IDIV",
+#endif
   NULL
 };
 
@@ -98,5 +107,15 @@ const lu_byte luaP_opmodes[NUM_OPCODES] = {
  ,opmode(0, 0, OpArgN, OpArgN, iABC)		/* OP_CLOSE */
  ,opmode(0, 1, OpArgU, OpArgN, iABx)		/* OP_CLOSURE */
  ,opmode(0, 1, OpArgU, OpArgN, iABC)		/* OP_VARARG */
+
+#if defined(LUA_BITWISE_OPERATORS)
+ ,opmode(0, 1, OpArgK, OpArgK, iABC)		/* OP_BOR */
+ ,opmode(0, 1, OpArgK, OpArgK, iABC)		/* OP_BAND */
+ ,opmode(0, 1, OpArgK, OpArgK, iABC)		/* OP_BXOR */
+ ,opmode(0, 1, OpArgK, OpArgK, iABC)		/* OP_SHL */
+ ,opmode(0, 1, OpArgK, OpArgK, iABC)		/* OP_SHR */
+ ,opmode(0, 1, OpArgR, OpArgN, iABC)		/* OP_BNOT */
+ ,opmode(0, 1, OpArgK, OpArgK, iABC)		/* OP_IDIV */
+#endif
 };
 

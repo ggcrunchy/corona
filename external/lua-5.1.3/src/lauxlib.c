@@ -217,18 +217,6 @@ LUALIB_API lua_Integer luaL_optintegerx (lua_State *L, int narg,
 }
 
 
-/* LNUM */
-#ifdef LNUM_COMPLEX
-LUALIB_API lua_Complex luaL_checkcomplex(lua_State* L, int narg) {
-    lua_Complex c = lua_tocomplex(L, narg);
-    if (c == 0 && !lua_isnumber(L, narg))  /* avoid extra test when c is not 0 */
-        tag_error(L, narg, LUA_TNUMBER);
-    return c;
-}
-#endif
-/* /LNUM */
-
-
 LUALIB_API int luaL_getmetafield (lua_State *L, int obj, const char *event) {
   if (!lua_getmetatable(L, obj))  /* no metatable? */
     return 0;

@@ -148,74 +148,16 @@
 #define LUA_EXECDIR	"!"
 #define LUA_IGMARK	"-"
 
-/* LNUM */
-/*
-@@ LNUM_DOUBLE | LNUM_FLOAT | LNUM_LDOUBLE: Generic Lua number mode
-@@ LNUM_INT32 | LNUM_INT64: Integer type(optional)
-@@ LNUM_COMPLEX: Define for using 'a+bi' numbers
-@ *
-@ * You can combine LNUM_xxx but only one of each group.I.e. 'LNUM_FLOAT
-@ * LNUM_INT32 LNUM_COMPLEX' gives float range complex numbers, with 
-@ * 32 - bit scalar integer range optimized.
-*/
-
-
-#define LNUM_INT64
-
-/*
-** Default number mode
-*/
-#if (!defined LNUM_DOUBLE) && (!defined LNUM_FLOAT) && (!defined LNUM_LDOUBLE)
-# define LNUM_DOUBLE
-#endif
-
-/*
-** Require C99 mode for COMPLEX, FLOAT and LDOUBLE (only DOUBLE is ANSI C).
-*/
-#if defined(LNUM_COMPLEX) && (__STDC_VERSION__ < 199901L)
-# error "Need C99 for complex (use '--std=c99' or similar)"
-#elif defined(LNUM_LDOUBLE) && (__STDC_VERSION__ < 199901L) && !defined(_MSC_VER)
-# error "Need C99 for 'long double' (use '--std=c99' or similar)"
-#elif defined(LNUM_FLOAT) && (__STDC_VERSION__ < 199901L)
-/* LNUM_FLOAT not supported on Windows */
-# error "Need C99 for 'float' (use '--std=c99' or similar)"
-#endif
-
-/*
-** COMPLEX mode currently only with integer optimization
-*/
-#if defined(LNUM_COMPLEX) && !(defined(LNUM_INT32) || defined(LNUM_INT64))
-# error "LNUM_COMPLEX needs to be used together with LNUM_INTxx"
-#endif
 
 /*
 ** Number mode identifier to accompany the version string.
 */
-#ifdef LNUM_COMPLEX
-# define _LNUM1 "complex "
-#else
-# define _LNUM1 ""
-#endif
-#ifdef LNUM_DOUBLE
-# define _LNUM2 "double"
-#elif defined(LNUM_FLOAT)
-# define _LNUM2 "float"
-#elif defined(LNUM_LDOUBLE)
-# define _LNUM2 "ldouble"
-#endif
-#ifdef LNUM_INT32
-# define _LNUM3 " int32"
-#elif defined(LNUM_INT64)
-# define _LNUM3 " int64"
-#else
-# define _LNUM3 ""
-#endif
 #ifdef __FAST_MATH__
-# define _LNUM4 "fastmath"
+# define _LNUM "fastmath"
 #else
-# define _LNUM4 ""
+# define _LNUM ""
 #endif
-#define LUA_LNUM _LNUM1 _LNUM2 _LNUM3 _LNUM4
+#define LUA_LNUM " double int64" _LNUM
 /* /LNUM */
 
 /*
@@ -294,6 +236,13 @@
 ** CHANGE it if you want a different size.
 */
 #define LUA_IDSIZE	60
+
+
+/*
+@@ LUA_BITWISE_OPERATORS enable logical operators | & ^| >> << ~ on lua_Number
+@* but also arithmetic operator \ (integer division) and != as an alernative to ~=
+*/
+#define LUA_BITWISE_OPERATORS
 
 
 /*
@@ -494,7 +443,6 @@
 ** LUA_INTEGER_SCAN is the format for reading integers
 ** LUA_INTEGER_FMT is the format for writing integers
 */
-#ifdef LNUM_INT64
 # define LUA_INTEGER	long long
 # ifdef _MSC_VER
 #  define lua_str2ul    _strtoui64
@@ -505,21 +453,6 @@
 # define LUA_INTEGER_FMT "%lld"
 # define LUA_INTEGER_MAX 0x7fffffffffffffffLL       /* 2^63-1 */ 
 # define LUA_INTEGER_MIN (-LUA_INTEGER_MAX - 1LL)   /* -2^63 */
-/* */
-#else
-# if LUAI_BITSINT == 32
-#  define LUA_INTEGER   int
-#  define LUA_INTEGER_SCAN "%d"
-#  define LUA_INTEGER_FMT "%d"
-# else
-/* Note: 'LUA_INTEGER' being 'ptrdiff_t' (as in Lua 5.1) causes problems with
- *       'printf()' operations. Also 'unsigned ptrdiff_t' is invalid. */
-#  define LUA_INTEGER   long
-#  define LUA_INTEGER_SCAN "%ld"
-#  define LUA_INTEGER_FMT "%ld"
-# endif
-# define LUA_INTEGER_MAX 0x7FFFFFFF             /* 2^31-1 */
-#endif
 
 #ifndef lua_str2ul
 # define lua_str2ul (unsigned LUA_INTEGER)strtoul
@@ -677,50 +610,6 @@
 #define LUAI_MAXNUMBER2STR	32 /* 16 digits, sign, point, and \0 */
 #define lua_str2number(s,p)	strtod((s), (p))
 
-/* LNUM */
-#if 0 // the above values are sufficient for doubles, but we can use the following for greater control:
-
- **LUA_NUMBER is the type of floating point number in Lua
- **LUA_NUMBER_SCAN is the format for reading numbers.
- **LUA_NUMBER_FMT is the format for writing numbers.
- */
-#ifdef LNUM_FLOAT
- # define LUA_NUMBER         float
- # define LUA_NUMBER_SCAN    "%f"
- # define LUA_NUMBER_FMT     "%g"
- #elif defined(LNUM_LDOUBLE)
-# define LUA_NUMBER         long double
- # define LUA_NUMBER_SCAN    "%Lg"
- # define LUA_NUMBER_FMT     "%.20Lg"
- #else
- # define LUA_NUMBER	        double
- # define LUA_NUMBER_SCAN    "%lf"
- # define LUA_NUMBER_FMT     "%.14g"
- #endif
-
-/*
-** LUAI_MAXNUMBER2STR: size of a buffer fitting any number->string result.
-**
-**  double:  24 (sign, x.xxxxxxxxxxxxxxe+nnnn, and \0)
-**  int64:   21 (19 digits, sign, and \0)
-**  long double: 43 for 128-bit (sign, x.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxe+nnnn, and \0)
-**           30 for 80-bit (sign, x.xxxxxxxxxxxxxxxxxxxxe+nnnn, and \0)
-*/
-#ifdef LNUM_LDOUBLE
-# define _LUAI_MN2S 44
-#else
-# define _LUAI_MN2S 24
-#endif
-
-#ifdef LNUM_COMPLEX
-# define LUAI_MAXNUMBER2STR(2 * _LUAI_MN2S)
-#else
-# define LUAI_MAXNUMBER2STR _LUAI_MN2S
-#endif
-
-#endif
-/* /LNUM */
-
 /*
 @@ The luai_num* macros define the primitive operations over numbers.
 */
@@ -742,29 +631,24 @@
 #endif
 */
 
+#ifdef LUA_BITWISE_OPERATORS
+#define luai_numintdiv(r, a, b)	{ lua_Integer i; lua_Number f = floor((a)/(b)); lua_number2int(i, f); r = i; }
+#define luai_logor(r, a, b)	{ lua_Integer ai,bi; lua_number2int(ai,a); lua_number2int(bi,b); r = ai|bi; }
+#define luai_logand(r, a,b)	{ lua_Integer ai,bi; lua_number2int(ai,a); lua_number2int(bi,b); r = ai&bi; }
+#define luai_logxor(r, a,b)	{ lua_Integer ai,bi; lua_number2int(ai,a); lua_number2int(bi,b); r = ai^bi; }
+#define luai_lognot(r,a)	{ lua_Integer ai; lua_number2int(ai,a); r = ~ai; }
+#define luai_loglshft(r, a,b)	{ lua_Integer ai,bi; lua_number2int(ai,a); lua_number2int(bi,b); r = ai<<bi; }
+#define luai_logrshft(r, a,b)	{ lua_Integer ai,bi; lua_number2int(ai,a); lua_number2int(bi,b); r = ai>>bi; }
+#endif
+
 /*
 ** 'luai_abs()' to give absolute value of 'lua_Integer'
 */
-#ifdef LNUM_INT64
 # if (__STDC_VERSION__ >= 199901L)
 #  define luai_abs llabs
 # else
 #  define luai_abs(v) ((v) >= 0 ? (v) : -(v))
 # endif
-#else
-# define luai_abs abs
-#endif
-
-/* ANSI C only has math funcs for 'double. C99 required for float and long double
- * variants.
- */
-#ifdef LNUM_DOUBLE
-# define _LF(name) name
-#elif defined(LNUM_FLOAT)
-# define _LF(name) name ## f
-#elif defined(LNUM_LDOUBLE)
-# define _LF(name) name ## l
-#endif
 /* /LNUM */
 
 /*
@@ -783,7 +667,7 @@
 /* On a Microsoft compiler, use assembler */
 #if defined(_MSC_VER)
 
-#define lua_number2int(i,d)   __asm fld d   __asm fistp i
+#define lua_number2int(i,d)   { __asm fld d   __asm fistp i }
 // #define lua_number2integer(i,n)		lua_number2int(i, n) /* LNUM */
 
 /* the next trick should work on any Pentium, but sometimes clashes
@@ -798,9 +682,7 @@ union luai_Cast { double l_d; long l_l; };
 #endif
 
 /* LNUM */
-# ifndef LNUM_INT64
 #  define lua_number2integer    lua_number2int
-# endif
 /* /LNUM */
 
 /* this option always works, but may be slow */
@@ -809,15 +691,6 @@ union luai_Cast { double l_d; long l_l; };
 // #define lua_number2integer(i,d)	((i)=(lua_Integer)(d)) /* LNUM */
 
 #endif
-
-/* LNUM */
-/* Note: Some compilers (OS X gcc 4.0?) may choke on double->long long conversion
- *       since it can lose precision. Others do require 'long long' there.
- */
-#ifndef lua_number2integer
-# define lua_number2integer(i, d)    ((i) = (lua_Integer)(d))
-#endif
-/* /LNUM */
 
 /* }================================================================== */
 

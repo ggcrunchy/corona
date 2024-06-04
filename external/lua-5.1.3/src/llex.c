@@ -40,14 +40,15 @@ const char *const luaX_tokens [] = {
     "end", "false", "for", "function", "if",
     "in", "local", "nil", "not", "or", "repeat",
     "return", "then", "true", "until", "while",
-    "..", "...", "==", ">=", "<=", "~=",
-    "<number>", "<name>", "<string>", "<eof>",
-/* LNUM */
-    "<integer>",
-#ifdef LNUM_COMPLEX
-    "<number2>",
+#if defined(LUA_BITWISE_OPERATORS)
+    "//",
 #endif
-/* /LNUM */
+    "..", "...", "==", ">=", "<=", "~=",
+#if defined(LUA_BITWISE_OPERATORS)
+    "<<", ">>",
+#endif
+    "<number>", "<name>", "<string>", "<eof>",
+    "<integer>", /* LNUM */
     NULL
 };
 
@@ -97,11 +98,6 @@ static const char *txtToken (LexState *ls, int token) {
     case TK_STRING:
     case TK_INT: /* LNUM */
     case TK_NUMBER:
-    /* LNUM */
-#ifdef LNUM_COMPLEX
-    case TK_NUMBER2:
-#endif
-    /* /LNUM */
       save(ls, '\0');
       return luaZ_buffer(ls->buff);
     default:
@@ -414,6 +410,25 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         if (ls->current != '=') return '=';
         else { next(ls); return TK_EQ; }
       }
+#if defined(LUA_BITWISE_OPERATORS)
+      case '<': {
+          next(ls);
+          if (ls->current == '=') { next(ls); return TK_LE; }
+          else if (ls->current == '<') { next(ls); return TK_SHL; }
+          else  return '<';
+      }
+      case '>': {
+          next(ls);
+          if (ls->current == '=') { next(ls); return TK_GE; }
+          else if (ls->current == '>') { next(ls); return TK_SHR; }
+          else return '>';
+      }
+      case '/': {
+          next(ls);
+          if (ls->current == '/') { next(ls); return TK_IDIV; }
+          else return '/';
+      }
+#else
       case '<': {
         next(ls);
         if (ls->current != '=') return '<';
@@ -424,6 +439,7 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         if (ls->current != '=') return '>';
         else { next(ls); return TK_GE; }
       }
+#endif /* LUA_BITWISE_OPERATORS */
       case '~': {
         next(ls);
         if (ls->current != '=') return '~';

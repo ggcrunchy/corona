@@ -113,9 +113,6 @@ int luaO_rawequalObj(const TValue* l, const TValue* r) {
             return ivalue(l) == ivalue(r);
 #endif
         case LUA_TNUMBER:
-#ifdef LNUM_COMPLEX
-            if (!luai_numeq(nvalue_img_fast(l), nvalue_img_fast(r))) return 0;
-#endif
             return luai_numeq(nvalue_fast(l), nvalue_fast(r));
         case LUA_TBOOLEAN:
             return bvalue(l) == bvalue(r);  /* boolean true must be 1 !! */
@@ -128,9 +125,6 @@ int luaO_rawequalObj(const TValue* l, const TValue* r) {
     }
 #ifdef LUA_TINT
     else if (tl == LUA_TINT && tr == LUA_TNUMBER) {
-# ifdef LNUM_COMPLEX
-        if (nvalue_img_fast(r) != 0) return 0;
-# endif
         /* Avoid doing accuracy losing cast, if possible. */
         lua_Integer tmp;
         return tt_integer_valued(r, &tmp) ? (ivalue(l) == tmp)

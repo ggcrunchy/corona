@@ -62,10 +62,6 @@ const TValue *luaV_tonumber (const TValue *obj, TValue *n) {
             setivalue(n, i); return n;
         case TK_NUMBER:
             setnvalue(n, d); return n;
-#ifdef LNUM_COMPLEX
-        case TK_NUMBER2:    /* "N.NNNi", != 0 */
-            setnvalue_complex_fast(n, d * I); return n;
-#endif
         }
     }
     return NULL;
@@ -258,20 +254,6 @@ static int l_strcmp (const TString *ls, const TString *rs) {
 }
 
 
-/* LNUM */
-#ifdef LNUM_COMPLEX
-void error_complex(lua_State* L, const TValue* l, const TValue* r)
-{
-    char buf1[LUAI_MAXNUMBER2STR];
-    char buf2[LUAI_MAXNUMBER2STR];
-    luaO_num2buf(buf1, l);
-    luaO_num2buf(buf2, r);
-    luaG_runerror(L, "unable to compare: %s with %s", buf1, buf2);
-    /* no return */
-}
-#endif
-/* /LNUM */
-
 int luaV_lessthan (lua_State *L, const TValue *l, const TValue *r) {
   int res;
   /* LNUM */
@@ -293,10 +275,6 @@ int luaV_lessthan (lua_State *L, const TValue *l, const TValue *r) {
           return ivalue(l) < ivalue(r);
 #endif
       case LUA_TNUMBER:
-#ifdef LNUM_COMPLEX
-          if ((nvalue_img_fast(l) != 0) || (nvalue_img_fast(r) != 0))
-              error_complex(L, l, r);
-#endif
           return luai_numlt(nvalue_fast(l), nvalue_fast(r));
       case LUA_TSTRING:
           return l_strcmp(rawtsvalue(l), rawtsvalue(r)) < 0;
@@ -312,10 +290,6 @@ int luaV_lessthan (lua_State *L, const TValue *l, const TValue *r) {
        * in integer realm. Only otherwise cast 'l' to FP (which might change its
        * value).
        */
-# ifdef LNUM_COMPLEX
-      if ((nvalue_img(l) != 0) || (nvalue_img(r) != 0))
-          error_complex(L, l, r);
-# endif
       if (tl == LUA_TINT) {  /* l:int, r:num */
           return tt_integer_valued(r, &tmp) ? (ivalue(l) < tmp)
               : luai_numlt(cast_num(ivalue(l)), nvalue_fast(r));
@@ -355,10 +329,6 @@ static int lessequal (lua_State *L, const TValue *l, const TValue *r) {
           return ivalue(l) <= ivalue(r);
 #endif
       case LUA_TNUMBER:
-#ifdef LNUM_COMPLEX
-          if ((nvalue_img_fast(l) != 0) || (nvalue_img_fast(r) != 0))
-              error_complex(L, l, r);
-#endif
           return luai_numle(nvalue_fast(l), nvalue_fast(r));
       case LUA_TSTRING:
           return l_strcmp(rawtsvalue(l), rawtsvalue(r)) <= 0;
@@ -373,10 +343,6 @@ static int lessequal (lua_State *L, const TValue *l, const TValue *r) {
 #ifdef LUA_TINT
   else if (ttype_ext(l) == ttype_ext(r)) {
       lua_Integer tmp;
-# ifdef LNUM_COMPLEX
-      if ((nvalue_img(l) != 0) || (nvalue_img(r) != 0))
-          error_complex(L, l, r);
-# endif
       if (tl == LUA_TINT) {  /* l:int, r:num */
           return tt_integer_valued(r, &tmp) ? (ivalue(l) <= tmp)
               : luai_numle(cast_num(ivalue(l)), nvalue_fast(r));
@@ -527,6 +493,12 @@ static void Arith (lua_State *L, StkId ra, const TValue *rb,
 
 
 /* LNUM */
+static inline lua_Integer idiv (lua_Number a, lua_Number b)
+{
+    lua_Integer tmp;
+    luai_numintdiv(tmp, a, b);
+    return tmp;
+}
 /*
 #define arith_op(op,tm) { \
         TValue *rb = RKB(i); \
@@ -560,6 +532,9 @@ static void Arith(lua_State* L, StkId ra, const TValue* rb,
             case TM_ADD: if (try_addint(ri, ib, ic)) return; break;
             case TM_SUB: if (try_subint(ri, ib, ic)) return; break;
             case TM_MUL: if (try_mulint(ri, ib, ic)) return; break;
+#if defined(LUA_BITWISE_OPERATORS)
+            case TM_IDIV: // fallthrough
+#endif
             case TM_DIV: if (try_divint(ri, ib, ic)) return; break;
             case TM_MOD: if (try_modint(ri, ib, ic)) return; break;
             case TM_POW: if (try_powint(ri, ib, ic)) return; break;
@@ -570,30 +545,6 @@ static void Arith(lua_State* L, StkId ra, const TValue* rb,
 #endif
         /* Fallback to floating point, when leaving range. */
 
-#ifdef LNUM_COMPLEX
-        if ((nvalue_img(b) != 0) || (nvalue_img(c) != 0)) {
-            lua_Complex r;
-            if (op == TM_UNM) {
-                r = -nvalue_complex_fast(b);     /* never an integer (or scalar) */
-                setnvalue_complex_fast(ra, r);
-            }
-            else {
-                lua_Complex bb = nvalue_complex(b), cc = nvalue_complex(c);
-                switch (op) {
-                case TM_ADD: r = bb + cc; break;
-                case TM_SUB: r = bb - cc; break;
-                case TM_MUL: r = bb * cc; break;
-                case TM_DIV: r = bb / cc; break;
-                case TM_MOD:
-                    luaG_runerror(L, "attempt to use %% on complex numbers");  /* no return */
-                case TM_POW: r = luai_vectpow(bb, cc); break;
-                default: lua_assert(0); r = 0;
-                }
-                setnvalue_complex(ra, r);
-            }
-            return;
-        }
-#endif
         nb = nvalue(b); nc = nvalue(c);
         switch (op) {
         case TM_ADD: setnvalue(ra, luai_numadd(nb, nc)); return;
@@ -603,6 +554,9 @@ static void Arith(lua_State* L, StkId ra, const TValue* rb,
         case TM_MOD: setnvalue(ra, luai_nummod(nb, nc)); return;
         case TM_POW: setnvalue(ra, luai_numpow(nb, nc)); return;
         case TM_UNM: setnvalue(ra, luai_numunm(nb)); return;
+#if defined(LUA_BITWISE_OPERATORS)
+        case TM_IDIV: setivalue(ra, idiv(nb, nc)); break; /* LNUM */
+#endif
         default: lua_assert(0);
         }
     }
@@ -614,23 +568,10 @@ static void Arith(lua_State* L, StkId ra, const TValue* rb,
 
 /* Helper macro to sort arithmetic operations into four categories:
  *  TK_INT: integer - integer operands
- *  TK_NUMBER: number - number (non complex, either may be integer)
- *  TK_NUMBER2: complex numbers (at least the other)
+ *  TK_NUMBER: number - number (either may be integer)
  *  0: non-numeric (at least the other)
 */
-#ifdef LNUM_COMPLEX
-static inline int arith_mode(const TValue* rb, const TValue* rc) {
-    if (ttisint(rb) && ttisint(rc)) return TK_INT;
-    if (ttiscomplex(rb) || ttiscomplex(rc)) return TK_NUMBER2;
-    if (ttisnumber(rb) && ttisnumber(rc)) return TK_NUMBER;
-    return 0;
-}
-static inline int arith_mode1(const TValue* rb) {
-    return ttisint(rb) ? TK_INT :
-        ttiscomplex(rb) ? TK_NUMBER2 :
-        ttisnumber(rb) ? TK_NUMBER : 0;
-}
-#elif defined(LUA_TINT)
+#if defined(LUA_TINT)
 # define arith_mode(rb,rc) \
     ( (ttisint(rb) && ttisint(rc)) ? TK_INT : \
       (ttisnumber(rb) && ttisnumber(rc)) ? TK_NUMBER : 0 )
@@ -666,19 +607,9 @@ static inline int arith_mode1(const TValue* rb) {
       failed= 1; break; \
   } if (!failed) continue;
 
-#define arith_op_continue_scalar( op_num, op_int ) \
+# define arith_op_continue(op_num,op_int) \
     ARITH_OP2_START( op_num, op_int ) \
     ARITH_OP_END
-
-#ifdef LNUM_COMPLEX
-# define arith_op_continue( op_num, op_int, op_complex ) \
-    ARITH_OP2_START( op_num, op_int ) \
-      case TK_NUMBER2: \
-        setnvalue_complex( ra, op_complex ( nvalue_complex(rb), nvalue_complex(rc) ) ); break; \
-    ARITH_OP_END
-#else
-# define arith_op_continue(op_num,op_int,_) arith_op_continue_scalar(op_num,op_int)
-#endif
 
  /* arith_op macro for one operator:
   */
@@ -699,19 +630,53 @@ static inline int arith_mode1(const TValue* rb) {
       setnvalue(ra, op_num (nvalue(rb))); break;
 #endif
 
-#ifdef LNUM_COMPLEX
-# define arith_op1_continue( op_num, op_int, op_complex ) \
-    ARITH_OP1_START( op_num, op_int ) \
-      case TK_NUMBER2: \
-        setnvalue_complex( ra, op_complex ( nvalue_complex_fast(rb) )); break; \
-    ARITH_OP_END
-#else
-# define arith_op1_continue( op_num, op_int, _ ) \
+# define arith_op1_continue( op_num, op_int ) \
     ARITH_OP1_START( op_num, op_int ) \
     ARITH_OP_END
-#endif
 /* /LNUM */
 
+
+
+#if defined(LUA_BITWISE_OPERATORS)
+static void Logic(lua_State* L, StkId ra, const TValue* rb,
+    const TValue* rc, TMS op) {
+    TValue tempb, tempc;
+    const TValue* b, * c;
+    if ((b = luaV_tonumber(rb, &tempb)) != NULL &&
+        (c = luaV_tonumber(rc, &tempc)) != NULL) {
+        lua_Number nb = nvalue(b), nc = nvalue(c);
+        lua_Integer r;
+        switch (op) {
+        case TM_SHL: luai_loglshft(r, nb, nc); break;
+        case TM_SHR: luai_logrshft(r, nb, nc); break;
+        case TM_BOR: luai_logor(r, nb, nc); break;
+        case TM_BAND: luai_logand(r, nb, nc); break;
+        case TM_BXOR: luai_logxor(r, nb, nc); break;
+        case TM_BNOT: luai_lognot(r, nb); break;
+        default: lua_assert(0); r = 0; break;
+        }
+        setivalue(ra, r); /* LNUM */
+    }
+    else if (!call_binTM(L, rb, rc, ra, op))
+        luaG_logicerror(L, rb, rc);
+}
+#endif
+
+
+#if defined(LUA_BITWISE_OPERATORS)
+#define logic_op(op,tm) { \
+        TValue *rb = RKB(i); \
+        TValue *rc = RKC(i); \
+        if (ttisnumber(rb) && ttisnumber(rc)) { \
+          lua_Integer r; \
+          lua_Number nb = nvalue(rb), nc = nvalue(rc); \
+          op(r, nb, nc); \
+          setivalue(ra, r); \
+        } \
+        else \
+          Protect(Logic(L, ra, rb, rc, tm)); \
+      }
+#endif
 
 
 void luaV_execute (lua_State *L, int nexeccalls) {
@@ -815,7 +780,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         // arith_op(luai_numadd, TM_ADD); /* LNUM */
         /* LNUM */
         TValue* rb = RKB(i), * rc = RKC(i);
-        arith_op_continue(luai_numadd, try_addint, luai_vectadd);
+        arith_op_continue(luai_numadd, try_addint);
         Protect(Arith(L, ra, rb, rc, TM_ADD));
         /* /LNUM */
         continue;
@@ -824,7 +789,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         // arith_op(luai_numsub, TM_SUB); /* LNUM */
         /* LNUM */
         TValue* rb = RKB(i), * rc = RKC(i);
-        arith_op_continue(luai_numsub, try_subint, luai_vectsub);
+        arith_op_continue(luai_numsub, try_subint);
         Protect(Arith(L, ra, rb, rc, TM_SUB));
         /* /LNUM */
         continue;
@@ -833,7 +798,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         // arith_op(luai_nummul, TM_MUL); /* LNUM */
         /* LNUM */
         TValue* rb = RKB(i), * rc = RKC(i);
-        arith_op_continue(luai_nummul, try_mulint, luai_vectmul);
+        arith_op_continue(luai_nummul, try_mulint);
         Protect(Arith(L, ra, rb, rc, TM_MUL));
         /* /LNUM */
         continue;
@@ -842,7 +807,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         // arith_op(luai_numdiv, TM_DIV); /* LNUM */
         /* LNUM */
         TValue* rb = RKB(i), * rc = RKC(i);
-        arith_op_continue(luai_numdiv, try_divint, luai_vectdiv);
+        arith_op_continue(luai_numdiv, try_divint);
         Protect(Arith(L, ra, rb, rc, TM_DIV));
         /* /LNUM */
         continue;
@@ -851,7 +816,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         // arith_op(luai_nummod, TM_MOD); /* LNUM */
         /* LNUM */
         TValue* rb = RKB(i), * rc = RKC(i);
-        arith_op_continue_scalar(luai_nummod, try_modint);  /* scalars only */
+        arith_op_continue(luai_nummod, try_modint);
         Protect(Arith(L, ra, rb, rc, TM_MOD));
         /* /LNUM */
         continue;
@@ -860,7 +825,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         // arith_op(luai_numpow, TM_POW); /* LNUM */
         /* LNUM */
         TValue* rb = RKB(i), * rc = RKC(i);
-        arith_op_continue(luai_numpow, try_powint, luai_vectpow);
+        arith_op_continue(luai_numpow, try_powint);
         Protect(Arith(L, ra, rb, rc, TM_POW));
         /* /LNUM */
         continue;
@@ -875,11 +840,53 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         else {
           Protect(Arith(L, ra, rb, rb, TM_UNM));
         }*/
-        arith_op1_continue(luai_numunm, try_unmint, luai_vectunm);
+        arith_op1_continue(luai_numunm, try_unmint);
         Protect(Arith(L, ra, rb, rb, TM_UNM));
         /* /LNUM */
         continue;
       }
+#if defined(LUA_BITWISE_OPERATORS)
+      case OP_BOR: {
+          logic_op(luai_logor, TM_BOR);
+          continue;
+      }
+      case OP_BAND: {
+          logic_op(luai_logand, TM_BAND);
+          continue;
+      }
+      case OP_BXOR: {
+          logic_op(luai_logxor, TM_BXOR);
+          continue;
+      }
+      case OP_SHL: {
+          logic_op(luai_loglshft, TM_SHL);
+          continue;
+      }
+      case OP_SHR: {
+          logic_op(luai_logrshft, TM_SHR);
+          continue;
+      }
+      case OP_BNOT: {
+          TValue* rb = RB(i);
+          if (ttisnumber(rb)) {
+              lua_Integer r;
+              lua_Number nb = nvalue(rb);
+              luai_lognot(r, nb);
+              setivalue(ra, r);
+          }
+          else {
+              Protect(Logic(L, ra, rb, rb, TM_BNOT));
+          }
+          continue;
+      }
+      case OP_IDIV: {
+          // arith_op(luai_numintdiv, TM_DIV); /* LNUM */
+          TValue* rb = RKB(i), * rc = RKC(i);
+          arith_op_continue(idiv, try_divint);
+          Protect(Arith(L, ra, rb, rc, TM_IDIV));
+          continue;
+      }
+#endif
       case OP_NOT: {
         int res = l_isfalse(RB(i));  /* next assignment may change this value */
         setbvalue(ra, res);

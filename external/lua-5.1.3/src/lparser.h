@@ -32,12 +32,7 @@ typedef enum {
   VNONRELOC,	/* info = result register */
   VCALL,	/* info = instruction pc */
   VVARARG	/* info = instruction pc */
-/* LNUM */
-, VKINT     /* ival = integer value */
-#ifdef LNUM_COMPLEX
-, VKNUM2   /* nval = imaginary value */
-#endif
-/* /LNUM */
+, VKINT     /* ival = integer value */ /* LNUM */
 } expkind;
 
 typedef struct expdesc {

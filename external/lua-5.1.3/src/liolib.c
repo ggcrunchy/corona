@@ -353,34 +353,6 @@ static int read_integer(lua_State* L, FILE* f) {
     }
     else return 0;  /* read fails */
 }
-
-#ifdef LNUM_COMPLEX
-static int read_complex(lua_State* L, FILE* f) {
-    /* NNN / NNNi / NNN+MMMi / NNN-MMMi */
-    lua_Number a, b;
-    if (fscanf(f, LUA_NUMBER_SCAN, &a) == 1) {
-        int c = fgetc(f);
-        switch (c) {
-        case 'i':
-            lua_pushcomplex(L, a * I);
-            return 1;
-        case '+':
-        case '-':
-            /* "i" is consumed if at the end; just 'NNN+MMM' will most likely
-             * behave as if "i" was there? (TBD: test)
-             */
-            if (fscanf(f, LUA_NUMBER_SCAN "i", &b) == 1) {
-                lua_pushcomplex(L, a + (c == '+' ? b : -b) * I);
-                return 1;
-            }
-        }
-        ungetc(c, f);
-        lua_pushnumber(L, a);  /*real part only*/
-        return 1;
-    }
-    return 0;  /* read fails */
-}
-#endif
 /* /LNUM */
 
 
@@ -460,11 +432,6 @@ static int g_read (lua_State *L, FILE *f, int first) {
           case 'i':  /* integer (full accuracy) */
               success = read_integer(L, f);
               break;
-#ifdef LNUM_COMPLEX
-          case 'c':  /* complex */
-              success = read_complex(L, f);
-              break;
-#endif
         /* /LNUM */
           case 'l':  /* line */
             success = read_line(L, f);
@@ -533,7 +500,7 @@ static int g_write (lua_State *L, FILE *f, int arg) {
           fprintf(f, LUA_NUMBER_FMT, lua_tonumber(L, arg)) > 0;
 #endif
       if (lua_isinteger(L, arg))
-          status = status && fprintf(f, LUA_INTEGER_FMT, lua_tointeger(L, arg)) > 0;
+          status = status && fprintf(f, LUA_INTEGER_FMT, lua_tointegerx(L, arg)) > 0; /* LNUM */
       else
           status = status && fprintf(f, LUA_NUMBER_FMT, lua_tonumber(L, arg)) > 0;
       /* /LNUM */

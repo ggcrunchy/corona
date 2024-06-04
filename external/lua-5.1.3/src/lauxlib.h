@@ -64,10 +64,6 @@ LUALIB_API lua_Integer (luaL_optintegerx) (lua_State* L, int nArg,
 /* LNUM */
 #define luaL_checkint32(L,narg) ((int)luaL_checkintegerx(L,narg))
 #define luaL_optint32(L,narg,def) ((int)luaL_optintegerx(L,narg,def))
-
-#ifdef LNUM_COMPLEX
-LUALIB_API lua_Complex(luaL_checkcomplex) (lua_State* L, int narg);
-#endif
 /* /LNUM */
 
 LUALIB_API void (luaL_checkstack) (lua_State *L, int sz, const char *msg);

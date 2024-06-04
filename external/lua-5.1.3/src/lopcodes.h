@@ -205,10 +205,25 @@ OP_CLOSE,/*	A 	close all variables in the stack up to (>=) R(A)*/
 OP_CLOSURE,/*	A Bx	R(A) := closure(KPROTO[Bx], R(A), ... ,R(A+n))	*/
 
 OP_VARARG/*	A B	R(A), R(A+1), ..., R(A+B-1) = vararg		*/
+
+#if defined(LUA_BITWISE_OPERATORS)
+,
+OP_BOR,/*	A B C	R(A) := RK(B) | RK(C)				*/
+OP_BAND,/*	A B C	R(A) := RK(B) & RK(C)				*/
+OP_BXOR,/*	A B C	R(A) := RK(B) ^| RK(C)				*/
+OP_SHL,/*	A B C	R(A) := RK(B) << RK(C)				*/
+OP_SHR,/*	A B C	R(A) := RK(B) >> RK(C)				*/
+OP_BNOT,/*	A B	R(A) := ~ R(B)				*/
+OP_IDIV,/*	A B C	R(A) := RK(B) \ RK(C)				*/
+#endif
 } OpCode;
 
-
+#if defined(LUA_BITWISE_OPERATORS)
+#define NUM_OPCODES	(cast(int, OP_IDIV) + 1)
+#define EXTRA_OPCODE_0 OP_BOR
+#else
 #define NUM_OPCODES	(cast(int, OP_VARARG) + 1)
+#endif /* LUA_BITWISE_OPERATORS */
 
 
 

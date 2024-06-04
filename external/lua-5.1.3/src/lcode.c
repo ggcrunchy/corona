@@ -31,11 +31,7 @@
 static int isnumeral(expdesc *e) {
   // return (e->k == VKNUM && e->t == NO_JUMP && e->f == NO_JUMP); /* LNUM */
   /* LNUM */
-    int ek =
-#ifdef LNUM_COMPLEX
-    (e->k == VKNUM2) ||
-#endif
-        (e->k == VKINT) || (e->k == VKNUM);
+    int ek = (e->k == VKINT) || (e->k == VKNUM);
     return (ek && e->t == NO_JUMP && e->f == NO_JUMP);
   /* /LNUM */
 }
@@ -245,9 +241,7 @@ static int addk (FuncState *fs, TValue *k, TValue *v) {
   /* Note: Integer-valued LUA_TNUMBER's are handled as in unpatched Lua (below)
   */
   if (ttype(idx) == LUA_TINT) {
-# ifdef LNUM_INT64
       lua_assert((int)ivalue(idx) == ivalue(idx));  /* make sure no data is lost in the casting */
-# endif
       int i = (int)ivalue(idx);
       lua_assert(luaO_rawequalObj(&fs->f->k[i], v));
       return i;
@@ -302,15 +296,6 @@ int luaK_integerK(FuncState* fs, lua_Integer r) {
     setivalue(&o, r);
     return addk(fs, &o, &o);
 }
-
-
-#ifdef LNUM_COMPLEX
-static int luaK_imagK(FuncState* fs, lua_Number r) {
-    TValue o;
-    setnvalue_complex(&o, r * I);
-    return addk(fs, &o, &o);
-}
-#endif
 /* /LNUM */
 
 
@@ -417,12 +402,6 @@ static void discharge2reg (FuncState *fs, expdesc *e, int reg) {
         luaK_codeABx(fs, OP_LOADK, reg, luaK_integerK(fs, e->u.ival));
         break;
     }
-#ifdef LNUM_COMPLEX
-    case VKNUM2: {
-        luaK_codeABx(fs, OP_LOADK, reg, luaK_imagK(fs, e->u.nval));
-        break;
-    }
-#endif
 /* /LNUM */
     case VRELOCABLE: {
       Instruction *pc = &getcode(fs, e);
@@ -509,12 +488,7 @@ void luaK_exp2val (FuncState *fs, expdesc *e) {
 int luaK_exp2RK (FuncState *fs, expdesc *e) {
   luaK_exp2val(fs, e);
   switch (e->k) {
-/* LNUM */
-#ifdef LNUM_COMPLEX
-  case VKNUM2:
-#endif
-  case VKINT:
-/* /LNUM */
+    case VKINT: /* LNUM */
     case VKNUM:
     case VTRUE:
     case VFALSE:
@@ -522,12 +496,7 @@ int luaK_exp2RK (FuncState *fs, expdesc *e) {
       if (fs->nk <= MAXINDEXRK) {  /* constant fit in RK operand? */
         e->u.s.info = (e->k == VNIL)  ? nilK(fs) :
                       (e->k == VKNUM) ? luaK_numberK(fs, e->u.nval) :
-/* LNUM */
-(e->k == VKINT) ? luaK_integerK(fs, e->u.ival) :
-#ifdef LNUM_COMPLEX
-(e->k == VKNUM2) ? luaK_imagK(fs, e->u.nval) :
-#endif
-/* /LNUM */
+                      (e->k == VKINT) ? luaK_integerK(fs, e->u.ival) : /* LNUM */
                                         boolK(fs, (e->k == VTRUE));
         e->k = VK;
         return RKASK(e->u.s.info);
@@ -619,9 +588,6 @@ void luaK_goiftrue (FuncState *fs, expdesc *e) {
   switch (e->k) {
     // case VK: case VKNUM: case VTRUE: { /* LNUM */
     /* LNUM */
-#ifdef LNUM_COMPLEX
-  case VKNUM2:
-#endif
   case VKINT: case VK: case VKNUM: case VTRUE: {
     /* /LNUM */
       pc = NO_JUMP;  /* always true; do nothing */
@@ -675,9 +641,6 @@ static void codenot (FuncState *fs, expdesc *e) {
     }
     // case VK: case VKNUM: case VTRUE: { /* LNUM */
     /* LNUM */
-#ifdef LNUM_COMPLEX
-    case VKNUM2:
-#endif
     case VKINT: case VK: case VKNUM: case VTRUE: {
     /* /LNUM */
       e->k = VFALSE;
@@ -715,20 +678,15 @@ void luaK_indexed (FuncState *fs, expdesc *t, expdesc *k) {
 
 static int constfolding (OpCode op, expdesc *e1, expdesc *e2) {
   lua_Number v1, v2, r;
+#if defined(LUA_BITWISE_OPERATORS)
+  lua_Integer i;
+#endif
   int vkres = VKNUM; /* LNUM */
   if (!isnumeral(e1) || !isnumeral(e2)) return 0;
   /* LNUM */
   /*v1 = e1->u.nval;
   v2 = e2->u.nval;*/
 
-  /* real and imaginary parts don't mix. */
-#ifdef LNUM_COMPLEX
-  if (e1->k == VKNUM2) {
-      if ((op != OP_UNM) && (e2->k != VKNUM2)) return 0;
-      vkres = VKNUM2;
-  }
-  else if (e2->k == VKNUM2) { return 0; }
-#endif
 #ifdef LUA_TINT
   if ((e1->k == VKINT) && (e2->k == VKINT)) {
       lua_Integer i1 = e1->u.ival, i2 = e2->u.ival;
@@ -758,43 +716,36 @@ static int constfolding (OpCode op, expdesc *e1, expdesc *e2) {
   switch (op) {
     case OP_ADD: r = luai_numadd(v1, v2); break;
     case OP_SUB: r = luai_numsub(v1, v2); break;
-    // case OP_MUL: r = luai_nummul(v1, v2); break; /* LNUM */
-      /* LNUM */
-    case OP_MUL:
-#ifdef LNUM_COMPLEX
-        if (vkres == VKNUM2) return 0;    /* leave to runtime (could do here, but not worth it?) */
-#endif
-        r = luai_nummul(v1, v2); break;
-        /* /LNUM */
+    case OP_MUL: r = luai_nummul(v1, v2); break;
     case OP_DIV:
       if (v2 == 0) return 0;  /* do not attempt to divide by 0 */
-      /* LNUM */
-#ifdef LNUM_COMPLEX
-      if (vkres == VKNUM2) return 0;    /* leave to runtime */
-#endif
-      /* /LNUM */
       r = luai_numdiv(v1, v2); break;
     case OP_MOD:
       if (v2 == 0) return 0;  /* do not attempt to divide by 0 */
-      /* LNUM */
-#ifdef LNUM_COMPLEX
-      if (vkres == VKNUM2) return 0;    /* leave to runtime */
-#endif
-      /* /LNUM */
       r = luai_nummod(v1, v2); break;
-    // case OP_POW: r = luai_numpow(v1, v2); break; /* LNUM */
-    /* LNUM */
-#ifdef LNUM_COMPLEX
-      if (vkres == VKNUM2) return 0;    /* leave to runtime */
-#endif
-      r = luai_numpow(v1, v2); break;
-      /* /LNUM */
+    case OP_POW: r = luai_numpow(v1, v2); break;
     case OP_UNM: r = luai_numunm(v1); break;
     case OP_LEN: return 0;  /* no constant folding for 'len' */
+#if defined(LUA_BITWISE_OPERATORS)
+    case OP_BOR: luai_logor(i, v1, v2); break;
+    case OP_BAND: luai_logand(i, v1, v2); break;
+    case OP_BXOR: luai_logxor(i, v1, v2);  break;
+    case OP_SHL: luai_loglshft(i, v1, v2); break;
+    case OP_SHR: luai_logrshft(i, v1, v2); break;
+    case OP_BNOT: luai_lognot(i, v1); break;
+    case OP_IDIV:
+        if (v2 == 0) return 0;  /* do not attempt to divide by 0 */
+        luai_numintdiv(i, v1, v2); break;
+#endif
     default: lua_assert(0); r = 0; break;
   }
   if (luai_numisnan(r)) return 0;  /* do not attempt to produce NaN */
   e1->k = cast(expkind, vkres); /* LNUM */
+#if defined(LUA_BITWISE_OPERATORS)
+  if (op >= EXTRA_OPCODE_0)
+      e1->u.ival = i;
+  else
+#endif
   e1->u.nval = r;
   return 1;
 }
@@ -804,7 +755,11 @@ static void codearith (FuncState *fs, OpCode op, expdesc *e1, expdesc *e2) {
   if (constfolding(op, e1, e2))
     return;
   else {
+#if defined(LUA_BITWISE_OPERATORS)
+    int o2 = (op != OP_UNM && op != OP_LEN && op != OP_BNOT) ? luaK_exp2RK(fs, e2) : 0;
+#else
     int o2 = (op != OP_UNM && op != OP_LEN) ? luaK_exp2RK(fs, e2) : 0;
+#endif /* LUA_BITWISE_OPERATORS */
     int o1 = luaK_exp2RK(fs, e1);
     if (o1 > o2) {
       freeexp(fs, e1);
@@ -840,6 +795,14 @@ void luaK_prefix (FuncState *fs, UnOpr op, expdesc *e) {
   expdesc e2;
   e2.t = e2.f = NO_JUMP; e2.k = VKINT/*NUM*/; e2.u./*n*/ival = 0; /* LNUM */
   switch (op) {
+#if defined(LUA_BITWISE_OPERATORS)
+  case OPR_BNOT: {
+      if (e->k == VK)
+          luaK_exp2anyreg(fs, e);  /* cannot operate on non-numeric constants */
+      codearith(fs, OP_BNOT, e, &e2);
+      break;
+  }
+#endif
     case OPR_MINUS: {
       if (!isnumeral(e))
         luaK_exp2anyreg(fs, e);  /* cannot operate on non-numeric constants */
@@ -920,6 +883,14 @@ void luaK_posfix (FuncState *fs, BinOpr op, expdesc *e1, expdesc *e2) {
     case OPR_DIV: codearith(fs, OP_DIV, e1, e2); break;
     case OPR_MOD: codearith(fs, OP_MOD, e1, e2); break;
     case OPR_POW: codearith(fs, OP_POW, e1, e2); break;
+#if defined(LUA_BITWISE_OPERATORS)
+    case OPR_BOR: codearith(fs, OP_BOR, e1, e2); break;
+    case OPR_BAND: codearith(fs, OP_BAND, e1, e2); break;
+    case OPR_BXOR: codearith(fs, OP_BXOR, e1, e2); break;
+    case OPR_SHL: codearith(fs, OP_SHL, e1, e2); break;
+    case OPR_SHR: codearith(fs, OP_SHR, e1, e2); break;
+    case OPR_IDIV: codearith(fs, OP_IDIV, e1, e2); break;
+#endif
     case OPR_EQ: codecomp(fs, OP_EQ, 1, e1, e2); break;
     case OPR_NE: codecomp(fs, OP_EQ, 0, e1, e2); break;
     case OPR_LT: codecomp(fs, OP_LT, 1, e1, e2); break;

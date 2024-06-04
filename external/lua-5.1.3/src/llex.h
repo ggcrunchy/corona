@@ -28,16 +28,13 @@ enum RESERVED {
   TK_IF, TK_IN, TK_LOCAL, TK_NIL, TK_NOT, TK_OR, TK_REPEAT,
   TK_RETURN, TK_THEN, TK_TRUE, TK_UNTIL, TK_WHILE,
   /* other terminal symbols */
+#if defined(LUA_BITWISE_OPERATORS)
+  TK_IDIV, TK_CONCAT, TK_DOTS, TK_EQ, TK_GE, TK_LE, TK_NE, TK_SHL, TK_SHR, TK_NUMBER,
+#else
   TK_CONCAT, TK_DOTS, TK_EQ, TK_GE, TK_LE, TK_NE, TK_NUMBER,
+#endif /* LUA_BITWISE_OPERATORS */
   TK_NAME, TK_STRING, TK_EOS,
-
-/* LNUM */
-    TK_INT
- #ifdef LNUM_COMPLEX
- , TK_NUMBER2   /* imaginary constants: Ni */
- #endif
-
-/* /LNUM */
+  TK_INT /* LNUM */
 };
 
 /* number of reserved words */

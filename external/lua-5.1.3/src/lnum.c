@@ -19,31 +19,11 @@
 #include "lnum.h"
 
 /*
-** lua_real2str converts a (non-complex) number to a string.
-** lua_str2real converts a string to a (non-complex) number.
+** lua_real2str converts a number to a string.
+** lua_str2real converts a string to a number.
 */
 #define lua_real2str(s, n)  sprintf((s), LUA_NUMBER_FMT, (n))
-
-/*
-* Note: Only 'strtod()' is part of ANSI C; others are C99 and
-* may need '--std=c99' compiler setting (at least on Ubuntu 7.10).
-*
-* Visual C++ 2008 Express does not have 'strtof()', nor 'strtold()'.
-* References to '_strtold()' exist but don't compile. It seems best
-* to leave Windows users with DOUBLE only (or compile with MinGW).
-*
-* In practise, using '(long double)strtod' is a risky thing, since
-* it will cause accuracy loss in reading in numbers, and such losses
-* will pile up in later processing. Get a real 'strtold()' or don't
-* use that mode at all.
-*/
-#ifdef LNUM_DOUBLE
-# define lua_str2real	strtod
-#elif defined(LNUM_FLOAT)
-# define lua_str2real	strtof
-#elif defined(LNUM_LDOUBLE)
-# define lua_str2real	strtold
-#endif
+#define lua_str2real	strtod
 
 #define lua_integer2str(s, v) sprintf((s), LUA_INTEGER_FMT, (v))
 
@@ -66,18 +46,6 @@ void luaO_num2buf(char* s, const TValue* o)
 #endif
 	n = nvalue_fast(o);
 	lua_real2str(s, n);
-
-#ifdef LNUM_COMPLEX
-	ua_Number n2 = nvalue_img_fast(o);
-	if (n2 != 0) {   /* Postfix with +-Ni */
-		int re0 = (n == 0);
-		char* s2 = re0 ? s : strchr(s, '\0');
-		if ((!re0) && (n2 > 0)) *s2++ = '+';
-		lua_real2str(s2, n2);
-		strcat(s2, "i");
-
-	}
-#endif
 }
 
 /*
@@ -89,9 +57,7 @@ int /*bool*/ tt_integer_valued(const TValue* o, lua_Integer* ref) {
 
 	lua_assert(ttype(o) == LUA_TNUMBER);
 	lua_assert(ref);
-#ifdef LNUM_COMPLEX
-	if (nvalue_img_fast(o) != 0) return 0;
-#endif
+
 	d = nvalue_fast(o);
 	lua_number2integer(i, d);
 	if (cast_num(i) == d) {
@@ -189,9 +155,7 @@ int luaO_str2d(const char* s, lua_Number* res_n, lua_Integer* res_i) {
 			return 0;  /* conversion failed */
 
 	}
-#ifdef LNUM_COMPLEX
-	if (*endptr == 'i') { endptr++; ret = TK_NUMBER2; }
-#endif
+
 	if (!*endptr) return ret;
 
 	while (isspace(cast(unsigned char, *endptr))) endptr++;

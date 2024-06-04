@@ -274,14 +274,8 @@ void luaU_header (char* h)
   *
   * 0: lua_Number is float/double/ldouble (nonpatched only)
   * 1: lua_Number is integer (nonpatched only)
-  * 4: LNUM_INT32: sizeof(lua_Integer)
-  * 8: LNUM_INT64: sizeof(lua_Integer)
-  * +0x80: LNUM_COMPLEX
+  * 8: sizeof(lua_Integer)
   */
- * h++ = (char)(sizeof(lua_Integer)
-#ifdef LNUM_COMPLEX
-	 | 0x80
-#endif
-	 );
+ * h++ = (char)(sizeof(lua_Integer));
 /* /LNUM */
 }

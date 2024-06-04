@@ -66,14 +66,8 @@ typedef struct GCheader {
 typedef union {
   GCObject *gc;
   void *p;
-/* LNUM */
-#ifdef LNUM_COMPLEX
-  lua_Complex n;
-#else
-/* /LNUM */
   lua_Number n;
 /* LNUM */
-#endif
 #ifdef LUA_TINT
   lua_Integer i;
 #endif
@@ -108,10 +102,6 @@ typedef struct lua_TValue {
 #else
 # define ttisnumber(o) (ttype(o) == LUA_TNUMBER)
 #endif
-
-#ifdef LNUM_COMPLEX
-# define ttiscomplex(o) ((ttype(o) == LUA_TNUMBER) && (nvalue_img_fast(o)!=0))
-#endif
 /* /LNUM */
 
 #define ttisstring(o)	(ttype(o) == LUA_TSTRING)
@@ -140,18 +130,7 @@ typedef struct lua_TValue {
 
 /* '_fast' variants are for cases where 'ttype(o)' is known to be LUA_TNUMBER
  */
-#ifdef LNUM_COMPLEX
-# ifndef LUA_TINT
-#  error "LNUM_COMPLEX only allowed with LNUM_INTxx defined (can be changed)"
-# endif
-# define nvalue_complex_fast(o) check_exp( ttype(o)==LUA_TNUMBER, (o)->value.n )   
-# define nvalue_fast(o)     ( _LF(creal) ( nvalue_complex_fast(o) ) )
-# define nvalue_img_fast(o) ( _LF(cimag) ( nvalue_complex_fast(o) ) )
-# define nvalue_complex(o) check_exp( ttisnumber(o), (ttype(o)==LUA_TINT) ? (o)->value.i : (o)->value.n )
-# define nvalue_img(o) check_exp( ttisnumber(o), (ttype(o)==LUA_TINT) ? 0 : _LF(cimag)( (o)->value.n ) ) 
-# define nvalue(o) check_exp( ttisnumber(o), (ttype(o)==LUA_TINT) ? cast_num((o)->value.i) : _LF(creal)((o)->value.n) ) 
- /* */
-#elif defined(LUA_TINT)
+#if defined(LUA_TINT)
 # define nvalue(o)	check_exp( ttisnumber(o), (ttype(o)==LUA_TINT) ? cast_num((o)->value.i) : (o)->value.n )
 # define nvalue_fast(o) check_exp( ttype(o)==LUA_TNUMBER, (o)->value.n )   
 #else
@@ -198,19 +177,6 @@ typedef struct lua_TValue {
 # define setivalue(obj,x) { TValue *i_o=(obj); i_o->value.i=(x); i_o->tt=LUA_TINT; }
 #else
 # define setivalue(obj,x) setnvalue(obj,cast_num(x))
-#endif
-
-/* Note: Complex always has "inline", both are C99.
-*/
-#ifdef LNUM_COMPLEX
-static inline void setnvalue_complex_fast(TValue* obj, lua_Complex x) {
-    lua_assert(_LF(cimag)(x) != 0);
-    obj->value.n = x; obj->tt = LUA_TNUMBER;
-}
-static inline void setnvalue_complex(TValue* obj, lua_Complex x) {
-    if (_LF(cimag)(x) == 0) { setnvalue(obj, _LF(creal)(x)); }
-    else { obj->value.n = x; obj->tt = LUA_TNUMBER; }
-}
 #endif
 /* /LNUM */
 

@@ -106,44 +106,8 @@ static Node *hashnum (const Table *t, lua_Number n) {
   return hashmod(t, a[0]);
 }
 #endif
-/** number of ints of lua_Number used for hashing
-*
-* OS X Intel(1.5.6) :
-    *'sizeof(long double)' == 16 but gives "Bus error" if NUM_INTS is 4.
-    * The error does not seem to happen exactly at the read, but is most
-    * likely caused by random trailing bits that cause inconsistent hashes.
-    * To avoid this, fix NUM_INTS to 3 (12 bytes).
-    *
-    *Linux x86(2.6.24, gcc 4.2.4) :
-    *'sizeof(long double)' is 12, which works apart from LNUM_COMPLEX
-    * (and LNUM_LDOUBLE) mode(if optimized >= -O2).There, bytes 11 and 12
-    * seem to have random bits and cause inconsistent hashes.The x87 FPU
-    * long double is 10 bytes(80 bits).We set NUM_INTS to 2 and don't use
-    * the last 2 bytes for hashing, at all.
-    *
-    * Linux x86_64(2.6.28, gcc 4.3.3) :
-    *'sizeof(long double)' is 16, but only 3 ints seem to be stable(with
-        * LNUM_COMPLEX and LNUM_LDOUBLE together only 80 bits are stable).
-    *
-    *NOTE : We could simplify this by simply using always 2 ints or
-    *'(sizeof(lua_Number)/sizeof(int))-1' for hashing the 'long double's
-    */
-#ifndef LNUM_LDOUBLE
-    /* Anything not LNUM_LDOUBLE */
+
 # define NUM_INTS (sizeof(lua_Number)/sizeof(int))
-#else
-# if defined(__x86_64) || defined(__i386__)
-    /* Linux x86_64 or x86 */
-#  ifdef LNUM_COMPLEX
-#   define NUM_INTS 2
-#  else
-#   define NUM_INTS 3
-#  endif
-# else
-    /* Default (some systems will need the -1, some won't) */
-#  define NUM_INTS ((sizeof(lua_Number)/sizeof(int))-1)
-# endif
-#endif
 
 
 /*
@@ -212,13 +176,6 @@ static Node *mainposition (const Table *t, const TValue *key) {
       lua_Integer i;
       if (tt_integer_valued(key, &i))
           return hashint(t, i);
-# ifdef LNUM_COMPLEX
-      /* Complex numbers are hashed by their scalar part. Pure imaginary values
-       * with scalar 0 or -0 should give same hash.
-       */
-      if (nvalue_img_fast(key) != 0 && luai_numeq(nvalue_fast(key), 0))
-          return gnode(t, 0);  /* 0 and -0 to give same hash */
-# endif
 #else
       if (luai_numeq(nvalue(key), 0)) return gnode(t, 0);  /* 0 and -0 to give same hash */
 #endif
@@ -654,9 +611,7 @@ const TValue *luaH_get (Table *t, const TValue *key) {
 #ifdef LUA_TINT
     case LUA_TINT: {
         int i = cast_int(ivalue(key));
-# ifdef LNUM_INT64
         if (i != ivalue(key)) break;   /* handle non-32 bit separately */
-# endif
         return luaH_getint(t, i);
 #endif
     }
@@ -682,9 +637,7 @@ const TValue *luaH_get (Table *t, const TValue *key) {
 #endif
       lua_Integer j;
       if (!tt_integer_valued(key, &j)) break;
-# ifdef LNUM_INT64
       if (cast_int(j) != j) break;   /* handle non-32 bit separately */
-# endif
       return luaH_getint(t, cast_int(j));
 /* /LNUM */
     }
@@ -718,13 +671,11 @@ TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
         /* [3.0] must use the same index slot as [3] */
         lua_Integer i;
         if (tt_integer_valued(key, &i)) {
-# ifdef LNUM_INT64
             if (cast_int(i) != i) {  /* does not fit in 32 bits */
                 TValue k;
                 setivalue(&k, i);
                 return newkey(L, t, &k);
             }
-# endif
             return luaH_setint(L, t, cast_int(i));
         }
 #endif
