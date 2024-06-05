@@ -54,17 +54,22 @@ LUALIB_API const char *(luaL_optlstring) (lua_State *L, int numArg,
 LUALIB_API lua_Number (luaL_checknumber) (lua_State *L, int numArg);
 LUALIB_API lua_Number (luaL_optnumber) (lua_State *L, int nArg, lua_Number def);
 
-LUALIB_API /*lua_Integer*/ptrdiff_t (luaL_checkinteger) (lua_State *L, int numArg); /* LNUM */
-LUALIB_API lua_Integer (luaL_checkintegerx) (lua_State* L, int numArg); /* LNUM */
-LUALIB_API /*lua_Integer*/ptrdiff_t (luaL_optinteger) (lua_State *L, int nArg,
-                                          /*lua_Integer*/ptrdiff_t def); /* LNUM */
+#if defined(LUA_TINT)
+LUALIB_API ptrdiff_t (luaL_checkinteger) (lua_State *L, int numArg);
+LUALIB_API lua_Integer (luaL_checkintegerx) (lua_State* L, int numArg);
+LUALIB_API ptrdiff_t (luaL_optinteger) (lua_State *L, int nArg,
+                                          ptrdiff_t def);
 LUALIB_API lua_Integer (luaL_optintegerx) (lua_State* L, int nArg,
-    lua_Integer def); /* LNUM */
+    lua_Integer def);
 
-/* LNUM */
 #define luaL_checkint32(L,narg) ((int)luaL_checkintegerx(L,narg))
 #define luaL_optint32(L,narg,def) ((int)luaL_optintegerx(L,narg,def))
-/* /LNUM */
+
+#else
+LUALIB_API lua_Integer (luaL_checkinteger) (lua_State* L, int numArg);
+LUALIB_API lua_Integer (luaL_optinteger) (lua_State* L, int nArg,
+    lua_Integer def);
+#endif
 
 LUALIB_API void (luaL_checkstack) (lua_State *L, int sz, const char *msg);
 LUALIB_API void (luaL_checktype) (lua_State *L, int narg, int t);

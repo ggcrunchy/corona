@@ -158,7 +158,6 @@
 # define _LNUM ""
 #endif
 #define LUA_LNUM " double int64" _LNUM
-/* /LNUM */
 
 /*
 @@ LUA_INTEGER is the integral type used by lua_pushinteger/lua_tointeger.
@@ -243,7 +242,6 @@
 @* but also arithmetic operator \ (integer division) and != as an alernative to ~=
 */
 #define LUA_BITWISE_OPERATORS
-
 
 /*
 ** {==================================================================
@@ -681,16 +679,21 @@ union luai_Cast { double l_d; long l_l; };
 
 #endif
 
-/* LNUM */
-#  define lua_number2integer    lua_number2int
-/* /LNUM */
-
 /* this option always works, but may be slow */
 #else
 #define lua_number2int(i,d)	((i)=(int)(d))
 // #define lua_number2integer(i,d)	((i)=(lua_Integer)(d)) /* LNUM */
 
 #endif
+
+/* LNUM */
+/* Note: Some compilers (OS X gcc 4.0?) may choke on double->long long conversion
+ *       since it can lose precision. Others do require 'long long' there.
+ */
+#ifndef lua_number2integer
+# define lua_number2integer(i, d)    ((i) = (lua_Integer)(d))
+#endif
+ /* /LNUM */
 
 /* }================================================================== */
 

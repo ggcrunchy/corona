@@ -24,7 +24,9 @@
 
 #include "lauxlib.h"
 
-#include "llimits.h" /* LNUM */
+#if defined(LUA_TINT)
+#include "llimits.h"
+#endif
 
 #define FREELIST_REF	0	/* free list of references */
 
@@ -67,7 +69,11 @@ LUALIB_API int luaL_typerror (lua_State *L, int narg, const char *tname) {
 
 
 static void tag_error (lua_State *L, int narg, int tag) {
-  luaL_typerror(L, narg, tag < 0 ? "integer" : lua_typename(L, tag)); /* LNUM */
+  luaL_typerror(L, narg,
+    #if defined(LUA_TINT)
+      tag < 0 ? "integer" : 
+    #endif
+      lua_typename(L, tag));
 }
 
 
@@ -189,32 +195,44 @@ LUALIB_API lua_Number luaL_optnumber (lua_State *L, int narg, lua_Number def) {
 }
 
 
-/* LNUM */
-LUALIB_API ptrdiff_t luaL_checkinteger (lua_State* L, int narg) { /* LNUM */
+#if defined(LUA_TINT)
+LUALIB_API ptrdiff_t luaL_checkinteger (lua_State* L, int narg) {
     return (ptrdiff_t)luaL_checkintegerx(L, narg);
 }
-/* /LNUM */
 
 
-LUALIB_API lua_Integer luaL_checkintegerx (lua_State *L, int narg) { /* LNUM */
+LUALIB_API lua_Integer luaL_checkintegerx (lua_State *L, int narg) {
   lua_Integer d = lua_tointeger(L, narg);
-  if (d == 0 && !lua_isinteger/*number*/(L, narg))  /* avoid extra test when d is not 0 */ /* LNUM */
-    tag_error(L, narg, -1 /* integer */ /*LUA_TNUMBER*/); /* LNUM */
+  if (d == 0 && !lua_isinteger(L, narg))  /* avoid extra test when d is not 0 */
+    tag_error(L, narg, -1 /* integer */);
   return d;
 }
 
 
-/* LNUM */
 LUALIB_API ptrdiff_t luaL_optinteger (lua_State* L, int narg,
-    ptrdiff_t def) { /* LNUM */
+    ptrdiff_t def) {
     return (ptrdiff_t)luaL_optintegerx(L, narg, (lua_Integer)def);
 }
-/* /LNUM */
+
 
 LUALIB_API lua_Integer luaL_optintegerx (lua_State *L, int narg,
-                                                      lua_Integer def) { /* LNUM */
+                                                      lua_Integer def) {
   return luaL_opt(L, luaL_checkintegerx, narg, def);
 }
+#else
+LUALIB_API lua_Integer luaL_checkinteger(lua_State* L, int narg) {
+    lua_Integer d = lua_tointeger(L, narg);
+    if (d == 0 && !lua_isnumber(L, narg))  /* avoid extra test when d is not 0 */
+        tag_error(L, narg, LUA_TNUMBER);
+    return d;
+}
+
+
+LUALIB_API lua_Integer luaL_optinteger(lua_State* L, int narg,
+    lua_Integer def) {
+    return luaL_opt(L, luaL_checkinteger, narg, def);
+}
+#endif
 
 
 LUALIB_API int luaL_getmetafield (lua_State *L, int obj, const char *event) {

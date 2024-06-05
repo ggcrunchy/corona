@@ -22,7 +22,7 @@
 #define LUA_VERSION	"Lua 5.1"
 #define LUA_RELEASE	"Lua 5.1.5"
 #define LUA_VERSION_NUM	501
-#define LUA_COPYRIGHT	"Copyright (C) 1994-2012 Lua.org, PUC-Rio" " (" LUA_LNUM ")  (added | & << >> ~ //)" /* LNUM */ /* LUA_BITWISE_OPERATORS */
+#define LUA_COPYRIGHT	"Copyright (C) 1994-2012 Lua.org, PUC-Rio" " (" LUA_LNUM ")  (added | & << >> ~ //)"
 #define LUA_AUTHORS 	"R. Ierusalimschy, L. H. de Figueiredo & W. Celes"
 
 
@@ -78,8 +78,8 @@ typedef void * (*lua_Alloc) (void *ud, void *ptr, size_t osize, size_t nsize);
 */
 #define LUA_TNONE		(-1)
 
-/* LNUM */
-/* LUA_TINT is an internal type, not visible to applications. There are many
+
+/* LNUM: LUA_TINT is an internal type, not visible to applications. There are many
  * potential values where it can be tweaked to (code autoadjusts to these):
  *
  * -2: not 'usual' type value; good since 'LUA_TINT' is not part of the API
@@ -89,8 +89,11 @@ typedef void * (*lua_Alloc) (void *ud, void *ptr, size_t osize, size_t nsize);
  * -13 (0xff..f3) or 0x13: 'ttisnumber()' and 'ttype_ext()' can be reduced to
  *     bitmask operation instead of conditional (may be good for pipelined processors)
 */
-# define LUA_TINT (-2)
-/* /LNUM */
+# define LUA_TINT 9 /* TODO TODO TODO other guard */
+
+#if defined(LUA_BITWISE_OPERATORS) && !defined(LUA_TINT)
+ error "Bitwise operators expect integer support"
+#endif
 
 #define LUA_TNIL		0
 #define LUA_TBOOLEAN		1
@@ -160,15 +163,25 @@ LUA_API int             (lua_isuserdata) (lua_State *L, int idx);
 LUA_API int             (lua_type) (lua_State *L, int idx);
 LUA_API const char     *(lua_typename) (lua_State *L, int tp);
 
-LUA_API int             (lua_isinteger)(lua_State* L, int idx); /* LNUM */
+#if defined(LUA_TINT)
+LUA_API int             (lua_isinteger)(lua_State* L, int idx);
+#endif
 
 LUA_API int            (lua_equal) (lua_State *L, int idx1, int idx2);
 LUA_API int            (lua_rawequal) (lua_State *L, int idx1, int idx2);
 LUA_API int            (lua_lessthan) (lua_State *L, int idx1, int idx2);
 
 LUA_API lua_Number      (lua_tonumber) (lua_State *L, int idx);
-LUA_API ptrdiff_t/*lua_Integer*/     (lua_tointeger) (lua_State *L, int idx); /* LNUM */
-LUA_API lua_Integer     (lua_tointegerx) (lua_State* L, int idx); /* LNUM */
+
+#if defined(LUA_TINT)
+
+LUA_API ptrdiff_t     (lua_tointeger) (lua_State *L, int idx);
+LUA_API lua_Integer     (lua_tointegerx) (lua_State* L, int idx);
+
+#else
+LUA_API lua_Integer (lua_tointeger) (lua_State* L, int idx);
+#endif
+
 LUA_API int             (lua_toboolean) (lua_State *L, int idx);
 LUA_API const char     *(lua_tolstring) (lua_State *L, int idx, size_t *len);
 LUA_API size_t          (lua_objlen) (lua_State *L, int idx);
@@ -183,8 +196,14 @@ LUA_API const void     *(lua_topointer) (lua_State *L, int idx);
 */
 LUA_API void  (lua_pushnil) (lua_State *L);
 LUA_API void  (lua_pushnumber) (lua_State *L, lua_Number n);
-LUA_API void  (lua_pushinteger) (lua_State *L, ptrdiff_t/*lua_Integer*/ n); /* LNUM */
-LUA_API void  (lua_pushintegerx)(lua_State* L, lua_Integer n); /* LNUM */
+
+#if defined(LUA_TINT)
+LUA_API void  (lua_pushinteger) (lua_State *L, ptrdiff_t n);
+LUA_API void  (lua_pushintegerx)(lua_State* L, lua_Integer n);
+#else
+LUA_API void  (lua_pushinteger)(lua_State* L, lua_Integer n);
+#endif
+
 LUA_API void  (lua_pushlstring) (lua_State *L, const char *s, size_t l);
 LUA_API void  (lua_pushstring) (lua_State *L, const char *s);
 LUA_API const char *(lua_pushvfstring) (lua_State *L, const char *fmt,
@@ -291,15 +310,12 @@ LUA_API void lua_setallocf (lua_State *L, lua_Alloc f, void *ud);
 #define lua_isboolean(L,n)	(lua_type(L, (n)) == LUA_TBOOLEAN)
 #define lua_isthread(L,n)	(lua_type(L, (n)) == LUA_TTHREAD)
 #define lua_isnone(L,n)		(lua_type(L, (n)) == LUA_TNONE)
-// #define lua_isnoneornil(L, n)	(lua_type(L, (n)) <= 0) /* LNUM */
 
-/* LNUM */
-#if LUA_TINT < 0
+#if defined(LUA_TINT) && LUA_TINT < 0
  # define lua_isnoneornil(L, n)	((lua_type(L, (n)) <= 0) && (lua_type(L, (n)) != LUA_TINT))
 #else
  # define lua_isnoneornil(L, n)	(lua_type(L, (n)) <= 0)
 #endif
-/* /LNUM */
 
 #define lua_pushliteral(L, s)	\
 	lua_pushlstring(L, "" s, (sizeof(s)/sizeof(char))-1)

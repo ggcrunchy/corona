@@ -17,14 +17,11 @@
 
 
 /* tags for values visible from Lua */
-// #define LAST_TAG	LUA_TTHREAD /* LNUM */
-/* LNUM */
 #if defined(LUA_TINT) && (LUA_TINT > LUA_TTHREAD)
 # define LAST_TAG   LUA_TINT
 #else
 # define LAST_TAG	LUA_TTHREAD
 #endif
-/* /LNUM */
 
 #define NUM_TAGS	(LAST_TAG+1)
 
@@ -67,11 +64,9 @@ typedef union {
   GCObject *gc;
   void *p;
   lua_Number n;
-/* LNUM */
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
   lua_Integer i;
 #endif
-/* /LNUM */
   int b;
 } Value;
 
@@ -89,20 +84,17 @@ typedef struct lua_TValue {
 
 /* Macros to test type */
 #define ttisnil(o)	(ttype(o) == LUA_TNIL)
-// #define ttisnumber(o)	(ttype(o) == LUA_TNUMBER) /* LNUM */
 
-/* LNUM */
-#ifdef LUA_TINT
-# if (LUA_TINT & 0x0f) == LUA_TNUMBER
-#  define ttisnumber(o) ((ttype(o) & 0x0f) == LUA_TNUMBER)
-# else
-#  define ttisnumber(o) ((ttype(o) == LUA_TINT) || (ttype(o) == LUA_TNUMBER))
-# endif
-# define ttisint(o) (ttype(o) == LUA_TINT)
-#else
+#if !defined(LUA_TINT)
 # define ttisnumber(o) (ttype(o) == LUA_TNUMBER)
+#else
+#if (LUA_TINT & 0x0f) == LUA_TNUMBER
+#  define ttisnumber(o) ((ttype(o) & 0x0f) == LUA_TNUMBER)
+#else
+#  define ttisnumber(o) ((ttype(o) == LUA_TINT) || (ttype(o) == LUA_TNUMBER))
 #endif
-/* /LNUM */
+# define ttisint(o) (ttype(o) == LUA_TINT)
+#endif
 
 #define ttisstring(o)	(ttype(o) == LUA_TSTRING)
 #define ttistable(o)	(ttype(o) == LUA_TTABLE)
@@ -116,16 +108,15 @@ typedef struct lua_TValue {
 #define ttype(o)	((o)->tt)
 #define gcvalue(o)	check_exp(iscollectable(o), (o)->value.gc)
 #define pvalue(o)	check_exp(ttislightuserdata(o), (o)->value.p)
-// #define nvalue(o)	check_exp(ttisnumber(o), (o)->value.n) /* LNUM */
 
-/* LNUM */
-#if defined(LUA_TINT) && (LUA_TINT&0x0f == LUA_TNUMBER)
+
+#if !defined(LUA_TINT)
+# define ttype_ext(o) ttype(o)
+#elif LUA_TINT&0x0f == LUA_TNUMBER
 /* expects never to be called on <0 (LUA_TNONE) */
 # define ttype_ext(o) ( ttype(o) & 0x0f )
-#elif defined(LUA_TINT)
-# define ttype_ext(o) ( ttype(o) == LUA_TINT ? LUA_TNUMBER : ttype(o) )
 #else
-# define ttype_ext(o) ttype(o)
+# define ttype_ext(o) ( ttype(o) == LUA_TINT ? LUA_TNUMBER : ttype(o) )
 #endif
 
 /* '_fast' variants are for cases where 'ttype(o)' is known to be LUA_TNUMBER
@@ -141,7 +132,6 @@ typedef struct lua_TValue {
 #ifdef LUA_TINT
 # define ivalue(o)	check_exp( ttype(o)==LUA_TINT, (o)->value.i )
 #endif
-/* /LNUM */
 
 #define rawtsvalue(o)	check_exp(ttisstring(o), &(o)->value.gc->ts)
 #define tsvalue(o)	(&rawtsvalue(o)->tsv)
@@ -168,9 +158,7 @@ typedef struct lua_TValue {
 /* Macros to set values */
 #define setnilvalue(obj) ((obj)->tt=LUA_TNIL)
 
-/* LNUM */
-// #define setnvalue(obj,x) \
-//  { TValue *i_o=(obj); i_o->value.n=(x); i_o->tt=LUA_TNUMBER; }
+
 #define setnvalue(obj,x) { TValue *i_o=(obj); i_o->value.n= (x); i_o->tt=LUA_TNUMBER; }
 
 #ifdef LUA_TINT
@@ -178,7 +166,6 @@ typedef struct lua_TValue {
 #else
 # define setivalue(obj,x) setnvalue(obj,cast_num(x))
 #endif
-/* /LNUM */
 
 #define setpvalue(obj,x) \
   { TValue *i_o=(obj); i_o->value.p=(x); i_o->tt=LUA_TLIGHTUSERDATA; }
@@ -247,14 +234,11 @@ typedef struct lua_TValue {
 #define setttype(obj, tt) (ttype(obj) = (tt))
 
 
-// #define iscollectable(o)	(ttype(o) >= LUA_TSTRING) /* LNUM */
-/* LNUM */
 #if defined(LUA_TINT) && (LUA_TINT >= LUA_TSTRING)
 # define iscollectable(o)	((ttype(o) >= LUA_TSTRING) && (ttype(o) != LUA_TINT))
 #else
 # define iscollectable(o)	(ttype(o) >= LUA_TSTRING)
 #endif
-/* /LNUM */
 
 
 typedef TValue *StkId;  /* index to stack elements */
@@ -437,7 +421,11 @@ LUAI_FUNC int luaO_log2 (unsigned int x);
 LUAI_FUNC int luaO_int2fb (unsigned int x);
 LUAI_FUNC int luaO_fb2int (int x);
 LUAI_FUNC int luaO_rawequalObj (const TValue *t1, const TValue *t2);
-// LUAI_FUNC int luaO_str2d (const char *s, lua_Number *result); /* LNUM */
+
+#if !defined(LUA_TINT)
+LUAI_FUNC int luaO_str2d(const char* s, lua_Number* result);
+#endif
+
 LUAI_FUNC const char *luaO_pushvfstring (lua_State *L, const char *fmt,
                                                        va_list argp);
 LUAI_FUNC const char *luaO_pushfstring (lua_State *L, const char *fmt, ...);

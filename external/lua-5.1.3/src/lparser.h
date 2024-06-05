@@ -31,8 +31,10 @@ typedef enum {
   VRELOCABLE,	/* info = instruction pc */
   VNONRELOC,	/* info = result register */
   VCALL,	/* info = instruction pc */
-  VVARARG	/* info = instruction pc */
-, VKINT     /* ival = integer value */ /* LNUM */
+  VVARARG,	/* info = instruction pc */
+#if defined(LUA_TINT)
+  VKINT     /* ival = integer value */
+#endif
 } expkind;
 
 typedef struct expdesc {
@@ -40,7 +42,9 @@ typedef struct expdesc {
   union {
     struct { int info, aux; } s;
     lua_Number nval;
-    lua_Integer ival; /* LNUM */
+#if defined(LUA_TINT)
+    lua_Integer ival;
+#endif
   } u;
   int t;  /* patch list of `exit when true' */
   int f;  /* patch list of `exit when false' */

@@ -9,7 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h> /* LNUM */
+
+#if defined(LUA_TINT)
+#include <ctype.h>
+#endif
 
 #define liolib_c
 #define LUA_LIB
@@ -19,10 +22,10 @@
 #include "lauxlib.h"
 #include "lualib.h"
 
-/* LNUM */
+#if defined(LUA_TINT)
 #include "lnum.h"
 #include "llex.h"
-/* /LNUM */
+#endif
 
  #if defined( Rtt_ANDROID_ENV ) && defined( Rtt_DEBUG )
 	#include <android/log.h>
@@ -313,19 +316,17 @@ static int io_lines (lua_State *L) {
 */
 
 
-/* LNUM */
 /*
+* LNUM:
 * NOTE: Lua's usual '*n' format specifier reads numbers as floating point,
 *       and converts to integer if they are. IN ORDER TO NOT LOSE ACCURACY,
 *       a new '*i' format specifier is added (will also be speedier, on non-
 *       FPU systems).
 */
-/* /LNUM */
 
 static int read_number (lua_State *L, FILE *f) {
   lua_Number d;
   if (fscanf(f, LUA_NUMBER_SCAN, &d) == 1) {
-/* LNUM */
 #ifdef LUA_TINT
       lua_Integer tmp;
       lua_number2integer(tmp, d);
@@ -333,7 +334,6 @@ static int read_number (lua_State *L, FILE *f) {
           lua_pushinteger(L, tmp);
       else
 #endif
-/* /LNUM */
     lua_pushnumber(L, d);
     return 1;
   }
@@ -344,7 +344,7 @@ static int read_number (lua_State *L, FILE *f) {
 }
 
 
-/* LNUM */
+#if defined(LUA_TINT)
 static int read_integer(lua_State* L, FILE* f) {
     lua_Integer i;
     if (fscanf(f, LUA_INTEGER_SCAN, &i) == 1) {
@@ -353,7 +353,7 @@ static int read_integer(lua_State* L, FILE* f) {
     }
     else return 0;  /* read fails */
 }
-/* /LNUM */
+#endif
 
 
 static int test_eof (lua_State *L, FILE *f) {
@@ -428,11 +428,11 @@ static int g_read (lua_State *L, FILE *f, int first) {
           case 'n':  /* number */
             success = read_number(L, f);
             break;
-        /* LNUM */
+        #if defined(LUA_TINT)
           case 'i':  /* integer (full accuracy) */
               success = read_integer(L, f);
               break;
-        /* /LNUM */
+        #endif
           case 'l':  /* line */
             success = read_line(L, f);
             break;
@@ -493,17 +493,14 @@ static int g_write (lua_State *L, FILE *f, int arg) {
   int status = 1;
   for (; nargs--; arg++) {
     if (lua_type(L, arg) == LUA_TNUMBER) {
-      /* LNUM */
-#if 0
+#if defined(LUA_TINT)
+      if (lua_isinteger(L, arg))
+          status = status && fprintf(f, LUA_INTEGER_FMT, lua_tointegerx(L, arg)) > 0;
+      else
+#endif
       /* optimization: could be done exactly as for strings */
       status = status &&
           fprintf(f, LUA_NUMBER_FMT, lua_tonumber(L, arg)) > 0;
-#endif
-      if (lua_isinteger(L, arg))
-          status = status && fprintf(f, LUA_INTEGER_FMT, lua_tointegerx(L, arg)) > 0; /* LNUM */
-      else
-          status = status && fprintf(f, LUA_NUMBER_FMT, lua_tonumber(L, arg)) > 0;
-      /* /LNUM */
     }
     else {
       size_t l;
@@ -546,8 +543,11 @@ static int f_setvbuf (lua_State *L) {
   static const char *const modenames[] = {"no", "full", "line", NULL};
   FILE *f = tofile(L);
   int op = luaL_checkoption(L, 2, NULL, modenames);
-  // lua_Integer sz = luaL_optinteger(L, 3, LUAL_BUFFERSIZE); /* LNUM */
-  size_t sz = luaL_optint32(L, 3, LUAL_BUFFERSIZE); /* LNUM */
+#if defined(LUA_TINT)
+  size_t sz = luaL_optint32(L, 3, LUAL_BUFFERSIZE);
+#else
+  lua_Integer sz = luaL_optinteger(L, 3, LUAL_BUFFERSIZE);
+#endif
   int res = setvbuf(f, NULL, mode[op], sz);
   return pushresult(L, res == 0, NULL);
 }

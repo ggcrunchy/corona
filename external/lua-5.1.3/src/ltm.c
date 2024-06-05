@@ -70,15 +70,8 @@ const TValue *luaT_gettmbyobj (lua_State *L, const TValue *o, TMS event) {
     case LUA_TUSERDATA:
       mt = uvalue(o)->metatable;
       break;
-    /* LNUM */
-#ifdef LUA_TINT
-    case LUA_TINT:
-        mt = G(L)->mt[LUA_TNUMBER];
-        break;
-#endif
-    /* /LNUM */
     default:
-      mt = G(L)->mt[ttype(o)];
+      mt = G(L)->mt[ttype_ext(o)];
   }
   return (mt ? luaH_getstr(mt, G(L)->tmname[event]) : luaO_nilobject);
 }

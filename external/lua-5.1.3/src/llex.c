@@ -23,7 +23,9 @@
 #include "ltable.h"
 #include "lzio.h"
 
-#include "lnum.h" /* LNUM */
+#if defined(LUA_TINT)
+#include "lnum.h"
+#endif
 
 
 #define next(ls) (ls->current = zgetc(ls->z))
@@ -48,7 +50,9 @@ const char *const luaX_tokens [] = {
     "<<", ">>",
 #endif
     "<number>", "<name>", "<string>", "<eof>",
-    "<integer>", /* LNUM */
+#if defined(LUA_TINT)
+    "<integer>",
+#endif
     NULL
 };
 
@@ -96,7 +100,9 @@ static const char *txtToken (LexState *ls, int token) {
   switch (token) {
     case TK_NAME:
     case TK_STRING:
-    case TK_INT: /* LNUM */
+#if defined(LUA_TINT)
+    case TK_INT:
+#endif
     case TK_NUMBER:
       save(ls, '\0');
       return luaZ_buffer(ls->buff);
@@ -184,43 +190,48 @@ static void buffreplace (LexState *ls, char from, char to) {
     if (p[n] == from) p[n] = to;
 }
 
-/* LNUM */
-//static void trydecpoint (LexState *ls, SemInfo *seminfo) {
-/* TK_NUMBER (/ TK_NUMBER2) */
+
+#if defined(LUA_TINT)
+/* TK_NUMBER */
 static int trydecpoint(LexState* ls, SemInfo* seminfo) {
-/* /LNUM */
+  int ret;
+#else
+static void trydecpoint (LexState *ls, SemInfo *seminfo) {
+#endif
   /* format error: try to update decimal point separator */
 #ifndef ANDROID_NDK
   struct lconv *cv = localeconv();
 #endif
   char old = ls->decpoint;
-  int ret; /* LNUM */
 #ifndef ANDROID_NDK
   ls->decpoint = (cv ? cv->decimal_point[0] : '.');
 #else
   ls->decpoint = '.'; // (cv ? cv->decimal_point[0] : '.');
 #endif
   buffreplace(ls, old, ls->decpoint);  /* try updated decimal separator */
-/* LNUM */
-  // if (!luaO_str2d(luaZ_buffer(ls->buff), &seminfo->r)) {
+#if defined(LUA_TINT)
   ret = luaO_str2d(luaZ_buffer(ls->buff), &seminfo->r, NULL);
   if (!ret) {
-/* /LNUM */
+#else
+  if (!luaO_str2d(luaZ_buffer(ls->buff), &seminfo->r)) {
+#endif
     /* format error with correct decimal point: no more options */
     buffreplace(ls, ls->decpoint, '.');  /* undo change (for error message) */
     luaX_lexerror(ls, "malformed number", TK_NUMBER);
   }
-  return ret; /* LNUM */
+#if defined(LUA_TINT)
+  return ret;
+#endif
 }
 
 
-/* LNUM */
-/* LUA_NUMBER */
-//static void read_numeral (LexState *ls, SemInfo *seminfo) {
-/* TK_NUMBER / TK_INT (/TK_NUMBER2) */
+#if defined(LUA_TINT)
+/* TK_NUMBER / TK_INT */
 static int read_numeral(LexState* ls, SemInfo* seminfo) {
     int ret;
-/* /LNUM */
+#else
+static void read_numeral (LexState *ls, SemInfo *seminfo) {
+#endif
   lua_assert(isdigit(ls->current));
   do {
     save_and_next(ls);
@@ -231,15 +242,14 @@ static int read_numeral(LexState* ls, SemInfo* seminfo) {
     save_and_next(ls);
   save(ls, '\0');
   buffreplace(ls, '.', ls->decpoint);  /* follow locale for decimal point */
-/* LNUM */
-#if 0
-  if (!luaO_str2d(luaZ_buffer(ls->buff), &seminfo->r))  /* format error? */
-    trydecpoint(ls, seminfo); /* try to update decimal point separator */
-#endif
+#if defined(LUA_TINT)
   ret = luaO_str2d(luaZ_buffer(ls->buff), &seminfo->r, &seminfo->i);
   if (!ret) return trydecpoint(ls, seminfo); /* try to update decimal point separator */
   return ret;
-/* /LNUM */
+#else
+  if (!luaO_str2d(luaZ_buffer(ls->buff), &seminfo->r))  /* format error? */
+      trydecpoint(ls, seminfo); /* try to update decimal point separator */
+#endif
 }
 
 
@@ -367,7 +377,7 @@ static void read_string (LexState *ls, int del, SemInfo *seminfo) {
 }
 
 
-/* char / TK_* */ /* LNUM */
+/* char / TK_* */
 static int llex (LexState *ls, SemInfo *seminfo) {
   luaZ_resetbuffer(ls->buff);
   for (;;) {
@@ -459,11 +469,12 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         }
         else if (!isdigit(ls->current)) return '.';
         else {
-            /* LNUM */
-          /*read_numeral(ls, seminfo);
-          return TK_NUMBER;*/
+          #if defined(LUA_TINT)
             return read_numeral(ls, seminfo);
-            /* /LNUM */
+          #else
+            read_numeral(ls, seminfo);
+            return TK_NUMBER;
+          #endif
         }
       }
       case EOZ: {
@@ -476,11 +487,12 @@ static int llex (LexState *ls, SemInfo *seminfo) {
           continue;
         }
         else if (isdigit(ls->current)) {
-          /* LNUM */
-          /*read_numeral(ls, seminfo);
-          return TK_NUMBER;*/
+          #if defined(LUA_TINT)
             return read_numeral(ls, seminfo);
-        /* /LNUM */
+          #else
+            read_numeral(ls, seminfo);
+            return TK_NUMBER;
+          #endif
         }
         else if (isalpha(ls->current) || ls->current == '_') {
           /* identifier or reserved word */

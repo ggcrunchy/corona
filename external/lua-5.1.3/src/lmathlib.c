@@ -184,8 +184,7 @@ static int math_random (lua_State *L) {
   /* the `%' avoids the (rare) case of r==1, and is needed also because on
      some systems (SunOS!) `rand()' may return a value larger than RAND_MAX */
   lua_Number r = (lua_Number)(rand()%RAND_MAX) / (lua_Number)RAND_MAX;
-  /* LNUM */
-#if 0
+#if !defined(LUA_TINT)
   switch (lua_gettop(L)) {  /* check number of arguments */
     case 0: {  /* no arguments */
       lua_pushnumber(L, r);  /* Number between 0 and 1 */
@@ -205,24 +204,24 @@ static int math_random (lua_State *L) {
       break;
     }
     default: return luaL_error(L, "wrong number of arguments");
+#else
+    int n = lua_gettop(L);  /* number of arguments */
+    if (n == 0) {	/* no arguments: range [0,1) */
+        lua_pushnumber(L, r);
+    }
+    else if (n <= 2) {	/* int range [1,u] or [l,u] */
+        int l = n == 1 ? 1 : luaL_checkint(L, 1);
+        int u = luaL_checkint(L, n);
+        int tmp;
+        lua_Number d;
+        luaL_argcheck(L, l <= u, n, "interval is empty");
+        d = floor(r * (u - l + 1));
+        lua_number2int(tmp, d);
+        lua_pushintegerx(L, l + tmp);
+    }
+    else {
+        return luaL_error(L, "wrong number of arguments");
 #endif
-        int n = lua_gettop(L);  /* number of arguments */
-        if (n == 0) {	/* no arguments: range [0,1) */
-            lua_pushnumber(L, r);
-        }
-        else if (n <= 2) {	/* int range [1,u] or [l,u] */
-            int l = n == 1 ? 1 : luaL_checkint(L, 1);
-            int u = luaL_checkint(L, n);
-            int tmp;
-            lua_Number d;
-            luaL_argcheck(L, l <= u, n, "interval is empty");
-            d = floor(r * (u - l + 1));
-            lua_number2int(tmp, d);
-            lua_pushintegerx(L, l + tmp);
-        }
-        else {
-            return luaL_error(L, "wrong number of arguments");
-    /* /LNUM */
   }
   return 1;
 }
@@ -277,10 +276,10 @@ LUALIB_API int luaopen_math (lua_State *L) {
   lua_setfield(L, -2, "pi");
   lua_pushnumber(L, HUGE_VAL);
   lua_setfield(L, -2, "huge");
-  /* LNUM */
-  lua_pushintegerx(L, LUA_INTEGER_MAX); /* LNUM */
+#if defined(LUA_TINT)
+  lua_pushintegerx(L, LUA_INTEGER_MAX);
   lua_setfield(L, -2, "hugeint");
-  /* /LNUM */
+#endif
 #if defined(LUA_COMPAT_MOD)
   lua_getfield(L, -1, "fmod");
   lua_setfield(L, -2, "mod");

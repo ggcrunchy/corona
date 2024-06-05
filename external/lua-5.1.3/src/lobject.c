@@ -22,10 +22,10 @@
 #include "lstring.h"
 #include "lvm.h"
 
-/* LNUM */
+#if defined(LUA_TINT)
 #include "llex.h"
 #include "lnum.h"
-/* /LNUM */
+#endif
 
 const TValue luaO_nilobject_ = {{NULL}, LUA_TNIL};
 
@@ -71,23 +71,54 @@ int luaO_log2 (unsigned int x) {
 
 }
 
-/* LNUM */
-#if 0
-int luaO_rawequalObj (const TValue *t1, const TValue *t2) {
-  if (ttype(t1) != ttype(t2)) return 0;
-  else switch (ttype(t1)) {
+
+#if defined(LUA_TINT)
+int luaO_rawequalObj(const TValue* l, const TValue* r) {
+    int tl = ttype(l), tr = ttype(r);
+    if (tl == tr) {
+        switch (tl) {
+        case LUA_TNIL:
+            return 1;
+        case LUA_TINT:
+            return ivalue(l) == ivalue(r);
+        case LUA_TNUMBER:
+            return luai_numeq(nvalue_fast(l), nvalue_fast(r));
+        case LUA_TBOOLEAN:
+            return bvalue(l) == bvalue(r);  /* boolean true must be 1 !! */
+        case LUA_TLIGHTUSERDATA:
+            return pvalue(l) == pvalue(r);
+        default:
+            lua_assert(iscollectable(l));
+            return gcvalue(l) == gcvalue(r);
+        }
+    }
+    else if (tl == LUA_TINT && tr == LUA_TNUMBER) {
+        /* Avoid doing accuracy losing cast, if possible. */
+        lua_Integer tmp;
+        return tt_integer_valued(r, &tmp) ? (ivalue(l) == tmp)
+            : luai_numeq(cast_num(ivalue(l)), nvalue_fast(r));
+    }
+    else if (tl == LUA_TNUMBER && tr == LUA_TINT) {
+        return luaO_rawequalObj(r, l);
+    }
+    return 0;
+}
+#else
+int luaO_rawequalObj(const TValue* t1, const TValue* t2) {
+    if (ttype(t1) != ttype(t2)) return 0;
+    else switch (ttype(t1)) {
     case LUA_TNIL:
-      return 1;
+        return 1;
     case LUA_TNUMBER:
-      return luai_numeq(nvalue(t1), nvalue(t2));
+        return luai_numeq(nvalue(t1), nvalue(t2));
     case LUA_TBOOLEAN:
-      return bvalue(t1) == bvalue(t2);  /* boolean true must be 1 !! */
+        return bvalue(t1) == bvalue(t2);  /* boolean true must be 1 !! */
     case LUA_TLIGHTUSERDATA:
-      return pvalue(t1) == pvalue(t2);
+        return pvalue(t1) == pvalue(t2);
     default:
-      lua_assert(iscollectable(t1));
-      return gcvalue(t1) == gcvalue(t2);
-  }
+        lua_assert(iscollectable(t1));
+        return gcvalue(t1) == gcvalue(t2);
+    }
 }
 
 int luaO_str2d(const char* s, lua_Number* result) {
@@ -102,41 +133,6 @@ int luaO_str2d(const char* s, lua_Number* result) {
     return 1;
 }
 #endif
-int luaO_rawequalObj(const TValue* l, const TValue* r) {
-    int tl = ttype(l), tr = ttype(r);
-    if (tl == tr) {
-        switch (tl) {
-        case LUA_TNIL:
-            return 1;
-#ifdef LUA_TINT
-        case LUA_TINT:
-            return ivalue(l) == ivalue(r);
-#endif
-        case LUA_TNUMBER:
-            return luai_numeq(nvalue_fast(l), nvalue_fast(r));
-        case LUA_TBOOLEAN:
-            return bvalue(l) == bvalue(r);  /* boolean true must be 1 !! */
-        case LUA_TLIGHTUSERDATA:
-            return pvalue(l) == pvalue(r);
-        default:
-            lua_assert(iscollectable(l));
-            return gcvalue(l) == gcvalue(r);
-        }
-    }
-#ifdef LUA_TINT
-    else if (tl == LUA_TINT && tr == LUA_TNUMBER) {
-        /* Avoid doing accuracy losing cast, if possible. */
-        lua_Integer tmp;
-        return tt_integer_valued(r, &tmp) ? (ivalue(l) == tmp)
-            : luai_numeq(cast_num(ivalue(l)), nvalue_fast(r));
-    }
-    else if (tl == LUA_TNUMBER && tr == LUA_TINT) {
-        return luaO_rawequalObj(r, l);
-    }
-#endif
-    return 0;
-}
-/* /LNUM */
 
 static void pushstr (lua_State *L, const char *str) {
   setsvalue2s(L, L->top, luaS_new(L, str));
@@ -168,14 +164,15 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
         break;
       }
       case 'd': {
-        // setnvalue(L->top, cast_num(va_arg(argp, int))); /* LNUM */
-        /* LNUM */
-        /* This is tricky for 64-bit integers; maybe they even cannot be
+        /* LNUM: This is tricky for 64-bit integers; maybe they even cannot be
         * supported on all compilers; depends on the conversions applied to
         * variable argument lists. TBD: test!
         */
+      #if defined(LUA_TINT)
         setivalue(L->top, (lua_Integer)va_arg(argp, l_uacInteger));
-        /* /LNUM */
+      #else
+        setnvalue(L->top, cast_num(va_arg(argp, int)));
+      #endif
         incr_top(L);
         break;
       }

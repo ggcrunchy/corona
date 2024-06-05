@@ -22,18 +22,21 @@
 #include "lopcodes.h"
 #include "lparser.h"
 #include "ltable.h"
-#include "lnum.h" /* LNUM */
 
+#if defined(LUA_TINT)
+#include "lnum.h"
+#endif
 
 #define hasjumps(e)	((e)->t != (e)->f)
 
 
 static int isnumeral(expdesc *e) {
-  // return (e->k == VKNUM && e->t == NO_JUMP && e->f == NO_JUMP); /* LNUM */
-  /* LNUM */
+#if !defined(LUA_TINT)
+  return (e->k == VKNUM && e->t == NO_JUMP && e->f == NO_JUMP);
+#else
     int ek = (e->k == VKINT) || (e->k == VKNUM);
     return (ek && e->t == NO_JUMP && e->f == NO_JUMP);
-  /* /LNUM */
+#endif
 }
 
 
@@ -234,9 +237,6 @@ static void freeexp (FuncState *fs, expdesc *e) {
 static int addk (FuncState *fs, TValue *k, TValue *v) {
   lua_State *L = fs->L;
   TValue *idx = luaH_set(L, fs->h, k);
-  /* LNUM */
-  /*Proto *f = fs->f;
-  int oldsize = f->sizek;*/
 #ifdef LUA_TINT
   /* Note: Integer-valued LUA_TNUMBER's are handled as in unpatched Lua (below)
   */
@@ -248,24 +248,20 @@ static int addk (FuncState *fs, TValue *k, TValue *v) {
   }
   else if (ttype(idx) == LUA_TNUMBER) {
 #else
-  /* /LNUM */
   if (ttisnumber(idx)) {
-    /* LNUM */
-    /*lua_assert(luaO_rawequalObj(&fs->f->k[cast_int(nvalue(idx))], v));
-    return cast_int(nvalue(idx));*/
 #endif
-      int i = cast_int(nvalue_fast(idx));
-      lua_assert(luaO_rawequalObj(&fs->f->k[i], v));
-      return i;
-    /* /LNUM */
+    int i = cast_int(nvalue_fast(idx));
+    lua_assert(luaO_rawequalObj(&fs->f->k[i], v));
+    return i;
   }
   else {  /* constant not found; create a new entry */
-    // setnvalue(idx, cast_num(fs->nk)); /* LNUM */
-    /* LNUM */
-      Proto* f = fs->f;
-      int oldsize = f->sizek;
-      setivalue(idx, fs->nk);
-    /* /LNUM */
+    Proto* f = fs->f;
+    int oldsize = f->sizek;
+  #if defined(LUA_TINT)
+    setivalue(idx, fs->nk);
+  #else
+    setnvalue(idx, cast_num(fs->nk));
+  #endif
     luaM_growvector(L, f->k, fs->nk, f->sizek, TValue,
                     MAXARG_Bx, "constant table overflow");
     while (oldsize < f->sizek) setnilvalue(&f->k[oldsize++]);
@@ -290,13 +286,13 @@ int luaK_numberK (FuncState *fs, lua_Number r) {
 }
 
 
-/* LNUM */
+#if defined(LUA_TINT)
 int luaK_integerK(FuncState* fs, lua_Integer r) {
     TValue o;
     setivalue(&o, r);
     return addk(fs, &o, &o);
 }
-/* /LNUM */
+#endif
 
 
 static int boolK (FuncState *fs, int b) {
@@ -397,12 +393,12 @@ static void discharge2reg (FuncState *fs, expdesc *e, int reg) {
       luaK_codeABx(fs, OP_LOADK, reg, luaK_numberK(fs, e->u.nval));
       break;
     }
-/* LNUM */
+#if defined(LUA_TINT)
     case VKINT: {
         luaK_codeABx(fs, OP_LOADK, reg, luaK_integerK(fs, e->u.ival));
         break;
     }
-/* /LNUM */
+#endif
     case VRELOCABLE: {
       Instruction *pc = &getcode(fs, e);
       SETARG_A(*pc, reg);
@@ -488,7 +484,9 @@ void luaK_exp2val (FuncState *fs, expdesc *e) {
 int luaK_exp2RK (FuncState *fs, expdesc *e) {
   luaK_exp2val(fs, e);
   switch (e->k) {
-    case VKINT: /* LNUM */
+#if defined(LUA_TINT)
+    case VKINT:
+#endif
     case VKNUM:
     case VTRUE:
     case VFALSE:
@@ -496,7 +494,9 @@ int luaK_exp2RK (FuncState *fs, expdesc *e) {
       if (fs->nk <= MAXINDEXRK) {  /* constant fit in RK operand? */
         e->u.s.info = (e->k == VNIL)  ? nilK(fs) :
                       (e->k == VKNUM) ? luaK_numberK(fs, e->u.nval) :
-                      (e->k == VKINT) ? luaK_integerK(fs, e->u.ival) : /* LNUM */
+#if defined(LUA_TINT)
+                      (e->k == VKINT) ? luaK_integerK(fs, e->u.ival) :
+#endif
                                         boolK(fs, (e->k == VTRUE));
         e->k = VK;
         return RKASK(e->u.s.info);
@@ -586,10 +586,10 @@ void luaK_goiftrue (FuncState *fs, expdesc *e) {
   int pc;  /* pc of last jump */
   luaK_dischargevars(fs, e);
   switch (e->k) {
-    // case VK: case VKNUM: case VTRUE: { /* LNUM */
-    /* LNUM */
-  case VKINT: case VK: case VKNUM: case VTRUE: {
-    /* /LNUM */
+#if defined(LUA_TINT)
+  case VKINT:
+#endif
+  case VK: case VKNUM: case VTRUE: {
       pc = NO_JUMP;  /* always true; do nothing */
       break;
     }
@@ -639,10 +639,10 @@ static void codenot (FuncState *fs, expdesc *e) {
       e->k = VTRUE;
       break;
     }
-    // case VK: case VKNUM: case VTRUE: { /* LNUM */
-    /* LNUM */
-    case VKINT: case VK: case VKNUM: case VTRUE: {
-    /* /LNUM */
+#if defined(LUA_TINT)
+    case VKINT:
+#endif
+    case VK: case VKNUM: case VTRUE: {
       e->k = VFALSE;
       break;
     }
@@ -681,12 +681,10 @@ static int constfolding (OpCode op, expdesc *e1, expdesc *e2) {
 #if defined(LUA_BITWISE_OPERATORS)
   lua_Integer i;
 #endif
-  int vkres = VKNUM; /* LNUM */
+#if defined(LUA_TINT)
+  int vkres = VKNUM;
+#endif
   if (!isnumeral(e1) || !isnumeral(e2)) return 0;
-  /* LNUM */
-  /*v1 = e1->u.nval;
-  v2 = e2->u.nval;*/
-
 #ifdef LUA_TINT
   if ((e1->k == VKINT) && (e2->k == VKINT)) {
       lua_Integer i1 = e1->u.ival, i2 = e2->u.ival;
@@ -708,11 +706,12 @@ static int constfolding (OpCode op, expdesc *e1, expdesc *e2) {
           return 1;
       }
   }
-#endif
   v1 = (e1->k == VKINT) ? cast_num(e1->u.ival) : e1->u.nval;
   v2 = (e2->k == VKINT) ? cast_num(e2->u.ival) : e2->u.nval;
-
-  /* /LNUM */
+#else
+  v1 = e1->u.nval;
+  v2 = e2->u.nval;
+#endif
   switch (op) {
     case OP_ADD: r = luai_numadd(v1, v2); break;
     case OP_SUB: r = luai_numsub(v1, v2); break;
@@ -740,10 +739,14 @@ static int constfolding (OpCode op, expdesc *e1, expdesc *e2) {
     default: lua_assert(0); r = 0; break;
   }
   if (luai_numisnan(r)) return 0;  /* do not attempt to produce NaN */
-  e1->k = cast(expkind, vkres); /* LNUM */
+#if defined(LUA_TINT)
+  e1->k = cast(expkind, vkres);
+#endif
 #if defined(LUA_BITWISE_OPERATORS)
-  if (op >= EXTRA_OPCODE_0)
+  if (op >= EXTRA_OPCODE_0) {
       e1->u.ival = i;
+      e1->k = cast(expkind, VKINT);
+  }
   else
 #endif
   e1->u.nval = r;
@@ -793,7 +796,11 @@ static void codecomp (FuncState *fs, OpCode op, int cond, expdesc *e1,
 
 void luaK_prefix (FuncState *fs, UnOpr op, expdesc *e) {
   expdesc e2;
-  e2.t = e2.f = NO_JUMP; e2.k = VKINT/*NUM*/; e2.u./*n*/ival = 0; /* LNUM */
+#if defined(LUA_TINT)
+  e2.t = e2.f = NO_JUMP; e2.k = VKINT; e2.u.ival = 0;
+#else
+  e2.t = e2.f = NO_JUMP; e2.k = VKNUM; e2.u.nval = 0;
+#endif
   switch (op) {
 #if defined(LUA_BITWISE_OPERATORS)
   case OPR_BNOT: {

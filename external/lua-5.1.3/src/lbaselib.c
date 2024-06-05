@@ -19,11 +19,11 @@
 #include "lauxlib.h"
 #include "lualib.h"
 
-/* LNUM */
+#if defined(LUA_TINT)
 #include "llimits.h"
 #include "lobject.h"
 #include "lapi.h"
-/* /LNUM */
+#endif
 
 
 /*
@@ -58,32 +58,40 @@ static int luaB_tonumber (lua_State *L) {
   int base = luaL_optint(L, 2, 10);
   if (base == 10) {  /* standard conversion */
     luaL_checkany(L, 1);
-    if (lua_isnumber(L, 1)) {       /* numeric string, or a number */ /* LNUM */
-/* LNUM */
+    if (lua_isnumber(L, 1)) {       /* LNUM: numeric string, or a number */
 #ifdef LUA_TINT
-        lua_pushvalue_as_number(L, 1);     /* API extension (not to lose accuracy here) */
+      lua_pushvalue_as_number(L, 1);     /* API extension (not to lose accuracy here) */
 #else
-/* /LNUM */
       lua_pushnumber(L, lua_tonumber(L, 1));
-#endif /* LNUM */
+#endif
       return 1;
     }
   }
   else {
     const char *s1 = luaL_checkstring(L, 1);
     char *s2;
-    unsigned LUA_INTEGER/*long*/ n; /* LNUM */
+#if defined(LUA_TINT)
+    unsigned LUA_INTEGER n;
+#else
+    long n;
+#endif
     luaL_argcheck(L, 2 <= base && base <= 36, 2, "base out of range");
-    n = lua_str2ul/*strtoul*/(s1, &s2, base); /* LNUM */
+#if defined(LUA_TINT)
+    n = lua_str2ul(s1, &s2, base);
+#else
+    n = strtoul(s1, &s2, base);
+#endif
     if (s1 != s2) {  /* at least one valid digit? */
       while (isspace((unsigned char)(*s2))) s2++;  /* skip trailing spaces */
       if (*s2 == '\0') {  /* no invalid trailing characters? */
-        /* LNUM */
-        /* Push as number, there needs to be separate 'luaB_tointeger' for
+        /* LNUM: Push as number, there needs to be separate 'luaB_tointeger' for
         * when the caller wants to preserve the bits (matters if unsigned
         * values are used).*/
-        /* /LNUM */
-        lua_pushnumber(L, cast_num(n));// (lua_Number)n); /* LNUM */
+      #if defined(LUA_TINT)
+        lua_pushnumber(L, cast_num(n));
+      #else
+        lua_pushnumber(L, (lua_Number)n);
+      #endif
         return 1;
       }
     }
@@ -159,7 +167,11 @@ static int luaB_setfenv (lua_State *L) {
   luaL_checktype(L, 2, LUA_TTABLE);
   getfunc(L, 0);
   lua_pushvalue(L, 2);
-  if (lua_isnumber(L, 1) && lua_tointeger/*number*/(L, 1) == 0) { /* LNUM */
+#if defined(LUA_TINT)
+  if (lua_isnumber(L, 1) && lua_tointeger(L, 1) == 0) {
+#else
+  if (lua_isnumber(L, 1) && lua_tonumber(L, 1) == 0) {
+#endif
     /* change environment of current thread */
     lua_pushthread(L);
     lua_insert(L, -2);
@@ -216,7 +228,11 @@ static int luaB_collectgarbage (lua_State *L) {
   switch (optsnum[o]) {
     case LUA_GCCOUNT: {
       int b = lua_gc(L, LUA_GCCOUNTB, 0);
-      lua_pushnumber(L, res + (/*(lua_Number)b*/cast_num(b)/1024)); /* LNUM */
+#if defined(LUA_TINT)
+      lua_pushnumber(L, res + (cast_num(b)/1024));
+#else
+      lua_pushnumber(L, res + ((lua_Number)b / 1024));
+#endif
       return 1;
     }
     case LUA_GCSTEP: {
@@ -224,7 +240,11 @@ static int luaB_collectgarbage (lua_State *L) {
       return 1;
     }
     default: {
-      lua_pushinteger/*number*/(L, res); /* LNUM */
+#if defined(LUA_TINT)
+      lua_pushinteger(L, res);
+#else
+      lua_pushnumber(L, res);
+#endif
       return 1;
     }
   }
@@ -646,10 +666,10 @@ static void base_open (lua_State *L) {
   luaL_register(L, "_G", base_funcs);
   lua_pushliteral(L, LUA_VERSION);
   lua_setglobal(L, "_VERSION");  /* set global _VERSION */
-  /* LNUM */
+#if defined(LUA_TINT)
   lua_pushliteral(L, LUA_LNUM);
   lua_setglobal(L, "_LNUM");  /* "[complex] double|float|ldouble [int16|int32|int64]" */
-  /* /LNUM */
+#endif
   /* `ipairs' and `pairs' need auxiliary functions as upvalues */
   auxopen(L, "ipairs", luaB_ipairs, ipairsaux);
   auxopen(L, "pairs", luaB_pairs, luaB_next);

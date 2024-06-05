@@ -183,7 +183,11 @@ static void collectvalidlines (lua_State *L, Closure *f) {
     int *lineinfo = f->l.p->lineinfo;
     int i;
     for (i=0; i<f->l.p->sizelineinfo; i++)
-      setbvalue(luaH_setint/*num*/(L, t, lineinfo[i]), 1); /* LNUM */
+    #if defined(LUA_TINT)
+      setbvalue(luaH_setint(L, t, lineinfo[i]), 1);
+    #else
+      setbvalue(luaH_setnum(L, t, lineinfo[i]), 1);
+    #endif
     sethvalue(L, L->top, t); 
   }
   incr_top(L);
@@ -566,7 +570,7 @@ static int isinstack (CallInfo *ci, const TValue *o) {
 
 void luaG_typeerror (lua_State *L, const TValue *o, const char *op) {
   const char *name = NULL;
-  const char* t = luaT_typenames[ttype_ext(o)]; // ttype(o)]; /* LNUM */
+  const char* t = luaT_typenames[ttype_ext(o)];
   const char *kind = (isinstack(L->ci, o)) ?
                          getobjname(L, L->ci, cast_int(o - L->base), &name) :
                          NULL;
@@ -604,8 +608,8 @@ void luaG_logicerror(lua_State* L, const TValue* p1, const TValue* p2) {
 
 
 int luaG_ordererror (lua_State *L, const TValue *p1, const TValue *p2) {
-  const char *t1 = luaT_typenames[ttype_ext(p1)]; // ttype(p1)]; /* LNUM */
-  const char* t2 = luaT_typenames[ttype_ext(p2)]; // ttype(p2)]; /* LNUM */
+  const char *t1 = luaT_typenames[ttype_ext(p1)];
+  const char* t2 = luaT_typenames[ttype_ext(p2)];
   if (t1[2] == t2[2])
     luaG_runerror(L, "attempt to compare two %s values", t1);
   else

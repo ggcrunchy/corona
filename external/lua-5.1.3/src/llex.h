@@ -34,7 +34,9 @@ enum RESERVED {
   TK_CONCAT, TK_DOTS, TK_EQ, TK_GE, TK_LE, TK_NE, TK_NUMBER,
 #endif /* LUA_BITWISE_OPERATORS */
   TK_NAME, TK_STRING, TK_EOS,
-  TK_INT /* LNUM */
+#if defined(LUA_TINT)
+  TK_INT
+#endif
 };
 
 /* number of reserved words */
@@ -47,7 +49,9 @@ LUAI_DATA const char *const luaX_tokens [];
 
 typedef union {
   lua_Number r;
-  lua_Integer i; /* LNUM */
+#if defined(LUA_TINT)
+  lua_Integer i;
+#endif
   TString *ts;
 } SemInfo;  /* semantics information */
 

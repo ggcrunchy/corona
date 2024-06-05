@@ -15,7 +15,9 @@
 #include "lopcodes.h"
 #include "lundump.h"
 
-#include "lnum.h" /* LNUM */
+#if defined(LUA_TINT)
+#include "lnum.h"
+#endif
 
 #define PrintFunction	luaU_print
 
@@ -61,18 +63,13 @@ static void PrintConstant(const Proto* f, int i)
   case LUA_TBOOLEAN:
 	printf(bvalue(o) ? "true" : "false");
 	break;
-/* LNUM */
 #ifdef LUA_TINT
   case LUA_TINT:
-      printf(LUA_INTEGER_FMT, ivalue(o));
-      break;
+    printf(LUA_INTEGER_FMT, ivalue(o));
+    break;
 #endif
-/* /LNUM */
   case LUA_TNUMBER:
-	// printf(LUA_NUMBER_FMT,nvalue(o)); /* LNUM */
-/* LNUM */
-  printf(LUA_NUMBER_FMT, nvalue_fast(o));
-/* /LNUM */
+    printf(LUA_NUMBER_FMT, nvalue_fast(o));
 	break;
   case LUA_TSTRING:
 	PrintString(rawtsvalue(o));

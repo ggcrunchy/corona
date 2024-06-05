@@ -29,7 +29,9 @@
 #include "lundump.h"
 #include "lvm.h"
 
-#include "lnum.h" /* LNUM */
+#ifdef LUA_TINT
+#include "lnum.h"
+#endif
 
 
 
@@ -243,17 +245,15 @@ LUA_API void lua_pushvalue (lua_State *L, int idx) {
 
 LUA_API int lua_type (lua_State *L, int idx) {
   StkId o = index2adr(L, idx);
-  return (o == luaO_nilobject) ? LUA_TNONE : ttype_ext(o); // ttype(o); /* LNUM */
+  return (o == luaO_nilobject) ? LUA_TNONE : ttype_ext(o);
 }
 
 
 LUA_API const char *lua_typename (lua_State *L, int t) {
   UNUSED(L);
-/* LNUM */
 #ifdef LUA_TINT
   lua_assert(t != LUA_TINT);
 #endif
-/* /LNUM */
   return (t == LUA_TNONE) ? "no value" : luaT_typenames[t];
 }
 
@@ -271,18 +271,16 @@ LUA_API int lua_isnumber (lua_State *L, int idx) {
 }
 
 
-/* LNUM */
+#if defined(LUA_TINT)
+
 LUA_API int lua_isinteger(lua_State* L, int idx) {
     TValue tmp;
     lua_Integer dum;
     const TValue* o = index2adr(L, idx);
-#ifdef LUA_TINT
     return tonumber(o, &tmp) && (ttisint(o) || tt_integer_valued(o, &dum));
-#else
-    return tonumber(o, &tmp) && tt_integer_valued(o, &dum);
-#endif
 }
-/* /LNUM */
+
+#endif
 
 
 LUA_API int lua_isstring (lua_State *L, int idx) {
@@ -341,43 +339,29 @@ LUA_API lua_Number lua_tonumber (lua_State *L, int idx) {
 }
 
 
-/* LNUM */
+#if defined(LUA_TINT)
 LUA_API ptrdiff_t lua_tointeger (lua_State* L, int idx) {
     return (ptrdiff_t)lua_tointegerx(L, idx);
 }
-/* /LNUM */
 
 
-LUA_API lua_Integer lua_tointegerx (lua_State *L, int idx) { /* LNUM */
+LUA_API lua_Integer lua_tointegerx (lua_State *L, int idx) {
   TValue n;
-  /* LNUM */
     /* Lua 5.1 documented behaviour is to return nonzero for non-integer:
      *
      * "If the number is not an integer, it is truncated in some non-specified way."
      */
 #ifdef LUA_COMPAT_TOINTEGER
      /* Lua 5.1 compatible */
-  /* /LNUM */
   const TValue *o = index2adr(L, idx);
   if (tonumber(o, &n)) {
-    /* LNUM */
-    /*lua_Integer res;
-    lua_Number num = nvalue(o);
-    lua_number2integer(res, num);
-    return res;*/
       lua_Integer i;
       lua_Number d;
-# ifdef LUA_TINT
       if (ttisint(o)) return ivalue(o);
-# endif
       d = nvalue_fast(o);
       lua_number2integer(i, d);
       return i;
-   /* /LNUM */
   }
-  /* LNUM */
-  /*else
-    return 0;*/
 #else
      /* New suggestion */
   const TValue* o = index2adr(L, idx);
@@ -388,8 +372,21 @@ LUA_API lua_Integer lua_tointegerx (lua_State *L, int idx) { /* LNUM */
   }
 #endif
   return 0;
-  /* /LNUM */
 }
+#else
+LUA_API lua_Integer lua_tointeger (lua_State* L, int idx) {
+    TValue n;
+    const TValue* o = index2adr(L, idx);
+    if (tonumber(o, &n)) {
+        lua_Integer res;
+        lua_Number num = nvalue(o);
+        lua_number2integer(res, num);
+        return res;
+    }
+    else
+        return 0;
+}
+#endif
 
 
 LUA_API int lua_toboolean (lua_State *L, int idx) {
@@ -422,11 +419,9 @@ LUA_API size_t lua_objlen (lua_State *L, int idx) {
     case LUA_TSTRING: return tsvalue(o)->len;
     case LUA_TUSERDATA: return uvalue(o)->len;
     case LUA_TTABLE: return luaH_getn(hvalue(o));
-    /* LNUM */
 #ifdef LUA_TINT
     case LUA_TINT:
 #endif
-    /* /LNUM */
     case LUA_TNUMBER: {
       size_t l;
       lua_lock(L);  /* `luaV_tostring' may create a new string */
@@ -489,9 +484,7 @@ LUA_API void lua_pushnil (lua_State *L) {
 }
 
 
-/* LNUM */
-/* 'lua_pushnumber()' may lose accuracy on integers, 'lua_pushinteger' will not. */
-/* /LNUM */
+/* LNUM: 'lua_pushnumber()' may lose accuracy on integers, 'lua_pushintegerx' will not. */
 LUA_API void lua_pushnumber (lua_State *L, lua_Number n) {
   lua_lock(L);
   setnvalue(L->top, n);
@@ -500,22 +493,26 @@ LUA_API void lua_pushnumber (lua_State *L, lua_Number n) {
 }
 
 
-/* LNUM */
+#if defined(LUA_TINT)
 LUA_API void lua_pushinteger (lua_State *L, ptrdiff_t n) {
     lua_pushintegerx(L, (lua_Integer)n);
 }
-/* /LNUM */
 
 
-/* LNUM */
-LUA_API void lua_pushintegerx(lua_State* L, lua_Integer n) {
+LUA_API void lua_pushintegerx (lua_State* L, lua_Integer n) {
     lua_lock(L);
-    // setnvalue(L->top, cast_num(n)); /* LNUM */
-    setivalue(L->top, n); /* LNUM */
+    setivalue(L->top, n);
     api_incr_top(L);
     lua_unlock(L);
 }
-/* /LNUM */
+#else
+LUA_API void lua_pushinteger (lua_State* L, lua_Integer n) {
+    lua_lock(L);
+    setnvalue(L->top, cast_num(n));
+    api_incr_top(L);
+    lua_unlock(L);
+}
+#endif
 
 
 LUA_API void lua_pushlstring (lua_State *L, const char *s, size_t len) {
@@ -645,7 +642,11 @@ LUA_API void lua_rawgeti (lua_State *L, int idx, int n) {
   lua_lock(L);
   o = index2adr(L, idx);
   api_check(L, ttistable(o));
-  setobj2s(L, L->top, luaH_getint/*num*/(hvalue(o), n)); /* LNUM */
+#if defined(LUA_TINT)
+  setobj2s(L, L->top, luaH_getint(hvalue(o), n));
+#else
+  setobj2s(L, L->top, luaH_getnum(hvalue(o), n));
+#endif
   api_incr_top(L);
   lua_unlock(L);
 }
@@ -673,15 +674,8 @@ LUA_API int lua_getmetatable (lua_State *L, int objindex) {
     case LUA_TUSERDATA:
       mt = uvalue(obj)->metatable;
       break;
-    /* LNUM */
-#ifdef LUA_TINT
-    case LUA_TINT:
-        mt = G(L)->mt[LUA_TNUMBER];
-        break;
-#endif
-    /* /LNUM */
     default:
-      mt = G(L)->mt[ttype(obj)];
+      mt = G(L)->mt[ttype_ext(obj)];
       break;
   }
   if (mt == NULL)
@@ -770,7 +764,11 @@ LUA_API void lua_rawseti (lua_State *L, int idx, int n) {
   api_checknelems(L, 1);
   o = index2adr(L, idx);
   api_check(L, ttistable(o));
-  setobj2t(L, luaH_setint/*num*/(L, hvalue(o), n), L->top-1); /* LNUM */
+#if defined(LUA_TINT)
+  setobj2t(L, luaH_setint(L, hvalue(o), n), L->top-1);
+#else
+  setobj2t(L, luaH_setnum(L, hvalue(o), n), L->top-1);
+#endif
   luaC_barriert(L, hvalue(o), L->top-1);
   L->top--;
   lua_unlock(L);
@@ -804,7 +802,7 @@ LUA_API int lua_setmetatable (lua_State *L, int objindex) {
       break;
     }
     default: {
-      G(L)->mt[/*ttype*/ttype_ext(obj)] = mt; /* LNUM */
+      G(L)->mt[ttype_ext(obj)] = mt;
       break;
     }
   }
@@ -814,7 +812,9 @@ LUA_API int lua_setmetatable (lua_State *L, int objindex) {
 }
 
 
-/* LNUM */
+
+#ifdef LUA_TINT
+
 /* Help function for 'luaB_tonumber()', avoids multiple str->number
  * conversions for Lua "tonumber()".
  *
@@ -826,7 +826,6 @@ LUA_API int lua_setmetatable (lua_State *L, int objindex) {
  * 'tonumber("4294967295.1")' should give a floating point value, although
  * the value would be 4294967296 (and storable in int64 realm).
  */
-#ifdef LUA_TINT
 int lua_pushvalue_as_number(lua_State* L, int idx)
 {
     const TValue* o = index2adr(L, idx);
@@ -845,8 +844,8 @@ int lua_pushvalue_as_number(lua_State* L, int idx)
     else lua_pushnumber(L, nvalue_fast(o));
     return 1;
 }
+
 #endif
-/* /LNUM */
 
 
 LUA_API int lua_setfenv (lua_State *L, int idx) {
