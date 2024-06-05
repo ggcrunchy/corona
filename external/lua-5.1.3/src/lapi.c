@@ -29,7 +29,7 @@
 #include "lundump.h"
 #include "lvm.h"
 
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
 #include "lnum.h"
 #endif
 
@@ -251,7 +251,7 @@ LUA_API int lua_type (lua_State *L, int idx) {
 
 LUA_API const char *lua_typename (lua_State *L, int t) {
   UNUSED(L);
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
   lua_assert(t != LUA_TINT);
 #endif
   return (t == LUA_TNONE) ? "no value" : luaT_typenames[t];
@@ -419,7 +419,7 @@ LUA_API size_t lua_objlen (lua_State *L, int idx) {
     case LUA_TSTRING: return tsvalue(o)->len;
     case LUA_TUSERDATA: return uvalue(o)->len;
     case LUA_TTABLE: return luaH_getn(hvalue(o));
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
     case LUA_TINT:
 #endif
     case LUA_TNUMBER: {
@@ -813,7 +813,7 @@ LUA_API int lua_setmetatable (lua_State *L, int objindex) {
 
 
 
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
 
 /* Help function for 'luaB_tonumber()', avoids multiple str->number
  * conversions for Lua "tonumber()".

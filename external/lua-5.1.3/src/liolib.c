@@ -327,11 +327,11 @@ static int io_lines (lua_State *L) {
 static int read_number (lua_State *L, FILE *f) {
   lua_Number d;
   if (fscanf(f, LUA_NUMBER_SCAN, &d) == 1) {
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
       lua_Integer tmp;
       lua_number2integer(tmp, d);
       if (cast_num(tmp) == d)
-          lua_pushinteger(L, tmp);
+          lua_pushintegerx(L, tmp);
       else
 #endif
     lua_pushnumber(L, d);
@@ -348,7 +348,7 @@ static int read_number (lua_State *L, FILE *f) {
 static int read_integer(lua_State* L, FILE* f) {
     lua_Integer i;
     if (fscanf(f, LUA_INTEGER_SCAN, &i) == 1) {
-        lua_pushinteger(L, i);
+        lua_pushintegerx(L, i);
         return 1;
     }
     else return 0;  /* read fails */

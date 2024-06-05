@@ -22,7 +22,7 @@
 #define LUA_VERSION	"Lua 5.1"
 #define LUA_RELEASE	"Lua 5.1.5"
 #define LUA_VERSION_NUM	501
-#define LUA_COPYRIGHT	"Copyright (C) 1994-2012 Lua.org, PUC-Rio" " (" LUA_LNUM ")  (added | & << >> ~ //)"
+#define LUA_COPYRIGHT	"Copyright (C) 1994-2012 Lua.org, PUC-Rio" LUA_LNUM_ABOUT LUA_BITWISE_OPS_ABOUT
 #define LUA_AUTHORS 	"R. Ierusalimschy, L. H. de Figueiredo & W. Celes"
 
 
@@ -89,9 +89,9 @@ typedef void * (*lua_Alloc) (void *ud, void *ptr, size_t osize, size_t nsize);
  * -13 (0xff..f3) or 0x13: 'ttisnumber()' and 'ttype_ext()' can be reduced to
  *     bitmask operation instead of conditional (may be good for pipelined processors)
 */
-# define LUA_TINT 9 /* TODO TODO TODO other guard */
-
-#if defined(LUA_BITWISE_OPERATORS) && !defined(LUA_TINT)
+#if WANT_LNUM
+# define LUA_TINT 9 /* for compatibility with NaN-boxing */
+#elif defined(LUA_BITWISE_OPERATORS)
  error "Bitwise operators expect integer support"
 #endif
 

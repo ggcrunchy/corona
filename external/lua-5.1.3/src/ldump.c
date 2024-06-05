@@ -73,7 +73,7 @@ static void DumpNumber(lua_Number x, DumpState* D)
  DumpVar(x,D);
 }
 
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
 static void DumpInteger(lua_Integer x, DumpState* D)
 {
 	DumpVar(x, D);
@@ -121,7 +121,7 @@ static void DumpConstants(const Proto* f, DumpState* D)
    case LUA_TBOOLEAN:
 	DumpChar(bvalue(o),D);
 	break;
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
    case LUA_TINT:
 	   DumpInteger(ivalue(o), D);
 	   break;

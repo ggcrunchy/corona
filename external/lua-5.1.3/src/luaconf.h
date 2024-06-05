@@ -16,6 +16,10 @@
 	#include <stdio.h>
 #endif
 
+
+#define WANT_LNUM 1 /* set to 0 to disable */
+
+
 /*
 ** ==================================================================
 ** Search for "@@" to find all configurable definitions.
@@ -149,26 +153,29 @@
 #define LUA_IGMARK	"-"
 
 
+#if WANT_LNUM
 /*
 ** Number mode identifier to accompany the version string.
 */
 #ifdef __FAST_MATH__
-# define _LNUM "fastmath"
+# define _LNUM "+fastmath"
 #else
 # define _LNUM ""
 #endif
-#define LUA_LNUM " double int64" _LNUM
+#define LUA_LNUM_ABOUT "( double+int64" _LNUM ")"
+#else
+#define LUA_LNUM_ABOUT
+#endif
 
 /*
 @@ LUA_INTEGER is the integral type used by lua_pushinteger/lua_tointeger.
 ** CHANGE that if ptrdiff_t is not adequate on your machine. (On most
 ** machines, ptrdiff_t gives a good choice between int or long.)
 */
-#define LUA_INTEGER	ptrdiff_t
 
-/* LNUM */
-#undef LUA_INTEGER
-/* /LNUM */
+#if !WANT_LNUM
+#define LUA_INTEGER	ptrdiff_t
+#endif
 
 /*
 @@ LUA_API is a mark for all core API functions.
@@ -241,7 +248,12 @@
 @@ LUA_BITWISE_OPERATORS enable logical operators | & ^| >> << ~ on lua_Number
 @* but also arithmetic operator \ (integer division) and != as an alernative to ~=
 */
+#if WANT_LNUM
 #define LUA_BITWISE_OPERATORS
+#define LUA_BITWISE_OPS_ABOUT " (added | & << >> ~ //)"
+#else
+#define LUA_BITWISE_OPS_ABOUT
+#endif
 
 /*
 ** {==================================================================
@@ -435,7 +447,7 @@
 #error "you must define LUA_BITSINT with number of bits in an integer"
 #endif
 
-/* LNUM */
+#if WANT_LNUM
 /*
 ** LUA_INTEGER is the integer type used by lua_pushinteger/lua_tointeger/lua_isinteger.
 ** LUA_INTEGER_SCAN is the format for reading integers
@@ -458,7 +470,7 @@
 #ifndef LUA_INTEGER_MIN
 # define LUA_INTEGER_MIN (-LUA_INTEGER_MAX -1)  /* -2^16|32 */
 #endif
-/* /LNUM */
+#endif /* WANT_LNUM */
 
 /*
 @@ LUAI_UINT32 is an unsigned integer with at least 32 bits.
@@ -588,12 +600,12 @@
 */
 #define LUAI_UACNUMBER	double
 
-/* LNUM */
+#if WANT_LNUM
 /*
 ** LUAI_UACINTEGER the same, over an integer.
 */
 #define LUAI_UACINTEGER long
-/* /LNUM */
+#endif
 
 /*
 @@ LUA_NUMBER_SCAN is the format for reading numbers.
@@ -611,8 +623,7 @@
 /*
 @@ The luai_num* macros define the primitive operations over numbers.
 */
-/* LNUM */
-/*
+#if !WANT_LNUM
 #if defined(LUA_CORE)
 #include <math.h>
 #define luai_numadd(a,b)	((a)+(b))
@@ -627,7 +638,7 @@
 #define luai_numle(a,b)		((a)<=(b))
 #define luai_numisnan(a)	(!luai_numeq((a), (a)))
 #endif
-*/
+#endif /* WANT_LNUM */
 
 #ifdef LUA_BITWISE_OPERATORS
 #define luai_numintdiv(r, a, b)	{ lua_Integer i; lua_Number f = floor((a)/(b)); lua_number2int(i, f); r = i; }
@@ -639,6 +650,7 @@
 #define luai_logrshft(r, a,b)	{ lua_Integer ai,bi; lua_number2int(ai,a); lua_number2int(bi,b); r = ai>>bi; }
 #endif
 
+#if WANT_LNUM
 /*
 ** 'luai_abs()' to give absolute value of 'lua_Integer'
 */
@@ -647,7 +659,7 @@
 # else
 #  define luai_abs(v) ((v) >= 0 ? (v) : -(v))
 # endif
-/* /LNUM */
+#endif /* WANT_LNUM */
 
 /*
 @@ lua_number2int is a macro to convert lua_Number to int.
@@ -666,7 +678,10 @@
 #if defined(_MSC_VER)
 
 #define lua_number2int(i,d)   { __asm fld d   __asm fistp i }
-// #define lua_number2integer(i,n)		lua_number2int(i, n) /* LNUM */
+
+#if !WANT_LNUM
+#define lua_number2integer(i,n)		lua_number2int(i, n)
+#endif
 
 /* the next trick should work on any Pentium, but sometimes clashes
    with a DirectX idiosyncrasy */
@@ -675,25 +690,25 @@
 union luai_Cast { double l_d; long l_l; };
 #define lua_number2int(i,d) \
   { volatile union luai_Cast u; u.l_d = (d) + 6755399441055744.0; (i) = u.l_l; }
-// #define lua_number2integer(i,n)		lua_number2int(i, n) /* LNUM */
+#if !WANT_LNUM
+#define lua_number2integer(i,n)		lua_number2int(i, n)
+#endif
 
 #endif
 
 /* this option always works, but may be slow */
 #else
 #define lua_number2int(i,d)	((i)=(int)(d))
-// #define lua_number2integer(i,d)	((i)=(lua_Integer)(d)) /* LNUM */
+#define lua_number2integer(i,d)	((i)=(lua_Integer)(d))
 
 #endif
 
-/* LNUM */
+#if WANT_LNUM && !defined(lua_number2integer)
 /* Note: Some compilers (OS X gcc 4.0?) may choke on double->long long conversion
  *       since it can lose precision. Others do require 'long long' there.
  */
-#ifndef lua_number2integer
 # define lua_number2integer(i, d)    ((i) = (lua_Integer)(d))
 #endif
- /* /LNUM */
 
 /* }================================================================== */
 
@@ -705,7 +720,7 @@ union luai_Cast { double l_d; long l_l; };
 ** aligned in 16-byte boundaries, then you should add long double in the
 ** union.) Probably you do not need to change this.
 */
-#define LUAI_USER_ALIGNMENT_T	union { LUA_NUMBER u; void *s; long l; } /* LNUM */
+#define LUAI_USER_ALIGNMENT_T	union { double u; void *s; long l; }
 
 
 /*
@@ -866,13 +881,13 @@ union luai_Cast { double l_d; long l_l; };
 
 #endif
 
-/* LNUM */
+#if WANT_LNUM
 /*
 @@ LUA_COMPAT_TOINTEGER controls compatibility with 5.1 'lua_tointeger()';
 @* allows values not fitting in 'lua_Integer' to be rounded.
 */
 #define LUA_COMPAT_TOINTEGER
-/* /LNUM */
+#endif
 
 /* =================================================================== */
 

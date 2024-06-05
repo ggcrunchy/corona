@@ -63,7 +63,7 @@ static void PrintConstant(const Proto* f, int i)
   case LUA_TBOOLEAN:
 	printf(bvalue(o) ? "true" : "false");
 	break;
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
   case LUA_TINT:
     printf(LUA_INTEGER_FMT, ivalue(o));
     break;

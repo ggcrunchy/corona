@@ -1109,7 +1109,7 @@ static void fornum (LexState *ls, TString *varname, int line) {
 #if defined(LUA_TINT)
     luaK_codeABx(fs, OP_LOADK, fs->freereg, luaK_integerK(fs, 1));
 #else
-    luaK_codeABx(fs, OP_LOADK, fs->freereg, numberK(fs, 1));
+    luaK_codeABx(fs, OP_LOADK, fs->freereg, luaK_numberK(fs, 1));
 #endif
     luaK_reserveregs(fs, 1);
   }

@@ -59,7 +59,7 @@ static int luaB_tonumber (lua_State *L) {
   if (base == 10) {  /* standard conversion */
     luaL_checkany(L, 1);
     if (lua_isnumber(L, 1)) {       /* LNUM: numeric string, or a number */
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
       lua_pushvalue_as_number(L, 1);     /* API extension (not to lose accuracy here) */
 #else
       lua_pushnumber(L, lua_tonumber(L, 1));
@@ -667,7 +667,7 @@ static void base_open (lua_State *L) {
   lua_pushliteral(L, LUA_VERSION);
   lua_setglobal(L, "_VERSION");  /* set global _VERSION */
 #if defined(LUA_TINT)
-  lua_pushliteral(L, LUA_LNUM);
+  lua_pushliteral(L, LUA_LNUM_ABOUT);
   lua_setglobal(L, "_LNUM");  /* "[complex] double|float|ldouble [int16|int32|int64]" */
 #endif
   /* `ipairs' and `pairs' need auxiliary functions as upvalues */

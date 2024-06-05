@@ -18,6 +18,8 @@
 #include "llex.h"
 #include "lnum.h"
 
+#if defined(LUA_TINT)
+
 /*
 ** lua_real2str converts a number to a string.
 ** lua_str2real converts a string to a number.
@@ -37,13 +39,12 @@ void luaO_num2buf(char* s, const TValue* o)
 	/* Reason to handle integers differently is not only speed, but accuracy as
 	 * well. We want to make any integer tostring() without roundings, at all.
 	 */
-#ifdef LUA_TINT
 	if (ttisint(o)) {
 		lua_integer2str(s, ivalue(o));
 		return;
 
 	}
-#endif
+
 	n = nvalue_fast(o);
 	lua_real2str(s, n);
 }
@@ -167,7 +168,6 @@ int luaO_str2d(const char* s, lua_Number* res_n, lua_Integer* res_i) {
 /* Functions for finding out, when integer operations remain in range
  * (and doing them).
  */
-#ifdef LUA_TINT
 int try_addint(lua_Integer* r, lua_Integer ib, lua_Integer ic) {
 	lua_Integer v = ib + ic; /* may overflow */
 	if (ib > 0 && ic > 0) { if (v < 0) return 0; /*overflow, use floats*/ }

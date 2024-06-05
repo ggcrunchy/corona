@@ -56,6 +56,7 @@ const TValue *luaV_tonumber (const TValue *obj, TValue *n) {
     }
     return NULL;
 #else
+    lua_Number num;
     if (ttisnumber(obj)) return obj;
     if (ttisstring(obj) && luaO_str2d(svalue(obj), &num)) {
         setnvalue(n, num);
@@ -365,7 +366,7 @@ int luaV_equalval (lua_State *L, const TValue *t1, const TValue *t2) {
   switch (ttype(t1)) {
 #endif
     case LUA_TNIL: return 1;
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
     case LUA_TINT:
     case LUA_TNUMBER: return luaO_rawequalObj(l, r);
     case LUA_TBOOLEAN: return bvalue(l) == bvalue(r);  /* true must be 1 !! */
@@ -503,6 +504,11 @@ static inline lua_Integer idiv (lua_Number a, lua_Number b)
     luai_numintdiv(tmp, a, b);
     return tmp;
 }
+
+static inline lua_Number idivf (lua_Number a, lua_Number b)
+{
+    return floor(a / b);
+}
 #else
 #define arith_op(op,tm) { \
         TValue *rb = RKB(i); \
@@ -592,7 +598,7 @@ static void Arith(lua_State* L, StkId ra, const TValue* rb,
 /* arith_op macro for two operators:
  * automatically chooses, which function (number, integer, complex) to use
  */
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
 # define ARITH_OP2_START( op_num, op_int ) \
   int failed= 0; \
   switch( arith_mode(rb,rc) ) { \
@@ -620,7 +626,7 @@ static void Arith(lua_State* L, StkId ra, const TValue* rb,
 
  /* arith_op macro for one operator:
   */
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
 # define ARITH_OP1_START( op_num, op_int ) \
   int failed= 0; \
   switch( arith_mode1(rb) ) { \
@@ -629,19 +635,12 @@ static void Arith(lua_State* L, StkId ra, const TValue* rb,
         { ra->tt= LUA_TINT; break; } /* else flow through */ \
     case TK_NUMBER: \
       setnvalue(ra, op_num (nvalue(rb))); break;
-#else
-# define ARITH_OP1_START( op_num, _ ) \
-  int failed= 0; \
-  switch( arith_mode1(rb) ) { \
-    case TK_NUMBER: \
-      setnvalue(ra, op_num (nvalue(rb))); break;
-#endif
+
 
 # define arith_op1_continue( op_num, op_int ) \
     ARITH_OP1_START( op_num, op_int ) \
     ARITH_OP_END
-/* /LNUM */
-
+#endif
 
 
 #if defined(LUA_BITWISE_OPERATORS)
@@ -667,10 +666,8 @@ static void Logic(lua_State* L, StkId ra, const TValue* rb,
     else if (!call_binTM(L, rb, rc, ra, op))
         luaG_logicerror(L, rb, rc);
 }
-#endif
 
 
-#if defined(LUA_BITWISE_OPERATORS)
 #define logic_op(op,tm) { \
         TValue *rb = RKB(i); \
         TValue *rc = RKC(i); \
@@ -894,14 +891,10 @@ void luaV_execute (lua_State *L, int nexeccalls) {
           continue;
       }
       case OP_IDIV: {
-        #if defined(LUA_TINT)
           TValue* rb = RKB(i), * rc = RKC(i);
-          arith_op_continue(idiv, try_divint);
+          arith_op_continue(idivf, try_divint);
           Protect(Arith(L, ra, rb, rc, TM_IDIV));
           continue;
-        #else
-          arith_op(luai_numintdiv, TM_DIV);
-        #endif
       }
 #endif
       case OP_NOT: {
@@ -1059,7 +1052,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
       }
       case OP_FORLOOP: {
  
-      #ifdef LUA_TINT
+      #if defined(LUA_TINT)
         /* If start,step and limit are all integers, we don't need to check
          * against overflow in the looping. */
         if (ttisint(ra) && ttisint(ra + 1) && ttisint(ra + 2)) {
@@ -1103,7 +1096,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
           luaG_runerror(L, LUA_QL("for") " limit must be a number");
         else if (!tonumber(pstep, ra+2))
           luaG_runerror(L, LUA_QL("for") " step must be a number");
-      #ifdef LUA_TINT
+      #if defined(LUA_TINT)
         /* Step back one value (keep within integers if we can) */
         if (ttisint(ra) && ttisint(pstep) &&
             try_subint(&ra->value.i, ivalue(ra), ivalue(pstep))) {

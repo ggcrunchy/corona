@@ -129,7 +129,7 @@ typedef struct lua_TValue {
 # define nvalue_fast(o) nvalue(o)
 #endif
 
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
 # define ivalue(o)	check_exp( ttype(o)==LUA_TINT, (o)->value.i )
 #endif
 
@@ -161,7 +161,7 @@ typedef struct lua_TValue {
 
 #define setnvalue(obj,x) { TValue *i_o=(obj); i_o->value.n= (x); i_o->tt=LUA_TNUMBER; }
 
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
 # define setivalue(obj,x) { TValue *i_o=(obj); i_o->value.i=(x); i_o->tt=LUA_TINT; }
 #else
 # define setivalue(obj,x) setnvalue(obj,cast_num(x))

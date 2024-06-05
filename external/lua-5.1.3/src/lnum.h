@@ -38,7 +38,6 @@
 # define luai_numisnan(a) (!luai_numeq((a), (a)))
 #endif
 
-#ifdef LUA_TINT
 int try_addint(lua_Integer* r, lua_Integer ib, lua_Integer ic);
 int try_subint(lua_Integer* r, lua_Integer ib, lua_Integer ic);
 int try_mulint(lua_Integer* r, lua_Integer ib, lua_Integer ic);
@@ -46,7 +45,6 @@ int try_divint(lua_Integer* r, lua_Integer ib, lua_Integer ic);
 int try_modint(lua_Integer* r, lua_Integer ib, lua_Integer ic);
 int try_powint(lua_Integer* r, lua_Integer ib, lua_Integer ic);
 int try_unmint(lua_Integer* r, lua_Integer ib);
-#endif
 
 LUAI_FUNC int luaO_str2d(const char* s, lua_Number* res1, lua_Integer* res2);
 LUAI_FUNC void luaO_num2buf(char* s, const TValue* o);

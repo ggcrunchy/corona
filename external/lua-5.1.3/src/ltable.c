@@ -60,7 +60,7 @@
 #define hashstr(t,str)  hashpow2(t, (str)->tsv.hash)
 #define hashboolean(t,p)        hashpow2(t, p)
 
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
 # define hashint(t,i)    hashpow2(t,i)
 #endif
 
@@ -155,23 +155,19 @@ static Node * hashnum(const Table * t, lua_Number n) {
 */
 static Node *mainposition (const Table *t, const TValue *key) {
   switch (ttype(key)) {
-#ifdef LUA_TINT
-  case LUA_TINT:
-      return hashint(t, ivalue(key));
-#else
-  case LUA_TNUMBER:
-      return hashnum(t, nvalue(key));
-#endif
-  case LUA_TNUMBER: {
-#ifdef LUA_TINT
-      lua_Integer i;
-      if (tt_integer_valued(key, &i))
+  #if defined(LUA_TINT)
+    case LUA_TINT:
+        return hashint(t, ivalue(key));
+    case LUA_TNUMBER: {
+        lua_Integer i;
+        if (tt_integer_valued(key, &i))
           return hashint(t, i);
-#else
-      if (luai_numeq(nvalue(key), 0)) return gnode(t, 0);  /* 0 and -0 to give same hash */
-#endif
-      return hashnum(t, nvalue_fast(key));
-  }
+        return hashnum(t, nvalue_fast(key));
+    }
+  #else
+    case LUA_TNUMBER:
+      return hashnum(t, nvalue(key));
+  #endif
     case LUA_TSTRING:
       return hashstr(t, rawtsvalue(key));
     case LUA_TBOOLEAN:
@@ -194,9 +190,7 @@ static Node *mainposition (const Table *t, const TValue *key) {
 static int arrayindex(const TValue* key, int max) {
   lua_Integer i;
   switch (ttype(key)) {
-#ifdef LUA_TINT
   case LUA_TINT:      i = ivalue(key); break;
-#endif
   case LUA_TNUMBER:   if (tt_integer_valued(key, &i)) break;
   default:            return -1;  /* not to be used as array index */
 #else
@@ -561,7 +555,7 @@ const TValue* luaH_getnum (Table * t, int key) {
   if (cast(unsigned int, key-1) < cast(unsigned int, t->sizearray))
     return &t->array[key-1];
   else {
-  #ifdef LUA_TINT
+  #if defined(LUA_TINT)
     Node* n = hashint(t, key);
     do {  /* check whether `key' is somewhere in the chain */
       if (ttisint(gkey(n)) && (ivalue(gkey(n)) == key))

@@ -92,7 +92,7 @@ static lua_Number LoadNumber(LoadState* S)
  return x;
 }
 
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
 static lua_Integer LoadInteger(LoadState* S)
 {
 	lua_Integer x;
@@ -147,7 +147,7 @@ static void LoadConstants(LoadState* S, Proto* f)
    case LUA_TNUMBER:
 	setnvalue(o,LoadNumber(S));
 	break;
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
    case LUA_TINT:   /* Integer type saved in bytecode (see lcode.c) */
 	   setivalue(o, LoadInteger(S));
 	   break;

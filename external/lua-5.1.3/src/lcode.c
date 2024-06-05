@@ -237,7 +237,7 @@ static void freeexp (FuncState *fs, expdesc *e) {
 static int addk (FuncState *fs, TValue *k, TValue *v) {
   lua_State *L = fs->L;
   TValue *idx = luaH_set(L, fs->h, k);
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
   /* Note: Integer-valued LUA_TNUMBER's are handled as in unpatched Lua (below)
   */
   if (ttype(idx) == LUA_TINT) {
@@ -685,7 +685,7 @@ static int constfolding (OpCode op, expdesc *e1, expdesc *e2) {
   int vkres = VKNUM;
 #endif
   if (!isnumeral(e1) || !isnumeral(e2)) return 0;
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
   if ((e1->k == VKINT) && (e2->k == VKINT)) {
       lua_Integer i1 = e1->u.ival, i2 = e2->u.ival;
       lua_Integer rr;

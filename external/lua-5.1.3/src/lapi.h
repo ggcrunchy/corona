@@ -13,7 +13,7 @@
 
 LUAI_FUNC void luaA_pushobject (lua_State *L, const TValue *o);
 
-#ifdef LUA_TINT
+#if defined(LUA_TINT)
  int lua_pushvalue_as_number(lua_State* L, int idx);
 #endif
 
