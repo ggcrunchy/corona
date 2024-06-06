@@ -202,7 +202,7 @@ LUALIB_API ptrdiff_t luaL_checkinteger (lua_State* L, int narg) {
 
 
 LUALIB_API lua_Integer luaL_checkintegerx (lua_State *L, int narg) {
-  lua_Integer d = lua_tointeger(L, narg);
+  lua_Integer d = lua_tointegerx(L, narg);
   if (d == 0 && !lua_isinteger(L, narg))  /* avoid extra test when d is not 0 */
     tag_error(L, narg, -1 /* integer */);
   return d;
