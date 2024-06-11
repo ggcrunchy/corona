@@ -217,7 +217,7 @@ static int math_random (lua_State *L) {
         luaL_argcheck(L, l <= u, n, "interval is empty");
         d = floor(r * (u - l + 1));
         lua_number2int(tmp, d);
-        lua_pushintegerx(L, l + tmp);
+        lua_pushinteger64(L, l + tmp);
     }
     else {
         return luaL_error(L, "wrong number of arguments");
@@ -277,7 +277,7 @@ LUALIB_API int luaopen_math (lua_State *L) {
   lua_pushnumber(L, HUGE_VAL);
   lua_setfield(L, -2, "huge");
 #if defined(LUA_TINT)
-  lua_pushintegerx(L, LUA_INTEGER_MAX);
+  lua_pushinteger64(L, LUA_INTEGER_MAX);
   lua_setfield(L, -2, "hugeint");
 #endif
 #if defined(LUA_COMPAT_MOD)

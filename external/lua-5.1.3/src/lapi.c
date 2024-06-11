@@ -341,11 +341,11 @@ LUA_API lua_Number lua_tonumber (lua_State *L, int idx) {
 
 #if defined(LUA_TINT)
 LUA_API ptrdiff_t lua_tointeger (lua_State* L, int idx) {
-    return (ptrdiff_t)lua_tointegerx(L, idx);
+    return (ptrdiff_t)lua_tointeger64(L, idx);
 }
 
 
-LUA_API lua_Integer lua_tointegerx (lua_State *L, int idx) {
+LUA_API lua_Integer lua_tointeger64 (lua_State *L, int idx) {
   TValue n;
     /* Lua 5.1 documented behaviour is to return nonzero for non-integer:
      *
@@ -484,7 +484,7 @@ LUA_API void lua_pushnil (lua_State *L) {
 }
 
 
-/* LNUM: 'lua_pushnumber()' may lose accuracy on integers, 'lua_pushintegerx' will not. */
+/* LNUM: 'lua_pushnumber()' may lose accuracy on integers, 'lua_pushinteger64' will not. */
 LUA_API void lua_pushnumber (lua_State *L, lua_Number n) {
   lua_lock(L);
   setnvalue(L->top, n);
@@ -495,11 +495,11 @@ LUA_API void lua_pushnumber (lua_State *L, lua_Number n) {
 
 #if defined(LUA_TINT)
 LUA_API void lua_pushinteger (lua_State *L, ptrdiff_t n) {
-    lua_pushintegerx(L, (lua_Integer)n);
+    lua_pushinteger64(L, (lua_Integer)n);
 }
 
 
-LUA_API void lua_pushintegerx (lua_State* L, lua_Integer n) {
+LUA_API void lua_pushinteger64 (lua_State* L, lua_Integer n) {
     lua_lock(L);
     setivalue(L->top, n);
     api_incr_top(L);
@@ -833,14 +833,14 @@ int lua_pushvalue_as_number(lua_State* L, int idx)
     lua_Integer i;
     if (ttisnumber(o)) {
         if ((!ttisint(o)) && tt_integer_valued(o, &i)) {
-            lua_pushintegerx(L, i);
+            lua_pushinteger64(L, i);
             return 1;
         }
     }
     else if (!tonumber(o, &tmp)) {
         return 0;
     }
-    if (ttisint(o)) lua_pushintegerx(L, ivalue(o));
+    if (ttisint(o)) lua_pushinteger64(L, ivalue(o));
     else lua_pushnumber(L, nvalue_fast(o));
     return 1;
 }

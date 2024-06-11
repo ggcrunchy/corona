@@ -804,7 +804,7 @@ static int str_format (lua_State *L) {
         case 'd':  case 'i': {
           addintlen(form);
          #if defined(LUA_TINT)
-          sprintf(buff, form, luaL_checkintegerx(L, arg));
+          sprintf(buff, form, luaL_checkinteger64(L, arg));
          #else
           sprintf(buff, form, (LUA_INTFRM_T)luaL_checknumber(L, arg));
          #endif
@@ -813,7 +813,7 @@ static int str_format (lua_State *L) {
         case 'o':  case 'u':  case 'x':  case 'X': {
           addintlen(form);
         #if defined(LUA_TINT)
-          sprintf(buff, form, (unsigned LUA_INTEGER)luaL_checkintegerx(L, arg));
+          sprintf(buff, form, (unsigned LUA_INTEGER)luaL_checkinteger64(L, arg));
         #else
           sprintf(buff, form, (unsigned LUA_INTFRM_T)luaL_checknumber(L, arg));
         #endif

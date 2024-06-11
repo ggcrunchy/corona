@@ -168,7 +168,7 @@ static int luaB_setfenv (lua_State *L) {
   getfunc(L, 0);
   lua_pushvalue(L, 2);
 #if defined(LUA_TINT)
-  if (lua_isnumber(L, 1) && lua_tointegerx(L, 1) == 0) {
+  if (lua_isnumber(L, 1) && lua_tointeger64(L, 1) == 0) {
 #else
   if (lua_isnumber(L, 1) && lua_tonumber(L, 1) == 0) {
 #endif

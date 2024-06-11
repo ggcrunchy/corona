@@ -197,12 +197,12 @@ LUALIB_API lua_Number luaL_optnumber (lua_State *L, int narg, lua_Number def) {
 
 #if defined(LUA_TINT)
 LUALIB_API ptrdiff_t luaL_checkinteger (lua_State* L, int narg) {
-    return (ptrdiff_t)luaL_checkintegerx(L, narg);
+    return (ptrdiff_t)luaL_checkinteger64(L, narg);
 }
 
 
-LUALIB_API lua_Integer luaL_checkintegerx (lua_State *L, int narg) {
-  lua_Integer d = lua_tointegerx(L, narg);
+LUALIB_API lua_Integer luaL_checkinteger64 (lua_State *L, int narg) {
+  lua_Integer d = lua_tointeger64(L, narg);
   if (d == 0 && !lua_isinteger(L, narg))  /* avoid extra test when d is not 0 */
     tag_error(L, narg, -1 /* integer */);
   return d;
@@ -211,13 +211,13 @@ LUALIB_API lua_Integer luaL_checkintegerx (lua_State *L, int narg) {
 
 LUALIB_API ptrdiff_t luaL_optinteger (lua_State* L, int narg,
     ptrdiff_t def) {
-    return (ptrdiff_t)luaL_optintegerx(L, narg, (lua_Integer)def);
+    return (ptrdiff_t)luaL_optinteger64(L, narg, (lua_Integer)def);
 }
 
 
-LUALIB_API lua_Integer luaL_optintegerx (lua_State *L, int narg,
+LUALIB_API lua_Integer luaL_optinteger64 (lua_State *L, int narg,
                                                       lua_Integer def) {
-  return luaL_opt(L, luaL_checkintegerx, narg, def);
+  return luaL_opt(L, luaL_checkinteger64, narg, def);
 }
 #else
 LUALIB_API lua_Integer luaL_checkinteger(lua_State* L, int narg) {

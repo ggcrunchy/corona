@@ -176,7 +176,7 @@ LUA_API lua_Number      (lua_tonumber) (lua_State *L, int idx);
 #if defined(LUA_TINT)
 
 LUA_API ptrdiff_t     (lua_tointeger) (lua_State *L, int idx);
-LUA_API lua_Integer     (lua_tointegerx) (lua_State* L, int idx);
+LUA_API lua_Integer     (lua_tointeger64) (lua_State* L, int idx);
 
 #else
 LUA_API lua_Integer (lua_tointeger) (lua_State* L, int idx);
@@ -199,7 +199,7 @@ LUA_API void  (lua_pushnumber) (lua_State *L, lua_Number n);
 
 #if defined(LUA_TINT)
 LUA_API void  (lua_pushinteger) (lua_State *L, ptrdiff_t n);
-LUA_API void  (lua_pushintegerx)(lua_State* L, lua_Integer n);
+LUA_API void  (lua_pushinteger64)(lua_State* L, lua_Integer n);
 #else
 LUA_API void  (lua_pushinteger)(lua_State* L, lua_Integer n);
 #endif
