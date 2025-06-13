@@ -18,7 +18,14 @@ namespace Rtt
 class MUpdatable
 {
 	public:
+		U8 GetCounter() const { return fCounter; }
+		void SetCounter( U8 counter ) { fCounter = counter; }
+
+	public:
 		virtual void QueueUpdate() = 0;
+
+	private:
+		U8 fCounter;
 };
 
 // ----------------------------------------------------------------------------

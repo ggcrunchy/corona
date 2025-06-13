@@ -88,9 +88,14 @@ class Scene
 		void PopStage();
 
 	public:
-		void RemoveActiveUpdatable( MUpdatable *e ){ fActiveUpdatable.erase( e ); }
-		void AddActiveUpdatable( MUpdatable *e ){ fActiveUpdatable.insert( e ); }
+		void RemoveActiveUpdatable( MUpdatable *e );//{ fActiveUpdatable.erase( e ); }
+		void AddActiveUpdatable( MUpdatable *e );//{ fActiveUpdatable.insert( e ); }
 		void QueueUpdateOfUpdatables();
+
+		bool RequestUpdate( MUpdatable *e ) const;
+
+	public:
+		U8 GetUpdatablesCounter() const { return fUpdatablesCounter; }
 
 	private:
 		Display& fOwner;
@@ -102,12 +107,14 @@ class Scene
 		StageObject *fSnapshotOrphanage;
 		StageObject *fOverlay;
 		LightPtrArray< LuaUserdataProxy > fProxyOrphanage;
+		U32 fNumUpdatables;
 		bool fIsValid;
 		U8 fCounter; // DO NOT change type --- must be U8
+		U8 fUpdatablesCounter;
 
 		// IMPORTANT: The purpose of this set is to iterate over all active
 		// MUpdatable. This class DOESN'T own these MUpdatable.
-		std::set< MUpdatable * > fActiveUpdatable;
+		// std::set< MUpdatable * > fActiveUpdatable;
 };
 
 // ----------------------------------------------------------------------------

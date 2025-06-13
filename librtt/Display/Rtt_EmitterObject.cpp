@@ -1076,13 +1076,18 @@ void EmitterObject::Prepare( const Display &display )
 
 	Rtt_ASSERT( fParticles );
 
+	bool canUpdate = display.GetScene().RequestUpdate( this );
+
 	if( ! ShouldHitTest() )
 	{
 		// Nothing to do.
 		return;
 	}
 
-	_Update( display );
+	if ( canUpdate )
+	{
+		_Update( display );
+	}
 
 	Super::Prepare( display );
 
@@ -1099,13 +1104,13 @@ void EmitterObject::_Update( const Display &display )
 {
 	//// Prevent doing more than one update per frame.
 	//
-	if( ! fShouldUpdate )
+	/*if( ! fShouldUpdate )
 	{
 		// Nothing to do.
 		return;
 	}
 
-	fShouldUpdate = false;
+	fShouldUpdate = false;*/
 	//
 	////
 

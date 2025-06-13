@@ -545,13 +545,18 @@ void ParticleSystemObject::Prepare( const Display &display )
 TRACE_CALL;
 	Rtt_ASSERT( fParticleSystem );
 
+	bool canUpdate = display.GetScene().RequestUpdate( this );
+
 	if( ! ShouldHitTest() )
 	{
 		// Nothing to do.
 		return;
 	}
 
-	_Update( display );
+	if ( canUpdate )
+	{
+		_Update( display );
+	}
 
 	Super::Prepare( display );
 
@@ -718,13 +723,13 @@ void ParticleSystemObject::_Update( const Display &display )
 TRACE_CALL;
 	//// Prevent doing more than one update per frame.
 	//
-	if( ! fShouldUpdate )
+	/*if( ! fShouldUpdate )
 	{
 		// Nothing to do.
 		return;
 	}
 
-	fShouldUpdate = false;
+	fShouldUpdate = false;*/
 	//
 	////
 

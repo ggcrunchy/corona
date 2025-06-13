@@ -55,9 +55,11 @@ Scene::Scene( Rtt_Allocator* pAllocator, Display& owner)
     fSnapshotOrphanage( Rtt_NEW( pAllocator, StageObject( pAllocator, * this ) ) ),
     fOverlay( Rtt_NEW( pAllocator, StageObject( pAllocator, * this ) ) ),
     fProxyOrphanage( owner.GetAllocator() ),
+	fNumUpdatables( 0 ),
     fIsValid( false ),
     fCounter( 0 ),
-    fActiveUpdatable()
+	fUpdatablesCounter( 0 )
+    //fActiveUpdatable()
 {
     fOffscreenStage->SetRenderedOffScreen( true );
  
@@ -171,7 +173,7 @@ Scene::IsValid() const
     // fActiveUpdatable.
     return ( fIsValid &&
                 ( Display::kForceRenderDrawMode != drawMode ) &&
-                fActiveUpdatable.empty() );
+				0 == fNumUpdatables );//fActiveUpdatable.empty() );
 }
 
 void
@@ -387,15 +389,42 @@ Scene::PopStage()
     Rtt_DELETE( oldHead );
 }
 
-void Scene::QueueUpdateOfUpdatables()
+void Scene::RemoveActiveUpdatable( MUpdatable *e )
 {
+	Rtt_ASSERT( fNumUpdatables > 0 );
+	
+	e->SetCounter( fUpdatablesCounter - 1 ); // 256 frames later
+	
+	fNumUpdatables--;
+}
+
+void Scene::AddActiveUpdatable( MUpdatable *e )
+{
+	e->SetCounter( fUpdatablesCounter - 1 ); // 256 frames later
+
+	fNumUpdatables++;
+}
+
+void Scene::QueueUpdateOfUpdatables()
+{/*
     for( std::set< MUpdatable * >::iterator u = fActiveUpdatable.begin();
             u != fActiveUpdatable.end();
             ++u )
     {
         (*u)->QueueUpdate();
-    }
+    }*/
+	fUpdatablesCounter++; // wraps after 0xFF
 }
+
+bool Scene::RequestUpdate( MUpdatable *e ) const
+{
+	bool isAvailable = e->GetCounter() != fUpdatablesCounter;
+	
+	e->SetCounter( fUpdatablesCounter );
+	
+	return isAvailable;
+}
+
 
 // ----------------------------------------------------------------------------
 
