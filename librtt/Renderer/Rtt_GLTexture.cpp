@@ -256,8 +256,8 @@ GetCompressedInputs( const TextureFormatInfo& info, int& width, int& height, GLs
 		
 		imageSize = (GLsizei)( width * height );
 		
-		// /= blockWidth * blockHeight
-		// *= blockSizeInBytes
+		imageSize *= info.fBlockSizeInBytes;
+		imageSize /= info.fBlockWidth * info.fBlockHeight;
 	}
 }
 
