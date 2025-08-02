@@ -34,6 +34,7 @@ class ShaderName;
 class ShaderData;
 class ShaderResource;
 class LuaMap;
+struct NonCoreFormatInfo;
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
     class ShaderBinaryVersions;
 #endif
@@ -72,12 +73,14 @@ class ShaderFactory
 				const char *shellFrag,
 				const char *kernelVertDefault,
 				const char *kernelFragDefault,
+				const NonCoreFormatInfo* info,
 				ShaderResource::ProgramMod mod ) const;
 		SharedPtr< ShaderResource > NewShaderResource(
 				ShaderTypes::Category category,
 				const char *name,
 				const char *kernelVert,
 				const char *kernelFrag,
+				const NonCoreFormatInfo* info,
                 int localStubsIndex );
 #endif
         Shader *NewShaderPrototype( lua_State *L, int index, const SharedPtr< ShaderResource >& resource );

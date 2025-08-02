@@ -27,7 +27,7 @@ class Texture : public CPUResource
 		typedef CPUResource Super;
 		typedef Texture Self;
 
-		typedef enum _Format
+		typedef enum _FormatValue
 		{
 			kAlpha,
 			kLuminance,
@@ -37,9 +37,25 @@ class Texture : public CPUResource
 			kABGR,
 			kARGB,
 			kLuminanceAlpha,
+			kNonCore,
 			kNumFormats
 		}
-		Format;
+		FormatValue;
+
+		class Format {
+		public:
+			Format( FormatValue value = kNumFormats );
+			
+			bool operator == ( FormatValue value ) const;
+			
+			static Format NonCore( U16 index, U16 layoutDetails );
+			
+			FormatValue GetValue( U16* index = NULL, U16* layoutDetails = NULL ) const;
+			
+		private:
+			U16 fValue;
+			U16 fIndex;
+		};
 
 		typedef enum _Filter
 		{
@@ -97,7 +113,7 @@ class Texture : public CPUResource
 	
 	public:
 		void SetRetina( bool newValue ){ fIsRetina = newValue; }
-		bool IsRetina(){ return fIsRetina; }
+		bool IsRetina() const { return fIsRetina; }
 		void SetTarget( bool newValue ){ fIsTarget = newValue; }
 		bool IsTarget() const { return fIsTarget; }
 
@@ -105,6 +121,11 @@ class Texture : public CPUResource
 		bool fIsRetina;
 		bool fIsTarget;
 };
+
+inline bool operator == ( Texture::FormatValue value, const Texture::Format& format )
+{
+	return format.GetValue() == value;
+}
 
 // ----------------------------------------------------------------------------
 

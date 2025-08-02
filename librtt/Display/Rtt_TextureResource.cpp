@@ -56,8 +56,9 @@ PlatformBitmap::Format
 TextureResource::ConvertFormat( Texture::Format format )
 {
 	PlatformBitmap::Format result = PlatformBitmap::kRGBA;
+	U16 formatIndex, layoutDetails;
 
-	switch ( format )
+	switch ( format.GetValue( &formatIndex, &layoutDetails ) )
 	{
 		case Texture::kRGB:
 			result = PlatformBitmap::kRGB;
@@ -76,6 +77,9 @@ TextureResource::ConvertFormat( Texture::Format format )
 			result = PlatformBitmap::kRGBA; // ???
 			break;
 #endif
+		case Texture::kNonCore:
+			result = PlatformBitmap::Format::NonCore( formatIndex, layoutDetails );
+			break;
 		case Texture::kLuminance:
 		case Texture::kAlpha:
 		default:

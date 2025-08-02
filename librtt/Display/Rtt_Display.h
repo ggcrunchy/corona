@@ -58,6 +58,32 @@ class ProfilingState;
 
 // ----------------------------------------------------------------------------
 
+struct NonCoreFormatInfo
+{
+	typedef enum _InputType
+	{
+		kByte,
+		kUint16,
+		kUint32,
+		kFloat16,
+		kFloat32,
+		kNumTypes
+	}
+	InputType;
+
+	InputType fInputType = kByte;
+	size_t fBytesPerComponent = 1;
+	int fNumFloatBits = 0;
+	int fNumComponents = 4;
+	int fRedIndex = 0;
+	int fGreenIndex = 1;
+	int fBlueIndex = 2;
+	int fAlphaIndex = 3;
+	bool fPacked = false;
+};
+
+// ----------------------------------------------------------------------------
+
 class Display
 {
     public:
@@ -117,6 +143,28 @@ class Display
         static bool IsEnterpriseFeature( Feature value );
         static const char *GetTierString( Feature value );
         static ScaleMode ScaleModeFromString( const char *scaleName );
+
+	public:
+		static const int LayoutDetailsBitCount;
+	
+		// These represent some logic common to textures and platform
+		// bitmaps to pack a format value and--to account for ones that
+		// don't belong to a built-in Solar format--a lookup index plus
+		// some cached layout details into a 32-bit integer.
+		// The `value` and `index` are separate 16-bit values and the
+		// layout detail bits are packed into one of them. The choices
+		// here are somewhat arbitrary.
+		// On that note, `part` stands for either `value` or `index`:
+		// it has to be consistent among the functions that use it, but
+		// the appropriate choice is being sussed out.
+	
+		static U16 EncodeLayoutDetails( const NonCoreFormatInfo& info );
+		static U16 MixPartWithLayoutDetails( U16 part, U16 layoutDetails );
+		static U16 GetValueAndIndex( U16 value, U16 index, U16 nonCoreConstant, U16 defConstant, U16* out );
+		static U16 ExtractLayoutDetails( U16 part );
+		static NonCoreFormatInfo DecodeLayoutDetails( U16 layoutDetails );
+
+		U16 EncodeNonCoreFormatLayoutDetails( U16 formatID ) const;
 
     public:
         Display( Runtime& owner );
@@ -336,6 +384,8 @@ class Display
         static U32 GetMaxVertexTextureUnits();
 
         bool HasFramebufferBlit( bool * canScale ) const;
+        bool QueryTextureInfo( const char* what, const char* name, U16* formatID = NULL ) const;
+		virtual void GetNonCoreFormatInfo( U16 formatID, NonCoreFormatInfo& info ) const;
         void GetVertexAttributes( VertexAttributeSupport & support ) const;
 
 	  public:

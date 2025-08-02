@@ -1378,12 +1378,14 @@ GPU_GetPixelFormat( PlatformBitmap::Format format )
 {
 #	ifdef Rtt_OPENGLES
 
-		switch ( format )
+		switch ( format.GetValue() )
 		{
 			case PlatformBitmap::kRGBA:
 				return GL_RGBA;
 			case PlatformBitmap::kMask:
 				return GL_ALPHA;
+			case PlatformBitmap::kNONCORE:
+				// TODO?
 			case PlatformBitmap::kRGB:
 			case PlatformBitmap::kBGRA:
 			case PlatformBitmap::kARGB:
@@ -1394,7 +1396,7 @@ GPU_GetPixelFormat( PlatformBitmap::Format format )
 
 #	else // Not Rtt_OPENGLES.
 
-		switch ( format )
+		switch ( format.GetValue() )
 		{
 			case PlatformBitmap::kBGRA:
 			case PlatformBitmap::kARGB:
@@ -1405,6 +1407,8 @@ GPU_GetPixelFormat( PlatformBitmap::Format format )
 				return GL_BGR;
 			case PlatformBitmap::kMask:
 				return GL_ALPHA;
+			case PlatformBitmap::kNONCORE:
+				// TODO?
 			default:
 				Rtt_ASSERT_NOT_IMPLEMENTED();
 				return GL_ALPHA;
@@ -1418,10 +1422,12 @@ GPU_GetPixelType( PlatformBitmap::Format format )
 {
 #	ifdef Rtt_OPENGLES
 
-		switch( format )
+		switch( format.GetValue() )
 		{
 			case PlatformBitmap::kMask:
 				return GL_UNSIGNED_BYTE;
+			case PlatformBitmap::kNONCORE:
+				// TODO?
 			case PlatformBitmap::kBGRA:
 			case PlatformBitmap::kARGB:
 			case PlatformBitmap::kRGBA:
@@ -1432,7 +1438,7 @@ GPU_GetPixelType( PlatformBitmap::Format format )
 
 #	else // Not Rtt_OPENGLES.
 
-		switch( format )
+		switch( format.GetValue() )
 		{
 			case PlatformBitmap::kBGRA:
 				#ifdef Rtt_BIG_ENDIAN
@@ -1454,6 +1460,8 @@ GPU_GetPixelType( PlatformBitmap::Format format )
 				#endif
 			case PlatformBitmap::kMask:
 				return GL_UNSIGNED_BYTE;
+			case PlatformBitmap::kNONCORE:
+				// TODO?
 			default:
 				Rtt_ASSERT_NOT_IMPLEMENTED();
 				return GL_UNSIGNED_BYTE;

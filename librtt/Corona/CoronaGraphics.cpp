@@ -39,10 +39,22 @@
 
 #include "Display/Rtt_TextureResourceExternalAdapter.h"
 
+// Sanity check: enums in C default to int and remain
+// so unless a value exceeds its size
+
+// version 1 bitmap format, i.e. original external bitmap enum
+// TinyCC does not seem to like the macro, thus this is done here
+enum OldBitmapFormat { k_OBF_Undefined = 0, k_OBF_Mask, k_OBF_RGB, k_OBF_RGBA };
+
+Rtt_STATIC_ASSERT( sizeof( OldBitmapFormat ) == sizeof( int ) );
+Rtt_STATIC_ASSERT( sizeof( CoronaExternalBitmapFormat )  == sizeof( int ) );
 
 CORONA_API
 int CoronaExternalPushTexture( lua_State *L, const CoronaExternalTextureCallbacks *callbacks, void* context)
 {
+	// TODO: detect CoronaExternalTextureCallbacks2
+		// then has name, kind (latter not useful in at least ES2...)
+
     if ( callbacks->size != sizeof(CoronaExternalTextureCallbacks) )
     {
         CoronaLuaError(L, "TextureResourceExternal - invalid binary version for callback structure; size value isn't valid");
@@ -88,12 +100,19 @@ int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format)
 {
     switch (format)
     {
+		// TODO: R = 1
         case kExternalBitmapFormat_Mask:
             return 1;
+		// TODO: RG, R16F = 2
         case kExternalBitmapFormat_RGB:
             return 3;
         default:
+        // TODO: R32F, RG16F = 4
             return 4;
+		// TODO: RGB16 = 6 (alignment = 2 or 4)
+		// TODO: RGBA16, RG32F = 8
+		// TODO: RGB32F = 12
+		// TODO: RGBA32F = 16
     }
 }
 

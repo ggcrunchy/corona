@@ -27,11 +27,25 @@ namespace Rtt
 class ExternalBitmap : public PlatformBitmap
 {
 public:
-	ExternalBitmap(const CoronaExternalTextureCallbacks* sourceCallbacks, void* context)
-	: fSrc(*sourceCallbacks)
-	, fContext(context)
+	ExternalBitmap(const Display& display, const CoronaExternalTextureCallbacks* sourceCallbacks, void* context)
+	: fDisplay(display),
+	  fContext(context)
 	{
+		if (sizeof(CoronaExternalTextureCallbacks2) == sourceCallbacks->size)
+		{
+			Rtt_STATIC_ASSERT( offsetof( CoronaExternalTextureCallbacks, size ) ==
+							  offsetof( CoronaExternalTextureCallbacks2, base.size ) );
 		
+			CoronaExternalTextureCallbacks2* extended = (CoronaExternalTextureCallbacks2 *)sourceCallbacks;
+			
+			fSrc2 = *extended;
+		}
+		else
+		{
+			fSrc2.getRequestedFormat = NULL;
+			
+			fSrc = *sourceCallbacks;
+		}
 	}
 	
 	void Finalize()
@@ -103,6 +117,20 @@ public:
 				return PlatformBitmap::kRGB;
 			case kExternalBitmapFormat_RGBA:
 				return PlatformBitmap::kRGBA;
+			case kExternalBitmapFormat_RequestedByName:
+				if ( fSrc2.getRequestedFormat )
+				{
+					const char* name = fSrc2.getRequestedFormat(GetUserData());
+					U16 formatIndex;
+					
+					if ( NULL != name && fDisplay.QueryTextureInfo( "Supported", name, &formatIndex ) )
+					{
+						U16 layoutDetails = fDisplay.EncodeNonCoreFormatLayoutDetails( formatIndex );
+						return PlatformBitmap::Format::NonCore( formatIndex, layoutDetails );
+					}
+				}
+			
+				// fallthrough if unresolved
 			case kExternalBitmapFormat_Undefined:
 				return PlatformBitmap::kRGBA;
 		}
@@ -124,7 +152,11 @@ public:
 	}
 	
 private:
-	CoronaExternalTextureCallbacks fSrc;
+	const Display& fDisplay;
+	union {
+		CoronaExternalTextureCallbacks fSrc;
+		CoronaExternalTextureCallbacks2 fSrc2;
+	};
 	void* fContext;
 };
 
@@ -140,7 +172,7 @@ TextureResourceExternal::Create(TextureFactory& factory,
 	Display& display = factory.GetDisplay();
 	
 	PlatformBitmap *bitmap = Rtt_NEW(display.GetAllocator(),
-									ExternalBitmap(callbacks, callbacksContext));
+									ExternalBitmap(display, callbacks, callbacksContext));
 	
 	bitmap->SetMagFilter( display.GetDefaults().GetMagTextureFilter() );
 	bitmap->SetMinFilter( display.GetDefaults().GetMinTextureFilter() );

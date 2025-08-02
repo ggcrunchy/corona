@@ -10,11 +10,48 @@
 #include "Core/Rtt_Build.h"
 
 #include "Display/Rtt_PlatformBitmap.h"
+#include "Display/Rtt_Display.h"
 
 // ----------------------------------------------------------------------------
 
 namespace Rtt
 {
+
+// ----------------------------------------------------------------------------
+
+PlatformBitmap::Format::Format( FormatValue value )
+:	fValue( value ),
+	fIndex( 0 )
+{
+}
+			
+bool
+PlatformBitmap::Format::operator == ( FormatValue value ) const
+{
+	return GetValue() == value;
+}
+			
+PlatformBitmap::Format
+PlatformBitmap::Format::NonCore( U16 index, U16 layoutDetails )
+{
+	Format format;
+		
+	format.fValue = Display::MixPartWithLayoutDetails( kNONCORE, layoutDetails ); 
+	format.fIndex = index;
+	
+	return format;
+}
+			
+PlatformBitmap::FormatValue
+PlatformBitmap::Format::GetValue( U16* index, U16* layoutDetails ) const
+{
+	if (layoutDetails)
+	{
+		*layoutDetails = Display::ExtractLayoutDetails( fValue );
+	}
+				
+	return (FormatValue)Display::GetValueAndIndex( fValue, fIndex, FormatValue::kNONCORE, FormatValue::kRGBA, index );
+}
 
 // ----------------------------------------------------------------------------
 
@@ -50,7 +87,7 @@ PlatformBitmap::HitTest( Rtt_Allocator *context, int i, int j, U8 threshold ) co
 
 			int index = (int) bytesPerPixel * ( i + j*Width() );
 
-			switch ( format )
+			switch ( format.GetValue() )
 			{
 				case kMask:
 					{
@@ -133,14 +170,22 @@ PlatformBitmap::HasAlphaChannel() const
 	bool result = false;
 
 	Format format = GetFormat();
+	U16 layoutDetails;
 
-	switch ( format )
+	switch ( format.GetValue( NULL, &layoutDetails ) )
 	{
 		case kRGBA:
 		case kBGRA:
 		case kABGR:
 		case kARGB:
 			result = true;
+			break;
+		case kNONCORE:
+		{
+			NonCoreFormatInfo info = Display::DecodeLayoutDetails( layoutDetails );
+			
+			result = -1 != info.fAlphaIndex;
+		}
 			break;
 		default:
 			break;
@@ -189,7 +234,8 @@ PlatformBitmap::IsLandscape() const
 size_t
 PlatformBitmap::BytesPerPixel( Format format )
 {
-	switch( format )
+	U16 layoutDetails;
+	switch( format.GetValue( NULL, &layoutDetails ) )
 	{
 		case kMask:
 			return 1;
@@ -202,6 +248,12 @@ PlatformBitmap::BytesPerPixel( Format format )
 		case kARGB:
 		case kABGR:
 			return 4;
+		case kNONCORE:
+		{
+			NonCoreFormatInfo info = Display::DecodeLayoutDetails( layoutDetails );
+			
+			return info.fBytesPerComponent * info.fNumComponents;
+		}
 		default:
 			break;
 	}
@@ -257,9 +309,11 @@ PlatformBitmap::GetColorByteIndexesFor(
 	int redIndexOut = -1;
 	int greenIndexOut = -1;
 	int blueIndexOut = -1;
+	
+	U16 layoutDetails;
 
 	// Fetch the color byte index by format and endianness.
-	switch (format)
+	switch (format.GetValue( NULL, &layoutDetails ))
 	{
 		case PlatformBitmap::kRGB:
 			#ifdef Rtt_LITTLE_ENDIAN
@@ -323,6 +377,16 @@ PlatformBitmap::GetColorByteIndexesFor(
 				redIndexOut = 1;
 				alphaIndexOut = 0;
 			#endif
+			break;
+		case PlatformBitmap::kNONCORE:
+		{
+			NonCoreFormatInfo info = Display::DecodeLayoutDetails( layoutDetails );
+			
+			redIndexOut = info.fRedIndex;
+			greenIndexOut = info.fGreenIndex;
+			blueIndexOut = info.fBlueIndex;
+			alphaIndexOut = info.fAlphaIndex;
+		}
 			break;
 		default:
 			// New formats need to have a case above

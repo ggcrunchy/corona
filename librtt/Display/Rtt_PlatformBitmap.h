@@ -26,7 +26,7 @@ namespace Rtt
 class PlatformBitmap
 {
 	public:
-		typedef enum Format
+		typedef enum FormatValue
 		{
 			kUndefined = 0,
 			kMask,
@@ -36,9 +36,26 @@ class PlatformBitmap
 			kABGR, // Channels are (left to right) from MSB to LSB, so A is in the most-significant 8 bits
 			kARGB,
 			kLUMINANCE_ALPHA,
+			kNONCORE,
 			kNumFormats
 		}
-		Format;
+		FormatValue;
+
+		class Format {
+		public:
+			Format( FormatValue value = kNumFormats );
+			
+			bool operator == ( FormatValue value ) const;
+			bool operator != ( FormatValue value ) const { return !( *this == value ); }
+			
+			static Format NonCore( U16 index, U16 layoutDetails );
+			
+			FormatValue GetValue( U16* index = NULL, U16* layoutDetails = NULL ) const;
+			
+		private:
+			U16 fValue;
+			U16 fIndex;
+		};
 
 	public:
 		typedef enum _Orientation
@@ -232,6 +249,10 @@ class PlatformBitAccess
 		PlatformBitmap& fBitmap;
 };
 
+inline bool operator == ( PlatformBitmap::FormatValue value, const PlatformBitmap::Format& format )
+{
+	return format.GetValue() == value;
+}
 
 // ----------------------------------------------------------------------------
 

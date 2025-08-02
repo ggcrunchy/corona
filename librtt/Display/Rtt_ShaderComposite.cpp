@@ -278,7 +278,7 @@ ShaderComposite::Prepare( RenderData& objectData, int w, int h, ShaderResource::
 		UpdateGeometry(textureInfo); // Optional for single node case
 
 		// Pass struct into UpdateCache
-		UpdateCache(textureInfo, objectData ); // Optional for single node case
+		UpdateCache(textureInfo, objectData); // Optional for single node case
 		
 	}
 

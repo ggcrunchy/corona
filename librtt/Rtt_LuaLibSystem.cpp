@@ -71,6 +71,37 @@ static void PushStringOrNil( lua_State *L, const char *str )
     }
 }
 
+static bool
+IsTextureFormatInfo( const char* key, char* what, char* item, size_t maxLen )
+{
+	if ( ! Rtt_StringStartsWith( key, "isTextureFormat" ) )
+	{
+		return false;
+	}
+	
+	key += sizeof( "isTextureFormat" ) - 1;
+	
+	const char* colon = strstr( key, ":" );
+	if ( !colon )
+	{
+		return false;
+	}
+	
+	size_t whatLen = (size_t)( colon - key ), itemLen = strlen( colon + 1 );
+	
+	if ( whatLen > maxLen || itemLen > maxLen )
+	{
+		return false;
+	}
+
+	strncpy( what, key, whatLen );
+	strcpy( item, colon + 1 );
+	
+	what[ whatLen ] = '\0';
+	
+	return true;
+}
+
 int
 LuaLibSystem::getInfo( lua_State *L )
 {
@@ -82,7 +113,9 @@ LuaLibSystem::getInfo( lua_State *L )
         CoronaLuaError(L, "system.getInfo() takes a string as its first parameter" );
         return 0;
     }
-    
+    char Type[80], Info[80]; // associated with open-ended messages
+	Rtt_STATIC_ASSERT( sizeof(Type) == sizeof(Info) );
+
     const MPlatform& platform = LuaContext::GetPlatform( L );
     MPlatformDevice& device = platform.GetDevice();
     if ( Rtt_StringCompare( key, "name" ) == 0 )
@@ -299,6 +332,11 @@ LuaLibSystem::getInfo( lua_State *L )
                 lua_setfield( L, -2, "hasInstanceID" );
             }
         }
+    }
+    else if ( IsTextureFormatInfo( key, Type, Info, sizeof( Type ) - 1 ) )
+    {
+		Runtime* runtime = LuaContext::GetRuntime( L );
+		lua_pushboolean( L, runtime->GetDisplay().QueryTextureInfo( Type, Info ) );
     }
     else
     {

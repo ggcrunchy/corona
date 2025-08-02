@@ -10,11 +10,48 @@
 #include "Renderer/Rtt_Texture.h"
 
 #include "Core/Rtt_Assert.h"
+#include "Display/Rtt_Display.h"
 
 // ----------------------------------------------------------------------------
 
 namespace Rtt
 {
+
+// ----------------------------------------------------------------------------
+
+Texture::Format::Format( FormatValue value)
+:	fValue( value ),
+	fIndex( 0 )
+{
+}
+
+bool
+Texture::Format::operator == ( Texture::FormatValue value ) const
+{
+	return GetValue() == value;
+}
+
+Texture::Format
+Texture::Format::NonCore( U16 index, U16 layoutDetails )
+{
+	Format format;
+	
+	format.fValue = Display::MixPartWithLayoutDetails( kNonCore, layoutDetails );
+	format.fIndex = index;
+	
+	return format;
+}
+
+Texture::FormatValue
+Texture::Format::GetValue( U16* index, U16* layoutDetails ) const
+{
+	if (layoutDetails)
+	{
+		*layoutDetails = Display::ExtractLayoutDetails( fValue );
+	}
+	
+	return (FormatValue)Display::GetValueAndIndex( fValue, fIndex, FormatValue::kNonCore, FormatValue::kRGBA, index );
+}
 
 // ----------------------------------------------------------------------------
 
@@ -64,7 +101,8 @@ Texture::GetSizeInBytes() const
 	U32 w = GetWidth();
 	U32 h = GetHeight();
 
-	switch(format)
+	U16 layoutDetails;
+	switch(format.GetValue( NULL, &layoutDetails ))
 	{
 		case kLuminance:	return w * h * 1;
 		case kRGB:			return w * h * 3;
@@ -72,6 +110,12 @@ Texture::GetSizeInBytes() const
 		case kBGRA:			return w * h * 4;
 		case kABGR:			return w * h * 4;
 		case kARGB:			return w * h * 4;
+		case kNonCore:
+		{
+			NonCoreFormatInfo info = Display::DecodeLayoutDetails( layoutDetails );
+			
+			return w * h * info.fBytesPerComponent * info.fNumComponents;
+		}
 		default:			return 0;
 	}
 }

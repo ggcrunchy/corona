@@ -173,12 +173,12 @@ ShaderFactory::Initialize()
             const char *kernelFrag = lua_tostring( L, -1 );
 
             
-            Program *program = NewProgram( shellVert, shellFrag, kernelVert, kernelFrag, ShaderResource::kDefault );
+            Program *program = NewProgram( shellVert, shellFrag, kernelVert, kernelFrag, NULL, ShaderResource::kDefault );
             if ( program )
             {
                 SharedPtr< ShaderResource > resource( Rtt_NEW( fAllocator, ShaderResource( program, ShaderTypes::kCategoryDefault ) ) );
                 
-                Program *program25D = NewProgram( shellVert, shellFrag, kernelVert, kernelFrag, ShaderResource::k25D );
+                Program *program25D = NewProgram( shellVert, shellFrag, kernelVert, kernelFrag, NULL, ShaderResource::k25D );
                 resource->SetProgramMod(ShaderResource::k25D, program25D);
                 
                 fDefaultShader = Rtt_NEW( fAllocator, Shader(fAllocator, resource, NULL ) );
@@ -258,6 +258,7 @@ ShaderFactory::NewProgram(
         const char *shellFrag,
         const char *kernelVert,
         const char *kernelFrag,
+        const NonCoreFormatInfo* info,
         ShaderResource::ProgramMod mod ) const
 {
     Rtt_ASSERT( shellVert );
@@ -326,6 +327,19 @@ ShaderFactory::NewProgram(
 		#endif
 		}
 		
+		if ( Program::kOpenGL_ES_2 == language && info && 0 != info->fNumFloatBits ) // need to fix P_COLOR?
+		{
+			if ( 32 == info->fNumFloatBits && Display::GetGpuSupportsHighPrecisionFragmentShaders() )
+			{
+				fProgramHeader->SetPrecision( ProgramHeader::kColorType, ProgramHeader::kHighPrecision );
+			}
+			else
+			{
+				Rtt_ASSERT( 16 == info->fNumFloatBits );
+				fProgramHeader->SetPrecision( ProgramHeader::kColorType, ProgramHeader::kMediumPrecision );
+			}
+		}
+		
 		std::string header = Program::HeaderForLanguage( language, * fProgramHeader );
 		
 		if (ShaderResource::k25D == mod)
@@ -352,6 +366,7 @@ ShaderFactory::NewShaderResource(
 	const char *name,
 	const char *kernelVert,
 	const char *kernelFrag,
+	const NonCoreFormatInfo* info,
     int localStubsIndex )
 {
     // Cannot create default
@@ -380,11 +395,12 @@ ShaderFactory::NewShaderResource(
         fDefaultShell->GetFragmentShaderSource(),
         kernelVert,
         kernelFrag,
+        info,
         ShaderResource::kDefault );
 
     SharedPtr< ShaderResource > result( Rtt_NEW( fAllocator, ShaderResource( program, category, name ) ) );
     
-    Program *program25D = NewProgram( fDefaultShell->GetVertexShaderSource(), fDefaultShell->GetFragmentShaderSource(), kernelVert, kernelFrag, ShaderResource::k25D );
+    Program *program25D = NewProgram( fDefaultShell->GetVertexShaderSource(), fDefaultShell->GetFragmentShaderSource(), kernelVert, kernelFrag, info, ShaderResource::k25D );
     result->SetProgramMod( ShaderResource::k25D, program25D );
 
     return result;
@@ -1012,7 +1028,32 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
                             lua_getfield( L, tableIndex, "fragment" );
                             const char *kernelFrag = lua_tostring( L, -1 );
 
-							resource = NewShaderResource( category, name, kernelVert, kernelFrag, localStubsIndex );
+							lua_getfield( L, tableIndex, "colorFormat" );
+							const char* formatName = luaL_optstring( L, -1, "" );
+							U16 formatIndex = 0, layoutDetails = 0;
+							NonCoreFormatInfo info;
+
+							if ( *formatName )
+							{
+								if ( fOwner.QueryTextureInfo( "ColorRenderable", formatName, &formatIndex ) )
+								{
+									// we define P_COLOR in the header when we create the
+									// resource and its programs; in ES these want some
+									// precision adjustments when using, say, a floating-
+									// point format, so this is a quick-and-dirty way to
+									// pass this along
+									fOwner.GetNonCoreFormatInfo( formatIndex, info );
+									
+									layoutDetails = Display::EncodeLayoutDetails( info );
+								}
+								else
+								{
+									CoronaLuaWarning( L, "Unknown or non-color-renderable format: '%s'", formatName );
+								}
+							}
+							lua_pop( L, 1 );
+
+							resource = NewShaderResource( category, name, kernelVert, kernelFrag, &info, localStubsIndex );
 							lua_pop( L, 2 ); // pop 2 strings
 #endif
 
@@ -1022,6 +1063,9 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
                                 bool usesTime = lua_toboolean( L, -1 ) ? true : false;
                                 resource->SetUsesTime( usesTime );
                                 lua_pop( L, 1 );
+
+								resource->SetNonCoreFormatIndex( formatIndex );
+								resource->SetNonCoreLayoutDetails( layoutDetails );
 
 								Shader *prototype = NULL;
 								prototype = NewShaderPrototype( L, tableIndex, resource );
@@ -1039,7 +1083,7 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
                             {
                                 localStubsIndex = 0;
                             }
-							
+				// STEVE TODO render format			
 							result = (ShaderComposite*)NewShaderGraph( L, graphIndex, localStubsIndex );
 						}
 					}

@@ -50,9 +50,12 @@ typedef enum {
      Important: Red, Green and Blue channels must have premultiplied alpha
      */
     kExternalBitmapFormat_RGBA,
-    
-} CoronaExternalBitmapFormat;
 
+	// version 2:
+	
+	kExternalBitmapFormat_RequestedByName
+	
+} CoronaExternalBitmapFormat;
 
 /**
  This structure contains callbacks required for TextureResource's life cycle
@@ -152,6 +155,14 @@ typedef struct CoronaExternalTextureCallbacks
     */
     int (*onGetField)(lua_State *L, const char *field, void* userData);   // optional; called Lua texture property lookup
 } CoronaExternalTextureCallbacks;
+
+typedef struct CoronaExternalTextureCallbacks2 {
+	// TODO (inherited)
+	CoronaExternalTextureCallbacks base;
+
+	// TODO
+	const char* (*getRequestedFormat)(void* userData);
+} CoronaExternalTextureCallbacks2;
 
 // C API
 // ----------------------------------------------------------------------------

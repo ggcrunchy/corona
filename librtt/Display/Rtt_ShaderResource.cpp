@@ -266,8 +266,10 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
     fDetailNames( NULL ),
     fDetailValues( NULL ),
     fDetailsCount( 0U ),
+	fNonCoreFormatIndex( 0U ),
     fShellTransform( NULL ),
 	fTimeTransform( NULL ),
+	fLayoutDetails( 0U ),
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {
@@ -284,8 +286,10 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
     fDetailNames( NULL ),
     fDetailValues( NULL ),
     fDetailsCount( 0U ),
+	fNonCoreFormatIndex( 0U ),
     fShellTransform( NULL ),
 	fTimeTransform( NULL ),
+	fLayoutDetails( 0U ),
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {

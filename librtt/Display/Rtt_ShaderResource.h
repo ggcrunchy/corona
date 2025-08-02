@@ -139,6 +139,13 @@ class ShaderResource
         void SetProgramMod(ProgramMod mod, Program *program);
         Program *GetProgramMod(ProgramMod mod) const;
         
+	public:
+		void SetNonCoreFormatIndex( U16 formatIndex ) { fNonCoreFormatIndex = formatIndex; }
+		U16 GetNonCoreFormatIndex() const { return fNonCoreFormatIndex; }
+		
+		void SetNonCoreLayoutDetails( U16 layoutDetails ) { fLayoutDetails = layoutDetails; }
+		U16 GetNonCoreLayoutDetails() const { return fLayoutDetails; }
+        
     private:
         void Init(Program *defaultProgram);
 
@@ -155,8 +162,10 @@ class ShaderResource
         SharedPtr<FormatExtensionList> fExtensionList;
         std::vector< std::string > fDetailNames;
         std::vector< std::string > fDetailValues;
-        U32 fDetailsCount;
+        U16 fDetailsCount;
+        U16 fNonCoreFormatIndex;
         TimeTransform *fTimeTransform;
+        U16 fLayoutDetails;
         bool fUsesUniforms;
         bool fUsesTime;
 

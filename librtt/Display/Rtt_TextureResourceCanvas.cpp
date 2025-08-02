@@ -57,13 +57,24 @@ TextureResourceCanvas* TextureResourceCanvas::Create(Rtt::TextureFactory &factor
 	Texture::Filter filter = RenderTypes::Convert( display.GetDefaults().GetMagTextureFilter() );
 	Texture::Wrap wrap = RenderTypes::Convert( display.GetDefaults().GetTextureWrapX() );
 
-	if (Texture::kLuminance == format)
+	if (Texture::kLuminance == format) // mask canvas?
 	{
-		format = Texture::kRGBA;
+		U16 formatID;
+		if (display.QueryTextureInfo( "ColorRenderable", "red", &formatID ) )
+		{
+			U16 layoutDetails = display.EncodeNonCoreFormatLayoutDetails( formatID );
+
+			format = Texture::Format::NonCore( formatID, layoutDetails );
+		}
+		else
+		{
+			format = Texture::kRGBA; // heavier but renderable (or more or less "ubiquitous", anyway)
+		}
 	}
 
 	Texture *texture = Rtt_NEW( pAllocator,
 							   TextureVolatile( display.GetAllocator(), texWidth, texHeight, format, filter, wrap, wrap ) );
+
 
 	/* TODO
 		fHasDepth = display.GetDefaults().GetAddDepthToResource();

@@ -54,6 +54,194 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
+// Current layout, 7 bits:
+// * 2 bits = bytes per component, as a shift count, e.g. 1 << 0 for 1 byte, 1 << 2 for 4 bytes
+// * 3 bits = component description: 0-3 = #components - 1; 4+ = special cases
+// * 2 bits = data, e.g. what kind of packed format
+// kNonCore = 8, so only needs 4 of the U16's bits (fewer if we want to be clever)
+// thus there is still room to grow if need be
+
+const U16 kShiftBits = 2;
+const U16 kComponentBits = 3;
+const U16 kDataBits = 2;
+
+enum { kAlpha = 4, kPacked };
+
+const U16 kInfoBits = kShiftBits + kComponentBits + kDataBits;
+const U16 kLayoutDetailsMask = (U16)( ( 1 << kInfoBits ) - 1 );
+const U16 kFormatBits = 16 - kInfoBits;
+const U16 kFormatMask = (U16)( ( 1 << kFormatBits ) - 1 );
+const U16 kRemainingAfterLayoutDetails = ( ~( kLayoutDetailsMask ) );
+
+Rtt_STATIC_ASSERT( ( ( kLayoutDetailsMask << kFormatBits ) | kFormatMask ) == 0xFFFF );
+Rtt_STATIC_ASSERT( ( ( kLayoutDetailsMask ) | ( kRemainingAfterLayoutDetails ) ) == 0xFFFF );
+
+const int Display::LayoutDetailsBitCount = kInfoBits;
+
+U16
+Display::EncodeLayoutDetails( const NonCoreFormatInfo& info )
+{
+    // ensure power-of-2 in (1, 2, 4, 8)
+    Rtt_ASSERT( info.fBytesPerComponent > 0 );
+    Rtt_ASSERT( info.fBytesPerComponent < 16 );
+    Rtt_ASSERT( 0 == ( info.fBytesPerComponent & ( info.fBytesPerComponent - 1 ) ) );
+    
+    // TODO: so far we only have simple schemes; fix up
+    // if and when more sophisticated cases arise
+    int componentCount = 1;
+
+    if ( 0 == info.fRedIndex )
+    {
+        if ( 1 == info.fGreenIndex )
+        {
+            componentCount++;
+            
+            if ( 2 == info.fBlueIndex )
+            {
+                componentCount++;
+                
+                if ( 3 == info.fAlphaIndex )
+                {
+                    componentCount++;
+                }
+                else if ( -1 != info.fAlphaIndex )
+                {
+                    CORONA_LOG_ERROR( "Formats with non-3 alpha index not yet supported" );
+                
+                    return 0;
+                }
+            }
+            else if ( -1 != info.fBlueIndex )
+            {
+                CORONA_LOG_ERROR( "Formats with non-2 blue index not yet supported" );
+            
+                return 0;
+            }
+        }
+        else if ( -1 != info.fGreenIndex )
+        {
+            CORONA_LOG_ERROR( "Formats with non-1 green index not yet supported" );
+            
+            return 0;
+        }
+    }
+    else
+    {
+        CORONA_LOG_ERROR( "Formats with non-0 red index not yet supported" );
+        
+        return 0;
+    }
+
+    int shift = 0;
+    for ( ; shift < 4; shift++ )
+    {
+        if ( info.fBytesPerComponent == ( 1 << shift ) )
+        {
+            break;
+        }
+    }
+    
+    Rtt_ASSERT( shift < 4 );
+
+    int components = componentCount - 1, data = 0;
+    U16 details = ( shift << ( kComponentBits + kDataBits ) )
+                | ( components << kDataBits )
+                | data;
+    return details;
+}
+
+U16
+Display::MixPartWithLayoutDetails( U16 part, U16 layoutDetails )
+{
+    Rtt_ASSERT( part < kRemainingAfterLayoutDetails );
+    Rtt_ASSERT( ( layoutDetails & kLayoutDetailsMask ) == layoutDetails );
+    
+    return part | ( layoutDetails << kFormatBits );
+}
+
+U16
+Display::GetValueAndIndex( U16 value, U16 index, U16 nonCoreConstant, U16 defConstant, U16* out )
+{
+    value &= kFormatMask;
+
+    if ( nonCoreConstant != value )
+    {
+        return value;
+    }
+    else if ( 0 == index )
+    {
+        return defConstant;
+    }
+    else
+    {
+        if ( NULL != out )
+        {
+            *out = index;
+        }
+        
+        return nonCoreConstant;
+    }
+}
+
+U16
+Display::ExtractLayoutDetails( U16 part )
+{
+    return part >> kFormatBits;
+}
+
+NonCoreFormatInfo
+Display::DecodeLayoutDetails( U16 layoutDetails )
+{
+    NonCoreFormatInfo info;
+    
+    layoutDetails >>= kFormatBits;
+    
+    int data = layoutDetails & ( ( 1 << kDataBits ) - 1 );
+    
+    layoutDetails >>= kDataBits;
+    
+    int components = layoutDetails & ( ( 1 << kComponentBits ) - 1 );
+    
+    layoutDetails >>= kComponentBits;
+
+    info.fBytesPerComponent = 1 << layoutDetails; // remainder is shift
+
+    if ( components < 4 )
+    {
+        info.fNumComponents = components + 1;
+        
+        if ( info.fNumComponents < 4 )
+        {
+            info.fAlphaIndex = -1;
+        }
+        if ( info.fNumComponents < 3 )
+        {
+            info.fBlueIndex = -1;
+        }
+        if ( info.fNumComponents < 2 )
+        {
+            info.fGreenIndex = -1;
+        }
+    }
+    else
+    {
+        CORONA_LOG_ERROR( "NYI: unpacking non-count component formats" );
+    }
+    
+    return info;
+}
+
+U16
+Display::EncodeNonCoreFormatLayoutDetails( U16 formatID ) const
+{
+    NonCoreFormatInfo info;
+    GetNonCoreFormatInfo( formatID, info );
+				
+	return EncodeLayoutDetails( info );
+}
+
+// ----------------------------------------------------------------------------
+
 static const char kDisplayNewSnapshotString[] = "display.newSnapshot()";
 static const char kGraphicsDefineEffectGraphString[] = "graphics.defineEffect( { graph } )";
 static const char kGraphicsDefineEffectFragmentString[] = "graphics.defineEffect( { fragment } )";
@@ -1972,6 +2160,18 @@ bool
 Display::HasFramebufferBlit( bool * canScale ) const
 {
     return fRenderer->HasFramebufferBlit( canScale );
+}
+
+bool
+Display::QueryTextureInfo( const char* what, const char* name, U16* formatID ) const
+{
+    return fRenderer->QueryTextureInfo( what, name, formatID );
+}
+
+void
+Display::GetNonCoreFormatInfo( U16 formatID, NonCoreFormatInfo& info ) const
+{
+    fRenderer->GetNonCoreFormatInfo( formatID, info );
 }
 
 void

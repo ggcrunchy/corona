@@ -36,6 +36,7 @@ class GLTexture : public GPUResource
 private:
 	GLint fCachedFormat;
 	unsigned long fCachedWidth, fCachedHeight;
+	bool fUsingLinearFiltering;
 };
 
 // ----------------------------------------------------------------------------

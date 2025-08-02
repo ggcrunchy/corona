@@ -41,6 +41,7 @@ class BufferBitmap;
 class ShaderData;
 struct CustomGraphicsInfo;
 struct TimeTransform;
+struct NonCoreFormatInfo;
 
 // ----------------------------------------------------------------------------
 
@@ -189,6 +190,8 @@ class Renderer
         static U32 GetMaxUniformVectorsCount();
 		static U32 GetMaxVertexTextureUnits();
 
+		virtual bool QueryTextureInfo( const char* what, const char* name, U16* formatID ) const;
+		virtual void GetNonCoreFormatInfo( U16 formatID, NonCoreFormatInfo& info ) const;
         bool HasFramebufferBlit(  bool * canScale ) const;
         void GetVertexAttributes( VertexAttributeSupport & support ) const;
 

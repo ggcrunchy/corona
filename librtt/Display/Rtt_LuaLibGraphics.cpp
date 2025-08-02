@@ -1173,12 +1173,37 @@ SharedPtr<TextureResource> CreateResourceBitmapFromTable(Rtt::TextureFactory &fa
 }
 
 //helper funciton to parse lua table to create canvas resource
-SharedPtr<TextureResource> CreateResourceCanvasFromTable(Rtt::TextureFactory &factory, lua_State *L, int index, bool isCanvas)
+SharedPtr<TextureResource> CreateResourceCanvasFromTable(Rtt::TextureFactory &factory, lua_State *L, int index, bool isMaskCanvas)
 {
     Display &display = factory.GetDisplay();
     
     static unsigned int sNextRenderTextureID = 1;
     SharedPtr<TextureResource> ret;
+    
+	Texture::Format format = Texture::kRGBA;
+	if ( isMaskCanvas )
+	{
+		format = Texture::kLuminance; // not renderable, but a good "is a mask" indicator
+	}
+	else
+	{
+		lua_getfield( L, index, "colorFormat" );
+		if (lua_isstring( L, -1 ))
+		{
+			const char* formatName = lua_tostring( L, -1 );
+			U16 formatIndex;
+			if ( factory.GetDisplay().QueryTextureInfo( "ColorRenderable", formatName, &formatIndex ) )
+			{
+				U16 layoutDetails = factory.GetDisplay().EncodeNonCoreFormatLayoutDetails( formatIndex );
+				format = Texture::Format::NonCore( formatIndex, layoutDetails );
+			}
+			else
+			{
+				CoronaLuaWarning( L, "Format `%s` is unknown or not color-renderable", formatName );
+			}
+		}
+		lua_pop( L, 1 );
+	}
     
     Real width = -1, height = -1;
     int pixelWidth = -1, pixelHeight = -1;
@@ -1248,7 +1273,7 @@ SharedPtr<TextureResource> CreateResourceCanvasFromTable(Rtt::TextureFactory &fa
         char filename[30];
         snprintf(filename, 30, "corona://FBOgo_%u", sNextRenderTextureID++);
 
-        SharedPtr<TextureResource> texSource = factory.FindOrCreateCanvas( filename, width, height, pixelWidth, pixelHeight, isCanvas );
+		SharedPtr<TextureResource> texSource = factory.FindOrCreateCanvas( filename, width, height, pixelWidth, pixelHeight, format );
         if( texSource.NotNull() )
         {
             factory.Retain(texSource);
@@ -1330,6 +1355,7 @@ GraphicsLibrary::newTexture( lua_State *L )
 	
 	if( lua_istable( L, index ) )
 	{
+// STEVE TODO: getfield() -> format = string (floats subsumed under this?)
 		lua_getfield( L, index, "type" );
 		const char *textureType = lua_tostring( L, -1 );
 		if ( textureType )

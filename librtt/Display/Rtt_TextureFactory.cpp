@@ -542,7 +542,7 @@ TextureFactory::WillRemoveTexture( const TextureResource& resource )
 SharedPtr< TextureResource >
 TextureFactory::FindOrCreateCanvas(const std::string &cacheKey,
 								Real width, Real height,
-								int pixelWidth, int pixelHeight, bool isMask )
+								int pixelWidth, int pixelHeight, Texture::Format format )
 
 {
 	SharedPtr< TextureResource > result = Find(cacheKey);
@@ -551,7 +551,7 @@ TextureFactory::FindOrCreateCanvas(const std::string &cacheKey,
 		return result;
 	}
 	
-	TextureResourceCanvas *resource = TextureResourceCanvas::Create( * this, width, height, pixelWidth, pixelHeight, isMask ? Texture::kLuminance : Texture::kRGBA );
+	TextureResourceCanvas *resource = TextureResourceCanvas::Create( * this, width, height, pixelWidth, pixelHeight, format );
 	result = SharedPtr< TextureResource >( resource );
 	
 	fCache[cacheKey] = CacheEntry( result );
