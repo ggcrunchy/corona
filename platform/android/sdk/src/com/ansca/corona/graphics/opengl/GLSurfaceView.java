@@ -24,6 +24,8 @@ package com.ansca.corona.graphics.opengl;
 import java.io.Writer;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+
+import javax.microedition.khronos.egl.EGL;
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGL11;
 import javax.microedition.khronos.egl.EGLConfig;
@@ -2050,47 +2052,36 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
     private boolean mNeedsSwap = true;
 
     static private boolean sHasChecked30Support = false;
-    static private boolean sHas30Support;
-    static private boolean sHas31Support;
-    static private boolean sHas32Support;
+    static private int sMinorVersionSupported;
 
     public boolean HasES3Support( int minorVersion ) {
         if ( ! sHasChecked30Support ) {
-            EGLContext context30 =
-            //mEGLContextFactory.createContext(mEgl, mEglDisplay, eglConfig, 3, 0);
-            null;
-            if (context30 != null) {
-                sHas30Support = true;
-                // destroyContext(context30);
-            }
-            EGLContext context31 =
-                    //mEGLContextFactory.createContext(mEgl, mEglDisplay, eglConfig, 3, 1);
-                    null;
-            if (context31 != null) {
-                sHas31Support = true;
-                // destroyContext(context31);
-            }
-            EGLContext context32 =
-                    //mEGLContextFactory.createContext(mEgl, mEglDisplay, eglConfig, 3, 2);
-                    null;
-            if (context32 != null) {
-                sHas32Support = true;
-                // destroyContext(context32);
+            sMinorVersionSupported = -1;
+
+            EGL10 egl = (EGL10) EGLContext.getEGL();
+            EGLDisplay display = egl.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY);
+
+            DefaultContextFactory factory = (DefaultContextFactory) mEGLContextFactory;
+
+            for (int i = 0; i < 2; i++) {
+                EGLContext context = factory.createContext(egl, display, null, 3, i);
+                if ( context != null ) {
+                    sMinorVersionSupported++;
+
+                    mEGLContextFactory.destroyContext(egl, display, context);
+                } else {
+                    break;
+                }
             }
 
             sHasChecked30Support = true;
         }
 
-        if ( 0 == minorVersion ) {
-            return sHas30Support;
-        } else if ( 1 == minorVersion ) {
-            return sHas31Support;
-        } else if ( 2 == minorVersion ) {
-            return sHas32Support;
+        if ( minorVersion >= 0 && minorVersion <= 2 ) {
+            return minorVersion <= sMinorVersionSupported;
         } else {
             throw new RuntimeException( "Unknown ES 3 minor version" );
         }
-    }
     }
 
     public void setNeedsSwap() {
