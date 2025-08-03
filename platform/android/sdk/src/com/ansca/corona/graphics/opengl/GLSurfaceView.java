@@ -778,6 +778,8 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
 
     private class DefaultContextFactory implements EGLContextFactory {
         private int EGL_CONTEXT_CLIENT_VERSION = 0x3098;
+        private int EGL_CONTEXT_MINOR_VERSION = 0x30FB;
+
 
         public EGLContext createContext(EGL10 egl, EGLDisplay display, EGLConfig config) {
             int[] attrib_list = {EGL_CONTEXT_CLIENT_VERSION, mEGLContextClientVersion,
@@ -785,6 +787,14 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
 
             return egl.eglCreateContext(display, config, EGL10.EGL_NO_CONTEXT,
                     mEGLContextClientVersion != 0 ? attrib_list : null);
+        }
+
+        public EGLContext createContext(EGL10 egl, EGLDisplay display, EGLConfig config, int majorVersion, int minorVersion) {
+            int[] attrib_list = {EGL_CONTEXT_CLIENT_VERSION, majorVersion, EGL_CONTEXT_MINOR_VERSION, minorVersion,
+                    EGL10.EGL_NONE };
+
+            return egl.eglCreateContext(display, config, EGL10.EGL_NO_CONTEXT,
+                    majorVersion != 0 ? attrib_list : null);
         }
 
         public void destroyContext(EGL10 egl, EGLDisplay display,
@@ -2038,7 +2048,51 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
     private int mEGLContextClientVersion;
     private boolean mPreserveEGLContextOnPause;
     private boolean mNeedsSwap = true;
-    
+
+    static private boolean sHasChecked30Support = false;
+    static private boolean sHas30Support;
+    static private boolean sHas31Support;
+    static private boolean sHas32Support;
+
+    public boolean HasES3Support( int minorVersion ) {
+        if ( ! sHasChecked30Support ) {
+            EGLContext context30 =
+            //mEGLContextFactory.createContext(mEgl, mEglDisplay, eglConfig, 3, 0);
+            null;
+            if (context30 != null) {
+                sHas30Support = true;
+                // destroyContext(context30);
+            }
+            EGLContext context31 =
+                    //mEGLContextFactory.createContext(mEgl, mEglDisplay, eglConfig, 3, 1);
+                    null;
+            if (context31 != null) {
+                sHas31Support = true;
+                // destroyContext(context31);
+            }
+            EGLContext context32 =
+                    //mEGLContextFactory.createContext(mEgl, mEglDisplay, eglConfig, 3, 2);
+                    null;
+            if (context32 != null) {
+                sHas32Support = true;
+                // destroyContext(context32);
+            }
+
+            sHasChecked30Support = true;
+        }
+
+        if ( 0 == minorVersion ) {
+            return sHas30Support;
+        } else if ( 1 == minorVersion ) {
+            return sHas31Support;
+        } else if ( 2 == minorVersion ) {
+            return sHas32Support;
+        } else {
+            throw new RuntimeException( "Unknown ES 3 minor version" );
+        }
+    }
+    }
+
     public void setNeedsSwap() {
         mNeedsSwap = true;
     }

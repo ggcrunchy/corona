@@ -178,7 +178,7 @@ struct TextureFormatInfo {
 		// particular backend or because some extension is present,
 		// so we could avoid doing a redundant FBO attach...
 	};
-
+	
 	void Initialize( const char* name, GLenum source, GLenum internal = 0 )
 	{
 		Rtt_ASSERT( (GLenum)(GLushort)source == source );
@@ -498,6 +498,14 @@ AllocInfo( const TextureFormatInfo& form )
 	}
 }
 
+static void
+AliasInfo( const TextureFormatInfo& copy, const char* name )
+{
+	TextureFormatInfo* info = AllocInfo( copy );
+	
+	info->fName = name;
+}
+
 static int
 FindInfo( const char* name )
 {
@@ -726,17 +734,27 @@ bool hasS3TC = false, hasDXT1 = false;
 
 	if ( hasS3TC )
 	{
+		int currentIndex = sInfoCount;
+		
 		AllocInfo( compressedForm )->InitializeBlocked( "dxt3", GL_COMPRESSED_RGBA_S3TC_DXT3_EXT, 4, 4, 16 );
-		AllocInfo( compressedForm )->InitializeBlocked( "dxt5", GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, 4, 4, 16 ); 
+		AllocInfo( compressedForm )->InitializeBlocked( "dxt5", GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, 4, 4, 16 );
+		
+		AliasInfo( sInfo[currentIndex++], "bc2" );
+		AliasInfo( sInfo[currentIndex++], "bc3" );
 	}
 	if ( hasS3TC || hasDXT1 )
 	{
+		int currentIndex = sInfoCount;
+		
 		AllocInfo( compressedForm )->InitializeBlocked( "dxt1-rgb", GL_COMPRESSED_RGB_S3TC_DXT1_EXT, 4, 4, 8 );
-		AllocInfo( compressedForm )->InitializeBlocked( "dxt1-rgba", GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, 4, 4, 8 ); 
+		AllocInfo( compressedForm )->InitializeBlocked( "dxt1-rgba", GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, 4, 4, 8 );
+		
+		AliasInfo( sInfo[currentIndex++], "bc1-rgb" );
+		AliasInfo( sInfo[currentIndex++], "bc1-rgba" );
 	}
 	
 	// GL_ARB/EXT_texture_compression_rgtc
-	// GL_ARB_texture_compression_bptc (also BC aliases for above)
+	// GL_ARB_texture_compression_bptc
 	// there are also some ANGLE / WebGL things; sRGB
 }
 

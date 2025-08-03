@@ -29,6 +29,7 @@ import android.view.KeyEvent;
 import android.util.Log;
 import android.widget.*;
 import com.ansca.corona.events.EventManager;
+import com.ansca.corona.graphics.opengl.GLSurfaceView;
 import com.ansca.corona.permissions.PermissionsSettings;
 import com.ansca.corona.permissions.PermissionsServices;
 import com.ansca.corona.permissions.PermissionState;
@@ -48,6 +49,7 @@ public class CoronaActivity extends Activity {
 	private boolean myIsActivityResumed = false;
 	private boolean myIsOrientationLocked = false;
 	private com.ansca.corona.graphics.opengl.CoronaGLSurfaceView myGLView;
+
 	private android.widget.ImageView fSplashScreenView = null;
 	private com.ansca.corona.purchasing.StoreProxy myStore = null;
 	private CoronaStatusBarSettings myStatusBarMode;
@@ -209,9 +211,27 @@ public class CoronaActivity extends Activity {
 			android.content.pm.ApplicationInfo applicationInfo;
 			applicationInfo = getPackageManager().getApplicationInfo(
 					getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
+			int majorVersion = 2;
+			int minorVersion = 0;
 			if (applicationInfo != null && applicationInfo.metaData != null) {
 				wantsDepthBuffer = applicationInfo.metaData.getBoolean( "wantsDepthBuffer" );
 				wantsStencilBuffer = applicationInfo.metaData.getBoolean( "wantsStencilBuffer" );
+				if (applicationInfo.metaData.getBoolean( "useES3" )) {
+					majorVersion = 3;
+					minorVersion = applicationInfo.metaData.getInt("minorVersion", 0);
+					if (minorVersion < 0 || minorVersion > 2) {
+						throw new RuntimeException("Invalid GL ES 3 minor version");
+					}
+					if (getGLView().HasES3Support(minorVersion)) {
+						// getGLView()... <- logic should be in here
+						// DefaultContextFactory <- set it up
+							// try to create 3.0
+							// if ! null, set value
+							// delete
+							// ditto for 3.1, 3.2
+						// mEGLContextFactory.createContext
+					}
+				}
 			}
 			android.content.pm.ActivityInfo activityInfo;
 			activityInfo = getPackageManager().getActivityInfo(
