@@ -94,15 +94,20 @@ void GLLogError( const char* message, const char* file, int line )
 	bool GLIsRunningES3( int& minor )
 	{
 		const char* version = (const char *)glGetString( GL_VERSION );
-
-        const char kStartsWithStr[] = "OpenGL ES 3.";
-        if ( NULL == version || NULL == strstr( version, kStartsWithStr ))
+        if ( NULL == version )
         {
             return false;
         }
 
-        const char* rest = version;
-        rest += sizeof( kStartsWithStr ) - 1;
+        const char kES3Substr[] = "OpenGL ES 3.";
+        const char* es3Substr = strstr( version, kES3Substr );
+        if ( NULL == es3Substr )
+        {
+            return false;
+        }
+
+        const char* rest = es3Substr;
+        rest += sizeof( kES3Substr ) - 1;
 
         if ( *rest >= '0' && *rest <= '2' )
         {
