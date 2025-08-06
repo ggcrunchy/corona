@@ -207,30 +207,23 @@ public class CoronaActivity extends Activity {
 
 		// Fetch this activity's meta-data from the manifest.
 		boolean isKeyboardAppPanningEnabled = false, wantsDepthBuffer = false, wantsStencilBuffer = false;
+		int esVersion = 2;
 		try {
 			android.content.pm.ApplicationInfo applicationInfo;
 			applicationInfo = getPackageManager().getApplicationInfo(
 					getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
-			int majorVersion = 2;
-			int minorVersion = 0;
+			esVersion = 32;
 			if (applicationInfo != null && applicationInfo.metaData != null) {
 				wantsDepthBuffer = applicationInfo.metaData.getBoolean( "wantsDepthBuffer" );
 				wantsStencilBuffer = applicationInfo.metaData.getBoolean( "wantsStencilBuffer" );
 				if (applicationInfo.metaData.getBoolean( "useES3" )) {
-					majorVersion = 3;
-					minorVersion = applicationInfo.metaData.getInt("minorVersion", 0);
+					esVersion = 32;
+				} else {
+					int minorVersion = applicationInfo.metaData.getInt("minorVersion", 0);
 					if (minorVersion < 0 || minorVersion > 2) {
 						throw new RuntimeException("Invalid GL ES 3 minor version");
 					}
-					if (getGLView().HasES3Support(minorVersion)) {
-						// getGLView()... <- logic should be in here
-						// DefaultContextFactory <- set it up
-							// try to create 3.0
-							// if ! null, set value
-							// delete
-							// ditto for 3.1, 3.2
-						// mEGLContextFactory.createContext
-					}
+					esVersion = 30 + minorVersion;
 				}
 			}
 			android.content.pm.ActivityInfo activityInfo;
@@ -278,7 +271,7 @@ public class CoronaActivity extends Activity {
 		CoronaEnvironment.setCoronaActivity(this);
 
 		// Create our CoronaRuntime, which also initializes the native side of the CoronaRuntime.
-		fCoronaRuntime = new CoronaRuntime(this, false, wantsDepthBuffer, wantsStencilBuffer);
+		fCoronaRuntime = new CoronaRuntime(this, false, esVersion, wantsDepthBuffer, wantsStencilBuffer);
 
 		// Set initialSystemUiVisibility before splashScreen comes up
 		try {

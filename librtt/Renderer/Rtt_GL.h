@@ -69,6 +69,12 @@ void GLCheckError( const char* file, int line );
 // Send the given message to the logging system
 void GLLogError( const char* message, const char* file, int line );
 
+#if !defined(Rtt_OPENGLES)
+    bool GLIsRunningES3( int& _1, int& _2 ) { return false; }
+#else
+	bool GLIsRunningES3( int& minor );
+#endif
+
 #ifdef Rtt_DEBUG
 	#define GL_CHECK_ERROR() Rtt::GLCheckError( __FILE__, __LINE__ )
 	#define GL_LOG_ERROR( message ) Rtt::GLLogError( message, __FILE__, __LINE__ )

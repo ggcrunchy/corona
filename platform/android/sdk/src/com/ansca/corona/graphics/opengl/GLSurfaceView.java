@@ -784,19 +784,20 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
 
 
         public EGLContext createContext(EGL10 egl, EGLDisplay display, EGLConfig config) {
-            int[] attrib_list = {EGL_CONTEXT_CLIENT_VERSION, mEGLContextClientVersion,
+            int majorVersion = 2, minorVersion = 0;
+            if ( mEGLContextClientVersion >= 30 && mEGLContextClientVersion <= 32 )
+            {
+                majorVersion = 3;
+                minorVersion = mEGLContextClientVersion - 30;
+            }
+
+            int[] attrib_list = {
+                    EGL_CONTEXT_CLIENT_VERSION, majorVersion,
+                    EGL_CONTEXT_MINOR_VERSION, minorVersion,
                     EGL10.EGL_NONE };
 
             return egl.eglCreateContext(display, config, EGL10.EGL_NO_CONTEXT,
                     mEGLContextClientVersion != 0 ? attrib_list : null);
-        }
-
-        public EGLContext createContext(EGL10 egl, EGLDisplay display, EGLConfig config, int majorVersion, int minorVersion) {
-            int[] attrib_list = {EGL_CONTEXT_CLIENT_VERSION, majorVersion, EGL_CONTEXT_MINOR_VERSION, minorVersion,
-                    EGL10.EGL_NONE };
-
-            return egl.eglCreateContext(display, config, EGL10.EGL_NO_CONTEXT,
-                    majorVersion != 0 ? attrib_list : null);
         }
 
         public void destroyContext(EGL10 egl, EGLDisplay display,
@@ -909,7 +910,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
         protected int[] mConfigSpec;
 
         private int[] filterConfigSpec(int[] configSpec) {
-            if (mEGLContextClientVersion != 2) {
+            if (mEGLContextClientVersion != 2 && !( mEGLContextClientVersion >= 30 && mEGLContextClientVersion <= 32 )) {
                 return configSpec;
             }
             /* We know none of the subclasses define EGL_RENDERABLE_TYPE.
@@ -1087,7 +1088,17 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
                 * Create an EGL context. We want to do this as rarely as we can, because an
                 * EGL context is a somewhat heavy object.
                 */
-                mEglContext = view.mEGLContextFactory.createContext(mEgl, mEglDisplay, mEglConfig);
+                while (view.mEGLContextClientVersion >= 30) // try highest to lowest
+                {
+                    mEglContext = view.mEGLContextFactory.createContext(mEgl, mEglDisplay, mEglConfig);
+                    if (mEglContext != null && mEglContext != EGL10.EGL_NO_CONTEXT) break;
+                    view.mEGLContextClientVersion--;
+                }
+
+                if (mEglContext == null || mEglContext == EGL10.EGL_NO_CONTEXT) { // 3 not available, or 2 requested
+                    view.mEGLContextClientVersion = 2;
+                    mEglContext = view.mEGLContextFactory.createContext(mEgl, mEglDisplay, mEglConfig);
+                }
             }
             if (mEglContext == null || mEglContext == EGL10.EGL_NO_CONTEXT) {
                 mEglContext = null;
@@ -2050,39 +2061,6 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
     private int mEGLContextClientVersion;
     private boolean mPreserveEGLContextOnPause;
     private boolean mNeedsSwap = true;
-
-    static private boolean sHasChecked30Support = false;
-    static private int sMinorVersionSupported;
-
-    public boolean HasES3Support( int minorVersion ) {
-        if ( ! sHasChecked30Support ) {
-            sMinorVersionSupported = -1;
-
-            EGL10 egl = (EGL10) EGLContext.getEGL();
-            EGLDisplay display = egl.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY);
-
-            DefaultContextFactory factory = (DefaultContextFactory) mEGLContextFactory;
-
-            for (int i = 0; i < 2; i++) {
-                EGLContext context = factory.createContext(egl, display, null, 3, i);
-                if ( context != null ) {
-                    sMinorVersionSupported++;
-
-                    mEGLContextFactory.destroyContext(egl, display, context);
-                } else {
-                    break;
-                }
-            }
-
-            sHasChecked30Support = true;
-        }
-
-        if ( minorVersion >= 0 && minorVersion <= 2 ) {
-            return minorVersion <= sMinorVersionSupported;
-        } else {
-            throw new RuntimeException( "Unknown ES 3 minor version" );
-        }
-    }
 
     public void setNeedsSwap() {
         mNeedsSwap = true;

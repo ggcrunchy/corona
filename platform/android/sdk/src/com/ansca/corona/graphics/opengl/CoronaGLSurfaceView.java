@@ -48,7 +48,7 @@ public class CoronaGLSurfaceView extends GLSurfaceView {
 	 * Creates a new OpenGL surface used to render Corona's content.
 	 * @param context Reference to the context. Cannot be null.
 	 */
-	public CoronaGLSurfaceView(android.content.Context context, com.ansca.corona.CoronaRuntime runtime, boolean isCoronaKit, boolean wantsDepthBuffer, boolean wantsStencilBuffer) {
+	public CoronaGLSurfaceView(android.content.Context context, com.ansca.corona.CoronaRuntime runtime, boolean isCoronaKit, int esVersion, boolean wantsDepthBuffer, boolean wantsStencilBuffer) {
 		super(context);
 
 		// Validate.
@@ -131,7 +131,7 @@ public class CoronaGLSurfaceView extends GLSurfaceView {
 		};
 
 		// Set up rendering system to use OpenGL ES 2.0.
-		setEGLContextClientVersion(2);
+		setEGLContextClientVersion(esVersion);
 
 		// Set up OpenGL to render with a 32-bit color depth. (The default is 16-bit.)
 		// This must be done before setting the renderer below.

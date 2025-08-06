@@ -1638,10 +1638,6 @@
 		F55407F61C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F55407F31C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.cpp */; };
 		F55407F71C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = F55407F41C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.h */; };
 		F55407F81C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = F55407F41C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.h */; };
-		F5567D482ADC73BC008CD550 /* network.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F5567D442ADC7394008CD550 /* network.dylib */; };
-		F5567D492ADC73BC008CD550 /* network.dylib in Copy Frameworks and dylibs */ = {isa = PBXBuildFile; fileRef = F5567D442ADC7394008CD550 /* network.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		F5567D4A2ADC73CB008CD550 /* network.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F5567D442ADC7394008CD550 /* network.dylib */; };
-		F5567D4B2ADC73CB008CD550 /* network.dylib in Copy Frameworks */ = {isa = PBXBuildFile; fileRef = F5567D442ADC7394008CD550 /* network.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		F57469D7240291FA00CA5949 /* iostemplate in Resources */ = {isa = PBXBuildFile; fileRef = F57469D6240291FA00CA5949 /* iostemplate */; };
 		F57AE2051F051610000A4245 /* Rtt_AppleInAppStore.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0077B6571463359A00EEDF75 /* Rtt_AppleInAppStore.mm */; };
 		F57AE2061F051610000A4245 /* Rtt_AppleInAppStoreApple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0077B6591463359A00EEDF75 /* Rtt_AppleInAppStoreApple.mm */; };
@@ -2179,20 +2175,6 @@
 			remoteGlobalIDString = A49186401641DDB800A39286;
 			remoteInfo = network;
 		};
-		F5567D4C2ADC73E1008CD550 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = F583ABD82ADAF4F2002799CB /* NetworkPlugin.xcodeproj */;
-			proxyType = 1;
-			remoteGlobalIDString = A49186331641DDB800A39286;
-			remoteInfo = network;
-		};
-		F5567D4E2ADC740E008CD550 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = F583ABD82ADAF4F2002799CB /* NetworkPlugin.xcodeproj */;
-			proxyType = 1;
-			remoteGlobalIDString = A49186331641DDB800A39286;
-			remoteInfo = network;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -2203,7 +2185,6 @@
 			dstSubfolderSpec = 10;
 			files = (
 				0052EBF412B73ADD006ED5BC /* ALmixer.framework in Copy Frameworks */,
-				F5567D4B2ADC73CB008CD550 /* network.dylib in Copy Frameworks */,
 			);
 			name = "Copy Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2237,7 +2218,6 @@
 			dstSubfolderSpec = 10;
 			files = (
 				C279452E1B585BD60046B6E8 /* ads.dylib in Copy Frameworks and dylibs */,
-				F5567D492ADC73BC008CD550 /* network.dylib in Copy Frameworks and dylibs */,
 				C279452F1B585BD60046B6E8 /* analytics.dylib in Copy Frameworks and dylibs */,
 				C27945301B585BD60046B6E8 /* gameNetwork.dylib in Copy Frameworks and dylibs */,
 				C27945311B585BD60046B6E8 /* licensing.dylib in Copy Frameworks and dylibs */,
@@ -3497,7 +3477,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				C2C59B2C1E2812FF001DF51E /* CoreMedia.framework in Frameworks */,
-				F5567D4A2ADC73CB008CD550 /* network.dylib in Frameworks */,
 				C2C59B2A1E2812F9001DF51E /* AVFoundation.framework in Frameworks */,
 				C2C59B2B1E2812F9001DF51E /* AVKit.framework in Frameworks */,
 				C2F911111CDBFA19004A5564 /* libluasocket.a in Frameworks */,
@@ -3547,7 +3526,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F5567D482ADC73BC008CD550 /* network.dylib in Frameworks */,
 				F5FED0972512248E00AE2911 /* StoreKit.framework in Frameworks */,
 				C2C59B291E2812D6001DF51E /* CoreMedia.framework in Frameworks */,
 				C2C59B271E2812CE001DF51E /* AVFoundation.framework in Frameworks */,
@@ -6195,7 +6173,6 @@
 				001F574112B6018500F52101 /* PBXBuildRule */,
 			);
 			dependencies = (
-				F5567D4D2ADC73E1008CD550 /* PBXTargetDependency */,
 				F533258E1D9DD3CC003613F7 /* PBXTargetDependency */,
 				C21995B01C18A2C000E88FD0 /* PBXTargetDependency */,
 				C2B5FEEE1B336C3D00DD49E6 /* PBXTargetDependency */,
@@ -6290,7 +6267,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				F5567D4F2ADC740E008CD550 /* PBXTargetDependency */,
 				C226075C1B4B415D00172FB1 /* PBXTargetDependency */,
 				C2E993261A6B289D00E99F46 /* PBXTargetDependency */,
 				C2E9931C1A6B287500E99F46 /* PBXTargetDependency */,
@@ -8137,16 +8113,6 @@
 			name = CoronaLiveServer;
 			targetProxy = F533258D1D9DD3CC003613F7 /* PBXContainerItemProxy */;
 		};
-		F5567D4D2ADC73E1008CD550 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = network;
-			targetProxy = F5567D4C2ADC73E1008CD550 /* PBXContainerItemProxy */;
-		};
-		F5567D4F2ADC740E008CD550 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = network;
-			targetProxy = F5567D4E2ADC740E008CD550 /* PBXContainerItemProxy */;
-		};
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
@@ -8537,14 +8503,13 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CODE_SIGN_ENTITLEMENTS = CoronaSimulator.entitlements;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_RESOURCE_RULES_PATH = "";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = NO;
 				DEAD_CODE_STRIPPING = NO;
-				DEVELOPMENT_TEAM = BG2J43EA88;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = BG2J43EA88;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -8876,14 +8841,13 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CODE_SIGN_ENTITLEMENTS = CoronaSimulator.entitlements;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_RESOURCE_RULES_PATH = "";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = NO;
 				DEAD_CODE_STRIPPING = NO;
-				DEVELOPMENT_TEAM = BG2J43EA88;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = BG2J43EA88;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -8937,14 +8901,13 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CODE_SIGN_ENTITLEMENTS = CoronaSimulator.entitlements;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_RESOURCE_RULES_PATH = "";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = NO;
 				DEAD_CODE_STRIPPING = NO;
-				DEVELOPMENT_TEAM = BG2J43EA88;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = BG2J43EA88;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",

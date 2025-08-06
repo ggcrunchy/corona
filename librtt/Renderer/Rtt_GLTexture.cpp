@@ -194,7 +194,7 @@ struct TextureFormatInfo {
 			fFlags |= kAlphaBit; // ...and fallthrough
 		case GL_RGB:
 			fFlags |= kBlueBit; // ditto
-	#if GL_ARB_texture_rg
+	#if defined(GL_ARB_texture_rg)
 		case GL_RG:
     #elif defined(GL_EXT_texture_rg)
         case GL_RG_EXT:
@@ -209,7 +209,7 @@ struct TextureFormatInfo {
 		
 		fBlockWidth = width;
 		fBlockHeight = height;
-		fBlockSizeInBytes = blockSize;
+		fSizeFactor = blockSize / ( width * height );
 	}
 
 	// cf. getFormatTokens()
@@ -220,44 +220,37 @@ struct TextureFormatInfo {
 	GLushort fFlags;
 	U8 fBlockWidth; // for various compressed formats (we COULD repurpose fType and fSource...)
 	U8 fBlockHeight;
-	U8 fBlockSizeInBytes;
+	U8 fSizeFactor;
 		// ASTC: 128 bits in any
 			// various
-		// DXT1: 8 bytes
-		// DXT3, 5: 16
-		// ^^ 4x4
 		// BC*
-		// ETC1:
-			// The number of bits that represent a 4x4 texe	l block is 64 bits if
-			// <internalformat> is given by ETC1_RGB8_OES.
 		// ETC2: 4x4, 8 bytes
 		// EAC: r, rg...
 };
 
 static TextureFormatInfo sInfo[32]; // arbitrary size; expand as necessary
 
-static void
-RoundDimension( int& value, int dim )
+static bool
+CompressedBlockSizesAreConsistent( U16 formatIndex, const Texture* texture )
 {
-	value--;
-	
-	value += dim - value % dim;
-}
+	U32 widthRemainder = texture->GetWidth() % (U32)( sInfo[formatIndex].fBlockWidth );
+	U32 heightRemainder = texture->GetHeight() % (U32)( sInfo[formatIndex].fBlockHeight );
 
-static void
-GetCompressedInputs( const TextureFormatInfo& info, int& width, int& height, GLsizei& imageSize )
-{
-	if ( 0 != info.fBlockWidth )
+	if ( 0 != widthRemainder || 0 != heightRemainder )
 	{
-		Rtt_ASSERT( 0 != info.fBlockHeight );
-		
-		RoundDimension( width, (int)( info.fBlockWidth ) );
-		RoundDimension( height, (int)( info.fBlockHeight ) );
-		
-		imageSize = (GLsizei)( width * height );
-		
-		imageSize *= info.fBlockSizeInBytes;
-		imageSize /= info.fBlockWidth * info.fBlockHeight;
+		Rtt_LogException(
+			"Compressed texture's dimensions (%u, %u) are inconsistent with the block size (%u, %u)", 
+			texture->GetWidth(),
+			texture->GetHeight(),
+			(U32)( sInfo[formatIndex].fBlockWidth ),
+			(U32)( sInfo[formatIndex].fBlockHeight )
+		);
+			
+		return false;
+	}
+	else
+	{
+		return true;
 	}
 }
 
@@ -304,21 +297,27 @@ GLTexture::Create( CPUResource* resource )
     GLint internalFormat;
     GLenum format;
     GLenum type;
+    bool blockSizesOK = true;
     
 	if ( 0 != formatIndex )
 	{
 		internalFormat = sInfo[formatIndex].fInternal;
 		format = sInfo[formatIndex].fSource;
 		type = sInfo[formatIndex].fType;
+		
+		if ( IsCompressed( formatIndex ) && CompressedBlockSizesAreConsistent( formatIndex, texture ) )
+		{		
+			blockSizesOK = false;
+		}
 	}
 	else
 	{
 		Texture::Format textureFormat = texture->GetFormat();
 		getFormatTokens( textureFormat, internalFormat, format, type );
 	}
-    const U32 w = texture->GetWidth();
-    const U32 h = texture->GetHeight();
-    const U8* data = texture->GetData();
+    const U32 w = blockSizesOK ? texture->GetWidth() : 4;
+    const U32 h = blockSizesOK ? texture->GetHeight() : 4;
+    const U8* data = blockSizesOK ? texture->GetData() : NULL;
     {
 //#if defined( Rtt_EMSCRIPTEN_ENV )
 //        glPixelStorei( GL_UNPACK_ALIGNMENT, texture->GetByteAlignment() );
@@ -330,9 +329,8 @@ GLTexture::Create( CPUResource* resource )
         // It is valid to pass a NULL pointer, so allocation is done either way
 		if ( 0 != formatIndex && IsCompressed( formatIndex ) )
 		{
-			// TODO: type / size?
-			// imageSize = w * h * bpp?
-			glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, type, data );
+			GLsizei imageSize = ( GLsizei )( w * h ) * sInfo[formatIndex].fSizeFactor;
+			glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, imageSize, data );
 		}
 		else
 		{
@@ -359,15 +357,21 @@ GLTexture::Update( CPUResource* resource )
 
     SUMMED_TIMING( gltu, "Texture GPU Resource: Update" );
 
-    const U8* data = texture->GetData();
+	bool blockSizesOK = true;
+	U16 formatIndex = 0;
+	
+	texture->GetFormat().GetValue( &formatIndex );
+
+	if ( 0 != formatIndex && IsCompressed( formatIndex ) && !CompressedBlockSizesAreConsistent( formatIndex, texture ) )
+	{
+		blockSizesOK = false;
+	}
+
+    const U8* data = blockSizesOK ? texture->GetData() : NULL;
     if( data )
     {
         const U32 w = texture->GetWidth();
         const U32 h = texture->GetHeight();
-
-		U16 formatIndex = 0;
-		
-		texture->GetFormat().GetValue( &formatIndex );
 
         GLint internalFormat;
         GLenum format;
@@ -391,8 +395,8 @@ GLTexture::Update( CPUResource* resource )
         {
 			if ( 0 != formatIndex && IsCompressed( formatIndex ) )
 			{
-				// TODO: type = imageSize?
-				glCompressedTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, type, data );
+				GLsizei imageSize = ( GLsizei )( w * h ) * sInfo[formatIndex].fSizeFactor;
+				glCompressedTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, imageSize, data );
 			}
 			else
 			{
@@ -403,8 +407,8 @@ GLTexture::Update( CPUResource* resource )
         {
 			if ( 0 != formatIndex && IsCompressed( formatIndex ) )
 			{
-				// TODO: size?
-				glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, type, data );
+				GLsizei imageSize = ( GLsizei )( w * h ) * sInfo[formatIndex].fSizeFactor;
+				glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, imageSize, data );
 			}
 			else
 			{
@@ -548,7 +552,7 @@ EnumerateSupportedFormats()
 
 #if !defined( Rtt_OPENGLES )
 	bool hasRG = false;
-	#if GL_ARB_texture_rg
+	#if defined(GL_ARB_texture_rg)
 		hasRG = NULL != strstr( extensions, "GL_ARB_texture_rg" );
 		
 		if ( hasRG )
@@ -558,7 +562,7 @@ EnumerateSupportedFormats()
 		}
 	#endif
 
-	#if GL_ARB_texture_float
+	#if defined(GL_ARB_texture_float)
 		bool hasFloats = NULL != strstr( extensions, "GL_ARB_texture_float" );
 		if ( hasFloats )
 		{
@@ -593,7 +597,7 @@ EnumerateSupportedFormats()
 	AllocInfo( depthForm )->Initialize( "depth24", GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT24 );
 	AllocInfo( depthForm )->Initialize( "depth32", GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT32 );
 	
-	#if GL_ARB_depth_buffer_float
+	#if defined(GL_ARB_depth_buffer_float)
 		bool hasDepthBufferFloat = NULL != strstr( extensions, "GL_ARB_depth_buffer_float" );
 		if ( hasDepthBufferFloat )
 		{
@@ -612,15 +616,22 @@ EnumerateSupportedFormats()
 		// type probably not all that useful in most cases, if not populating from floats, etc.
 		// a few could be marked for where that's explicitly wanted
 #else
-	int esMajorVersion = 2, esMinorVersion = 0;
-	// TODO ^^^^
+	int esMinorVersion = 0;
+    bool isES3 = GLIsRunningES3( esMinorVersion );
+
 #if defined(GL_OES_compressed_ETC1_RGB8_texture)
-	bool hasETC1 = NULL != strstr( extensions, "GL_OES_compressed_ETC1_RGB8_texture" );
+	bool hasETC1 = isES3 || NULL != strstr( extensions, "GL_OES_compressed_ETC1_RGB8_texture" );
 	if ( hasETC1 )
     {
-        AllocInfo(compressedForm)->InitializeBlocked( "etc1", GL_ETC1_RGB8_OES, 4, 4, 8 );
+        AllocInfo(compressedForm )->InitializeBlocked( "etc1", GL_ETC1_RGB8_OES, 4, 4, 8 );
     }
 #endif
+
+    if ( isES3 )
+    {
+        // TODO! are these in ES3 headers?
+    //    AllocInfo( compressedForm )->InitializeBlocked( "etc2", 4, 4, )
+    }
 
 	bool hasRG = false;
 #if defined(GL_EXT_texture_rg)
@@ -642,8 +653,8 @@ EnumerateSupportedFormats()
         f16Info.fFlags = hasLinearFiltering ? TextureFormatInfo::kHasLinearFiltering : 0;
         f16Info.fType = GL_HALF_FLOAT_OES;
 
-        AllocInfo( f16Info )->Initialize( "rgb16f", GL_RGB16F_EXT );
-        AllocInfo( f16Info )->Initialize( "rgba16f", GL_RGBA16F_EXT );
+        AllocInfo( f16Info )->Initialize( "rgb16f", GL_RGB );
+        AllocInfo( f16Info )->Initialize( "rgba16f", GL_RGBA );
 
 		// also _linear for each?
 		// linear for magnification
@@ -651,8 +662,10 @@ EnumerateSupportedFormats()
 
 		if ( hasRG )
 		{
-            AllocInfo( f16Info )->Initialize( "r16f", GL_R16F_EXT );
-            AllocInfo( f16Info )->Initialize( "rg16f", GL_RG16F_EXT );
+#if defined(GL_EXT_texture_rg)
+            AllocInfo( f16Info )->Initialize( "r16f", GL_RED_EXT );
+            AllocInfo( f16Info )->Initialize( "rg16f", GL_RG_EXT );
+#endif
 		}
 	}
 #endif
@@ -667,13 +680,15 @@ EnumerateSupportedFormats()
         f32Info.fFlags = hasLinearFiltering ? TextureFormatInfo::kHasLinearFiltering : 0;
         f32Info.fType = GL_FLOAT;
 
-        AllocInfo( f32Info )->Initialize( "rgb32f", GL_RGB32F_EXT );
-        AllocInfo( f32Info )->Initialize( "rgba32f", GL_RGBA32F_EXT );
+        AllocInfo( f32Info )->Initialize( "rgb32f", GL_RGB );
+        AllocInfo( f32Info )->Initialize( "rgba32f", GL_RGBA );
 
 		if ( hasRG )
 		{
-            AllocInfo( f32Info )->Initialize( "r32f", GL_R32F_EXT );
-            AllocInfo( f32Info )->Initialize( "rg32f", GL_RG32F_EXT );
+#if defined(GL_EXT_texture_rg)
+            AllocInfo( f32Info )->Initialize( "r32f", GL_RED_EXT );
+            AllocInfo( f32Info )->Initialize( "rg32f", GL_RG_EXT );
+#endif
 		}
 	}
 #endif

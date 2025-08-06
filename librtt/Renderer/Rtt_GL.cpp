@@ -88,6 +88,33 @@ void GLLogError( const char* message, const char* file, int line )
 	Rtt_LogException( message, file, line );
 }
 
+#if defined(Rtt_OPENGLES)
+    #include <string.h>
+
+	bool GLIsRunningES3( int& minor )
+	{
+		const char* version = (const char *)glGetString( GL_VERSION );
+
+        const char kStartsWithStr[] = "OpenGL ES 3.";
+        if ( NULL == version || NULL == strstr( version, kStartsWithStr ))
+        {
+            return false;
+        }
+
+        const char* rest = version;
+        rest += sizeof( kStartsWithStr ) - 1;
+
+        if ( *rest >= '0' && *rest <= '2' )
+        {
+            minor = *rest - '0';
+
+            return true;
+        }
+
+        return false;
+	}
+#endif
+
 // ----------------------------------------------------------------------------
 
 } // namespace Rtt
