@@ -212,7 +212,7 @@ public class CoronaActivity extends Activity {
 			android.content.pm.ApplicationInfo applicationInfo;
 			applicationInfo = getPackageManager().getApplicationInfo(
 					getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
-			esVersion = 32;
+		//	esVersion = 32;
 			if (applicationInfo != null && applicationInfo.metaData != null) {
 				wantsDepthBuffer = applicationInfo.metaData.getBoolean( "wantsDepthBuffer" );
 				wantsStencilBuffer = applicationInfo.metaData.getBoolean( "wantsStencilBuffer" );

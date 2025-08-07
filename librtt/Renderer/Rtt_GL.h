@@ -22,6 +22,8 @@
 	#elif defined( Rtt_ANDROID_ENV ) || defined( Rtt_WEBOS_ENV ) || defined( Rtt_WIN_PHONE_ENV ) || defined( Rtt_EMSCRIPTEN_ENV )
 		#include <GLES2/gl2.h>
 		#include <GLES2/gl2ext.h>
+        #include <GLES3/gl3.h>
+        #include <GLES3/gl3ext.h>
 	#elif defined( Rtt_POWERVR_ENV )
 		#include <GLES/egl.h>
 		#include <GLES/gl.h>
