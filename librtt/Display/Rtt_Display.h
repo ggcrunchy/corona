@@ -73,13 +73,17 @@ struct NonCoreFormatInfo
 
 	InputType fInputType = kByte;
 	size_t fBytesPerComponent = 1;
-	int fNumFloatBits = 0;
 	int fNumComponents = 4;
 	int fRedIndex = 0;
 	int fGreenIndex = 1;
 	int fBlueIndex = 2;
 	int fAlphaIndex = 3;
+	U8 fBlockWidth = 0;
+	U8 fBlockHeight = 0;
+	U8 fBlockSize = 0;
+	bool fFloatingPoint = false;
 	bool fPacked = false;
+	bool fsRGB = false;
 };
 
 // ----------------------------------------------------------------------------
@@ -165,6 +169,10 @@ class Display
 		static NonCoreFormatInfo DecodeLayoutDetails( U16 layoutDetails );
 
 		U16 EncodeNonCoreFormatLayoutDetails( U16 formatID ) const;
+		
+		// as first character, indicates that a format "name" is actually
+		// one of the backend's internal formats, as a 32-bit integer
+		enum { kInternalFormatByValueMarker = '#' };
 
     public:
         Display( Runtime& owner );

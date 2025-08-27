@@ -51,8 +51,11 @@ typedef enum {
      */
     kExternalBitmapFormat_RGBA,
 
-	// version 2:
-	
+	/**
+	 Version 2.
+	 Format request callbacks are used to come up with the actual format. (If this
+	 fails, RGBA is used as a fallback.)
+	*/
 	kExternalBitmapFormat_RequestedByName
 	
 } CoronaExternalBitmapFormat;
@@ -156,12 +159,64 @@ typedef struct CoronaExternalTextureCallbacks
     int (*onGetField)(lua_State *L, const char *field, void* userData);   // optional; called Lua texture property lookup
 } CoronaExternalTextureCallbacks;
 
+/**
+  In addtion to what `CoronaExternalTextureCallbacks` provides, this also adds
+  support for formats not provided by Solar's core.
+*/
 typedef struct CoronaExternalTextureCallbacks2 {
-	// TODO (inherited)
+	/**
+	 Required
+	 Inherited part from "version 1" callbacks.
+	*/
 	CoronaExternalTextureCallbacks base;
 
-	// TODO
+	/**
+	  Optional
+	  Called if getFormat() returns `kExternalBitmapFormat_RequestedByName`.
+	  If a string is returned and the name belongs to a supported format (this can be checked
+	  with `system.getInfo()`), that format will be used. TODO: data type
+     @param userData Pointer passed to CoronaExternalPushTexture
+	*/
 	const char* (*getRequestedFormat)(void* userData);
+	
+	/**
+	  Optional
+	  Called if getFormat() returns `kExternalBitmapFormat_RequestedByName`,
+	  and getRequestedFormat() failed to provide anything.
+	  The result is a 32-bit integer expected to correspond to one of the backend's internal
+	  format. If recognized, that format will be used. TODO: data type
+     @param userData Pointer passed to CoronaExternalPushTexture
+	*/
+	unsigned int (*supplyInternalFormatByValue)(void* userData);
+
+	/**
+	 Optional
+	 The result is a 32-bit integer expected to correspond to one of the backend's texture
+	 targets, indicateing e.g. a basic 2D texture or 3D texture array
+	 @param userData Pointer passed to CoronaExternalPushTexture 
+	*/
+	unsigned int (*getCustomUploadTextureTarget)(void* userData);
+
+	/**
+	 Optional
+	 The result, if non-0, indicates that the load provided mipmaps, either through a built-in
+	 generation routine or explicitly loading the resource's levels
+	 @param userData Pointer passed to CoronaExternalPushTexture
+	*/
+	int (*getCustomUploadProvidesMipmaps)(void* userData);
+
+	/**
+	 Optional
+	 Called instead of `onRequestBitmap()` / `onReleaseBitmap()` to upload
+	 image data directly to the texture.
+	 If present, `supplyInternalFormatByValue`, `getCustomUploadTextureTarget`,
+	 and `getCustomUploadGeneratesMipmaps` are also expected. Furthermore, performing
+	 a successful load should leave their results intact.
+	 The result is 0 on success, or else a backend-specific error code.
+	 @param resource Backend-specific texture resource, e.g. an OpenGL name or a VkTexture.
+	 @param userData Pointer passed to CoronaExternalPushTexture
+	*/
+	unsigned int (*customUpload)(void* resource, void* userData);
 } CoronaExternalTextureCallbacks2;
 
 // C API

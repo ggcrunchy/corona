@@ -147,6 +147,12 @@ PlatformBitmapTexture::ReleaseData()
 	fBitmap.FreeBits();
 }
 
+void
+PlatformBitmapTexture::DoCustomUpload( void* resource, CustomUploadTextureInfo& info ) const
+{
+	fBitmap.DoCustomUpload( resource, info );
+}
+
 // ----------------------------------------------------------------------------
 
 } // namespace Rtt

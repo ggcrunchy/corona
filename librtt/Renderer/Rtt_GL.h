@@ -72,7 +72,7 @@ void GLCheckError( const char* file, int line );
 void GLLogError( const char* message, const char* file, int line );
 
 #if !defined(Rtt_OPENGLES)
-    bool GLIsRunningES3( int& _1, int& _2 ) { return false; }
+    inline bool GLIsRunningES3( int& _1, int& _2 ) { return false; }
 #else
 	bool GLIsRunningES3( int& minor );
 #endif

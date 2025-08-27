@@ -54,16 +54,26 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-// Current layout, 7 bits:
+// Current layout, 9 bits:
 // * 2 bits = bytes per component, as a shift count, e.g. 1 << 0 for 1 byte, 1 << 2 for 4 bytes
 // * 3 bits = component description: 0-3 = #components - 1; 4+ = special cases
-// * 2 bits = data, e.g. what kind of packed format
+// * 4 bits = data, e.g. what kind of packed format
 // kNonCore = 8, so only needs 4 of the U16's bits (fewer if we want to be clever)
+    // "clever" means use 8 (bit 3) as a mask instead, giving us back bits 0-2
+    // changes getting / setting the value a bit
 // thus there is still room to grow if need be
+
+// special considerations:
+// there are no formats with 8 bytes per component
+// this is used to indicate compression (which is measured in a different way, besides)
+// if the top component bit is set here, it indicates an "ASTC" case (16 bytes, rather than 8)
+// assuming we don't care about PVTRC (so far no), we have 4x4 dimensions otherwise
+// in the ASTC case, the data is a lookup index to one of the (< 16) 2D cases
+// there is a conflict with BC7, but it uses 4x4 so still dovetails well
 
 const U16 kShiftBits = 2;
 const U16 kComponentBits = 3;
-const U16 kDataBits = 2;
+const U16 kDataBits = 4;
 
 enum { kAlpha = 4, kPacked };
 
@@ -73,6 +83,8 @@ const U16 kFormatBits = 16 - kInfoBits;
 const U16 kFormatMask = (U16)( ( 1 << kFormatBits ) - 1 );
 const U16 kRemainingAfterLayoutDetails = ( ~( kLayoutDetailsMask ) );
 
+const U16 kASTCMask = (U16)( 1 << ( kComponentBits - 1 ) );
+
 Rtt_STATIC_ASSERT( ( ( kLayoutDetailsMask << kFormatBits ) | kFormatMask ) == 0xFFFF );
 Rtt_STATIC_ASSERT( ( ( kLayoutDetailsMask ) | ( kRemainingAfterLayoutDetails ) ) == 0xFFFF );
 
@@ -81,10 +93,13 @@ const int Display::LayoutDetailsBitCount = kInfoBits;
 U16
 Display::EncodeLayoutDetails( const NonCoreFormatInfo& info )
 {
-    // ensure power-of-2 in (1, 2, 4, 8)
-    Rtt_ASSERT( info.fBytesPerComponent > 0 );
-    Rtt_ASSERT( info.fBytesPerComponent < 16 );
-    Rtt_ASSERT( 0 == ( info.fBytesPerComponent & ( info.fBytesPerComponent - 1 ) ) );
+    // ensure power-of-2 in (1, 2, 4)
+    bool isCompressed = 0 != info.fBlockSize;
+    
+    Rtt_ASSERT( !isCompressed || ( 0 != info.fBlockWidth && 0 != info.fBlockHeight ) );
+    Rtt_ASSERT( isCompressed || info.fBytesPerComponent > 0 );
+    Rtt_ASSERT( isCompressed || info.fBytesPerComponent < 8 );
+    Rtt_ASSERT( isCompressed || 0 == ( info.fBytesPerComponent & ( info.fBytesPerComponent - 1 ) ) );
     
     // TODO: so far we only have simple schemes; fix up
     // if and when more sophisticated cases arise
@@ -132,18 +147,35 @@ Display::EncodeLayoutDetails( const NonCoreFormatInfo& info )
         return 0;
     }
 
-    int shift = 0;
-    for ( ; shift < 4; shift++ )
+    int shift = 0, components = componentCount - 1, data = 0;
+    if ( !isCompressed )
     {
-        if ( info.fBytesPerComponent == ( 1 << shift ) )
+        for ( ; shift < 3; shift++ )
         {
-            break;
+            if ( info.fBytesPerComponent == ( 1 << shift ) )
+            {
+                break;
+            }
+        }
+        
+        Rtt_ASSERT( shift < 3 );
+    }
+    else
+    {
+        // TODO: any reason to worry about non-Texture case?
+        shift = 3; // cf. layout notes up top
+
+        if ( 16 == info.fBlockSize ) // ASTC or BC7?
+        {
+            Rtt_ASSERT( 0 == ( components & kASTCMask ) );
+        
+            components |= kASTCMask;
+            data = Texture::Format::BlockDimsID( info.fBlockWidth, info.fBlockHeight );
+            
+            Rtt_ASSERT( data >= 0 && data < ( 1 << kDataBits ) );
         }
     }
-    
-    Rtt_ASSERT( shift < 4 );
 
-    int components = componentCount - 1, data = 0;
     U16 details = ( shift << ( kComponentBits + kDataBits ) )
                 | ( components << kDataBits )
                 | data;
@@ -205,6 +237,27 @@ Display::DecodeLayoutDetails( U16 layoutDetails )
     layoutDetails >>= kComponentBits;
 
     info.fBytesPerComponent = 1 << layoutDetails; // remainder is shift
+
+    if ( 8 == info.fBytesPerComponent ) // compressed?
+    {
+        // TODO: any reason to care about non-Texture case?
+        info.fBytesPerComponent = 1;
+
+        bool isASTCish = 0 != ( components & kASTCMask );
+        if ( isASTCish )
+        {
+            components &= ~kASTCMask;
+            
+            Texture::Format::GetBlockDims( data, info.fBlockWidth, info.fBlockHeight );
+        }
+        else
+        {
+            info.fBlockWidth = 4;
+            info.fBlockHeight = 4;
+        }
+        
+        info.fBlockSize = isASTCish ? 16 : 8;
+    }
 
     if ( components < 4 )
     {

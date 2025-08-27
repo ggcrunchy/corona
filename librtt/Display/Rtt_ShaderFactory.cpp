@@ -327,15 +327,15 @@ ShaderFactory::NewProgram(
 		#endif
 		}
 		
-		if ( Program::kOpenGL_ES_2 == language && info && 0 != info->fNumFloatBits ) // need to fix P_COLOR?
+		if ( Program::kOpenGL_ES_2 == language && info && info->fFloatingPoint ) // need to fix P_COLOR?
 		{
-			if ( 32 == info->fNumFloatBits && Display::GetGpuSupportsHighPrecisionFragmentShaders() )
+			if ( 4 == info->fBytesPerComponent && Display::GetGpuSupportsHighPrecisionFragmentShaders() )
 			{
 				fProgramHeader->SetPrecision( ProgramHeader::kColorType, ProgramHeader::kHighPrecision );
 			}
 			else
 			{
-				Rtt_ASSERT( 16 == info->fNumFloatBits );
+				Rtt_ASSERT( 2 == info->fBytesPerComponent );
 				fProgramHeader->SetPrecision( ProgramHeader::kColorType, ProgramHeader::kMediumPrecision );
 			}
 		}

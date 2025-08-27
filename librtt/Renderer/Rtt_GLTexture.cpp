@@ -81,7 +81,7 @@ namespace /*anonymous*/
         }
     }
 
-    void getFilterTokens( Texture::Filter filter, GLenum& minFilter, GLenum& magFilter )
+    void getFilterTokens( Texture::Filter filter, GLenum& minFilter, GLenum& magFilter, bool hasMipmaps )
     {
         switch( filter )
         {
@@ -162,6 +162,37 @@ GLint CalculateOptimalAlignment(U32 width, GLenum format)
 static bool HasLinearFiltering( int index );
 static bool IsCompressed( int index );
 
+template<int N> inline GLsizei
+RoundUpNPOT( U8 dim )
+{
+	return ( dim + N - 1 ) / N;
+}
+
+static GLsizei RoundUpToMultiple( U8 dim, U8 size )
+{
+	switch (size)
+	{
+		case 4: // most cases
+			return ( dim + 3 ) / 4;
+		case 8: // ASTC...
+			return ( dim + 7 ) / 8;
+		case 3: // ...and ditto the rest, albeit not powers of 2
+			return RoundUpNPOT<3>( dim );
+		case 5:
+			return RoundUpNPOT<5>( dim );
+		case 6:
+			return RoundUpNPOT<6>( dim );
+		case 10:
+			return RoundUpNPOT<10>( dim );
+		case 12:
+			return RoundUpNPOT<12>( dim );
+		default:
+			Rtt_ASSERT_NOT_REACHED();
+		
+			return 0;
+	}
+}
+
 struct TextureFormatInfo {
 	enum {
 		kIsRenderable = 0x01,
@@ -212,8 +243,13 @@ struct TextureFormatInfo {
 		
 		fBlockWidth = width;
 		fBlockHeight = height;
-		fSizeFactor = blockSize / ( width * height );
+        fBlockSize = blockSize;
 	}
+
+    GLsizei GetSize( U8 w, U8 h ) const
+    {
+		return Texture::Format::GetCompressedSize( w, h, fBlockWidth, fBlockHeight, fBlockSize );
+    }
 
 	// cf. getFormatTokens()
 	const char* fName;
@@ -223,33 +259,35 @@ struct TextureFormatInfo {
 	GLushort fFlags;
 	U8 fBlockWidth; // for various compressed formats (we COULD repurpose fType and fSource...)
 	U8 fBlockHeight;
-	U8 fSizeFactor;
+	U8 fBlockSize;
 };
 
 static TextureFormatInfo sInfo[32]; // arbitrary size; expand as necessary
 
 static bool
-CompressedBlockSizesAreConsistent( U16 formatIndex, const Texture* texture )
+DoCustomUpload( Texture* texture, GLuint name, GLint internalFormat, CustomUploadTextureInfo& uploadInfo )
 {
-	U32 widthRemainder = texture->GetWidth() % (U32)( sInfo[formatIndex].fBlockWidth );
-	U32 heightRemainder = texture->GetHeight() % (U32)( sInfo[formatIndex].fBlockHeight );
+	texture->DoCustomUpload( 0 != name ? &name : NULL, uploadInfo );
 
-	if ( 0 != widthRemainder || 0 != heightRemainder )
+	if ( 0 != uploadInfo.fError ) // TODO: or be return value?
 	{
-		Rtt_LogException(
-			"Compressed texture's dimensions (%u, %u) are inconsistent with the block size (%u, %u)", 
-			texture->GetWidth(),
-			texture->GetHeight(),
-			(U32)( sInfo[formatIndex].fBlockWidth ),
-			(U32)( sInfo[formatIndex].fBlockHeight )
-		);
-			
+		Rtt_LogException( "Error occurred during custom upload: %u", uploadInfo.fError );
 		return false;
 	}
-	else
+
+	if ( 0 != name && GL_TEXTURE_2D != uploadInfo.fTextureTarget )
 	{
-		return true;
+		Rtt_LogException( "Custom load uses unsupported texture target: %u", uploadInfo.fTextureTarget );
+		return false;
 	}
+
+	if ( 0 != name && internalFormat != uploadInfo.fTextureFormat )
+	{
+		Rtt_LogException( "Custom load has discrepancy in texture format: %i vs. %u", (int)internalFormat, uploadInfo.fTextureFormat );
+		return false;
+	}
+	
+	return true;
 }
 
 void
@@ -260,6 +298,15 @@ GLTexture::Create( CPUResource* resource )
 
     SUMMED_TIMING( gltc, "Texture GPU Resource: Create" );
 
+	CustomUploadTextureInfo uploadInfo = {};
+	bool hasMipmaps = texture->GenMipmaps();
+	if ( texture->HasCustomUploader() )
+	{
+		DoCustomUpload( texture, 0, 0, uploadInfo ); // n.b. non-loading query for mipmaps
+		
+		hasMipmaps = uploadInfo.fAddedMipmaps;
+	}
+
     GLuint name = 0;
     glGenTextures( 1, &name );
     fHandle = NameToHandle( name );
@@ -267,7 +314,7 @@ GLTexture::Create( CPUResource* resource )
 
     GLenum minFilter;
     GLenum magFilter;
-    getFilterTokens( texture->GetFilter(), minFilter, magFilter );
+    getFilterTokens( texture->GetFilter(), minFilter, magFilter, hasMipmaps );
 
 	fUsingLinearFiltering = Texture::kLinear == texture->GetFilter();
 
@@ -275,7 +322,7 @@ GLTexture::Create( CPUResource* resource )
 	texture->GetFormat().GetValue( &formatIndex );
 	if ( 0 != formatIndex && fUsingLinearFiltering && !HasLinearFiltering( formatIndex ) )
 	{
-		getFilterTokens( Texture::kNearest, minFilter, magFilter );
+		getFilterTokens( Texture::kNearest, minFilter, magFilter, false );
 		
 		fUsingLinearFiltering = false;
 	}
@@ -295,27 +342,31 @@ GLTexture::Create( CPUResource* resource )
     GLint internalFormat;
     GLenum format;
     GLenum type;
-    bool blockSizesOK = true;
     
 	if ( 0 != formatIndex )
 	{
 		internalFormat = sInfo[formatIndex].fInternal;
 		format = sInfo[formatIndex].fSource;
 		type = sInfo[formatIndex].fType;
-		
-		if ( IsCompressed( formatIndex ) && CompressedBlockSizesAreConsistent( formatIndex, texture ) )
-		{		
-			blockSizesOK = false;
-		}
 	}
 	else
 	{
 		Texture::Format textureFormat = texture->GetFormat();
 		getFormatTokens( textureFormat, internalFormat, format, type );
 	}
-    const U32 w = blockSizesOK ? texture->GetWidth() : 4;
-    const U32 h = blockSizesOK ? texture->GetHeight() : 4;
-    const U8* data = blockSizesOK ? texture->GetData() : NULL;
+
+	if ( texture->HasCustomUploader() )
+	{
+		if ( DoCustomUpload( texture, name, internalFormat, uploadInfo ) )
+		{
+			fCachedFormat = 0; // assign some meaningless format
+		}
+		return;
+	}
+
+    const U32 w = texture->GetWidth();
+    const U32 h = texture->GetHeight();
+    const U8* data = texture->GetData();
     {
 //#if defined( Rtt_EMSCRIPTEN_ENV )
 //        glPixelStorei( GL_UNPACK_ALIGNMENT, texture->GetByteAlignment() );
@@ -327,14 +378,19 @@ GLTexture::Create( CPUResource* resource )
         // It is valid to pass a NULL pointer, so allocation is done either way
 		if ( 0 != formatIndex && IsCompressed( formatIndex ) )
 		{
-			GLsizei imageSize = ( GLsizei )( w * h ) * sInfo[formatIndex].fSizeFactor;
-			glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, imageSize, data );
+			fCachedImageSize = sInfo[formatIndex].GetSize( w, h );
+			glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, fCachedImageSize, data );
 		}
 		else
 		{
 			glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
 		}
         GL_CHECK_ERROR();
+        
+        if ( texture->GenMipmaps() )
+        {
+			glGenerateMipmap( GL_TEXTURE_2D );
+        }
         
         fCachedFormat = internalFormat;
         fCachedWidth = w;
@@ -355,35 +411,46 @@ GLTexture::Update( CPUResource* resource )
 
     SUMMED_TIMING( gltu, "Texture GPU Resource: Update" );
 
-	bool blockSizesOK = true;
 	U16 formatIndex = 0;
-	
 	texture->GetFormat().GetValue( &formatIndex );
 
-	if ( 0 != formatIndex && IsCompressed( formatIndex ) && !CompressedBlockSizesAreConsistent( formatIndex, texture ) )
+	GLint internalFormat;
+	GLenum format;
+	GLenum type;
+	if ( 0 != formatIndex )
 	{
-		blockSizesOK = false;
+		internalFormat = sInfo[formatIndex].fInternal;
+		format = sInfo[formatIndex].fSource;
+		type = sInfo[formatIndex].fType;
+	}
+	else
+	{
+		getFormatTokens( texture->GetFormat(), internalFormat, format, type );
 	}
 
-    const U8* data = blockSizesOK ? texture->GetData() : NULL;
+	CustomUploadTextureInfo uploadInfo = {};
+	bool hasMipmaps = false;
+	
+	if ( texture->HasCustomUploader() )
+	{
+		if ( DoCustomUpload( texture, GetName(), internalFormat, uploadInfo ) )
+		{
+			fCachedFormat = 0; // assign some meaningless format
+	
+			hasMipmaps = uploadInfo.fAddedMipmaps;
+		}
+		else
+		{
+			return;
+		}
+	}
+
+    const U8* data = !texture->HasCustomUploader() ? texture->GetData() : NULL;
     if( data )
     {
         const U32 w = texture->GetWidth();
         const U32 h = texture->GetHeight();
 
-        GLint internalFormat;
-        GLenum format;
-        GLenum type;
-		if ( 0 != formatIndex )
-		{
-			internalFormat = sInfo[formatIndex].fInternal;
-			format = sInfo[formatIndex].fSource;
-			type = sInfo[formatIndex].fType;
-		}
-		else
-		{
-			getFormatTokens( texture->GetFormat(), internalFormat, format, type );
-		}
         glBindTexture( GL_TEXTURE_2D, GetName() );
 
         glPixelStorei(GL_UNPACK_ALIGNMENT, CalculateOptimalAlignment(w, internalFormat));
@@ -393,8 +460,7 @@ GLTexture::Update( CPUResource* resource )
         {
 			if ( 0 != formatIndex && IsCompressed( formatIndex ) )
 			{
-				GLsizei imageSize = ( GLsizei )( w * h ) * sInfo[formatIndex].fSizeFactor;
-				glCompressedTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, imageSize, data );
+				glCompressedTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, fCachedImageSize, data );
 			}
 			else
 			{
@@ -405,8 +471,8 @@ GLTexture::Update( CPUResource* resource )
         {
 			if ( 0 != formatIndex && IsCompressed( formatIndex ) )
 			{
-				GLsizei imageSize = ( GLsizei )( w * h ) * sInfo[formatIndex].fSizeFactor;
-				glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, imageSize, data );
+				fCachedImageSize = sInfo[formatIndex].GetSize( w, h );
+				glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, fCachedImageSize, data );
 			}
 			else
 			{
@@ -417,6 +483,17 @@ GLTexture::Update( CPUResource* resource )
             fCachedHeight = h;
         }
 
+		if ( texture->GenMipmaps() )
+		{
+			glGenerateMipmap( GL_TEXTURE_2D );
+			
+			hasMipmaps = true;
+		}
+    }
+    texture->ReleaseData();
+
+	if ( data || texture->HasCustomUploader() ) // anything added?
+	{
 		// Apply any filter mode changes, taking into account that many
 		// texture formats cannot handle linear filtering.
 		bool wantsLinearFiltering = Texture::kLinear == texture->GetFilter();
@@ -429,16 +506,15 @@ GLTexture::Update( CPUResource* resource )
 		{
 			Texture::Filter newFilter = wantsLinearFiltering ? Texture::kLinear : Texture::kNearest;
 			GLenum minFilter, magFilter;
-			getFilterTokens( newFilter, minFilter, magFilter );
-			
+			getFilterTokens( newFilter, minFilter, magFilter, hasMipmaps );
+			// ^^^ TODO!
 			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter );
 			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter );
 			GL_CHECK_ERROR();			
 
 			fUsingLinearFiltering = wantsLinearFiltering;
 		}
-    }
-    texture->ReleaseData();
+	}
 }
 
 void
@@ -513,11 +589,27 @@ FindInfo( const char* name )
 {
 	Rtt_ASSERT( NULL != name );
 	
-	for ( int i = 0; i < sInfoCount; i++ )
+	if ( Display::kInternalFormatByValueMarker == *name )
 	{
-		if ( Rtt_StringCompareNoCase( sInfo[i].fName, name ) == 0 )
+		U32 format;
+		memcpy( &format, name + 1, sizeof(U32) );
+		
+		for ( int i = 0; i < sInfoCount; i++ )
 		{
-			return i;
+			if ( sInfo[i].fInternal == (GLsizei)( format ) )
+			{
+				return i;
+			}
+		}
+	}
+	else
+	{
+		for ( int i = 0; i < sInfoCount; i++ )
+		{
+			if ( Rtt_StringCompareNoCase( sInfo[i].fName, name ) == 0 )
+			{
+				return i;
+			}
 		}
 	}
 	
@@ -621,7 +713,7 @@ EnumerateSupportedFormats()
 	bool hasETC1 = isES3 || NULL != strstr( extensions, "GL_OES_compressed_ETC1_RGB8_texture" );
 	if ( hasETC1 )
     {
-        AllocInfo(compressedForm )->InitializeBlocked( "etc1", GL_ETC1_RGB8_OES, 4, 4, 8 );
+        AllocInfo( compressedForm )->InitializeBlocked( "etc1", GL_ETC1_RGB8_OES, 4, 4, 8 );
     }
 #endif
 
@@ -642,22 +734,22 @@ EnumerateSupportedFormats()
 		TextureFormatInfo astcForm = compressedForm;
 		// TODO: if can decode to UNORM8, set flag...
     
-        #define ASTC_PARAMS( WIDTH, HEIGHT ) "astc-" #WIDTH "x" #HEIGHT, GL_COMPRESSED_RGBA_ASTC_ ## WIDTH ## x ## HEIGHT ## _KHR, WIDTH, HEIGHT, 64
+        #define ASTC_PARAMS( WIDTH, HEIGHT ) "astc-" #WIDTH "x" #HEIGHT, GL_COMPRESSED_RGBA_ASTC_ ## WIDTH ## x ## HEIGHT ## _KHR, WIDTH, HEIGHT, 16
 
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(4, 4 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(5, 4 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(5, 5 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(6, 5 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(6, 6 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(8, 5 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(8, 6 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(8, 8 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(10, 5 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(10, 6 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(10, 8 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(10, 10 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(12, 10 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS(12, 12 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 4, 4 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 5, 4 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 5, 5 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 6, 5 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 6, 6 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 8, 5 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 8, 6 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 8, 8 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 10, 5 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 10, 6 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 10, 8 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 10, 10 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 12, 10 ) );
+        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 12, 12 ) );
 
         #undef ASTC_PARAMS
     }
@@ -1065,24 +1157,23 @@ Renderer::GetNonCoreFormatInfo( U16 formatID, NonCoreFormatInfo& info ) const
 		Rtt_ASSERT_NOT_REACHED();
 	}
 
+	info.fFloatingPoint = false;
 	if ( NonCoreFormatInfo::kUint16 == info.fInputType )
 	{
-		info.fNumFloatBits = 0;
 		info.fBytesPerComponent = 2;
 	}
 	else if ( Rtt_StringEndsWith( sInfo[formatID].fName, "16f" ) )
 	{
-		info.fNumFloatBits = 16;
+		info.fFloatingPoint = true;
 		info.fBytesPerComponent = 2;
 	}
 	else if ( Rtt_StringEndsWith( sInfo[formatID].fName, "32f" ) )
 	{
-		info.fNumFloatBits = 32;
+		info.fFloatingPoint = true;
 		info.fBytesPerComponent = 4;
 	}
 	else
 	{
-		info.fNumFloatBits = 0;
 		info.fBytesPerComponent = 1;
 	}
 	
@@ -1112,7 +1203,12 @@ Renderer::GetNonCoreFormatInfo( U16 formatID, NonCoreFormatInfo& info ) const
 		// TODO! indices are into packed form rather than byte offsets
 	}
 	
-	// TODO? compressed, etc.
+	if ( sInfo[formatID].fFlags & TextureFormatInfo::kIsCompressed )
+	{
+		info.fBlockWidth = sInfo[formatID].fBlockWidth;
+		info.fBlockHeight = sInfo[formatID].fBlockHeight;
+		info.fBlockSize = sInfo[formatID].fBlockSize;
+	}
 }
 
 

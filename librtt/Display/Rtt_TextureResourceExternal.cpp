@@ -42,7 +42,7 @@ public:
 		}
 		else
 		{
-			fSrc2.getRequestedFormat = NULL;
+			memset( &fSrc2, 0, sizeof( fSrc2 ) );
 			
 			fSrc = *sourceCallbacks;
 		}
@@ -81,6 +81,26 @@ public:
 		if( fSrc.onReleaseBitmap)
 		{
 			return fSrc.onReleaseBitmap(GetUserData());
+		}
+	}
+	
+	virtual void DoCustomUpload( void* resource, CustomUploadTextureInfo& info ) const override
+	{
+		Rtt_ASSERT( fSrc2.customUpload ); // n.b. guarded by HasCustomUploader() check
+		Rtt_ASSERT( fSrc2.supplyInternalFormatByValue );
+		Rtt_ASSERT( fSrc2.getCustomUploadTextureTarget );
+		Rtt_ASSERT( fSrc2.getCustomUploadProvidesMipmaps );
+				
+		if ( resource ) // not just a query?
+		{
+			info.fError = fSrc2.customUpload( resource, GetUserData() );
+		}
+		if ( 0 == info.fError )
+		{
+		
+			info.fTextureTarget = fSrc2.getCustomUploadTextureTarget( GetUserData() );
+			info.fTextureFormat = fSrc2.supplyInternalFormatByValue( GetUserData() );
+			info.fAddedMipmaps = fSrc2.getCustomUploadProvidesMipmaps( GetUserData() );
 		}
 	}
 	
@@ -124,6 +144,22 @@ public:
 					U16 formatIndex;
 					
 					if ( NULL != name && fDisplay.QueryTextureInfo( "Supported", name, &formatIndex ) )
+					{
+						U16 layoutDetails = fDisplay.EncodeNonCoreFormatLayoutDetails( formatIndex );
+						return PlatformBitmap::Format::NonCore( formatIndex, layoutDetails );
+					}
+				}
+			
+				if ( fSrc2.supplyInternalFormatByValue )
+				{
+					U32 internalFormat = fSrc2.supplyInternalFormatByValue(GetUserData());
+					U16 formatIndex;
+					
+					char name[ 1 + sizeof(U32) ] = { Display::kInternalFormatByValueMarker };
+					
+					memcpy( name + 1, &internalFormat, sizeof(U32) );
+					
+					if ( fDisplay.QueryTextureInfo( "Supported", name, &formatIndex ))
 					{
 						U16 layoutDetails = fDisplay.EncodeNonCoreFormatLayoutDetails( formatIndex );
 						return PlatformBitmap::Format::NonCore( formatIndex, layoutDetails );
@@ -186,6 +222,22 @@ TextureResourceExternal::Create(TextureFactory& factory,
 									TextureResourceExternal( factory, texture, bitmap ) );
 	
 	texture->SetRetina( isRetina );
+	
+	if ( sizeof( CoronaExternalTextureCallbacks2 ) == callbacks->size )
+	{
+		CoronaExternalTextureCallbacks2* callbacks2 = (CoronaExternalTextureCallbacks2*)callbacks;
+		if ( NULL != callbacks2->customUpload )
+		{
+			if ( NULL != callbacks2->supplyInternalFormatByValue && NULL != callbacks2->getCustomUploadTextureTarget && NULL != callbacks2->getCustomUploadProvidesMipmaps )
+			{
+				texture->SetHasCustomUploader( true );
+			}
+			else
+			{
+				Rtt_LogException( "ERROR: TextureResourceExternal provided custom uploader but missing one or more accompanying handlers" );
+			}
+		}
+	}
 	
 	return result;
 }

@@ -16,6 +16,14 @@
 
 // ----------------------------------------------------------------------------
 
+struct CustomUploadTextureInfo
+{
+	U32 fError;
+	U32 fTextureTarget;
+	U32 fTextureFormat;
+	bool fAddedMipmaps;
+};
+		
 namespace Rtt
 {
 
@@ -51,6 +59,11 @@ class Texture : public CPUResource
 			static Format NonCore( U16 index, U16 layoutDetails );
 			
 			FormatValue GetValue( U16* index = NULL, U16* layoutDetails = NULL ) const;
+			
+			static int BlockDimsID( U8 width, U8 height );
+			static void GetBlockDims( int blockDimsID, U8& width, U8& height );
+			
+			static int GetCompressedSize( U8 w, U8 h, U8 blockWidth, U8 blockHeight, U8 blockSize );
 			
 		private:
 			U16 fValue;
@@ -104,6 +117,8 @@ class Texture : public CPUResource
 		virtual size_t GetSizeInBytes() const;
 		virtual U8 GetByteAlignment() const;
 
+		virtual void DoCustomUpload( void* resource, CustomUploadTextureInfo& info ) const;
+
 		virtual const U8* GetData() const;
 		virtual void ReleaseData();
 
@@ -116,10 +131,16 @@ class Texture : public CPUResource
 		bool IsRetina() const { return fIsRetina; }
 		void SetTarget( bool newValue ){ fIsTarget = newValue; }
 		bool IsTarget() const { return fIsTarget; }
-
+		void SetGenMipmaps( bool newValue ){ fGenMipmaps = newValue; }
+		bool GenMipmaps() const { return fGenMipmaps; }
+		void SetHasCustomUploader( bool newValue ){ fHasCustomUploader = newValue; }
+		bool HasCustomUploader() const { return fHasCustomUploader; }
+		
 	private:
 		bool fIsRetina;
 		bool fIsTarget;
+		bool fGenMipmaps;
+		bool fHasCustomUploader;
 };
 
 inline bool operator == ( Texture::FormatValue value, const Texture::Format& format )

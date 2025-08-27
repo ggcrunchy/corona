@@ -18,6 +18,8 @@
 
 // ----------------------------------------------------------------------------
 
+struct CustomUploadTextureInfo;
+
 namespace Rtt
 {
 
@@ -124,6 +126,8 @@ class PlatformBitmap
 		// often times, you cannot save EXIF metadata along with the image copy.
 		virtual const void* GetBits( Rtt_Allocator* context ) const = 0;
 		virtual void FreeBits() const = 0;
+
+		virtual void DoCustomUpload( void* resource, CustomUploadTextureInfo& info ) const {}
 
 		// Returns true if the value (0-100%) of the pixel at row,col (i,j) is greater than threshold
 		bool HitTest( Rtt_Allocator *context, int i, int j, U8 threshold = 0 ) const;

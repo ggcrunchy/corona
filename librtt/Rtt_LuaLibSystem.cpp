@@ -72,6 +72,78 @@ static void PushStringOrNil( lua_State *L, const char *str )
 }
 
 static bool
+ParseItemAsU32( char* item, size_t itemLen )
+{
+	U32 sum = 0;
+
+	if ( '0' == item[0] && ( 'x' == item[1] || 'X' == item[1] ) ) // hex?
+	{
+		if ( itemLen > 8 ) // > 32-bit?
+		{
+			return false;
+		}
+		
+		if ( '0' == item[2] && itemLen > 3 ) // leading zero, but more too? 
+		{
+			return false;
+		}
+		
+		for ( size_t i = 2; i < itemLen; i++, sum *= 4 )
+		{
+			if ( !isxdigit( item[i] ) )
+			{
+				return false;
+			}
+			
+			if ( isdigit( item[i] ) )
+			{
+				sum += item[i] - '0';
+			}
+			else
+			{
+				sum += 10 + tolower( item[i] ) - 'a';
+			}
+		}
+	}
+	
+	else
+	{
+		if ( itemLen > 10 ) // trivially > 32-bit?
+		{
+			return false;
+		}
+		
+		if ( '0' == item[0] && itemLen > 1 ) // leading zero, but more too? 
+		{
+			return false;
+		}
+		
+		U32 previous = 0;
+		for ( size_t i = 0; i < itemLen; i++, sum *= 10 )
+		{
+			if ( !isdigit( item[i] ) )
+			{
+				return false;
+			}
+			
+			previous = sum;
+			sum += item[i] - '0';
+		}
+		
+		if ( previous > sum ) // overflow?
+		{
+			return false;
+		}
+	}
+		
+	item[0] = Display::kInternalFormatByValueMarker;
+	
+	memcpy( item + 1, &sum, sizeof( U32 ) );
+		
+	return true;
+}
+
+static bool
 IsTextureFormatInfo( const char* key, char* what, char* item, size_t maxLen )
 {
 	if ( ! Rtt_StringStartsWith( key, "isTextureFormat" ) )
@@ -98,6 +170,13 @@ IsTextureFormatInfo( const char* key, char* what, char* item, size_t maxLen )
 	strcpy( item, colon + 1 );
 	
 	what[ whatLen ] = '\0';
+	
+	if ( isdigit( item[0] ) ) // hex or decimal integer candidate?
+	{
+		Rtt_ASSERT( maxLen >= sizeof( U32 ) + 1 );
+		
+		return ParseItemAsU32( item, itemLen );
+	}
 	
 	return true;
 }

@@ -52,10 +52,7 @@ Rtt_STATIC_ASSERT( sizeof( CoronaExternalBitmapFormat )  == sizeof( int ) );
 CORONA_API
 int CoronaExternalPushTexture( lua_State *L, const CoronaExternalTextureCallbacks *callbacks, void* context)
 {
-	// TODO: detect CoronaExternalTextureCallbacks2
-		// then has name, kind (latter not useful in at least ES2...)
-
-    if ( callbacks->size != sizeof(CoronaExternalTextureCallbacks) )
+	if ( callbacks->size != sizeof(CoronaExternalTextureCallbacks) && callbacks->size != sizeof(CoronaExternalTextureCallbacks2) )
     {
         CoronaLuaError(L, "TextureResourceExternal - invalid binary version for callback structure; size value isn't valid");
         return 0;

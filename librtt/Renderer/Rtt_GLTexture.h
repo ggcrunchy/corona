@@ -35,6 +35,7 @@ class GLTexture : public GPUResource
 		virtual GLuint GetName();
 private:
 	GLint fCachedFormat;
+	GLsizei fCachedImageSize;
 	unsigned long fCachedWidth, fCachedHeight;
 	bool fUsingLinearFiltering;
 };

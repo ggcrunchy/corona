@@ -48,6 +48,8 @@ class PlatformBitmapTexture : public Texture
 		virtual const U8* GetData() const;
 		virtual void ReleaseData();
 
+		virtual void DoCustomUpload( void* resource, CustomUploadTextureInfo& info ) const;
+
 	public:
 		PlatformBitmap& GetBitmap() const { return fBitmap; }
 
