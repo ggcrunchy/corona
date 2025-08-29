@@ -54,6 +54,12 @@ class DisplayDefaults
         RenderTypes::TextureFilter GetMinTextureFilter() const { return (RenderTypes::TextureFilter)fMinTextureFilter; }
         void SetMinTextureFilter( RenderTypes::TextureFilter newValue ) { fMinTextureFilter = newValue; }
 
+        RenderTypes::TextureFilter GetMipmapMagTextureFilter() const { return (RenderTypes::TextureFilter)fMipmapMagTextureFilter; }
+        void SetMipmapMagTextureFilter( RenderTypes::TextureFilter newValue ) { fMipmapMagTextureFilter = newValue; }
+
+        RenderTypes::TextureFilter GetMipmapMinTextureFilter() const { return (RenderTypes::TextureFilter)fMipmapMinTextureFilter; }
+        void SetMipmapMinTextureFilter( RenderTypes::TextureFilter newValue ) { fMipmapMinTextureFilter = newValue; }
+
         RenderTypes::TextureWrap GetTextureWrapX() const { return (RenderTypes::TextureWrap)fWrapX; }
         void SetTextureWrapX( RenderTypes::TextureWrap newValue ) { fWrapX = newValue; }
 
@@ -69,7 +75,7 @@ class DisplayDefaults
 		bool IsImageSheetFrameTrimCorrected() const { return fIsImageSheetFrameTrimCorrected;}
 		void SetImageSheetFrameTrimCorrected( bool newValue ) { fIsImageSheetFrameTrimCorrected = newValue; }
 
-    bool IsExternalTextureRetina() const { return fIsExternalTextureRetina;}
+		bool IsExternalTextureRetina() const { return fIsExternalTextureRetina;}
 		void SetExternalTextureRetina( bool newValue ) { fIsExternalTextureRetina = newValue; }
 
 	public:
@@ -88,6 +94,9 @@ class DisplayDefaults
 
         bool IsShaderCompilerVerbose() const { return fShaderCompilerVerbose; }
         void SetShaderCompilerVerbose( bool newValue ) { fShaderCompilerVerbose = newValue; }
+
+        bool GetUseMipmapping() const { return fUseMipmapping; }
+        void SetUseMipmapping( bool newValue ) { fUseMipmapping = newValue; }
 
         bool GetSkipsCull() const { return fSkipsCull; }
         void SetSkipsCull( bool newValue ) { fSkipsCull = newValue; }
@@ -132,6 +141,8 @@ class DisplayDefaults
         float fAnchorY;
         U8 fMagTextureFilter;
         U8 fMinTextureFilter;
+        U8 fMipmapMagTextureFilter;
+        U8 fMipmapMinTextureFilter;
         U8 fWrapX;
         U8 fWrapY;
 		U8 fEmitterMapping;
@@ -144,6 +155,7 @@ class DisplayDefaults
         bool fIsImageSheetSampledInsideFrame;
 		bool fIsImageSheetFrameTrimCorrected;
 		bool fIsExternalTextureRetina;
+		bool fUseMipmapping;
         bool fSkipsCull;
         bool fSkipsHitTest;
         bool fEnableDepthInScene;

@@ -126,6 +126,18 @@ class Texture : public CPUResource
 		virtual void SetWrapX( Wrap newValue );
 		virtual void SetWrapY( Wrap newValue );
 	
+		void SetMipmapFilters( Filter newMagValue, Filter newMinValue )
+		{
+			fMipmapMagFilter = newMagValue;
+			fMipmapMinFilter = newMinValue;
+		}
+	
+		void GetMipmapFilters( Filter& magValue, Filter& minValue )
+		{
+			magValue = (Filter)fMipmapMagFilter;
+			minValue = (Filter)fMipmapMinFilter;
+		}
+	
 	public:
 		void SetRetina( bool newValue ){ fIsRetina = newValue; }
 		bool IsRetina() const { return fIsRetina; }
@@ -137,6 +149,8 @@ class Texture : public CPUResource
 		bool HasCustomUploader() const { return fHasCustomUploader; }
 		
 	private:
+		U8 fMipmapMagFilter : 2;
+		U8 fMipmapMinFilter : 2;
 		bool fIsRetina;
 		bool fIsTarget;
 		bool fGenMipmaps;

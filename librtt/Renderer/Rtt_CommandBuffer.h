@@ -108,6 +108,8 @@ class CommandBuffer
         virtual void AddCommand( const CoronaCommand * command ) = 0;
         virtual void IssueCommand( U16 id, const void * data, U32 size ) = 0;
 
+		virtual void GenerateMipmaps() {}
+
         virtual const unsigned char * GetBaseAddress() const = 0;
     
         virtual bool WriteNamedUniform( const char * uniformName, const void * data, unsigned int size ) = 0;

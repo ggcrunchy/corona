@@ -227,6 +227,7 @@ void TextureResourceCanvas::Render(Rtt::Renderer &renderer, GroupObject *group, 
 		group->DidDraw( renderer );
 	}
 	renderer.PopMaskCount();
+	renderer.DidFinishFrameBufferObject( fDstFBO );
 	
 	renderer.SetFrameBufferObject( fbo );
 }

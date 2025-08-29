@@ -57,6 +57,8 @@ Texture::Format::GetValue( U16* index, U16* layoutDetails ) const
 
 Texture::Texture( Rtt_Allocator* allocator )
 :	Super( allocator ),
+	fMipmapMagFilter( kLinear ),
+	fMipmapMinFilter( kLinear ),
 	fIsRetina( false ),
 	fIsTarget( false ),
 	fGenMipmaps( false ),

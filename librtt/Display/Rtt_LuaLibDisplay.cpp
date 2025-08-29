@@ -1917,6 +1917,21 @@ DisplayLibrary::getDefault( lua_State *L )
         RenderTypes::TextureFilter filter = defaults.GetMinTextureFilter();
         lua_pushstring( L, RenderTypes::StringForTextureFilter( filter ) );
     }
+    else if ( Rtt_StringCompare( key, "mipmapMagTextureFilter" ) == 0 )
+    {
+        RenderTypes::TextureFilter filter = defaults.GetMipmapMagTextureFilter();
+        lua_pushstring( L, RenderTypes::StringForTextureFilter( filter ) );
+    }
+    else if ( Rtt_StringCompare( key, "mipmapMinTextureFilter" ) == 0 )
+    {
+        RenderTypes::TextureFilter filter = defaults.GetMipmapMinTextureFilter();
+        lua_pushstring( L, RenderTypes::StringForTextureFilter( filter ) );
+    }
+    else if ( Rtt_StringCompare( key, "useMipmapping" ) == 0 )
+    {
+		bool value = defaults.GetUseMipmapping();
+        lua_pushboolean( L, value ? 1 : 0 );
+    }
     else if ( Rtt_StringCompare( key, "textureWrapX" ) == 0 )
     {
         RenderTypes::TextureWrap wrap = defaults.GetTextureWrapX();
@@ -2099,6 +2114,23 @@ DisplayLibrary::setDefault( lua_State *L )
         const char *value = lua_tostring( L, index );
         RenderTypes::TextureFilter filter = RenderTypes::TextureFilterForString( value );
         defaults.SetMinTextureFilter( filter );
+    }
+    else if ( Rtt_StringCompare( key, "mipmapMagTextureFilter" ) == 0 )
+    {
+        const char *value = lua_tostring( L, index );
+        RenderTypes::TextureFilter filter = RenderTypes::TextureFilterForString( value );
+        defaults.SetMipmapMagTextureFilter( filter );
+    }
+    else if ( Rtt_StringCompare( key, "mipmapMinTextureFilter" ) == 0 )
+    {
+        const char *value = lua_tostring( L, index );
+        RenderTypes::TextureFilter filter = RenderTypes::TextureFilterForString( value );
+        defaults.SetMipmapMinTextureFilter( filter );
+    }
+    else if ( Rtt_StringCompare( key, "useMipmapping" ) == 0 )
+    {
+        bool value = lua_toboolean( L, index ) ? true : false;
+        defaults.SetUseMipmapping( value );
     }
     else if ( Rtt_StringCompare( key, "textureWrapX" ) == 0 )
     {

@@ -465,6 +465,17 @@ Renderer::SetFrameBufferObject( FrameBufferObject* fbo )
 }
 
 void
+Renderer::DidFinishFrameBufferObject( FrameBufferObject* fbo )
+{
+	Texture* texture = fbo->GetTexture();
+	if ( texture->GenMipmaps() )
+	{
+		fBackCommandBuffer->BindTexture( texture, 0 );
+		fBackCommandBuffer->GenerateMipmaps();
+	}
+}
+
+void
 Renderer::Clear( Real r, Real g, Real b, Real a, const ExtraClearOptions * extraOptions ) 
 {
     CheckAndInsertDrawCommand();

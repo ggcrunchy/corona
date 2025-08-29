@@ -374,6 +374,7 @@ SnapshotObject::RenderToFBO(
 		object.Draw( renderer );
 	}
 	renderer.PopMaskCount();
+	renderer.DidFinishFrameBufferObject( dstFBO );
 
 	// Restore state so further rendering is unaffected
 	renderer.SetViewport( x, y, width, height );

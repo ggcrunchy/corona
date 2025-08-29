@@ -81,13 +81,45 @@ namespace /*anonymous*/
         }
     }
 
-    void getFilterTokens( Texture::Filter filter, GLenum& minFilter, GLenum& magFilter, bool hasMipmaps )
+	GLenum MipmapFilter( GLenum filter, Texture::Filter mipmapFilter )
+	{
+		bool mipmapNearest = Texture::kNearest == mipmapFilter;
+		switch ( filter )
+		{
+		case GL_NEAREST:
+			return mipmapNearest ? GL_NEAREST_MIPMAP_NEAREST : GL_NEAREST_MIPMAP_LINEAR;
+		case GL_LINEAR:
+			return mipmapNearest ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR_MIPMAP_LINEAR; 
+		default:
+			Rtt_ASSERT_NOT_REACHED();
+			
+			return (GLenum)0;
+		}
+	}
+
+    void getFilterTokens( Texture::Filter filter, GLenum& minFilter, GLenum& magFilter, bool hasMipmaps, Texture* texture )
     {
         switch( filter )
         {
             case Texture::kNearest:    minFilter = GL_NEAREST;    magFilter = GL_NEAREST;    break;
             case Texture::kLinear:    minFilter = GL_LINEAR;    magFilter = GL_LINEAR;    break;
             default: Rtt_ASSERT_NOT_REACHED();
+        }
+        
+        if ( hasMipmaps )
+        {
+			Texture::Filter mipmapMagFilter, mipmapMinFilter;
+			if ( NULL != texture ) // linear filtering allowed?
+			{
+				texture->GetMipmapFilters( mipmapMagFilter, mipmapMinFilter );
+			}
+			else // everything nearest
+			{
+				mipmapMagFilter = Texture::kNearest;
+				mipmapMinFilter = Texture::kNearest;
+			}
+			magFilter = MipmapFilter( magFilter, mipmapMagFilter );
+			minFilter = MipmapFilter( minFilter, mipmapMinFilter ); 
         }
     }
 
@@ -312,17 +344,18 @@ GLTexture::Create( CPUResource* resource )
     fHandle = NameToHandle( name );
     GL_CHECK_ERROR();
 
+	U16 formatIndex = 0;
+	texture->GetFormat().GetValue( &formatIndex );
+
     GLenum minFilter;
     GLenum magFilter;
-    getFilterTokens( texture->GetFilter(), minFilter, magFilter, hasMipmaps );
+    getFilterTokens( texture->GetFilter(), minFilter, magFilter, hasMipmaps, HasLinearFiltering( formatIndex ) ? texture : NULL );
 
 	fUsingLinearFiltering = Texture::kLinear == texture->GetFilter();
 
-	U16 formatIndex = 0;
-	texture->GetFormat().GetValue( &formatIndex );
 	if ( 0 != formatIndex && fUsingLinearFiltering && !HasLinearFiltering( formatIndex ) )
 	{
-		getFilterTokens( Texture::kNearest, minFilter, magFilter, false );
+		getFilterTokens( Texture::kNearest, minFilter, magFilter, hasMipmaps, NULL );
 		
 		fUsingLinearFiltering = false;
 	}
@@ -506,8 +539,8 @@ GLTexture::Update( CPUResource* resource )
 		{
 			Texture::Filter newFilter = wantsLinearFiltering ? Texture::kLinear : Texture::kNearest;
 			GLenum minFilter, magFilter;
-			getFilterTokens( newFilter, minFilter, magFilter, hasMipmaps );
-			// ^^^ TODO!
+			getFilterTokens( newFilter, minFilter, magFilter, hasMipmaps, HasLinearFiltering( formatIndex ) ? texture : NULL );
+
 			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter );
 			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter );
 			GL_CHECK_ERROR();			

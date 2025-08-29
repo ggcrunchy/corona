@@ -518,7 +518,10 @@ TextureFactory::DidAddTexture( const TextureResource& resource )
 	{
 		const Texture& texture = resource.GetTexture();
 		size_t numTextureBytes = texture.GetSizeInBytes();
-		// TODO: if mipmapped, scale by 1.333...
+		if ( texture.GenMipmaps() )
+		{
+			numTextureBytes = 4 * numTextureBytes / 3;
+		}
 		fTextureMemoryUsed += numTextureBytes;
 	}
 }
@@ -534,7 +537,10 @@ TextureFactory::WillRemoveTexture( const TextureResource& resource )
 	{
 		const Texture& texture = resource.GetTexture();
 		size_t numTextureBytes = texture.GetSizeInBytes();
-		// TODO: if mipmapped, scale by 1.333...
+		if ( texture.GenMipmaps() )
+		{
+			numTextureBytes = 4 * numTextureBytes / 3;
+		}
 		fTextureMemoryUsed -= numTextureBytes;
 		Rtt_ASSERT( fTextureMemoryUsed >= 0 );
 	}

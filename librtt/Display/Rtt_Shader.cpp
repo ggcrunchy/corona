@@ -234,6 +234,7 @@ Shader::RenderToTexture( Renderer& renderer, Geometry& cache ) const
 			}
 			renderer.PopMaskCount();
 		}
+		renderer.DidFinishFrameBufferObject( fFBO );
 
         // Restore state so further rendering is unaffected
         renderer.SetViewport( x, y, width, height );

@@ -228,7 +228,9 @@ TextureResourceExternal::Create(TextureFactory& factory,
 		CoronaExternalTextureCallbacks2* callbacks2 = (CoronaExternalTextureCallbacks2*)callbacks;
 		if ( NULL != callbacks2->customUpload )
 		{
-			if ( NULL != callbacks2->supplyInternalFormatByValue && NULL != callbacks2->getCustomUploadTextureTarget && NULL != callbacks2->getCustomUploadProvidesMipmaps )
+			if ( NULL != callbacks2->supplyInternalFormatByValue &&
+				NULL != callbacks2->getCustomUploadTextureTarget &&
+				 NULL != callbacks2->getCustomUploadProvidesMipmaps )
 			{
 				texture->SetHasCustomUploader( true );
 			}

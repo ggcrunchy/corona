@@ -53,6 +53,7 @@ namespace /*anonymous*/
         kCommandBindTexture,
         kCommandBindProgram,
         kCommandBindInstancing,
+        kCommandGenerateMipmaps,
         kCommandResolveVertexFormat,
         kCommandApplyUniformScalar,
         kCommandApplyUniformVec2,
@@ -792,6 +793,12 @@ GLCommandBuffer::GetCachedParam( CommandBuffer::QueryableParams param )
 }
 
 void
+GLCommandBuffer::GenerateMipmaps()
+{
+	WRITE_COMMAND( kCommandGenerateMipmaps );
+}
+
+void
 GLCommandBuffer::AddCommand( const CoronaCommand* command )
 {
     fCustomCommands.Append( command );
@@ -1007,6 +1014,8 @@ GLCommandBuffer::Execute( bool measureGPU )
 				      GL_CHECK_ERROR();
 			      }
 			  
+				  // TODO: mipmaps?
+			  
 			      DEBUG_PRINT( "Capture Rect: (%f, %f, %f, %f), using FBO = %s", rect.xMin, rect.yMin, rect.xMax, rect.yMax, !texture ? "true" : "false" );
 			      CHECK_ERROR_AND_BREAK;
 		      }
@@ -1044,6 +1053,11 @@ GLCommandBuffer::Execute( bool measureGPU )
                 instanceCount = Read<U32>();
                 instancingData = Read<Geometry::Vertex*>();
                 CHECK_ERROR_AND_BREAK;
+            }
+            case kCommandGenerateMipmaps:
+            {
+				glGenerateMipmap( GL_TEXTURE_2D );
+				CHECK_ERROR_AND_BREAK;
             }
             case kCommandResolveVertexFormat:
             {

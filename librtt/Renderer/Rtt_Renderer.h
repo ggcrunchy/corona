@@ -126,6 +126,10 @@ class Renderer
             U32 stencilClearValue;
         };
     
+		// Indicate that the FBO is done being used. FBOs might be nested, so
+		// this is distinct from merely switching to another one.
+		void DidFinishFrameBufferObject( FrameBufferObject* fbo );
+    
         // Assign the given color to all pixels in the back buffer or, if there
         // is a texture bound for offscreen rendering, to pixels in the texture.
         void Clear( Real r, Real g, Real b, Real a, const ExtraClearOptions * extraOptions = NULL );

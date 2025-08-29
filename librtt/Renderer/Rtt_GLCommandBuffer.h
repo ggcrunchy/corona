@@ -70,6 +70,8 @@ class GLCommandBuffer : public CommandBuffer
         virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type );
         virtual S32 GetCachedParam( CommandBuffer::QueryableParams param );
 
+		virtual void GenerateMipmaps();
+
         virtual void AddCommand( const CoronaCommand * command );
         virtual void IssueCommand( U16 id, const void * data, U32 size );
 
