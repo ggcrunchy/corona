@@ -183,16 +183,16 @@ typedef struct CoronaExternalTextureCallbacks2 {
 	  Optional
 	  Called if getFormat() returns `kExternalBitmapFormat_RequestedByName`,
 	  and getRequestedFormat() failed to provide anything.
-	  The result is a 32-bit integer expected to correspond to one of the backend's internal
-	  format. If recognized, that format will be used. TODO: data type
+	  The result is a 32-bit integer expected to correspond to an internal format recognized
+	  by the backend. If recognized, that format will be used. TODO: data type
      @param userData Pointer passed to CoronaExternalPushTexture
 	*/
 	unsigned int (*supplyInternalFormatByValue)(void* userData);
 
 	/**
 	 Optional
-	 The result is a 32-bit integer expected to correspond to one of the backend's texture
-	 targets, indicateing e.g. a basic 2D texture or 3D texture array
+	 The result is a 32-bit integer expected to correspond to a target recognized by the
+	 backend,  indicating e.g. a basic 2D texture or 3D texture array
 	 @param userData Pointer passed to CoronaExternalPushTexture 
 	*/
 	unsigned int (*getCustomUploadTextureTarget)(void* userData);

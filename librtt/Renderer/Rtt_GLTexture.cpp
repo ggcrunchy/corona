@@ -293,8 +293,11 @@ struct TextureFormatInfo {
 	U8 fBlockHeight;
 	U8 fBlockSize;
 };
+// ^^^ TODO: make fName fixed size or make separate consolidated array
 
-static TextureFormatInfo sInfo[32]; // arbitrary size; expand as necessary
+// n.b. these are defined later since they need the final counter value
+static TextureFormatInfo* GetInfo( U16 index );
+static U16 GetInfoCount();
 
 static bool
 DoCustomUpload( Texture* texture, GLuint name, GLint internalFormat, CustomUploadTextureInfo& uploadInfo )
@@ -330,8 +333,12 @@ GLTexture::Create( CPUResource* resource )
 
     SUMMED_TIMING( gltc, "Texture GPU Resource: Create" );
 
+	U16 formatIndex = 0;
+	texture->GetFormat().GetValue( &formatIndex );
+
 	CustomUploadTextureInfo uploadInfo = {};
-	bool hasMipmaps = texture->GenMipmaps();
+	bool isCompressed = 0 != formatIndex && IsCompressed( formatIndex );
+	bool hasMipmaps = texture->GenMipmaps() && !isCompressed;
 	if ( texture->HasCustomUploader() )
 	{
 		DoCustomUpload( texture, 0, 0, uploadInfo ); // n.b. non-loading query for mipmaps
@@ -344,16 +351,14 @@ GLTexture::Create( CPUResource* resource )
     fHandle = NameToHandle( name );
     GL_CHECK_ERROR();
 
-	U16 formatIndex = 0;
-	texture->GetFormat().GetValue( &formatIndex );
-
     GLenum minFilter;
     GLenum magFilter;
-    getFilterTokens( texture->GetFilter(), minFilter, magFilter, hasMipmaps, HasLinearFiltering( formatIndex ) ? texture : NULL );
+    bool hasLinearFiltering = 0 == formatIndex || HasLinearFiltering( formatIndex );
+    getFilterTokens( texture->GetFilter(), minFilter, magFilter, hasMipmaps, hasLinearFiltering ? texture : NULL );
 
 	fUsingLinearFiltering = Texture::kLinear == texture->GetFilter();
 
-	if ( 0 != formatIndex && fUsingLinearFiltering && !HasLinearFiltering( formatIndex ) )
+	if ( fUsingLinearFiltering && !hasLinearFiltering )
 	{
 		getFilterTokens( Texture::kNearest, minFilter, magFilter, hasMipmaps, NULL );
 		
@@ -376,11 +381,13 @@ GLTexture::Create( CPUResource* resource )
     GLenum format;
     GLenum type;
     
+    TextureFormatInfo* info = NULL;
 	if ( 0 != formatIndex )
 	{
-		internalFormat = sInfo[formatIndex].fInternal;
-		format = sInfo[formatIndex].fSource;
-		type = sInfo[formatIndex].fType;
+		info = GetInfo( formatIndex );
+		internalFormat = info->fInternal;
+		format = info->fSource;
+		type = info->fType;
 	}
 	else
 	{
@@ -409,21 +416,21 @@ GLTexture::Create( CPUResource* resource )
         GL_CHECK_ERROR();
 
         // It is valid to pass a NULL pointer, so allocation is done either way
-		if ( 0 != formatIndex && IsCompressed( formatIndex ) )
+		if ( isCompressed )
 		{
-			fCachedImageSize = sInfo[formatIndex].GetSize( w, h );
+			fCachedImageSize = info->GetSize( w, h );
 			glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, fCachedImageSize, data );
 		}
 		else
 		{
 			glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
+
+			if ( texture->GenMipmaps() )
+			{
+				glGenerateMipmap( GL_TEXTURE_2D );
+			}
 		}
         GL_CHECK_ERROR();
-        
-        if ( texture->GenMipmaps() )
-        {
-			glGenerateMipmap( GL_TEXTURE_2D );
-        }
         
         fCachedFormat = internalFormat;
         fCachedWidth = w;
@@ -447,14 +454,16 @@ GLTexture::Update( CPUResource* resource )
 	U16 formatIndex = 0;
 	texture->GetFormat().GetValue( &formatIndex );
 
+	TextureFormatInfo* info = NULL;
 	GLint internalFormat;
 	GLenum format;
 	GLenum type;
 	if ( 0 != formatIndex )
 	{
-		internalFormat = sInfo[formatIndex].fInternal;
-		format = sInfo[formatIndex].fSource;
-		type = sInfo[formatIndex].fType;
+		info = GetInfo( formatIndex );
+		internalFormat = info->fInternal;
+		format = info->fSource;
+		type = info->fType;
 	}
 	else
 	{
@@ -462,7 +471,8 @@ GLTexture::Update( CPUResource* resource )
 	}
 
 	CustomUploadTextureInfo uploadInfo = {};
-	bool hasMipmaps = false;
+	bool isCompressed = 0 != formatIndex && IsCompressed( formatIndex );
+	bool hasMipmaps = texture->GenMipmaps() && !isCompressed;
 	
 	if ( texture->HasCustomUploader() )
 	{
@@ -491,7 +501,7 @@ GLTexture::Update( CPUResource* resource )
 
         if (internalFormat == fCachedFormat && w == fCachedWidth && h == fCachedHeight )
         {
-			if ( 0 != formatIndex && IsCompressed( formatIndex ) )
+			if ( isCompressed )
 			{
 				glCompressedTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, fCachedImageSize, data );
 			}
@@ -502,9 +512,9 @@ GLTexture::Update( CPUResource* resource )
         }
         else
         {
-			if ( 0 != formatIndex && IsCompressed( formatIndex ) )
+			if ( isCompressed )
 			{
-				fCachedImageSize = sInfo[formatIndex].GetSize( w, h );
+				fCachedImageSize = info->GetSize( w, h );
 				glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, fCachedImageSize, data );
 			}
 			else
@@ -515,13 +525,11 @@ GLTexture::Update( CPUResource* resource )
             fCachedWidth = w;
             fCachedHeight = h;
         }
-
-		if ( texture->GenMipmaps() )
-		{
+        
+        if ( hasMipmaps )
+        {
 			glGenerateMipmap( GL_TEXTURE_2D );
-			
-			hasMipmaps = true;
-		}
+        }
     }
     texture->ReleaseData();
 
@@ -529,17 +537,18 @@ GLTexture::Update( CPUResource* resource )
 	{
 		// Apply any filter mode changes, taking into account that many
 		// texture formats cannot handle linear filtering.
+		bool hasLinearFiltering = 0 == formatIndex || HasLinearFiltering( formatIndex );
 		bool wantsLinearFiltering = Texture::kLinear == texture->GetFilter();
 		if (wantsLinearFiltering) // is it also allowed?
 		{
-			wantsLinearFiltering = ( 0 == formatIndex ) || HasLinearFiltering( formatIndex );
+			wantsLinearFiltering = hasLinearFiltering;
 		}
 									
 		if ( wantsLinearFiltering != fUsingLinearFiltering )
 		{
 			Texture::Filter newFilter = wantsLinearFiltering ? Texture::kLinear : Texture::kNearest;
 			GLenum minFilter, magFilter;
-			getFilterTokens( newFilter, minFilter, magFilter, hasMipmaps, HasLinearFiltering( formatIndex ) ? texture : NULL );
+			getFilterTokens( newFilter, minFilter, magFilter, hasMipmaps, hasLinearFiltering ? texture : NULL );
 
 			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter );
 			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter );
@@ -586,37 +595,6 @@ GLTexture::GetName()
 	#define GL_GET_PROC(name, suffix) gl ## name ## suffix
 #endif
 
-static int sInfoCount;
-
-static TextureFormatInfo*
-AllocInfo( const TextureFormatInfo& form )
-{
-	if ( sInfoCount < sizeof( sInfo ) / sizeof( *sInfo ) )
-	{
-		TextureFormatInfo* info = & sInfo[ sInfoCount++ ];
-		*info = form;
-		
-		return info;
-	}
-	
-	else
-	{
-		Rtt_LogException( "Too many texture formats" );
-		
-		Rtt_ASSERT_NOT_REACHED();
-		
-		return NULL;
-	}
-}
-
-static void
-AliasInfo( const TextureFormatInfo& copy, const char* name )
-{
-	TextureFormatInfo* info = AllocInfo( copy );
-	
-	info->fName = name;
-}
-
 static int
 FindInfo( const char* name )
 {
@@ -627,9 +605,9 @@ FindInfo( const char* name )
 		U32 format;
 		memcpy( &format, name + 1, sizeof(U32) );
 		
-		for ( int i = 0; i < sInfoCount; i++ )
+		for ( U16 i = 0; i < GetInfoCount(); i++ )
 		{
-			if ( sInfo[i].fInternal == (GLsizei)( format ) )
+			if ( GetInfo( i )->fInternal == (GLsizei)( format ) )
 			{
 				return i;
 			}
@@ -637,9 +615,11 @@ FindInfo( const char* name )
 	}
 	else
 	{
-		for ( int i = 0; i < sInfoCount; i++ )
+		// TODO: could just copy name into fixed-size buffer and
+		// tolower() it along the way, and check too-large size
+		for ( U16 i = 0; i < GetInfoCount(); i++ )
 		{
-			if ( Rtt_StringCompareNoCase( sInfo[i].fName, name ) == 0 )
+			if ( Rtt_StringCompareNoCase( GetInfo( i )->fName, name ) == 0 )
 			{
 				return i;
 			}
@@ -667,9 +647,17 @@ EnumerateSupportedFormats()
 
 	compressedForm.fFlags = TextureFormatInfo::kIsCompressed;
 
+	TextureFormatInfo* alloced;
+	int allocIndex;
+
+	// these macros increment a counter to find the final array size; the
+	// counter uses an intermediate index so that aliases are easy
+	#define ALLOC_INFO( FORM ) allocIndex = __COUNTER__; alloced = GetInfo( allocIndex ); *alloced = FORM; alloced
+	#define ALIAS_INFO( INDEX, NAME ) ALLOC_INFO( *GetInfo( INDEX ) )->fName = NAME; alloced
+
 	// this is a fallback for index 0; in practice it shouldn't be reached
 	// and probably indicates a bug in the calling code
-	AllocInfo( form )->Initialize( "", GL_RGBA );
+	ALLOC_INFO( form )->Initialize( "", GL_RGBA );
 
 	const char * extensions = (const char *)glGetString( GL_EXTENSIONS );
 
@@ -680,8 +668,8 @@ EnumerateSupportedFormats()
 		
 		if ( hasRG )
 		{
-			AllocInfo( form )->Initialize( "red", GL_RED, GL_R8 );
-			AllocInfo( form )->Initialize( "rg", GL_RG, GL_RG8 );
+			ALLOC_INFO( form )->Initialize( "red", GL_RED, GL_R8 );
+			ALLOC_INFO( form )->Initialize( "rg", GL_RG, GL_RG8 );
 		}
 	#endif
 
@@ -691,17 +679,17 @@ EnumerateSupportedFormats()
 		{
 			form.fType = GL_FLOAT;
 			
-			AllocInfo( form )->Initialize( "rgb16f", GL_RGB, GL_RGB16F_ARB );
-			AllocInfo( form )->Initialize( "rgba16f", GL_RGBA, GL_RGBA16F_ARB );
-			AllocInfo( form )->Initialize( "rgb16f", GL_RGB, GL_RGB32F_ARB );
-			AllocInfo( form )->Initialize( "rgba16f", GL_RGBA, GL_RGBA32F_ARB );
+			ALLOC_INFO( form )->Initialize( "rgb16f", GL_RGB, GL_RGB16F_ARB );
+			ALLOC_INFO( form )->Initialize( "rgba16f", GL_RGBA, GL_RGBA16F_ARB );
+			ALLOC_INFO( form )->Initialize( "rgb32f", GL_RGB, GL_RGB32F_ARB );
+			ALLOC_INFO( form )->Initialize( "rgba32f", GL_RGBA, GL_RGBA32F_ARB );
 			
 			if ( hasRG )
 			{
-				AllocInfo( form )->Initialize( "r16f", GL_RED, GL_R16F );
-				AllocInfo( form )->Initialize( "rg16f", GL_RG, GL_RG16F );
-				AllocInfo( form )->Initialize( "r32f", GL_RED, GL_R32F );
-				AllocInfo( form )->Initialize( "rg32f", GL_RG, GL_RG32F );
+				ALLOC_INFO( form )->Initialize( "r16f", GL_RED, GL_R16F );
+				ALLOC_INFO( form )->Initialize( "rg16f", GL_RG, GL_RG16F );
+				ALLOC_INFO( form )->Initialize( "r32f", GL_RED, GL_R32F );
+				ALLOC_INFO( form )->Initialize( "rg32f", GL_RG, GL_RG32F );
 			}
 		}
 	#endif
@@ -713,12 +701,12 @@ EnumerateSupportedFormats()
 	depthForm.fFlags = TextureFormatInfo::kIsDepthRelated;
 	depthForm.fType = GL_UNSIGNED_SHORT;
 	
-	AllocInfo( depthForm )->Initialize( "depth16", GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT16 );
+	ALLOC_INFO( depthForm )->Initialize( "depth16", GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT16 );
 	
 	depthForm.fType = GL_UNSIGNED_INT;
 	
-	AllocInfo( depthForm )->Initialize( "depth24", GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT24 );
-	AllocInfo( depthForm )->Initialize( "depth32", GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT32 );
+	ALLOC_INFO( depthForm )->Initialize( "depth24", GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT24 );
+	ALLOC_INFO( depthForm )->Initialize( "depth32", GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT32 );
 	
 	#if defined(GL_ARB_depth_buffer_float)
 		bool hasDepthBufferFloat = NULL != strstr( extensions, "GL_ARB_depth_buffer_float" );
@@ -726,7 +714,7 @@ EnumerateSupportedFormats()
 		{
 			depthForm.fType = GL_FLOAT;
 		
-			AllocInfo( depthForm )->Initialize( "depth32f", GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT32F );
+			ALLOC_INFO( depthForm )->Initialize( "depth32f", GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT32F );
 		}
 
 		// GL_DEPTH32F_STENCIL8, GL_FLOAT_32_UNSIGNED_INT_24_8_REV
@@ -746,15 +734,15 @@ EnumerateSupportedFormats()
 	bool hasETC1 = isES3 || NULL != strstr( extensions, "GL_OES_compressed_ETC1_RGB8_texture" );
 	if ( hasETC1 )
     {
-        AllocInfo( compressedForm )->InitializeBlocked( "etc1", GL_ETC1_RGB8_OES, 4, 4, 8 );
+        ALLOC_INFO( compressedForm )->InitializeBlocked( "etc1", GL_ETC1_RGB8_OES, 4, 4, 8 );
     }
 #endif
 
     if ( isES3 )
     {
-        AllocInfo( compressedForm )->InitializeBlocked( "etc2-rgb", GL_COMPRESSED_RGB8_ETC2, 4, 4, 8 );
-        AllocInfo( compressedForm )->InitializeBlocked( "etc-rgba1", GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2, 4, 4, 8 );
-        AllocInfo( compressedForm )->InitializeBlocked( "etc2-rgba", GL_COMPRESSED_RGBA8_ETC2_EAC, 4, 4, 16 );
+        ALLOC_INFO( compressedForm )->InitializeBlocked( "etc2-rgb", GL_COMPRESSED_RGB8_ETC2, 4, 4, 8 );
+        ALLOC_INFO( compressedForm )->InitializeBlocked( "etc-rgba1", GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2, 4, 4, 8 );
+        ALLOC_INFO( compressedForm )->InitializeBlocked( "etc2-rgba", GL_COMPRESSED_RGBA8_ETC2_EAC, 4, 4, 16 );
         // EAC
     }
 
@@ -769,22 +757,29 @@ EnumerateSupportedFormats()
     
         #define ASTC_PARAMS( WIDTH, HEIGHT ) "astc-" #WIDTH "x" #HEIGHT, GL_COMPRESSED_RGBA_ASTC_ ## WIDTH ## x ## HEIGHT ## _KHR, WIDTH, HEIGHT, 16
 
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 4, 4 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 5, 4 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 5, 5 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 6, 5 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 6, 6 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 8, 5 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 8, 6 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 8, 8 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 10, 5 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 10, 6 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 10, 8 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 10, 10 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 12, 10 ) );
-        AllocInfo( astcForm )->InitializeBlocked( ASTC_PARAMS( 12, 12 ) );
+        #define ASTC_PARAMS_SRGB_A8( WIDTH, HEIGHT ) "astc-" #WIDTH "x" #HEIGHT "-srgb_a8", GL_COMPRESSED_SRGB8_ALPHA8_ASTC_ ## WIDTH ## x ## HEIGHT ## _KHR, WIDTH, HEIGHT, 16
+
+		#define ALLOC_ASTC_INFO( WIDTH, HEIGHT ) ALLOC_INFO( astcForm )->InitializeBlocked( ASTC_PARAMS( WIDTH, HEIGHT ) ); \
+												ALLOC_INFO( astcForm )->InitializeBlocked( ASTC_PARAMS_SRGB_A8( WIDTH, HEIGHT ) )
+
+		ALLOC_ASTC_INFO( 4, 4 );
+		ALLOC_ASTC_INFO( 5, 4 );
+		ALLOC_ASTC_INFO( 5, 5 );
+		ALLOC_ASTC_INFO( 6, 5 );
+		ALLOC_ASTC_INFO( 6, 6 );
+		ALLOC_ASTC_INFO( 8, 5 );
+		ALLOC_ASTC_INFO( 8, 6 );
+		ALLOC_ASTC_INFO( 8, 8 );
+        ALLOC_ASTC_INFO( 10, 5 );
+        ALLOC_ASTC_INFO( 10, 6 );
+        ALLOC_ASTC_INFO( 10, 8 );
+        ALLOC_ASTC_INFO( 10, 10 );
+        ALLOC_ASTC_INFO( 12, 10 );
+        ALLOC_ASTC_INFO( 12, 12 );
 
         #undef ASTC_PARAMS
+        #undef ASTC_PARAMS_SRGB_A8
+        #undef ALLOC_ASTC_INFO
     }
 
     /*
@@ -798,13 +793,13 @@ EnumerateSupportedFormats()
     hasRG = isES3 || NULL != strstr( extensions, "GL_EXT_texture_rg" );
 	if ( hasRG )
 	{
-		AllocInfo( form )->Initialize( "red", GL_RED_EXT );
-		AllocInfo( form )->Initialize( "rg", GL_RG_EXT );
+        ALLOC_INFO( form )->Initialize( "red", GL_RED_EXT );
+        ALLOC_INFO( form )->Initialize( "rg", GL_RG_EXT );
 	}
 #endif
 
 #if defined(GL_OES_texture_half_float)
-	bool has16BitFloats = isES3 || NULL != strstr( extensions, "GL_OES_texture_half_float" ); // TODO: core in 3?
+	bool has16BitFloats = isES3 || NULL != strstr( extensions, "GL_OES_texture_half_float" );
 	if (has16BitFloats)
     {
         bool hasLinearFiltering = isES3 || NULL != strstr( extensions, "GL_OES_texture_half_float_linear" );
@@ -813,25 +808,21 @@ EnumerateSupportedFormats()
         f16Info.fFlags = hasLinearFiltering ? TextureFormatInfo::kHasLinearFiltering : 0;
         f16Info.fType = GL_HALF_FLOAT_OES;
 
-        AllocInfo( f16Info )->Initialize( "rgb16f", GL_RGB, GL_RGB16F_EXT );
-        AllocInfo( f16Info )->Initialize( "rgba16f", GL_RGBA, GL_RGBA16F_EXT );
-
-		// also _linear for each?
-		// linear for magnification
-		// linear + mipmap distinctions for minification
+        ALLOC_INFO( f16Info )->Initialize( "rgb16f", GL_RGB, GL_RGB16F_EXT );
+        ALLOC_INFO( f16Info )->Initialize( "rgba16f", GL_RGBA, GL_RGBA16F_EXT );
 
 		if ( hasRG )
 		{
 #if defined(GL_EXT_texture_rg)
-            AllocInfo( f16Info )->Initialize( "r16f", GL_RED_EXT, GL_R16F_EXT );
-            AllocInfo( f16Info )->Initialize( "rg16f", GL_RG_EXT, GL_RG16F_EXT );
+            ALLOC_INFO( f16Info )->Initialize( "r16f", GL_RED_EXT, GL_R16F_EXT );
+            ALLOC_INFO( f16Info )->Initialize( "rg16f", GL_RG_EXT, GL_RG16F_EXT );
 #endif
 		}
 	}
 #endif
 
 #if defined(GL_OES_texture_float)
-	bool has32BitFloats = isES3 || NULL != strstr( extensions, "GL_OES_texture_float" ); // TODO: ditto...
+	bool has32BitFloats = isES3 || NULL != strstr( extensions, "GL_OES_texture_float" );
 	if (has32BitFloats)
 	{
         // n.b. not core in 3.0
@@ -841,14 +832,14 @@ EnumerateSupportedFormats()
         f32Info.fFlags = hasLinearFiltering ? TextureFormatInfo::kHasLinearFiltering : 0;
         f32Info.fType = GL_FLOAT;
 
-        AllocInfo( f32Info )->Initialize( "rgb32f", GL_RGB, GL_RGB32F_EXT );
-        AllocInfo( f32Info )->Initialize( "rgba32f", GL_RGBA, GL_RGBA32F_EXT );
+        ALLOC_INFO( f32Info )->Initialize( "rgb32f", GL_RGB, GL_RGB32F_EXT );
+        ALLOC_INFO( f32Info )->Initialize( "rgba32f", GL_RGBA, GL_RGBA32F_EXT );
 
 		if ( hasRG )
 		{
 #if defined(GL_EXT_texture_rg)
-            AllocInfo( f32Info )->Initialize( "r32f", GL_RED_EXT, GL_R32F_EXT );
-            AllocInfo( f32Info )->Initialize( "rg32f", GL_RG_EXT, GL_RG32F_EXT );
+            ALLOC_INFO( f32Info )->Initialize( "r32f", GL_RED_EXT, GL_R32F_EXT );
+            ALLOC_INFO( f32Info )->Initialize( "rg32f", GL_RG_EXT, GL_RG32F_EXT );
 #endif
 		}
 	}
@@ -906,28 +897,52 @@ bool hasS3TC = false, hasDXT1 = false;
 
 	if ( hasS3TC )
 	{
-		int currentIndex = sInfoCount;
+		int currentIndex = allocIndex;
 		
-		AllocInfo( compressedForm )->InitializeBlocked( "dxt3", GL_COMPRESSED_RGBA_S3TC_DXT3_EXT, 4, 4, 16 );
-		AllocInfo( compressedForm )->InitializeBlocked( "dxt5", GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, 4, 4, 16 );
+		ALLOC_INFO( compressedForm )->InitializeBlocked( "dxt3", GL_COMPRESSED_RGBA_S3TC_DXT3_EXT, 4, 4, 16 );
+		ALLOC_INFO( compressedForm )->InitializeBlocked( "dxt5", GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, 4, 4, 16 );
 		
-		AliasInfo( sInfo[currentIndex++], "bc2" );
-		AliasInfo( sInfo[currentIndex++], "bc3" );
+		ALIAS_INFO( currentIndex++, "bc2" );
+		ALIAS_INFO( currentIndex++, "bc3" );
 	}
 	if ( hasS3TC || hasDXT1 )
 	{
-		int currentIndex = sInfoCount;
+		int currentIndex = allocIndex;
 		
-		AllocInfo( compressedForm )->InitializeBlocked( "dxt1-rgb", GL_COMPRESSED_RGB_S3TC_DXT1_EXT, 4, 4, 8 );
-		AllocInfo( compressedForm )->InitializeBlocked( "dxt1-rgba", GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, 4, 4, 8 );
+		ALLOC_INFO( compressedForm )->InitializeBlocked( "dxt1-rgb", GL_COMPRESSED_RGB_S3TC_DXT1_EXT, 4, 4, 8 );
+		ALLOC_INFO( compressedForm )->InitializeBlocked( "dxt1-rgba", GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, 4, 4, 8 );
 		
-		AliasInfo( sInfo[currentIndex++], "bc1-rgb" );
-		AliasInfo( sInfo[currentIndex++], "bc1-rgba" );
+		ALIAS_INFO( currentIndex++, "bc1-rgb" );
+		ALIAS_INFO( currentIndex++, "bc1-rgba" );
 	}
 	
 	// GL_ARB/EXT_texture_compression_rgtc
 	// GL_ARB_texture_compression_bptc
 	// there are also some ANGLE / WebGL things; sRGB
+	
+	#undef ALLOC_INFO
+	#undef ALIAS_INFO
+}
+
+// counter was incremented from 0 to final size
+#define TEXTURE_FORMAT_INFO_SIZE __COUNTER__
+
+static TextureFormatInfo sInfo[TEXTURE_FORMAT_INFO_SIZE];
+
+#undef TEXTURE_FORMAT_INFO_SIZE
+
+TextureFormatInfo*
+GetInfo( U16 index )
+{
+	Rtt_ASSERT( index < GetInfoCount() );
+
+	return &sInfo[index];
+}
+
+U16
+GetInfoCount()
+{
+	return sizeof(sInfo) / sizeof(*sInfo);
 }
 
 struct FBOCompleteChecks {
@@ -992,21 +1007,22 @@ IsFormatColorRenderable( int index )
 	{
 		FBOCompleteChecks fboCheck;
 		
-		for ( int i = 0; i < sInfoCount; i++ )
+		for ( U16 i = 0; i < GetInfoCount(); i++ )
 		{
-			if ( sInfo[i].fFlags & kDepthOrStencilMask )
+			TextureFormatInfo* info = GetInfo( i );
+			if ( info->fFlags & kDepthOrStencilMask )
 			{
 				continue;
 			}
 			
-			if ( sInfo[i].fFlags & TextureFormatInfo::kIsCompressed )
+			if ( info->fFlags & TextureFormatInfo::kIsCompressed )
 			{
 				continue;
 			}
 			
-			if ( fboCheck.CanAttach( sInfo[i] ) )
+			if ( fboCheck.CanAttach( *info ) )
 			{
-				sInfo[i].fFlags |= TextureFormatInfo::kIsRenderable;
+				info->fFlags |= TextureFormatInfo::kIsRenderable;
 			}
 		}
 		
@@ -1026,16 +1042,17 @@ IsFormatDepthRenderable( int index )
 	{
 		FBOCompleteChecks fboCheck;
 	
-		for ( int i = 0; i < sInfoCount; i++ )
+		for ( U16 i = 0; i < GetInfoCount(); i++ )
 		{
-			if ( !( sInfo[i].fFlags & TextureFormatInfo::kIsDepthRelated ) )
+			TextureFormatInfo* info = GetInfo( i );
+			if ( !( info->fFlags & TextureFormatInfo::kIsDepthRelated ) )
 			{
 				continue;
 			}
 			
-			if ( fboCheck.CanAttach( sInfo[i], GL_DEPTH_ATTACHMENT ) )
+			if ( fboCheck.CanAttach( *info, GL_DEPTH_ATTACHMENT ) )
 			{
-				sInfo[i].fFlags |= TextureFormatInfo::kIsRenderable;
+				info->fFlags |= TextureFormatInfo::kIsRenderable;
 			}
 		}
 
@@ -1055,16 +1072,17 @@ IsFormatStencilRenderable( int index )
 	{
 		FBOCompleteChecks fboCheck;
 	
-		for ( int i = 0; i < sInfoCount; i++ )
+		for ( U16 i = 0; i < GetInfoCount(); i++ )
 		{
-			if ( !( sInfo[i].fFlags & TextureFormatInfo::kIsStencilRelated ) )
+			TextureFormatInfo* info = GetInfo( i );
+			if ( !( info->fFlags & TextureFormatInfo::kIsStencilRelated ) )
 			{
 				continue;
 			}
 			
-			if ( fboCheck.CanAttach( sInfo[i], GL_STENCIL_ATTACHMENT ) )
+			if ( fboCheck.CanAttach( *info, GL_STENCIL_ATTACHMENT ) )
 			{
-				sInfo[i].fFlags |= TextureFormatInfo::kIsRenderable;
+				info->fFlags |= TextureFormatInfo::kIsRenderable;
 			}
 		}
 	
@@ -1078,17 +1096,17 @@ IsFormatStencilRenderable( int index )
 static bool
 HasLinearFiltering( int index )
 {
-	Rtt_ASSERT( index < sInfoCount );
+	Rtt_ASSERT( index < GetInfoCount() );
 
-	return sInfo[index].fFlags & TextureFormatInfo::kHasLinearFiltering;
+	return GetInfo( index )->fFlags & TextureFormatInfo::kHasLinearFiltering;
 }
 
 static bool
 IsCompressed( int index )
 {
-	Rtt_ASSERT( index < sInfoCount );
+	Rtt_ASSERT( index < GetInfoCount() );
 	
-	return sInfo[index].fFlags & TextureFormatInfo::kIsCompressed;
+	return GetInfo( index )->fFlags & TextureFormatInfo::kIsCompressed;
 }
 
 #undef GL_GET_PROC
@@ -1160,7 +1178,7 @@ Renderer::QueryTextureInfo( const char* what, const char* name, U16* formatID ) 
 void
 Renderer::GetNonCoreFormatInfo( U16 formatID, NonCoreFormatInfo& info ) const
 {
-	Rtt_ASSERT( formatID < sInfoCount );
+	Rtt_ASSERT( formatID < GetInfoCount() );
 
 	// TODO:
 	// (This is not yet put to use; ES 2.0, at least,
