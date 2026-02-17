@@ -1407,6 +1407,12 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
                 sGLThreadManager.releaseEglContextLocked(this);
             }
         }
+        // STEVE CHANGE
+        private boolean canUseVulkan() {
+            GLSurfaceView view = mGLSurfaceViewWeakRef.get();
+            return (view != null && view.mCanUseVulkan);
+        }
+        // /STEVE CHANGE
         private void guardedRun() throws InterruptedException {
             mEglHelper = new EglHelper(mGLSurfaceViewWeakRef);
             mHaveEglContext = false;
@@ -1505,6 +1511,13 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
                                 if (! mHaveEglContext) {
                                     if (askedToReleaseEglContext) {
                                         askedToReleaseEglContext = false;
+                                    } else if (canUseVulkan()) { // <- STEVE CHANGE
+                                        if (mSizeChanged) {
+                                            w = mWidth;
+                                            h = mHeight;
+                                            sizeChanged = true;
+                                        }
+                                        break;
                                     } else if (sGLThreadManager.tryAcquireEglContextLocked(this)) {
                                         try {
                                             mEglHelper.start();
@@ -1594,7 +1607,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
                         createGlInterface = false;
                     }
 
-                    if (createEglContext) {
+                    if (createEglContext || canUseVulkan()) { // <- STEVE CHANGE
                         if (LOG_RENDERER) {
                             Log.w("GLThread", "onSurfaceCreated");
                         }
@@ -1621,7 +1634,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
                     }
                     {
                         GLSurfaceView view = mGLSurfaceViewWeakRef.get();
-                        if ((view != null) && (w > 0) && (h > 0)) {
+                        if ((view != null) && !view.mCanUseVulkan && (w > 0) && (h > 0)) {
                             view.mRenderer.onDrawFrame(gl);
                             if (view.mNeedsSwap) {
                                 int swapError = mEglHelper.swap();
@@ -2046,6 +2059,12 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
     public void clearNeedsSwap() {
         mNeedsSwap = false;
     }
+
+    // STEVE CHANGE
+    private boolean mCanUseVulkan = false;
+
+    public void setCanUseVulkan() { mCanUseVulkan = true; }
+    // /STEVE CHANGE
 
     public boolean canRender() {
         return (mGLThread != null);

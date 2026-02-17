@@ -8,6 +8,8 @@ add_definitions(
 	-DLUA_USE_POSIX
 )
 
+add_definitions(-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=1)
+
 #if(CMAKE_ANDROID_ARCH MATCHES "arm")
 #	add_definitions(-D_ARM_ASSEM_)
 #endif()

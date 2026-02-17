@@ -30,10 +30,17 @@ struct RenderPassData;
 class RenderPassBuilder {
 	public:
 		struct AttachmentOptions {
-			VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+            AttachmentOptions()
+            :   samples(VK_SAMPLE_COUNT_1_BIT),
+                isResolve(false),
+                isResult(false) // n.b. already implied by isResolve
+            {
+            }
+
+			VkSampleCountFlagBits samples;
 			VkImageLayout finalLayout;
-			bool isResolve = false;
-			bool isResult = false; // n.b. already implied by isResolve
+			bool isResolve;
+			bool isResult;
 		};
 
 		void AddColorAttachment( VkFormat format, const AttachmentOptions & options = AttachmentOptions() );

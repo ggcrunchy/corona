@@ -54,7 +54,7 @@ class VulkanProgram : public GPUResource
 		Rtt_CLASSCONSTANT( VulkanProgram, kInvalidID, (uint16_t)~0U );
 
 		struct Location {
-			Location( size_t offset = 0U, size_t range = 0U, bool isUniform = false )
+			Location( /*size_t*/U32 offset = 0U, /*size_t*/U32 range = 0U, bool isUniform = false )
 			:	fOffset( offset ),
 				fRange( range ),
 				fIsUniform( isUniform )
@@ -63,8 +63,8 @@ class VulkanProgram : public GPUResource
 
 			bool IsValid() const { return !!fRange; }
 
-			size_t fOffset;
-			size_t fRange;
+			/*size_t*/U32 fOffset;
+			/*size_t*/U32 fRange;
 			bool fIsUniform;
 		};
 

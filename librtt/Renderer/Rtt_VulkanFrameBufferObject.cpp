@@ -74,7 +74,7 @@ RenderPassBuilder::AddDepthStencilAttachment( VkFormat format, const AttachmentO
 {
 	VkAttachmentDescription depthAttachment = PrepareAttachmentDescription( format );
 
-	AddAttachment( depthAttachment, fDepthStencilReferences, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL );
+	AddAttachment( depthAttachment, fDepthStencilReferences, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 }
 
 void

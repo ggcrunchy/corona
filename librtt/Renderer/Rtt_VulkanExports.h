@@ -12,6 +12,8 @@
 
 #ifdef _WIN32
 	#include <windows.h>
+#elif defined(Rtt_ANDROID_ENV)
+    #include <android/native_window.h>
 #endif
 
 // ----------------------------------------------------------------------------
@@ -30,6 +32,8 @@ struct VulkanSurfaceParams {
 #ifdef _WIN32
 	HINSTANCE fInstance;
 	HWND fWindowHandle;
+#elif defined(Rtt_ANDROID_ENV)
+    ANativeWindow* fWindow;
 #endif
 
 };

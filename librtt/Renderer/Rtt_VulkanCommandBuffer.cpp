@@ -1814,7 +1814,7 @@ void VulkanCommandBuffer::ApplyUniforms( GPUResource* resource )
 	}
 }
 
-void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, const size_t * translationOffset, VulkanProgram * program, U32 index )
+void VulkanCommandBuffer::ApplyPushConstant( Uniform * uniform, size_t offset, const U32 * translationOffset, VulkanProgram * program, U32 index )
 {
 	Uniform::DataType dataType = uniform->GetDataType();
 

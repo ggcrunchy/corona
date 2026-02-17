@@ -10,10 +10,17 @@
 #ifndef _Rtt_VulkanIncludes_H__
 #define _Rtt_VulkanIncludes_H__
 
-#ifdef Rtt_DEBUG
-	#include <vulkan/vulkan.h>
+#if defined( Rtt_ANDROID_ENV )
+    #define VK_NO_PROTOTYPES
+    #include <vulkan/vulkan.h>
+    #include <vulkan/vulkan_android.h>
+    #include "../../external/vulkan/utils/volk.h"
 #else
-	#include "../../vulkan/utils/volk.h"
+    #ifdef Rtt_DEBUG
+        #include <vulkan/vulkan.h>
+    #else
+        #include "../../vulkan/utils/volk.h"
+    #endif
 #endif
 
 #endif // _Rtt_VulkanIncludes_H__

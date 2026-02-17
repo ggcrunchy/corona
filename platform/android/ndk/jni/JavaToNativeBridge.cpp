@@ -56,11 +56,17 @@
 #include "AndroidGLView.h"
 #include "NativeToJavaBridge.h"
 
+// STEVE CHANGE
+#include "Renderer/Rtt_VulkanIncludes.h"
+#include "Renderer/Rtt_VulkanExports.h"
+// /STEVE CHANGE
+
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <android/bitmap.h>
 #include <android/log.h>
+#include <android/native_window_jni.h> // <- STEVE CHANGE
 
 #include "importgl.h"
 
@@ -75,6 +81,8 @@
 
 JavaToNativeBridge::JavaToNativeBridge()
 :	fView( NULL ),
+    fWindow( NULL ), // <- STEVE CHANGE
+    fVulkanContext( NULL ), // <- STEVE CHANGE
 	fPlatform( NULL ),
 	fRuntime( NULL ),
 	fRuntimeDelegate( NULL ),
@@ -157,7 +165,14 @@ JavaToNativeBridge::Init(
 		fRuntime = Rtt_NEW( & fPlatform->GetAllocator(), Rtt::Runtime( * fPlatform ) );
 
 		fNativeToJavaBridge->SetRuntime( fRuntime );
-		
+
+        // STEVE CHANGE
+        if (fVulkanContext)
+        {
+            fRuntime->SetBackend("vulkanBackend", fVulkanContext);
+        }
+        // /STEVE CHANGE
+
 		fView->SetNativeToJavaBridge( fNativeToJavaBridge );
 
 		fRuntimeDelegate = Rtt_NEW( & fPlatform->GetAllocator(), Rtt::AndroidRuntimeDelegate(fNativeToJavaBridge, isCoronaKit) );
@@ -300,6 +315,12 @@ JavaToNativeBridge::Deinit()
 
 	Rtt_DELETE( fNativeToJavaBridge );
 	fNativeToJavaBridge = NULL;
+    // STEVE CHANGE
+    if (HasVulkan(NULL ))
+    {
+        TerminateVulkan( NULL );
+    }
+    // /STEVE CHANGE
 }
 
 size_t
@@ -1724,6 +1745,72 @@ JavaToNativeBridge::VideoViewFailedEvent(jint id)
 	Rtt::VideoEvent e( Rtt::VideoEvent::kFailed );
 	view->DispatchEventWithTarget( e );
 }
+// STEVE CHANGE
+void JavaToNativeBridge::DidGetSurface(JNIEnv *env, jobject surface)
+{
+    ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
+    bool wantToInit = false;
+
+    if (fWindow != window)
+    {
+        if (NULL != fVulkanContext)
+        {
+            Rtt::VulkanExports::DestroyVulkanContext(fVulkanContext);
+
+            fVulkanContext = NULL;
+        }
+
+        wantToInit = NULL != window;
+    }
+
+    fWindow = window;
+
+    if (wantToInit)
+    {
+        InitializeVulkan(env);
+    }
+}
+
+jboolean JavaToNativeBridge::HasVulkan(JNIEnv *env)
+{
+    return NULL != fVulkanContext;
+}
+
+void JavaToNativeBridge::InitializeVulkan(JNIEnv *env)
+{
+    Rtt_ASSERT(fWindow);
+    Rtt_ASSERT(!fVulkanContext);
+
+    Rtt::VulkanSurfaceParams params;
+
+    params.fWindow = fWindow;
+
+    void *context = NULL;
+
+    if ( Rtt::VulkanExports::CreateVulkanContext(params, &context ) )
+    {
+        fVulkanContext = context;
+
+        Rtt::VulkanExports::PopulateMultisampleDetails( context );
+    }
+}
+
+void JavaToNativeBridge::DoVulkanFrame(JNIEnv *env)
+{
+    Rtt_ASSERT( fVulkanContext );
+
+    // TODO!
+}
+
+void JavaToNativeBridge::TerminateVulkan(JNIEnv *env)
+{
+    Rtt_ASSERT( fVulkanContext );
+
+    Rtt::VulkanExports::DestroyVulkanContext( fVulkanContext );
+
+    fVulkanContext = NULL;
+}
+// /STEVE CHANGE
 const char*
 JavaToNativeBridge::GetBuildId()
 {

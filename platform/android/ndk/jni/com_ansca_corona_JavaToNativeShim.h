@@ -518,6 +518,15 @@ JNIEXPORT void JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeVideoViewFai
 JNIEXPORT jobject JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeGetCoronaRuntime
   (JNIEnv *, jclass, jlong);
 
+// STEVE CHANGE
+JNIEXPORT void JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeDidGetSurface(JNIEnv *, jclass, jlong, jobject);
+JNIEXPORT jboolean JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeHasVulkan(JNIEnv *env, jclass, jlong);
+JNIEXPORT void JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeInitializeVulkan(JNIEnv *env, jclass, jlong);
+JNIEXPORT void JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeDoVulkanFrame(JNIEnv *env, jclass, jlong);
+JNIEXPORT void JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeTerminateVulkan(JNIEnv *env, jclass, jlong);
+
+// /STEVE CHANGE
+
 #ifdef __cplusplus
 }
 #endif

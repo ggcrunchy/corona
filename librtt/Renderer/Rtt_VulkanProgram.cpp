@@ -39,7 +39,9 @@
 #undef min
 #endif
 
-#include <spirv_cross/spirv_glsl.hpp>
+#include "../../external/vulkan/spirv_cross/spirv_cpp.hpp"
+#include "../../external/vulkan/spirv_cross/spirv_cross.hpp"
+//#include <spirv_cross/spirv_glsl.hpp>
 
 // To reduce memory consumption and startup cost, defer the
 // creation of Vulkan shaders and programs until they're needed.
@@ -922,14 +924,14 @@ VulkanProgram::ReplaceVaryings( bool isVertexSource, ShaderCode & code, VulkanCo
 
 				if (isVertexSource)
 				{
-					sprintf( buf, "layout(location = %u) out %s %s;", varyingLocation, type, name );
+					sprintf( buf, "layout(location = %u) out %s %s;", (U32)varyingLocation, type, name );
 
 					maps.varyings[name] = varyingLocation++;
 				}
 
 				else
 				{
-					auto & varying = maps.varyings.find( name );
+					const auto & varying = maps.varyings.find( name );
 
 					if (maps.varyings.end() == varying)
 					{
@@ -1234,7 +1236,7 @@ VulkanProgram::InstallDeclaredUserData( ShaderCode & code, const std::vector< Us
 {
 	for (auto && iter = declarations.rbegin(); iter != declarations.rend(); ++iter)
 	{
-		const char suffix[] = { '0' + iter->fValue->fIndex, 0 };
+		const char suffix[] = { (char)( '0' + iter->fValue->fIndex ), 0 };
 		std::string declaration = (prefix1 + suffix) + (prefix2 + suffix);
 
 		if (iter->fLength)

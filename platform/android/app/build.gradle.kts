@@ -223,6 +223,7 @@ android {
         getByName("release") {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")
             coronaKeystore?.let { signingConfig = signingConfigs.getByName("release") }
         }
     }

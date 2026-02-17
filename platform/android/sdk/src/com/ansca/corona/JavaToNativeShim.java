@@ -10,6 +10,8 @@
 package com.ansca.corona;
 
 
+import android.view.Surface;
+
 /**
  * Wrapper for all native calls 
  * 
@@ -119,6 +121,11 @@ public class JavaToNativeShim {
 	private static native void nativeVideoViewEnded( long bridgeAddress, int id );
 	private static native void nativeVideoViewFailed( long bridgeAddress, int id );
 	private static native Object nativeGetCoronaRuntime( long bridgeAddress );
+	private static native void nativeDidGetSurface( long bridgeAddress, Surface surface );
+	private static native boolean nativeHasVulkan( long bridgeAddress );
+	private static native void nativeInitializeVulkan( long bridgeAddress );
+	private static native void nativeDoVulkanFrame( long bridgeAddress );
+	private static native void nativeTerminateVulkan( long bridgeAddress );
 
 	// Load all C/C++ libraries and their dependencies.
 	// Note: Loading a library will NOT automatically load its dependencies. We must do that explicitly here.
@@ -134,6 +141,7 @@ public class JavaToNativeShim {
 
 		System.loadLibrary("almixer");
 		System.loadLibrary("corona");
+System.loadLibrary("vulkan");
     }
 	
 	/** Constructor made private to prevent instances of this class from being made. */
@@ -800,4 +808,25 @@ public class JavaToNativeShim {
 	public static CoronaRuntime getCoronaRuntimeFromBridge(long address) {
 		return (CoronaRuntime)nativeGetCoronaRuntime(address);
 	}
+
+    public static void didGetSurface(CoronaRuntime runtime, Surface surface) {
+		nativeDidGetSurface(runtime.getJavaToNativeBridgeAddress(), surface);
+    }
+
+	public static boolean hasVulkan(CoronaRuntime runtime) {
+		return nativeHasVulkan(runtime.getJavaToNativeBridgeAddress());
+	}
+
+	public static void initializeVulkan(CoronaRuntime runtime) {
+		nativeInitializeVulkan(runtime.getJavaToNativeBridgeAddress());
+	}
+
+	public static void doVulkanFrame(CoronaRuntime runtime) {
+		nativeDoVulkanFrame(runtime.getJavaToNativeBridgeAddress());
+	}
+
+	public static void terminateVulkan(CoronaRuntime runtime) {
+		nativeTerminateVulkan(runtime.getJavaToNativeBridgeAddress());
+	}
+
 }

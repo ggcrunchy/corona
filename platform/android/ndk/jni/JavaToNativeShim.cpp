@@ -629,6 +629,35 @@ Java_com_ansca_corona_JavaToNativeShim_nativeGetCoronaRuntime(
 {
 	return JavaToNativeBridgeFromMemoryAddress(bridgeAddress)->GetCoronaRuntime();
 }
+
+// STEVE CHANGE
+JNIEXPORT void JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeDidGetSurface(
+        JNIEnv * env, jclass cd, jlong bridgeAddress, jobject surface)
+{
+    JavaToNativeBridgeFromMemoryAddress(bridgeAddress)->DidGetSurface(env, surface);
+}
+
+JNIEXPORT jboolean JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeHasVulkan(JNIEnv *env, jclass, jlong bridgeAddress)
+{
+    return JavaToNativeBridgeFromMemoryAddress(bridgeAddress)->HasVulkan(env);
+}
+
+JNIEXPORT void JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeInitializeVulkan(JNIEnv *env, jclass, jlong bridgeAddress)
+{
+    JavaToNativeBridgeFromMemoryAddress(bridgeAddress)->InitializeVulkan(env);
+}
+
+JNIEXPORT void JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeDoVulkanFrame(JNIEnv *env, jclass, jlong bridgeAddress)
+{
+    JavaToNativeBridgeFromMemoryAddress(bridgeAddress)->DoVulkanFrame(env); // ANYTHING?
+}
+
+JNIEXPORT void JNICALL Java_com_ansca_corona_JavaToNativeShim_nativeTerminateVulkan(JNIEnv *env, jclass, jlong bridgeAddress)
+{
+    JavaToNativeBridgeFromMemoryAddress(bridgeAddress)->TerminateVulkan(env);
+}
+// /STEVE CHANGE
+
 // ----------------------------------------------------------------------------
 
 } // extern "C"

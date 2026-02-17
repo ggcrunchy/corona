@@ -14,6 +14,8 @@ add_definitions(
 	-DLUA_USE_POSIX
 )
 
+# add_compile_options(-Xclang -fdump-vtable-layouts)
+
 include_directories (
 	jni
 	${CORONA_ROOT}
@@ -37,6 +39,11 @@ include_directories (
     ${CORONA_ROOT}/external/b2Separator-cpp
     ${CORONA_ROOT}/external/smoothpolygon
     ${ANDROID_NDK_ROOT}/sources/android/cpufeatures
+    ${CMAKE_ANDROID_NDK}/sources/third_party/shaderc/libshaderc/include
+    ${CORONA_ROOT}/external/
+    ${CORONA_ROOT}/external/vulkan/Include
+    ${CORONA_ROOT}/external/vulkan/
+    ${CORONA_ROOT}/external/vulkan/utils
 )
 
 SET( LUA_SOURCES
@@ -172,6 +179,7 @@ SET( LUA_SOURCES
 	"${CORONA_ROOT}/librtt/Display/Shader/kernel_generator_stripes_gl.lua"
 	"${CORONA_ROOT}/librtt/Display/Shader/kernel_generator_sunbeams_gl.lua"
 	"${CORONA_ROOT}/librtt/Display/Shader/shell_default_gl.lua"
+	"${CORONA_ROOT}/librtt/Display/Shader/shell_default_vulkan.lua"
 	"${CORONA_ROOT}/external/lpeg/re.lua"
 )
 
@@ -614,6 +622,7 @@ add_library( corona SHARED
 		${Lua2CppOutputDir}/kernel_generator_stripes_gl.cpp
 		${Lua2CppOutputDir}/kernel_generator_sunbeams_gl.cpp
 		${Lua2CppOutputDir}/shell_default_gl.cpp
+		${Lua2CppOutputDir}/shell_default_vulkan.cpp
 
 		${CORONA_ROOT}/librtt/Renderer/Rtt_CommandBuffer.cpp
 		${CORONA_ROOT}/librtt/Renderer/Rtt_CPUResource.cpp
@@ -628,6 +637,18 @@ add_library( corona SHARED
 		${CORONA_ROOT}/librtt/Renderer/Rtt_GLProgram.cpp
 		${CORONA_ROOT}/librtt/Renderer/Rtt_GLRenderer.cpp
 		${CORONA_ROOT}/librtt/Renderer/Rtt_GLTexture.cpp
+
+
+		${CORONA_ROOT}/librtt/Renderer/Rtt_VulkanContext.cpp
+		${CORONA_ROOT}/librtt/Renderer/Rtt_VulkanCommandBuffer.cpp
+		${CORONA_ROOT}/librtt/Renderer/Rtt_VulkanFrameBufferObject.cpp
+		${CORONA_ROOT}/librtt/Renderer/Rtt_VulkanGeometry.cpp
+		${CORONA_ROOT}/librtt/Renderer/Rtt_VulkanProgram.cpp
+		${CORONA_ROOT}/librtt/Renderer/Rtt_VulkanRenderer.cpp
+		${CORONA_ROOT}/librtt/Renderer/Rtt_VulkanTexture.cpp
+		${CORONA_ROOT}/librtt/Renderer/Rtt_ShaderCode.cpp
+
+
 		${CORONA_ROOT}/librtt/Renderer/Rtt_GPUResource.cpp
 		${CORONA_ROOT}/librtt/Renderer/Rtt_HighPrecisionTime.cpp
 		${CORONA_ROOT}/librtt/Renderer/Rtt_Matrix_Renderer.cpp
@@ -730,6 +751,48 @@ add_library( corona SHARED
 
 		${CORONA_ROOT}/external/b2Separator-cpp/b2Separator.cpp
 		${CORONA_ROOT}/external/smoothpolygon/SmoothPolygon.cpp
+
+		${CORONA_ROOT}/external/vulkan/spirv_cross/spirv_cfg.cpp
+		${CORONA_ROOT}/external/vulkan/spirv_cross/spirv_cpp.cpp
+		${CORONA_ROOT}/external/vulkan/spirv_cross/spirv_cross_parsed_ir.cpp
+		${CORONA_ROOT}/external/vulkan/spirv_cross/spirv_cross_util.cpp
+		${CORONA_ROOT}/external/vulkan/spirv_cross/spirv_cross.cpp
+		${CORONA_ROOT}/external/vulkan/spirv_cross/spirv_glsl.cpp
+		${CORONA_ROOT}/external/vulkan/spirv_cross/spirv_parser.cpp
+		${CORONA_ROOT}/external/vulkan/spirv_cross/spirv_reflect.cpp
 )
 
-target_link_libraries ( corona lua jnlua5.1 mpg123 OpenAL almixer cpufeatures GLESv2 EGL jnigraphics dl log z OpenSLES )
+# STEVE CHANGE
+get_filename_component(SHADERC_ROOT "${CMAKE_ANDROID_NDK}/sources/third_party/shaderc" ABSOLUTE)
+set(SHADERC_LIB "${SHADERC_ROOT}/libs/${CMAKE_ANDROID_STL_TYPE}/${ANDROID_ABI}/libshaderc.a")
+
+# Custom command to build shaderc via ndk-build if not present
+add_custom_command(
+    OUTPUT "${SHADERC_LIB}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADERC_ROOT}/libs/${CMAKE_ANDROID_STL_TYPE}/${CMAKE_ANDROID_ARCH_ABI}"
+    COMMAND "${CMAKE_ANDROID_NDK}/ndk-build"
+        NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk
+        APP_STL=${CMAKE_ANDROID_STL_TYPE} APP_ABI=${CMAKE_ANDROID_ARCH_ABI}
+        libshaderc_combined
+    WORKING_DIRECTORY "${SHADERC_ROOT}"
+    COMMENT "Building Shaderc via ndk-build"
+    VERBATIM
+)
+
+# Custom target depending on the library
+add_custom_target(shaderc_build DEPENDS "${SHADERC_LIB}")
+
+# Now import as usual, depending on the build target
+add_library(shaderc STATIC IMPORTED)
+set_target_properties(shaderc PROPERTIES
+    IMPORTED_LOCATION "${SHADERC_LIB}"
+    INTERFACE_INCLUDE_DIRECTORIES "${SHADERC_ROOT}/libshaderc/include"
+)
+add_dependencies(shaderc shaderc_build)
+# /STEVE CHANGE
+
+
+find_library(android-lib android)
+find_library(nativewindow-lib nativewindow)
+
+target_link_libraries ( corona lua jnlua5.1 mpg123 OpenAL almixer cpufeatures GLESv2 EGL jnigraphics dl log z OpenSLES shaderc ${android-lib} )

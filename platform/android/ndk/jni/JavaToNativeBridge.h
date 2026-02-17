@@ -18,6 +18,7 @@
 
 class AndroidGLView;
 class NativeToJavaBridge;
+struct ANativeWindow; // <- STEVE CHANGE
 
 namespace Rtt {
 	class AndroidPlatform;
@@ -122,6 +123,13 @@ class JavaToNativeBridge
 		void VideoViewPreparedEvent(jint id);
 		void VideoViewEndedEvent(jint id);
 		void VideoViewFailedEvent(jint id);
+        // STEVE CHANGE
+        void DidGetSurface(JNIEnv *env, jobject surface);
+        jboolean HasVulkan(JNIEnv *env);
+        void InitializeVulkan(JNIEnv *env);
+        void DoVulkanFrame(JNIEnv *env);
+        void TerminateVulkan(JNIEnv *env);
+        // /STEVE CHANGE
 		const char* GetBuildId();
 
 	public:
@@ -133,6 +141,10 @@ class JavaToNativeBridge
 
 	private:
 		AndroidGLView *fView;
+        // STEVE CHANGE
+        ANativeWindow *fWindow;
+        void *fVulkanContext;
+        // /STEVE CHANGE
 		Rtt::AndroidPlatform *fPlatform;
 		Rtt::Runtime *fRuntime;
 		Rtt::AndroidRuntimeDelegate *fRuntimeDelegate;

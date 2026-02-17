@@ -244,6 +244,14 @@ public class CoronaGLSurfaceView extends GLSurfaceView {
 			fCurrentWindowOrientation = currentOrientation;
 		}
 
+		// STEVE CHANGE
+		com.ansca.corona.JavaToNativeShim.didGetSurface(fCoronaRuntime, holder.getSurface());
+
+		if (com.ansca.corona.JavaToNativeShim.hasVulkan(fCoronaRuntime)) {
+			setCanUseVulkan();
+		}
+		// /STEVE CHANGE
+
 		// Resize the OpenGL viewport with the given surface's width and height.
 		super.surfaceChanged(holder, format, width, height);
 	}

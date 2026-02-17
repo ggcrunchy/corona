@@ -7,6 +7,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
+#define VOLK_IMPLEMENTATION
 #include "Renderer/Rtt_VulkanContext.h"
 #include "Renderer/Rtt_VulkanProgram.h"
 #include "Renderer/Rtt_VulkanRenderer.h"
@@ -179,7 +180,7 @@ VulkanContext::~VulkanContext()
 const RenderPassData *
 VulkanContext::AddRenderPass( const RenderPassKey & key, VkRenderPass renderPass )
 {
-	RenderPassData data = { fRenderPasses.size(), renderPass };
+	RenderPassData data = { (U32)fRenderPasses.size(), renderPass };
 	auto result = fRenderPasses.insert( std::make_pair( key, data ) );
 
 	return result.second ? &result.first->second : NULL;
@@ -452,9 +453,9 @@ StringIdentity( const char * str )
 }
 
 template<typename I, typename F> bool
-FindString( I & i1, I & i2, const char * str, F && getString )
+FindString( const I & i1, const I & i2, const char * str, F && getString )
 {
-	return std::find_if( i1, i2, [str, getString]( const I::value_type & other ) { return strcmp( str, getString( other ) ) == 0; } ) != i2;
+	return std::find_if( i1, i2, [str, getString]( const typename I::value_type & other ) { return strcmp( str, getString( other ) ) == 0; } ) != i2;
 }
 
 static void
@@ -462,7 +463,7 @@ CollectExtensions( std::vector<const char *> & extensions, std::vector<const cha
 {
 	auto optionalEnd = std::remove_if( optional.begin(), optional.end(), [&extensions]( const char * name )
 	{
-		return FindString( extensions.begin(), extensions.end(), name, StringIdentity );
+		return FindString( extensions.cbegin(), extensions.cend(), name, StringIdentity );
 	} );
 		
 	for (auto & props : extensionProps)
@@ -890,6 +891,8 @@ VulkanContext::PopulatePreSwapchainDetails( VulkanContext & context, const Vulka
 		
 	#ifdef _WIN32
 		VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+    #elif defined(Rtt_ANDROID_ENV)
+        "VK_KHR_android_surface"
 	#endif
 
 		, allocator, &messenger );
@@ -914,8 +917,15 @@ VulkanContext::PopulatePreSwapchainDetails( VulkanContext & context, const Vulka
 		createSurfaceInfo.hinstance = params.fInstance;
 
 		#define CREATE_VULKAN_SURFACE vkCreateWin32SurfaceKHR
-	#else
-		#error Non-Windows Vulkan context not implemented!
+    #elif defined( Rtt_ANDROID_ENV )
+        VkAndroidSurfaceCreateInfoKHR createSurfaceInfo = {};
+
+        createSurfaceInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
+        createSurfaceInfo.window = params.fWindow;
+
+        #define CREATE_VULKAN_SURFACE vkCreateAndroidSurfaceKHR
+    #else
+		#error Vulkan context not implemented on this platform!
 	#endif
 
 		VkSurfaceKHR surface;
@@ -1033,7 +1043,7 @@ VulkanContext::UpdateSwapchainDetails( VulkanContext & context )
 bool
 VulkanContext::VolkInitialize()
 {
-#ifdef Rtt_DEBUG
+#if defined(Rtt_DEBUG) && !defined(Rtt_ANDROID_ENV)
 	return true;
 #else
 	return VK_SUCCESS == volkInitialize();

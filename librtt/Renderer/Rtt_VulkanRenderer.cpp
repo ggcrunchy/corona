@@ -219,7 +219,7 @@ BufferDescriptor::SetWorkspace( void * workspace )
 }
 
 void
-BufferDescriptor::TryToAddMemory( std::vector< VkMappedMemoryRange > & ranges, VkDescriptorSet sets[], size_t & count )
+BufferDescriptor::TryToAddMemory( std::vector< VkMappedMemoryRange > & ranges, VkDescriptorSet sets[], /*size_t*/U32 & count )
 {
 	const BufferData & buffer = fBuffers[fIndex];
 	bool allWritten = (fWritten & fDirty) == fDirty;
@@ -271,7 +271,7 @@ BufferDescriptor::TryToAddMemory( std::vector< VkMappedMemoryRange > & ranges, V
 }
 	
 void
-BufferDescriptor::TryToAddDynamicOffset( uint32_t offsets[], size_t & count )
+BufferDescriptor::TryToAddDynamicOffset( uint32_t offsets[], U32 & count )
 {
 	if (VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC == fType || VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC == fType)
 	{

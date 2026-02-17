@@ -263,7 +263,7 @@ Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orie
 	{
 		Rtt_Allocator *allocator = GetRuntime().GetAllocator();
 
-#if defined( Rtt_WIN_ENV )
+#if defined( Rtt_WIN_ENV ) || defined( Rtt_ANDROID_ENV )
 		if (strcmp( backend, "glBackend" ) == 0)
 		{
 			fRenderer = Rtt_NEW( allocator, GLRenderer( allocator ) );
