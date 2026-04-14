@@ -696,6 +696,365 @@
 		AAA5811D270D38A6002A51A7 /* CoronaObjects.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AAA58114270D38A5002A51A7 /* CoronaObjects.cpp */; };
 		AAA5811F270D38A6002A51A7 /* CoronaObjects.h in Headers */ = {isa = PBXBuildFile; fileRef = AAA5811B270D38A5002A51A7 /* CoronaObjects.h */; };
 		AAA58121270D38A6002A51A7 /* CoronaPublicTypes.h in Headers */ = {isa = PBXBuildFile; fileRef = AAA5811C270D38A6002A51A7 /* CoronaPublicTypes.h */; };
+		AAEAB9F22F843167001954A5 /* Corona Live Server.app in Resources */ = {isa = PBXBuildFile; fileRef = F533257E1D9DD2DF003613F7 /* Corona Live Server.app */; };
+		AAEAB9F32F843167001954A5 /* ios-syslog-helper in Resources */ = {isa = PBXBuildFile; fileRef = C21995AD1C189E0300E88FD0 /* ios-syslog-helper */; };
+		AAEAB9F42F843167001954A5 /* CoronaConsole.app in Resources */ = {isa = PBXBuildFile; fileRef = C26DD10F1BD9508900EC4F44 /* CoronaConsole.app */; };
+		AAEAB9F52F843167001954A5 /* android_sendapp.sh in Resources */ = {isa = PBXBuildFile; fileRef = C231262E1B8FC1B20061A232 /* android_sendapp.sh */; };
+		AAEAB9F62F843167001954A5 /* xcodesim_sendapp.sh in Resources */ = {isa = PBXBuildFile; fileRef = C249AAC919D368AB00BB0BDF /* xcodesim_sendapp.sh */; };
+		AAEAB9F72F843167001954A5 /* IOSAppPackageSheet.xib in Resources */ = {isa = PBXBuildFile; fileRef = C2678C1A1B7EE9E900864110 /* IOSAppPackageSheet.xib */; };
+		AAEAB9F82F843167001954A5 /* ios_sendapp.sh in Resources */ = {isa = PBXBuildFile; fileRef = C21D9DC61BF6992D0042C5A9 /* ios_sendapp.sh */; };
+		AAEAB9F92F843167001954A5 /* widget_theme_ios7_sheet.lua in Resources */ = {isa = PBXBuildFile; fileRef = F818407117E3C221003072C4 /* widget_theme_ios7_sheet.lua */; };
+		AAEAB9FA2F843167001954A5 /* _coronatest.jar in Resources */ = {isa = PBXBuildFile; fileRef = C2AEAC1418E23B34004F30FE /* _coronatest.jar */; };
+		AAEAB9FB2F843167001954A5 /* CoronaResources.bundle in Resources */ = {isa = PBXBuildFile; fileRef = A48B827D16D59A4000CA01A1 /* CoronaResources.bundle */; };
+		AAEAB9FC2F843167001954A5 /* OSXAppPackageSheet.xib in Resources */ = {isa = PBXBuildFile; fileRef = C2ADB4591B6C1C31008C9BF2 /* OSXAppPackageSheet.xib */; };
+		AAEAB9FD2F843167001954A5 /* widget_theme_android_holo_light.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DBF1954EDA300D6555E /* widget_theme_android_holo_light.png */; };
+		AAEAB9FE2F843167001954A5 /* widget_theme_ios.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756CF18CE49CF0018900A /* widget_theme_ios.png */; };
+		AAEAB9FF2F843167001954A5 /* codesign-framework.sh in Resources */ = {isa = PBXBuildFile; fileRef = A4DF58691BE44A3000B17862 /* codesign-framework.sh */; };
+		AAEABA002F843167001954A5 /* Corona3rdPartyLicenses.txt in Resources */ = {isa = PBXBuildFile; fileRef = 004A5F361368DB08003BD9DA /* Corona3rdPartyLicenses.txt */; };
+		AAEABA012F843167001954A5 /* widget_theme_ios_sheet.lua in Resources */ = {isa = PBXBuildFile; fileRef = C2C756C718CE49640018900A /* widget_theme_ios_sheet.lua */; };
+		AAEABA022F843167001954A5 /* composer_scene.lua in Resources */ = {isa = PBXBuildFile; fileRef = C24FA4FD18D14E80002039FB /* composer_scene.lua */; };
+		AAEABA032F843167001954A5 /* ant-launcher.jar in Resources */ = {isa = PBXBuildFile; fileRef = 00B73C8B12B720C90057F594 /* ant-launcher.jar */; };
+		AAEABA042F843167001954A5 /* ValidateSettings.lua in Resources */ = {isa = PBXBuildFile; fileRef = C2AF1E4F1DA6D80B00907A65 /* ValidateSettings.lua */; };
+		AAEABA052F843167001954A5 /* widget_theme_ios7@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = F818407717E3C313003072C4 /* widget_theme_ios7@2x.png */; };
+		AAEABA062F843167001954A5 /* webtemplate.zip in Resources */ = {isa = PBXBuildFile; fileRef = F500FB3F1FED5CE20050B28B /* webtemplate.zip */; };
+		AAEABA072F843167001954A5 /* ant.jar in Resources */ = {isa = PBXBuildFile; fileRef = 00B73C8C12B720C90057F594 /* ant.jar */; };
+		AAEABA082F843167001954A5 /* ListKeyStore.jar in Resources */ = {isa = PBXBuildFile; fileRef = 00B73C8D12B720C90057F594 /* ListKeyStore.jar */; };
+		AAEABA092F843167001954A5 /* AntInvoke.jar in Resources */ = {isa = PBXBuildFile; fileRef = 00B73C8E12B720C90057F594 /* AntInvoke.jar */; };
+		AAEABA0A2F843167001954A5 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 089C165CFE840E0CC02AAC07 /* InfoPlist.strings */; };
+		AAEABA0B2F843167001954A5 /* widget_theme_android_holo_light.lua in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DAD1954EC6900D6555E /* widget_theme_android_holo_light.lua */; };
+		AAEABA0C2F843167001954A5 /* widget_theme_android_sheet.lua in Resources */ = {isa = PBXBuildFile; fileRef = C2C756C518CE49640018900A /* widget_theme_android_sheet.lua */; };
+		AAEABA0D2F843167001954A5 /* widget_theme_pickerWheel_mask.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756D218CE49CF0018900A /* widget_theme_pickerWheel_mask.png */; };
+		AAEABA0E2F843167001954A5 /* OSXCreateDMGSheet.xib in Resources */ = {isa = PBXBuildFile; fileRef = C281651F1B9AAC3500F16B5A /* OSXCreateDMGSheet.xib */; };
+		AAEABA0F2F843167001954A5 /* CoronaResources-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C26149EA18DA10E300F34F71 /* CoronaResources-Info.plist */; };
+		AAEABA102F843167001954A5 /* tvOS-SDKs.json in Resources */ = {isa = PBXBuildFile; fileRef = A40A90711BD9A06C001D2038 /* tvOS-SDKs.json */; };
+		AAEABA112F843167001954A5 /* widget_theme_android@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756CE18CE49CF0018900A /* widget_theme_android@2x.png */; };
+		AAEABA122F843167001954A5 /* OSXApp.xcent in Resources */ = {isa = PBXBuildFile; fileRef = C2B170E11B702C2300349EC6 /* OSXApp.xcent */; };
+		AAEABA132F843167001954A5 /* CoronaSimulator.icns in Resources */ = {isa = PBXBuildFile; fileRef = 00B73C8512B720C90057F594 /* CoronaSimulator.icns */; };
+		AAEABA142F843167001954A5 /* valid_config_lua.lua in Resources */ = {isa = PBXBuildFile; fileRef = C2AF1E541DA6F0ED00907A65 /* valid_config_lua.lua */; };
+		AAEABA152F843167001954A5 /* RememberPreferenceCheckbox.xib in Resources */ = {isa = PBXBuildFile; fileRef = 00B73C8812B720C90057F594 /* RememberPreferenceCheckbox.xib */; };
+		AAEABA162F843167001954A5 /* widget_theme_android_holo_dark@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DBD1954EDA300D6555E /* widget_theme_android_holo_dark@2x.png */; };
+		AAEABA172F843167001954A5 /* widget_theme_ios7.png in Resources */ = {isa = PBXBuildFile; fileRef = F818407517E3C28E003072C4 /* widget_theme_ios7.png */; };
+		AAEABA182F843167001954A5 /* widget_theme_android_holo_light@4x.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DC11954EDA300D6555E /* widget_theme_android_holo_light@4x.png */; };
+		AAEABA192F843167001954A5 /* debug.keystore in Resources */ = {isa = PBXBuildFile; fileRef = 00B73C8F12B720C90057F594 /* debug.keystore */; };
+		AAEABA1A2F843167001954A5 /* ios_syslog.sh in Resources */ = {isa = PBXBuildFile; fileRef = C21D9DC71BF6992D0042C5A9 /* ios_syslog.sh */; };
+		AAEABA1B2F843167001954A5 /* CoronaPListSupport.lua in Resources */ = {isa = PBXBuildFile; fileRef = C200AAE919626D86005828AA /* CoronaPListSupport.lua */; };
+		AAEABA1C2F843167001954A5 /* zipalign in Resources */ = {isa = PBXBuildFile; fileRef = 00B73C9012B720C90057F594 /* zipalign */; };
+		AAEABA1D2F843167001954A5 /* TVOSAppPackageSheet.xib in Resources */ = {isa = PBXBuildFile; fileRef = A40A906E1BD99B23001D2038 /* TVOSAppPackageSheet.xib */; };
+		AAEABA1E2F843167001954A5 /* build.properties in Resources */ = {isa = PBXBuildFile; fileRef = 00B73C9312B720C90057F594 /* build.properties */; };
+		AAEABA1F2F843167001954A5 /* xcodesim_syslog.sh in Resources */ = {isa = PBXBuildFile; fileRef = C220A3B31BFBED7F00161EC8 /* xcodesim_syslog.sh */; };
+		AAEABA202F843167001954A5 /* build.xml in Resources */ = {isa = PBXBuildFile; fileRef = 00B73C9412B720C90057F594 /* build.xml */; };
+		AAEABA212F843167001954A5 /* CustomDevice.xib in Resources */ = {isa = PBXBuildFile; fileRef = C2427BFB1919481B0011CE7A /* CustomDevice.xib */; };
+		AAEABA222F843167001954A5 /* TVOSAppBuild.xib in Resources */ = {isa = PBXBuildFile; fileRef = A40A90611BD99B0D001D2038 /* TVOSAppBuild.xib */; };
+		AAEABA232F843167001954A5 /* MainMenu.nib in Resources */ = {isa = PBXBuildFile; fileRef = 00B73DF312B726350057F594 /* MainMenu.nib */; };
+		AAEABA252F843167001954A5 /* AndroidKeyAliasPassword.xib in Resources */ = {isa = PBXBuildFile; fileRef = 00B73DFA12B727240057F594 /* AndroidKeyAliasPassword.xib */; };
+		AAEABA262F843167001954A5 /* widget_theme_ios7.lua in Resources */ = {isa = PBXBuildFile; fileRef = F818407217E3C221003072C4 /* widget_theme_ios7.lua */; };
+		AAEABA272F843167001954A5 /* AndroidKeyStorePassword.xib in Resources */ = {isa = PBXBuildFile; fileRef = 00B73DFC12B727240057F594 /* AndroidKeyStorePassword.xib */; };
+		AAEABA282F843167001954A5 /* BuildProgress.xib in Resources */ = {isa = PBXBuildFile; fileRef = 00B73E0012B727240057F594 /* BuildProgress.xib */; };
+		AAEABA292F843167001954A5 /* iostemplate in Resources */ = {isa = PBXBuildFile; fileRef = F57469D6240291FA00CA5949 /* iostemplate */; };
+		AAEABA2A2F843167001954A5 /* License.xib in Resources */ = {isa = PBXBuildFile; fileRef = 00B73E0612B727240057F594 /* License.xib */; };
+		AAEABA2B2F843167001954A5 /* Login.xib in Resources */ = {isa = PBXBuildFile; fileRef = 00B73E0A12B727240057F594 /* Login.xib */; };
+		AAEABA2C2F843167001954A5 /* Password.xib in Resources */ = {isa = PBXBuildFile; fileRef = 00B73E1012B727240057F594 /* Password.xib */; };
+		AAEABA2D2F843167001954A5 /* Preferences.xib in Resources */ = {isa = PBXBuildFile; fileRef = 00B73E1212B727240057F594 /* Preferences.xib */; };
+		AAEABA2E2F843167001954A5 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 00E14F6313428CBF0089C390 /* Localizable.strings */; };
+		AAEABA2F2F843167001954A5 /* linuxtemplate_x64.tgz in Resources */ = {isa = PBXBuildFile; fileRef = F545474A21178F7400D5EDB7 /* linuxtemplate_x64.tgz */; };
+		AAEABA302F843167001954A5 /* widget_theme_ios@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756D018CE49CF0018900A /* widget_theme_ios@2x.png */; };
+		AAEABA312F843167001954A5 /* widget_theme_onOff_mask.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756D118CE49CF0018900A /* widget_theme_onOff_mask.png */; };
+		AAEABA322F843167001954A5 /* android_syslog.sh in Resources */ = {isa = PBXBuildFile; fileRef = C21D9DBC1BF67C300042C5A9 /* android_syslog.sh */; };
+		AAEABA332F843167001954A5 /* widget_theme_onOff_mask_android_holo.png in Resources */ = {isa = PBXBuildFile; fileRef = C25CDF53195B5CD400CE2321 /* widget_theme_onOff_mask_android_holo.png */; };
+		AAEABA342F843167001954A5 /* widget_theme_android_holo_dark@4x.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DBE1954EDA300D6555E /* widget_theme_android_holo_dark@4x.png */; };
+		AAEABA352F843167001954A5 /* LinuxAppBuild.xib in Resources */ = {isa = PBXBuildFile; fileRef = 1F34F53E21116445006EE117 /* LinuxAppBuild.xib */; };
+		AAEABA362F843167001954A5 /* widget_theme_ios.lua in Resources */ = {isa = PBXBuildFile; fileRef = C2C756C818CE49640018900A /* widget_theme_ios.lua */; };
+		AAEABA372F843167001954A5 /* NewProject.xib in Resources */ = {isa = PBXBuildFile; fileRef = A4D24B20143FC36500E583D1 /* NewProject.xib */; };
+		AAEABA382F843167001954A5 /* widget_theme_android_holo_light_sheet.lua in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DAA1954EC6900D6555E /* widget_theme_android_holo_light_sheet.lua */; };
+		AAEABA392F843167001954A5 /* OSXAppBuild.xib in Resources */ = {isa = PBXBuildFile; fileRef = A4B00FA5145656A9008FB6E6 /* OSXAppBuild.xib */; };
+		AAEABA3A2F843167001954A5 /* widget_theme_ios7@4x.png in Resources */ = {isa = PBXBuildFile; fileRef = C2A6E5411AB0C6BC00509FB2 /* widget_theme_ios7@4x.png */; };
+		AAEABA3B2F843167001954A5 /* widget_theme_android_holo_dark.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DBC1954EDA300D6555E /* widget_theme_android_holo_dark.png */; };
+		AAEABA3C2F843167001954A5 /* AppBuildProgressBanner.xib in Resources */ = {isa = PBXBuildFile; fileRef = A4B00FB514685113008FB6E6 /* AppBuildProgressBanner.xib */; };
+		AAEABA3D2F843167001954A5 /* widget_theme_android_holo_dark.lua in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DA91954EC6900D6555E /* widget_theme_android_holo_dark.lua */; };
+		AAEABA3E2F843167001954A5 /* iOS-SDKs.json in Resources */ = {isa = PBXBuildFile; fileRef = C2DC53BE1ADF15540077A44A /* iOS-SDKs.json */; };
+		AAEABA3F2F843167001954A5 /* IOSAppBuild.xib in Resources */ = {isa = PBXBuildFile; fileRef = A4B00FC0146B408A008FB6E6 /* IOSAppBuild.xib */; };
+		AAEABA402F843167001954A5 /* valid_build_settings.lua in Resources */ = {isa = PBXBuildFile; fileRef = C2AF1E531DA6F0ED00907A65 /* valid_build_settings.lua */; };
+		AAEABA412F843167001954A5 /* Credits.rtfd in Resources */ = {isa = PBXBuildFile; fileRef = C25E494D1A772743009551DB /* Credits.rtfd */; };
+		AAEABA422F843167001954A5 /* AndroidAppBuild.xib in Resources */ = {isa = PBXBuildFile; fileRef = A4F36550146C44030019808D /* AndroidAppBuild.xib */; };
+		AAEABA432F843167001954A5 /* re.lua in Resources */ = {isa = PBXBuildFile; fileRef = C26D8DA3195104D7008DE65C /* re.lua */; };
+		AAEABA442F843167001954A5 /* widget_theme_android.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756CD18CE49CF0018900A /* widget_theme_android.png */; };
+		AAEABA452F843167001954A5 /* WebAppBuild.xib in Resources */ = {isa = PBXBuildFile; fileRef = A425455918DBA04700EE06A8 /* WebAppBuild.xib */; };
+		AAEABA462F843167001954A5 /* widget_theme_android_holo_light@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DC01954EDA300D6555E /* widget_theme_android_holo_light@2x.png */; };
+		AAEABA472F843167001954A5 /* widget_theme_android.lua in Resources */ = {isa = PBXBuildFile; fileRef = C2C756C618CE49640018900A /* widget_theme_android.lua */; };
+		AAEABA482F843167001954A5 /* widget_theme_android_holo_dark_sheet.lua in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DA61954EC6900D6555E /* widget_theme_android_holo_dark_sheet.lua */; };
+		AAEABA492F843167001954A5 /* AntLiveManifest.jar in Resources */ = {isa = PBXBuildFile; fileRef = F5FED7061DF8DFE2001CA415 /* AntLiveManifest.jar */; };
+		AAEABA4C2F843167001954A5 /* IOSAppBuildController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4B00FBE146B3CC1008FB6E6 /* IOSAppBuildController.mm */; };
+		AAEABA4D2F843167001954A5 /* AndroidAppBuildController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4F36554146C44200019808D /* AndroidAppBuildController.mm */; };
+		AAEABA4E2F843167001954A5 /* AndroidValidation.lua in Sources */ = {isa = PBXBuildFile; fileRef = 008955B3133F0EA600699C04 /* AndroidValidation.lua */; };
+		AAEABA4F2F843167001954A5 /* AppBuildController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4B00FA014565609008FB6E6 /* AppBuildController.mm */; };
+		AAEABA502F843167001954A5 /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CDC12B720C90057F594 /* AppDelegate.mm */; };
+		AAEABA512F843167001954A5 /* AppleSigningIdentityController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4B00FA914576402008FB6E6 /* AppleSigningIdentityController.mm */; };
+		AAEABA522F843167001954A5 /* BuildSessionState.mm in Sources */ = {isa = PBXBuildFile; fileRef = E23CD30C147C725200BC9038 /* BuildSessionState.mm */; };
+		AAEABA532F843167001954A5 /* Rtt_LinuxAppPackager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1F34F53321115FB1006EE117 /* Rtt_LinuxAppPackager.cpp */; };
+		AAEABA542F843167001954A5 /* ButtonImageView.m in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D1312B720C90057F594 /* ButtonImageView.m */; };
+		AAEABA552F843167001954A5 /* ButtonTextField.m in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0F12B720C90057F594 /* ButtonTextField.m */; };
+		AAEABA562F843167001954A5 /* CoreAnimationUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 00F641BE146C65DD0021E5D4 /* CoreAnimationUtilities.m */; };
+		AAEABA572F843167001954A5 /* CoronaViewRuntimeDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2F8376C1AC205FA00D33D6E /* CoronaViewRuntimeDelegate.mm */; };
+		AAEABA582F843167001954A5 /* Rtt_AppleInputHIDDeviceListener.mm in Sources */ = {isa = PBXBuildFile; fileRef = F57D176A1BE25C7C00AABAC1 /* Rtt_AppleInputHIDDeviceListener.mm */; };
+		AAEABA592F843167001954A5 /* DimView.m in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D1B12B720C90057F594 /* DimView.m */; };
+		AAEABA5A2F843167001954A5 /* FileWatch.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D2712B720CA0057F594 /* FileWatch.mm */; };
+		AAEABA5B2F843167001954A5 /* FontHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D1912B720C90057F594 /* FontHelper.m */; };
+		AAEABA5C2F843167001954A5 /* FoundationUtilities.m in Sources */ = {isa = PBXBuildFile; fileRef = 0054E59B147750990051B2CE /* FoundationUtilities.m */; };
+		AAEABA5D2F843167001954A5 /* HomeScreenRuntimeDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4AB4480143E5AD300607F77 /* HomeScreenRuntimeDelegate.mm */; };
+		AAEABA5E2F843167001954A5 /* IntegerValidationFormatter.m in Sources */ = {isa = PBXBuildFile; fileRef = 00F730591300CDD70089B661 /* IntegerValidationFormatter.m */; };
+		AAEABA5F2F843167001954A5 /* Rtt_AppleInputDeviceManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = F57D17661BE25B1C00AABAC1 /* Rtt_AppleInputDeviceManager.mm */; };
+		AAEABA602F843167001954A5 /* Rtt_MacDialogController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F5B4D0E9246979CC00D32035 /* Rtt_MacDialogController.mm */; };
+		AAEABA612F843167001954A5 /* ListKeyStore.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE8DE12B7404400D9B6A4 /* ListKeyStore.cpp */; };
+		AAEABA622F843167001954A5 /* NSAlert-OAExtensions.m in Sources */ = {isa = PBXBuildFile; fileRef = 00602C3B153F9EA400A82C43 /* NSAlert-OAExtensions.m */; };
+		AAEABA632F843167001954A5 /* NSWindow+ForFirstResponderMenu.m in Sources */ = {isa = PBXBuildFile; fileRef = 0090CFB915E2F451000A0144 /* NSWindow+ForFirstResponderMenu.m */; };
+		AAEABA642F843167001954A5 /* NewProjectController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4D24B23143FD1E200E583D1 /* NewProjectController.mm */; };
+		AAEABA652F843167001954A5 /* OSXAppBuildController.mm in Sources */ = {isa = PBXBuildFile; fileRef = C21732B01B1EAE3B00F79CB8 /* OSXAppBuildController.mm */; };
+		AAEABA662F843167001954A5 /* ResponderPassthroughTextField.m in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D1112B720C90057F594 /* ResponderPassthroughTextField.m */; };
+		AAEABA672F843167001954A5 /* NSString+Extensions.m in Sources */ = {isa = PBXBuildFile; fileRef = C2F7D7B01C57281D0083EC74 /* NSString+Extensions.m */; };
+		AAEABA682F843167001954A5 /* Rtt_AndroidAppPackager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 00B73C9112B720C90057F594 /* Rtt_AndroidAppPackager.cpp */; };
+		AAEABA692F843167001954A5 /* Rtt_AppleKeyServices.mm in Sources */ = {isa = PBXBuildFile; fileRef = DB56B4C9284C2E7D00EC8B14 /* Rtt_AppleKeyServices.mm */; };
+		AAEABA6A2F843167001954A5 /* Rtt_AndroidSupportTools.c in Sources */ = {isa = PBXBuildFile; fileRef = 0089560F13404E9600699C04 /* Rtt_AndroidSupportTools.c */; };
+		AAEABA6B2F843167001954A5 /* Rtt_DeviceBuildData.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A498B85416DD64580091A148 /* Rtt_DeviceBuildData.cpp */; };
+		AAEABA6C2F843167001954A5 /* Rtt_IOSAppPackager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CE912B720C90057F594 /* Rtt_IOSAppPackager.mm */; };
+		AAEABA6D2F843167001954A5 /* TVOSAppBuildController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A40A906D1BD99B23001D2038 /* TVOSAppBuildController.mm */; };
+		AAEABA6E2F843167001954A5 /* Rtt_KeyName.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4C111FC91B2A41B200DF8BE8 /* Rtt_KeyName.cpp */; };
+		AAEABA6F2F843167001954A5 /* Rtt_LuaLibSimulator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A41A186B143A6F7E00F1BF0D /* Rtt_LuaLibSimulator.cpp */; };
+		AAEABA702F843167001954A5 /* Rtt_MacActivityIndicator.mm in Sources */ = {isa = PBXBuildFile; fileRef = 002D1B71145BB81B002B69B6 /* Rtt_MacActivityIndicator.mm */; };
+		AAEABA712F843167001954A5 /* Rtt_MacConsolePlatform.mm in Sources */ = {isa = PBXBuildFile; fileRef = C287481A19F6E01F002D5B27 /* Rtt_MacConsolePlatform.mm */; };
+		AAEABA722F843167001954A5 /* Rtt_MacDisplayObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CF112B720C90057F594 /* Rtt_MacDisplayObject.mm */; };
+		AAEABA732F843167001954A5 /* Rtt_MacExitCallback.mm in Sources */ = {isa = PBXBuildFile; fileRef = 002D72E112FB2C30006C7E9B /* Rtt_MacExitCallback.mm */; };
+		AAEABA742F843167001954A5 /* Rtt_MacFBConnect.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CF412B720C90057F594 /* Rtt_MacFBConnect.mm */; };
+		AAEABA752F843167001954A5 /* Rtt_MacImageProvider.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CF612B720C90057F594 /* Rtt_MacImageProvider.mm */; };
+		AAEABA762F843167001954A5 /* Rtt_MacMapViewObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = A476E628131DB173009A59F2 /* Rtt_MacMapViewObject.mm */; };
+		AAEABA772F843167001954A5 /* Rtt_MacRemotePlayerHost.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CFA12B720C90057F594 /* Rtt_MacRemotePlayerHost.mm */; };
+		AAEABA782F843167001954A5 /* Rtt_MacServer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CFC12B720C90057F594 /* Rtt_MacServer.mm */; };
+		AAEABA792F843167001954A5 /* Rtt_MacSimulator.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CFE12B720C90057F594 /* Rtt_MacSimulator.mm */; };
+		AAEABA7A2F843167001954A5 /* Rtt_MacSimulatorServices.mm in Sources */ = {isa = PBXBuildFile; fileRef = A42E68AA143AB0DE00693E3A /* Rtt_MacSimulatorServices.mm */; };
+		AAEABA7B2F843167001954A5 /* Rtt_MacSurfaceVideoRecorder.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0012B720C90057F594 /* Rtt_MacSurfaceVideoRecorder.mm */; };
+		AAEABA7C2F843167001954A5 /* LinuxAppBuildController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1F34F5412111661E006EE117 /* LinuxAppBuildController.mm */; };
+		AAEABA7D2F843167001954A5 /* Rtt_MacTextBoxObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0212B720C90057F594 /* Rtt_MacTextBoxObject.mm */; };
+		AAEABA7E2F843167001954A5 /* Rtt_MacTextFieldObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0412B720C90057F594 /* Rtt_MacTextFieldObject.mm */; };
+		AAEABA7F2F843167001954A5 /* Rtt_MacVideoObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4BEDC9A14BE81320028BE25 /* Rtt_MacVideoObject.mm */; };
+		AAEABA802F843167001954A5 /* Rtt_MacVideoPlayer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0812B720C90057F594 /* Rtt_MacVideoPlayer.mm */; };
+		AAEABA812F843167001954A5 /* Rtt_MacVideoProvider.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0797EB5C181F0CC400FA57B5 /* Rtt_MacVideoProvider.mm */; };
+		AAEABA822F843167001954A5 /* Rtt_MacWebPopup.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0A12B720C90057F594 /* Rtt_MacWebPopup.mm */; };
+		AAEABA832F843167001954A5 /* Rtt_MacWebViewObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4BED90C14B65EAD0028BE25 /* Rtt_MacWebViewObject.mm */; };
+		AAEABA842F843167001954A5 /* Rtt_OSXAppPackager.mm in Sources */ = {isa = PBXBuildFile; fileRef = C21733761B20F21A00F79CB8 /* Rtt_OSXAppPackager.mm */; };
+		AAEABA852F843167001954A5 /* Rtt_PlatformAppPackager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE8EA12B7404400D9B6A4 /* Rtt_PlatformAppPackager.cpp */; };
+		AAEABA862F843167001954A5 /* Rtt_PlatformDictionaryWrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CEA1012B7467E00D9B6A4 /* Rtt_PlatformDictionaryWrapper.cpp */; };
+		AAEABA872F843167001954A5 /* Rtt_PlatformObjectWrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CEA1512B7469B00D9B6A4 /* Rtt_PlatformObjectWrapper.cpp */; };
+		AAEABA882F843167001954A5 /* Rtt_PlatformPlayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE8F212B7404400D9B6A4 /* Rtt_PlatformPlayer.cpp */; };
+		AAEABA892F843167001954A5 /* Rtt_PlatformSimulator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE8F412B7404400D9B6A4 /* Rtt_PlatformSimulator.cpp */; };
+		AAEABA8A2F843167001954A5 /* Rtt_SimulatorAnalytics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A4592FA81433CF30008B4E6D /* Rtt_SimulatorAnalytics.cpp */; };
+		AAEABA8B2F843167001954A5 /* Rtt_TargetAndroidAppStore.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0718C13716E94A9D00FD5F45 /* Rtt_TargetAndroidAppStore.cpp */; };
+		AAEABA8C2F843167001954A5 /* Rtt_WebAppPackager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A45EBE1218E6465A0010C678 /* Rtt_WebAppPackager.cpp */; };
+		AAEABA8D2F843167001954A5 /* Rtt_AppleInputMFiDeviceListener.mm in Sources */ = {isa = PBXBuildFile; fileRef = F57D17741BE2713B00AABAC1 /* Rtt_AppleInputMFiDeviceListener.mm */; };
+		AAEABA8E2F843167001954A5 /* SDKList.m in Sources */ = {isa = PBXBuildFile; fileRef = C20F8AD71AD78CAB0034BD21 /* SDKList.m */; };
+		AAEABA8F2F843167001954A5 /* SPILDTopLayerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 002D1B28145BB621002B69B6 /* SPILDTopLayerView.m */; };
+		AAEABA902F843167001954A5 /* Rtt_AppleInputDevice.mm in Sources */ = {isa = PBXBuildFile; fileRef = F57D176F1BE25E1200AABAC1 /* Rtt_AppleInputDevice.mm */; };
+		AAEABA912F843167001954A5 /* SampleCodeLocator.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4AB4470143BE11200607F77 /* SampleCodeLocator.mm */; };
+		AAEABA922F843167001954A5 /* SimulatorDeviceWindow.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2942C1B1A0169B600372D6B /* SimulatorDeviceWindow.mm */; };
+		AAEABA932F843167001954A5 /* SkinView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CE012B720C90057F594 /* SkinView.mm */; };
+		AAEABA942F843167001954A5 /* SkinlessSimulatorWindow.mm in Sources */ = {isa = PBXBuildFile; fileRef = 004ADB3A1468C54300D732FC /* SkinlessSimulatorWindow.mm */; };
+		AAEABA952F843167001954A5 /* SkinnableWindow.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CE312B720C90057F594 /* SkinnableWindow.mm */; };
+		AAEABA962F843167001954A5 /* TextEditorSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D2312B720CA0057F594 /* TextEditorSupport.m */; };
+		AAEABA972F843167001954A5 /* AnalyticsProvider.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2038B0F1DDCF1970071594F /* AnalyticsProvider.mm */; };
+		AAEABA982F843167001954A5 /* AppleAppBuildController.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2678C1E1B85753800864110 /* AppleAppBuildController.mm */; };
+		AAEABA992F843167001954A5 /* ValidationSupportMacUI.m in Sources */ = {isa = PBXBuildFile; fileRef = 00C8225D13452C80005D1EEB /* ValidationSupportMacUI.m */; };
+		AAEABA9A2F843167001954A5 /* Rtt_TVOSAppPackager.mm in Sources */ = {isa = PBXBuildFile; fileRef = A40A90761BD9A4B1001D2038 /* Rtt_TVOSAppPackager.mm */; };
+		AAEABA9B2F843167001954A5 /* ValidationToolOutputViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 0026295912F88DB4009CB2A1 /* ValidationToolOutputViewController.m */; };
+		AAEABA9C2F843167001954A5 /* VersionLabel.m in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D1712B720C90057F594 /* VersionLabel.m */; };
+		AAEABA9D2F843167001954A5 /* WebAppBuildController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A425454E18DB9EF400EE06A8 /* WebAppBuildController.mm */; };
+		AAEABA9E2F843167001954A5 /* XcodeToolHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 0028FC3F14FEC5E400B40EC3 /* XcodeToolHelper.m */; };
+		AAEABA9F2F843167001954A5 /* YRKSpinningProgressIndicatorLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 002D1B2A145BB621002B69B6 /* YRKSpinningProgressIndicatorLayer.m */; };
+		AAEABAA02F843167001954A5 /* hmac_sha2.c in Sources */ = {isa = PBXBuildFile; fileRef = 000CE90612B7409400D9B6A4 /* hmac_sha2.c */; };
+		AAEABAA12F843167001954A5 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CD912B720C90057F594 /* main.m */; };
+		AAEABAA22F843167001954A5 /* sha2.c in Sources */ = {isa = PBXBuildFile; fileRef = 000CE90812B7409400D9B6A4 /* sha2.c */; };
+		AAEABAA42F843167001954A5 /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C59B251E281195001DF51E /* CoreMedia.framework */; };
+		AAEABAA52F843167001954A5 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C59B211E281181001DF51E /* AVFoundation.framework */; };
+		AAEABAA62F843167001954A5 /* AVKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C59B231E28118C001DF51E /* AVKit.framework */; };
+		AAEABAA72F843167001954A5 /* libluasocket.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C242172A1CCAD44800D8E4BE /* libluasocket.a */; };
+		AAEABAA82F843167001954A5 /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F57D17781BE2750800AABAC1 /* GameController.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
+		AAEABAA92F843167001954A5 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2F1CDA91B4F67D30006DC94 /* CoreLocation.framework */; };
+		AAEABAAB2F843167001954A5 /* libplugins.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A44308DA164C74BE00B9117B /* libplugins.a */; };
+		AAEABAAC2F843167001954A5 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C287481C19F6EED0002D5B27 /* Cocoa.framework */; };
+		AAEABAAD2F843167001954A5 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 005DB22C1410606400B1B0DD /* Quartz.framework */; };
+		AAEABAAE2F843167001954A5 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7374C12B706E00057F594 /* AudioToolbox.framework */; };
+		AAEABAAF2F843167001954A5 /* ApplicationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7374A12B706E00057F594 /* ApplicationServices.framework */; };
+		AAEABAB02F843167001954A5 /* libluafilesystem.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B5FEFA1B33705300DD49E6 /* libluafilesystem.a */; };
+		AAEABAB12F843167001954A5 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7374E12B706E00057F594 /* IOKit.framework */; };
+		AAEABAB22F843167001954A5 /* libsqlite3.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7376412B706E00057F594 /* libsqlite3.dylib */; };
+		AAEABAB32F843167001954A5 /* OpenAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7375212B706E00057F594 /* OpenAL.framework */; };
+		AAEABAB52F843167001954A5 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7375812B706E00057F594 /* QuartzCore.framework */; };
+		AAEABAB62F843167001954A5 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7375A12B706E00057F594 /* Security.framework */; };
+		AAEABAB72F843167001954A5 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7375C12B706E00057F594 /* SystemConfiguration.framework */; };
+		AAEABAB82F843167001954A5 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7375E12B706E00057F594 /* WebKit.framework */; };
+		AAEABAB92F843167001954A5 /* ALmixer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B737BA12B707B40057F594 /* ALmixer.framework */; };
+		AAEABABA2F843167001954A5 /* ForceFeedback.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F54D8E291B4B29120063F98B /* ForceFeedback.framework */; };
+		AAEABABE2F843167001954A5 /* ALmixer.framework in Copy Frameworks */ = {isa = PBXBuildFile; fileRef = 00B737BA12B707B40057F594 /* ALmixer.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AAEABAC02F843167001954A5 /* licensing.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = A4F12C2316D43662002BCCFB /* licensing.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AAEABAC12F843167001954A5 /* gameNetwork.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = A41AC1B516A75A7600AD331A /* gameNetwork.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AAEABAC22F843167001954A5 /* ads.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = A491860D1641DCFD00A39286 /* ads.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AAEABAC32F843167001954A5 /* analytics.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = A491867C1641F25900A39286 /* analytics.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AAEABAEB2F84316B001954A5 /* CoronaLuaObjC.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4728FFD1AE827C400BC088D /* CoronaLuaObjC.mm */; };
+		AAEABAEC2F84316B001954A5 /* CoronaViewPrivate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE90E12B7410200D9B6A4 /* CoronaViewPrivate.mm */; };
+		AAEABAED2F84316B001954A5 /* CoronaWindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4AB4479143E385700607F77 /* CoronaWindowController.mm */; };
+		AAEABAEE2F84316B001954A5 /* GLView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CDE12B720C90057F594 /* GLView.mm */; };
+		AAEABAEF2F84316B001954A5 /* Rtt_AppleAudioPlayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91212B7413200D9B6A4 /* Rtt_AppleAudioPlayer.cpp */; };
+		AAEABAF02F84316B001954A5 /* Rtt_AppleAudioRecorder.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91412B7413200D9B6A4 /* Rtt_AppleAudioRecorder.mm */; };
+		AAEABAF12F84316B001954A5 /* Rtt_AppleBitmap.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91712B7413200D9B6A4 /* Rtt_AppleBitmap.mm */; };
+		AAEABAF22F84316B001954A5 /* Rtt_AppleCallback.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91912B7413200D9B6A4 /* Rtt_AppleCallback.mm */; };
+		AAEABAF32F84316B001954A5 /* Rtt_AppleCrypto.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91C12B7413200D9B6A4 /* Rtt_AppleCrypto.cpp */; };
+		AAEABAF42F84316B001954A5 /* Rtt_AppleData.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91F12B7413200D9B6A4 /* Rtt_AppleData.mm */; };
+		AAEABAF52F84316B001954A5 /* Rtt_AppleDictionaryWrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE92112B7413200D9B6A4 /* Rtt_AppleDictionaryWrapper.mm */; };
+		AAEABAF62F84316B001954A5 /* Rtt_AppleEventSound.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE92212B7413200D9B6A4 /* Rtt_AppleEventSound.cpp */; };
+		AAEABAF72F84316B001954A5 /* Rtt_ApplePlatform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE92612B7413200D9B6A4 /* Rtt_ApplePlatform.mm */; };
+		AAEABAF82F84316B001954A5 /* Rtt_AppleReachability.mm in Sources */ = {isa = PBXBuildFile; fileRef = 006DC6DB13678536008DDB3D /* Rtt_AppleReachability.mm */; };
+		AAEABAF92F84316B001954A5 /* Rtt_AppleTextAlignment.mm in Sources */ = {isa = PBXBuildFile; fileRef = 078DA94A176FBE4900A5193E /* Rtt_AppleTextAlignment.mm */; };
+		AAEABAFA2F84316B001954A5 /* Rtt_AppleTextDelegateWrapperObjectHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 005C8DEC142D506F00F12B30 /* Rtt_AppleTextDelegateWrapperObjectHelper.m */; };
+		AAEABAFB2F84316B001954A5 /* Rtt_AppleTimer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE92812B7413200D9B6A4 /* Rtt_AppleTimer.mm */; };
+		AAEABAFC2F84316B001954A5 /* Rtt_FileSystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D3DA621B179D4F00137331 /* Rtt_FileSystem.cpp */; };
+		AAEABAFD2F84316B001954A5 /* Rtt_MacDevice.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CED12B720C90057F594 /* Rtt_MacDevice.mm */; };
+		AAEABAFE2F84316B001954A5 /* Rtt_MacDeviceIdentifier.c in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CEF12B720C90057F594 /* Rtt_MacDeviceIdentifier.c */; };
+		AAEABAFF2F84316B001954A5 /* Rtt_MacFont.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CF512B720C90057F594 /* Rtt_MacFont.mm */; };
+		AAEABB002F84316B001954A5 /* Rtt_MacPlatform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CF812B720C90057F594 /* Rtt_MacPlatform.mm */; };
+		AAEABB012F84316B001954A5 /* Rtt_MacViewCallback.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0799601417EBC78000A632B9 /* Rtt_MacViewCallback.mm */; };
+		AAEABB022F84316B001954A5 /* Rtt_MacViewSurface.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0612B720C90057F594 /* Rtt_MacViewSurface.mm */; };
+		AAEABB032F84316B001954A5 /* Rtt_AppleFont.mm in Sources */ = {isa = PBXBuildFile; fileRef = F54D1E111CA35968000B280E /* Rtt_AppleFont.mm */; };
+		AAEABB042F84316B001954A5 /* Rtt_NativeWindowMode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D3DA681B179DA000137331 /* Rtt_NativeWindowMode.cpp */; };
+		AAEABB052F84316B001954A5 /* Rtt_ProjectSettings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D3DA551B179C2400137331 /* Rtt_ProjectSettings.cpp */; };
+		AAEABB062F84316B001954A5 /* Rtt_ReadOnlyProjectSettings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D3DA571B179C2400137331 /* Rtt_ReadOnlyProjectSettings.cpp */; };
+		AAEABB082F84316B001954A5 /* libBox2D.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50B013EB17558BCA00B822B8 /* libBox2D.a */; };
+		AAEABB092F84316B001954A5 /* liblua.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B733FB12B6F6BC0057F594 /* liblua.a */; };
+		AAEABB0A2F84316B001954A5 /* liblpeg.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2A08C2A1950DF2B002B7532 /* liblpeg.a */; };
+		AAEABB0B2F84316B001954A5 /* librtt-simulator.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C229E2071B32221B00D87A7C /* librtt-simulator.a */; };
+		AAEABB0E2F84316B001954A5 /* CoronaLuaObjC.h in Headers */ = {isa = PBXBuildFile; fileRef = A4728FFC1AE827C400BC088D /* CoronaLuaObjC.h */; };
+		AAEABB0F2F84316B001954A5 /* Rtt_FileSystem.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D3DA631B179D4F00137331 /* Rtt_FileSystem.h */; };
+		AAEABB102F84316B001954A5 /* Rtt_NativeWindowMode.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D3DA691B179DA000137331 /* Rtt_NativeWindowMode.h */; };
+		AAEABB112F84316B001954A5 /* Rtt_ProjectSettings.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D3DA561B179C2400137331 /* Rtt_ProjectSettings.h */; };
+		AAEABB122F84316B001954A5 /* Rtt_ReadOnlyProjectSettings.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D3DA581B179C2400137331 /* Rtt_ReadOnlyProjectSettings.h */; };
+		AAEABB322F84316F001954A5 /* Rtt_AppleInAppStoreAppleTransactionObjectWrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0077B65B1463359A00EEDF75 /* Rtt_AppleInAppStoreAppleTransactionObjectWrapper.mm */; };
+		AAEABB332F84316F001954A5 /* Rtt_MacImageProvider.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CF612B720C90057F594 /* Rtt_MacImageProvider.mm */; };
+		AAEABB342F84316F001954A5 /* Rtt_MacMapViewObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = A476E628131DB173009A59F2 /* Rtt_MacMapViewObject.mm */; };
+		AAEABB352F84316F001954A5 /* CoronaLuaObjC.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4728FFD1AE827C400BC088D /* CoronaLuaObjC.mm */; };
+		AAEABB362F84316F001954A5 /* CoronaViewPrivate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE90E12B7410200D9B6A4 /* CoronaViewPrivate.mm */; };
+		AAEABB372F84316F001954A5 /* CoronaViewRuntimeDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = C2F8376C1AC205FA00D33D6E /* CoronaViewRuntimeDelegate.mm */; };
+		AAEABB382F84316F001954A5 /* CoronaWindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4AB4479143E385700607F77 /* CoronaWindowController.mm */; };
+		AAEABB392F84316F001954A5 /* GLView.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CDE12B720C90057F594 /* GLView.mm */; };
+		AAEABB3A2F84316F001954A5 /* Rtt_AppleAudioPlayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91212B7413200D9B6A4 /* Rtt_AppleAudioPlayer.cpp */; };
+		AAEABB3B2F84316F001954A5 /* Rtt_AppleInputDeviceManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = F57D17661BE25B1C00AABAC1 /* Rtt_AppleInputDeviceManager.mm */; };
+		AAEABB3C2F84316F001954A5 /* Rtt_AppleAudioRecorder.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91412B7413200D9B6A4 /* Rtt_AppleAudioRecorder.mm */; };
+		AAEABB3D2F84316F001954A5 /* Rtt_AppleBitmap.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91712B7413200D9B6A4 /* Rtt_AppleBitmap.mm */; };
+		AAEABB3E2F84316F001954A5 /* Rtt_AppleCallback.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91912B7413200D9B6A4 /* Rtt_AppleCallback.mm */; };
+		AAEABB3F2F84316F001954A5 /* Rtt_AppleCrypto.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91C12B7413200D9B6A4 /* Rtt_AppleCrypto.cpp */; };
+		AAEABB402F84316F001954A5 /* Rtt_AppleData.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE91F12B7413200D9B6A4 /* Rtt_AppleData.mm */; };
+		AAEABB412F84316F001954A5 /* Rtt_AppleDictionaryWrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE92112B7413200D9B6A4 /* Rtt_AppleDictionaryWrapper.mm */; };
+		AAEABB422F84316F001954A5 /* Rtt_AppleEventSound.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE92212B7413200D9B6A4 /* Rtt_AppleEventSound.cpp */; };
+		AAEABB432F84316F001954A5 /* Rtt_ApplePlatform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE92612B7413200D9B6A4 /* Rtt_ApplePlatform.mm */; };
+		AAEABB442F84316F001954A5 /* Rtt_AppleReachability.mm in Sources */ = {isa = PBXBuildFile; fileRef = 006DC6DB13678536008DDB3D /* Rtt_AppleReachability.mm */; };
+		AAEABB452F84316F001954A5 /* Rtt_AppleTextAlignment.mm in Sources */ = {isa = PBXBuildFile; fileRef = 078DA94A176FBE4900A5193E /* Rtt_AppleTextAlignment.mm */; };
+		AAEABB462F84316F001954A5 /* Rtt_AppleTextDelegateWrapperObjectHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = 005C8DEC142D506F00F12B30 /* Rtt_AppleTextDelegateWrapperObjectHelper.m */; };
+		AAEABB472F84316F001954A5 /* Rtt_AppleTimer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 000CE92812B7413200D9B6A4 /* Rtt_AppleTimer.mm */; };
+		AAEABB482F84316F001954A5 /* Rtt_FileSystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D3DA621B179D4F00137331 /* Rtt_FileSystem.cpp */; };
+		AAEABB492F84316F001954A5 /* Rtt_KeyName.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4C111FC91B2A41B200DF8BE8 /* Rtt_KeyName.cpp */; };
+		AAEABB4A2F84316F001954A5 /* Rtt_MacActivityIndicator.mm in Sources */ = {isa = PBXBuildFile; fileRef = 002D1B71145BB81B002B69B6 /* Rtt_MacActivityIndicator.mm */; };
+		AAEABB4B2F84316F001954A5 /* Rtt_AppleInputHIDDeviceListener.mm in Sources */ = {isa = PBXBuildFile; fileRef = F57D176A1BE25C7C00AABAC1 /* Rtt_AppleInputHIDDeviceListener.mm */; };
+		AAEABB4C2F84316F001954A5 /* Rtt_MacDevice.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CED12B720C90057F594 /* Rtt_MacDevice.mm */; };
+		AAEABB4D2F84316F001954A5 /* Rtt_AppleFont.mm in Sources */ = {isa = PBXBuildFile; fileRef = F54D1E111CA35968000B280E /* Rtt_AppleFont.mm */; };
+		AAEABB4E2F84316F001954A5 /* Rtt_MacDeviceIdentifier.c in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CEF12B720C90057F594 /* Rtt_MacDeviceIdentifier.c */; };
+		AAEABB4F2F84316F001954A5 /* Rtt_AppleKeyServices.mm in Sources */ = {isa = PBXBuildFile; fileRef = DB56B4C9284C2E7D00EC8B14 /* Rtt_AppleKeyServices.mm */; };
+		AAEABB502F84316F001954A5 /* Rtt_MacDisplayObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CF112B720C90057F594 /* Rtt_MacDisplayObject.mm */; };
+		AAEABB512F84316F001954A5 /* Rtt_MacExitCallback.mm in Sources */ = {isa = PBXBuildFile; fileRef = 002D72E112FB2C30006C7E9B /* Rtt_MacExitCallback.mm */; };
+		AAEABB522F84316F001954A5 /* Rtt_MacFont.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CF512B720C90057F594 /* Rtt_MacFont.mm */; };
+		AAEABB532F84316F001954A5 /* Rtt_MacPlatform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73CF812B720C90057F594 /* Rtt_MacPlatform.mm */; };
+		AAEABB542F84316F001954A5 /* Rtt_MacTextBoxObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0212B720C90057F594 /* Rtt_MacTextBoxObject.mm */; };
+		AAEABB552F84316F001954A5 /* Rtt_AppleInAppStore.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0077B6571463359A00EEDF75 /* Rtt_AppleInAppStore.mm */; };
+		AAEABB562F84316F001954A5 /* Rtt_MacTextFieldObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0412B720C90057F594 /* Rtt_MacTextFieldObject.mm */; };
+		AAEABB572F84316F001954A5 /* Rtt_MacVideoObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4BEDC9A14BE81320028BE25 /* Rtt_MacVideoObject.mm */; };
+		AAEABB582F84316F001954A5 /* Rtt_AppleInputMFiDeviceListener.mm in Sources */ = {isa = PBXBuildFile; fileRef = F57D17741BE2713B00AABAC1 /* Rtt_AppleInputMFiDeviceListener.mm */; };
+		AAEABB592F84316F001954A5 /* Rtt_MacVideoPlayer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0812B720C90057F594 /* Rtt_MacVideoPlayer.mm */; };
+		AAEABB5A2F84316F001954A5 /* Rtt_AppleInputDevice.mm in Sources */ = {isa = PBXBuildFile; fileRef = F57D176F1BE25E1200AABAC1 /* Rtt_AppleInputDevice.mm */; };
+		AAEABB5B2F84316F001954A5 /* Rtt_MacVideoProvider.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0797EB5C181F0CC400FA57B5 /* Rtt_MacVideoProvider.mm */; };
+		AAEABB5C2F84316F001954A5 /* Rtt_MacViewCallback.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0799601417EBC78000A632B9 /* Rtt_MacViewCallback.mm */; };
+		AAEABB5D2F84316F001954A5 /* Rtt_MacViewSurface.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0612B720C90057F594 /* Rtt_MacViewSurface.mm */; };
+		AAEABB5E2F84316F001954A5 /* Rtt_AppleInAppStoreApple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0077B6591463359A00EEDF75 /* Rtt_AppleInAppStoreApple.mm */; };
+		AAEABB5F2F84316F001954A5 /* Rtt_MacWebPopup.mm in Sources */ = {isa = PBXBuildFile; fileRef = 00B73D0A12B720C90057F594 /* Rtt_MacWebPopup.mm */; };
+		AAEABB602F84316F001954A5 /* Rtt_MacWebViewObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = A4BED90C14B65EAD0028BE25 /* Rtt_MacWebViewObject.mm */; };
+		AAEABB612F84316F001954A5 /* Rtt_NativeWindowMode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D3DA681B179DA000137331 /* Rtt_NativeWindowMode.cpp */; };
+		AAEABB622F84316F001954A5 /* Rtt_PlatformDictionaryWrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CEA1012B7467E00D9B6A4 /* Rtt_PlatformDictionaryWrapper.cpp */; };
+		AAEABB632F84316F001954A5 /* Rtt_PlatformExitCallback.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 002D74A912FB438A006C7E9B /* Rtt_PlatformExitCallback.cpp */; };
+		AAEABB642F84316F001954A5 /* Rtt_PlatformObjectWrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CEA1512B7469B00D9B6A4 /* Rtt_PlatformObjectWrapper.cpp */; };
+		AAEABB652F84316F001954A5 /* Rtt_PlatformVideoPlayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE74012B73EE300D9B6A4 /* Rtt_PlatformVideoPlayer.cpp */; };
+		AAEABB662F84316F001954A5 /* Rtt_PlatformVideoProvider.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0797EB55181F0C0300FA57B5 /* Rtt_PlatformVideoProvider.cpp */; };
+		AAEABB672F84316F001954A5 /* Rtt_PlatformWebPopup.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 000CE74212B73EE300D9B6A4 /* Rtt_PlatformWebPopup.cpp */; };
+		AAEABB682F84316F001954A5 /* Rtt_ProjectSettings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D3DA551B179C2400137331 /* Rtt_ProjectSettings.cpp */; };
+		AAEABB692F84316F001954A5 /* Rtt_ReadOnlyProjectSettings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C2D3DA571B179C2400137331 /* Rtt_ReadOnlyProjectSettings.cpp */; };
+		AAEABB6A2F84316F001954A5 /* SPILDTopLayerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 002D1B28145BB621002B69B6 /* SPILDTopLayerView.m */; };
+		AAEABB6B2F84316F001954A5 /* YRKSpinningProgressIndicatorLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 002D1B2A145BB621002B69B6 /* YRKSpinningProgressIndicatorLayer.m */; };
+		AAEABB6D2F84316F001954A5 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F5FED0962512248E00AE2911 /* StoreKit.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
+		AAEABB6E2F84316F001954A5 /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C59B251E281195001DF51E /* CoreMedia.framework */; };
+		AAEABB6F2F84316F001954A5 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C59B211E281181001DF51E /* AVFoundation.framework */; };
+		AAEABB702F84316F001954A5 /* AVKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2C59B231E28118C001DF51E /* AVKit.framework */; };
+		AAEABB712F84316F001954A5 /* libluasocket.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C242172A1CCAD44800D8E4BE /* libluasocket.a */; };
+		AAEABB722F84316F001954A5 /* libplugins.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A44308DA164C74BE00B9117B /* libplugins.a */; };
+		AAEABB732F84316F001954A5 /* libluafilesystem.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2B5FEFA1B33705300DD49E6 /* libluafilesystem.a */; };
+		AAEABB742F84316F001954A5 /* liblpeg.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C2A08C2A1950DF2B002B7532 /* liblpeg.a */; };
+		AAEABB762F84316F001954A5 /* libsqlite3.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7376412B706E00057F594 /* libsqlite3.dylib */; };
+		AAEABB772F84316F001954A5 /* libBox2D.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50B013EB17558BCA00B822B8 /* libBox2D.a */; };
+		AAEABB782F84316F001954A5 /* liblua.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B733FB12B6F6BC0057F594 /* liblua.a */; };
+		AAEABB792F84316F001954A5 /* librtt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B733F312B6F6740057F594 /* librtt.a */; };
+		AAEABB7A2F84316F001954A5 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7375E12B706E00057F594 /* WebKit.framework */; };
+		AAEABB7B2F84316F001954A5 /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F57D17781BE2750800AABAC1 /* GameController.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
+		AAEABB7C2F84316F001954A5 /* ALmixer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B737BA12B707B40057F594 /* ALmixer.framework */; };
+		AAEABB7E2F84316F001954A5 /* OpenAL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7375212B706E00057F594 /* OpenAL.framework */; };
+		AAEABB7F2F84316F001954A5 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7375C12B706E00057F594 /* SystemConfiguration.framework */; };
+		AAEABB802F84316F001954A5 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7375812B706E00057F594 /* QuartzCore.framework */; };
+		AAEABB812F84316F001954A5 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00B7374C12B706E00057F594 /* AudioToolbox.framework */; };
+		AAEABB822F84316F001954A5 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C287481C19F6EED0002D5B27 /* Cocoa.framework */; };
+		AAEABB832F84316F001954A5 /* ForceFeedback.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F54D8E291B4B29120063F98B /* ForceFeedback.framework */; };
+		AAEABB842F84316F001954A5 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2F1CDA91B4F67D30006DC94 /* CoreLocation.framework */; };
+		AAEABB862F84316F001954A5 /* CoronaCards.h in Headers */ = {isa = PBXBuildFile; fileRef = C2E992961A6B135500E99F46 /* CoronaCards.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		AAEABB872F84316F001954A5 /* CoronaView.h in Headers */ = {isa = PBXBuildFile; fileRef = C2E992971A6B135500E99F46 /* CoronaView.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		AAEABB882F84316F001954A5 /* CoronaViewController.h in Headers */ = {isa = PBXBuildFile; fileRef = C2E992981A6B135500E99F46 /* CoronaViewController.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		AAEABB892F84316F001954A5 /* GLViewDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = C2B62D8D1BE9642000246515 /* GLViewDelegate.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		AAEABB8A2F84316F001954A5 /* CoronaViewPrivate.h in Headers */ = {isa = PBXBuildFile; fileRef = 000CE90D12B7410200D9B6A4 /* CoronaViewPrivate.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		AAEABB8B2F84316F001954A5 /* Rtt_FileSystem.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D3DA631B179D4F00137331 /* Rtt_FileSystem.h */; };
+		AAEABB8C2F84316F001954A5 /* Rtt_AppleKeyServices.h in Headers */ = {isa = PBXBuildFile; fileRef = DB56B4C8284C2E7C00EC8B14 /* Rtt_AppleKeyServices.h */; };
+		AAEABB8D2F84316F001954A5 /* Rtt_NativeWindowMode.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D3DA691B179DA000137331 /* Rtt_NativeWindowMode.h */; };
+		AAEABB8E2F84316F001954A5 /* Rtt_ProjectSettings.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D3DA561B179C2400137331 /* Rtt_ProjectSettings.h */; };
+		AAEABB8F2F84316F001954A5 /* Rtt_ReadOnlyProjectSettings.h in Headers */ = {isa = PBXBuildFile; fileRef = C2D3DA581B179C2400137331 /* Rtt_ReadOnlyProjectSettings.h */; };
+		AAEABB912F84316F001954A5 /* ads.dylib in Copy Frameworks and dylibs */ = {isa = PBXBuildFile; fileRef = A491860D1641DCFD00A39286 /* ads.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AAEABB922F84316F001954A5 /* analytics.dylib in Copy Frameworks and dylibs */ = {isa = PBXBuildFile; fileRef = A491867C1641F25900A39286 /* analytics.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AAEABB932F84316F001954A5 /* gameNetwork.dylib in Copy Frameworks and dylibs */ = {isa = PBXBuildFile; fileRef = A41AC1B516A75A7600AD331A /* gameNetwork.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AAEABB942F84316F001954A5 /* licensing.dylib in Copy Frameworks and dylibs */ = {isa = PBXBuildFile; fileRef = A4F12C2316D43662002BCCFB /* licensing.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AAEABB952F84316F001954A5 /* ALmixer.framework in Copy Frameworks and dylibs */ = {isa = PBXBuildFile; fileRef = 00B737BA12B707B40057F594 /* ALmixer.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		AAEABB972F84316F001954A5 /* widget_theme_ios7@4x.png in Resources */ = {isa = PBXBuildFile; fileRef = C2A6E5411AB0C6BC00509FB2 /* widget_theme_ios7@4x.png */; };
+		AAEABB982F84316F001954A5 /* widget_theme_onOff_mask_android_holo.png in Resources */ = {isa = PBXBuildFile; fileRef = C25CDF53195B5CD400CE2321 /* widget_theme_onOff_mask_android_holo.png */; };
+		AAEABB992F84316F001954A5 /* CoronaResources-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C26149EA18DA10E300F34F71 /* CoronaResources-Info.plist */; };
+		AAEABB9A2F84316F001954A5 /* widget_theme_android_holo_dark.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DBC1954EDA300D6555E /* widget_theme_android_holo_dark.png */; };
+		AAEABB9B2F84316F001954A5 /* widget_theme_android_holo_dark@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DBD1954EDA300D6555E /* widget_theme_android_holo_dark@2x.png */; };
+		AAEABB9C2F84316F001954A5 /* widget_theme_android_holo_dark@4x.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DBE1954EDA300D6555E /* widget_theme_android_holo_dark@4x.png */; };
+		AAEABB9D2F84316F001954A5 /* widget_theme_android_holo_light.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DBF1954EDA300D6555E /* widget_theme_android_holo_light.png */; };
+		AAEABB9E2F84316F001954A5 /* widget_theme_android_holo_light@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DC01954EDA300D6555E /* widget_theme_android_holo_light@2x.png */; };
+		AAEABB9F2F84316F001954A5 /* widget_theme_android_holo_light@4x.png in Resources */ = {isa = PBXBuildFile; fileRef = C23D8DC11954EDA300D6555E /* widget_theme_android_holo_light@4x.png */; };
+		AAEABBA02F84316F001954A5 /* widget_theme_android.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756CD18CE49CF0018900A /* widget_theme_android.png */; };
+		AAEABBA12F84316F001954A5 /* widget_theme_android@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756CE18CE49CF0018900A /* widget_theme_android@2x.png */; };
+		AAEABBA22F84316F001954A5 /* widget_theme_ios.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756CF18CE49CF0018900A /* widget_theme_ios.png */; };
+		AAEABBA32F84316F001954A5 /* widget_theme_ios7.png in Resources */ = {isa = PBXBuildFile; fileRef = F818407517E3C28E003072C4 /* widget_theme_ios7.png */; };
+		AAEABBA42F84316F001954A5 /* widget_theme_ios7@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = F818407717E3C313003072C4 /* widget_theme_ios7@2x.png */; };
+		AAEABBA52F84316F001954A5 /* widget_theme_ios@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756D018CE49CF0018900A /* widget_theme_ios@2x.png */; };
+		AAEABBA62F84316F001954A5 /* widget_theme_onOff_mask.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756D118CE49CF0018900A /* widget_theme_onOff_mask.png */; };
+		AAEABBA72F84316F001954A5 /* widget_theme_pickerWheel_mask.png in Resources */ = {isa = PBXBuildFile; fileRef = C2C756D218CE49CF0018900A /* widget_theme_pickerWheel_mask.png */; };
+		AAEABBF32F843613001954A5 /* libCoronaCore-angle.a in Frameworks */ = {isa = PBXBuildFile; fileRef = AAEABB172F84316B001954A5 /* libCoronaCore-angle.a */; };
+		AAEABBF82F84368F001954A5 /* libtachyon-angle.a in Frameworks */ = {isa = PBXBuildFile; fileRef = AAEABBEE2F8431F9001954A5 /* libtachyon-angle.a */; };
+		AAEABBFB2F8436C1001954A5 /* libtachyon-angle.a in Frameworks */ = {isa = PBXBuildFile; fileRef = AAEABBEE2F8431F9001954A5 /* libtachyon-angle.a */; };
+		AAEABBFE2F843769001954A5 /* libEGL.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = AAEABBFC2F843769001954A5 /* libEGL.dylib */; };
+		AAEABBFF2F843769001954A5 /* libGLESv2.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = AAEABBFD2F843769001954A5 /* libGLESv2.dylib */; };
+		AAEABC002F843783001954A5 /* libEGL.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = AAEABBFC2F843769001954A5 /* libEGL.dylib */; };
+		AAEABC012F843783001954A5 /* libGLESv2.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = AAEABBFD2F843769001954A5 /* libGLESv2.dylib */; };
+		AAEABC322F84569D001954A5 /* CoronaCards-angle-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = AAEABBAE2F843170001954A5 /* CoronaCards-angle-Info.plist */; };
+		AAEABC622F859768001954A5 /* libEGL.dylib in Copy Frameworks */ = {isa = PBXBuildFile; fileRef = AAEABBFC2F843769001954A5 /* libEGL.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AAEABC632F859768001954A5 /* libGLESv2.dylib in Copy Frameworks */ = {isa = PBXBuildFile; fileRef = AAEABBFD2F843769001954A5 /* libGLESv2.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		AAF348FD29DF9BA800076706 /* Rtt_Profiling.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF348FC29DF9BA800076706 /* Rtt_Profiling.h */; };
 		AAF348FE29DF9BA800076706 /* Rtt_Profiling.h in Headers */ = {isa = PBXBuildFile; fileRef = AAF348FC29DF9BA800076706 /* Rtt_Profiling.h */; };
 		AAF3490029DF9BDD00076706 /* Rtt_Profiling.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AAF348FF29DF9BDD00076706 /* Rtt_Profiling.cpp */; };
@@ -1638,10 +1997,6 @@
 		F55407F61C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F55407F31C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.cpp */; };
 		F55407F71C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = F55407F41C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.h */; };
 		F55407F81C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.h in Headers */ = {isa = PBXBuildFile; fileRef = F55407F41C74ECDE007F53C9 /* Rtt_TextureResourceExternalAdapter.h */; };
-		F5567D482ADC73BC008CD550 /* network.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F5567D442ADC7394008CD550 /* network.dylib */; };
-		F5567D492ADC73BC008CD550 /* network.dylib in Copy Frameworks and dylibs */ = {isa = PBXBuildFile; fileRef = F5567D442ADC7394008CD550 /* network.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		F5567D4A2ADC73CB008CD550 /* network.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F5567D442ADC7394008CD550 /* network.dylib */; };
-		F5567D4B2ADC73CB008CD550 /* network.dylib in Copy Frameworks */ = {isa = PBXBuildFile; fileRef = F5567D442ADC7394008CD550 /* network.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		F57469D7240291FA00CA5949 /* iostemplate in Resources */ = {isa = PBXBuildFile; fileRef = F57469D6240291FA00CA5949 /* iostemplate */; };
 		F57AE2051F051610000A4245 /* Rtt_AppleInAppStore.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0077B6571463359A00EEDF75 /* Rtt_AppleInAppStore.mm */; };
 		F57AE2061F051610000A4245 /* Rtt_AppleInAppStoreApple.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0077B6591463359A00EEDF75 /* Rtt_AppleInAppStoreApple.mm */; };
@@ -1768,6 +2123,21 @@
 			);
 			runOncePerArchitecture = 0;
 			script = "# This option is used to exit the script as\n# soon as a command returns a non-zero value.\nset -o errexit\n\n$BUILT_PRODUCTS_DIR/lua $SRCROOT/../../bin/rcc.lua -c $BUILT_PRODUCTS_DIR -O$CONFIGURATION -o $TARGET_TEMP_DIR/$INPUT_FILE_BASE.lu $INPUT_FILE_PATH\n$BUILT_PRODUCTS_DIR/lua -epackage.path=[[$SRCROOT/../../external/loop-2.3-beta/lua/?.lua]] $SRCROOT/../../external/loop-2.3-beta/lua/precompiler.constant.lua -d $TARGET_TEMP_DIR -o $INPUT_FILE_BASE -l $TARGET_TEMP_DIR/?.lu -n $INPUT_FILE_BASE\n";
+		};
+		AAEABACA2F843167001954A5 /* PBXBuildRule */ = {
+			isa = PBXBuildRule;
+			compilerSpec = com.apple.compilers.proxy.script;
+			filePatterns = "*.lua";
+			fileType = pattern.proxy;
+			inputFiles = (
+				"$(BUILT_PRODUCTS_DIR)/lua",
+			);
+			isEditable = 1;
+			outputFiles = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/$(INPUT_FILE_BASE).lu",
+			);
+			runOncePerArchitecture = 0;
+			script = "# This option is used to exit the script as\n# soon as a command returns a non-zero value.\nset -o errexit\necho \"Compiling '$INPUT_FILE_PATH' -> '$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/$INPUT_FILE_BASE.lu'...\"\n$BUILT_PRODUCTS_DIR/lua $SRCROOT/../../bin/rcc.lua -c $BUILT_PRODUCTS_DIR -g -o \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/$INPUT_FILE_BASE.lu\" $INPUT_FILE_PATH\n";
 		};
 		C229E2021B32221B00D87A7C /* PBXBuildRule */ = {
 			isa = PBXBuildRule;
@@ -1941,13 +2311,6 @@
 			remoteGlobalIDString = 50B013EA17558BCA00B822B8;
 			remoteInfo = Box2D;
 		};
-		A4FBC5111A2D5509004D9A01 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = A4B66AB1176A7A370077B2BF /* libtachyon.xcodeproj */;
-			proxyType = 1;
-			remoteGlobalIDString = A43287D9176A610100ACB6FF;
-			remoteInfo = tachyon;
-		};
 		A4FBC5141A2D552C004D9A01 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 00FD0C011330445800716D46 /* car.xcodeproj */;
@@ -1982,6 +2345,244 @@
 			proxyType = 1;
 			remoteGlobalIDString = A4FBC4F61A2D5479004D9A01;
 			remoteInfo = libCoronaCards;
+		};
+		AAEAB9DD2F843167001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F53325791D9DD2DE003613F7 /* CoronaLiveServer.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = F511E5D21D81DDCC0084406E;
+			remoteInfo = CoronaLiveServer;
+		};
+		AAEAB9DF2F843167001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C21995A81C189E0100E88FD0 /* ios-syslog-helper.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = C219959D1C189E0100E88FD0;
+			remoteInfo = "ios-syslog-helper";
+		};
+		AAEAB9E32F843167001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C26DD10A1BD9508800EC4F44 /* CoronaConsole.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = C26DD0D41BD6B94700EC4F44;
+			remoteInfo = CoronaConsole;
+		};
+		AAEAB9E92F843167001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A48B827C16D59A4000CA01A1;
+			remoteInfo = CoronaResources;
+		};
+		AAEAB9EB2F843167001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0039BCEF132AF4570009B76B /* lua.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 004CED431339786A006ACF35;
+			remoteInfo = debugger;
+		};
+		AAEAB9ED2F843167001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 00B737B912B707B40057F594;
+			remoteInfo = ALmixer;
+		};
+		AAEAB9EF2F843167001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A49186021641DCFD00A39286 /* plugins.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = A44308AC164C733E00B9117B;
+			remoteInfo = plugins;
+		};
+		AAEABAD92F84316B001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0039BCEF132AF4570009B76B /* lua.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 004CED2913397858006ACF35;
+			remoteInfo = luac;
+		};
+		AAEABADB2F84316B001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0039BCEF132AF4570009B76B /* lua.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 004CED1C1339784D006ACF35;
+			remoteInfo = lua;
+		};
+		AAEABADD2F84316B001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 00FD0C011330445800716D46 /* car.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 8DD76FA90486AB0100D96B5E;
+			remoteInfo = car;
+		};
+		AAEABADF2F84316B001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 50B013EA17558BCA00B822B8;
+			remoteInfo = Box2D;
+		};
+		AAEABAE12F84316B001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 00B733FA12B6F6BC0057F594;
+			remoteInfo = liblua;
+		};
+		AAEABAE32F84316B001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 008955E31340466B00699C04;
+			remoteInfo = luafilesystem;
+		};
+		AAEABAE52F84316B001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C229DFD71B32221B00D87A7C;
+			remoteInfo = "librtt-simulator";
+		};
+		AAEABAE72F84316B001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C2A08C221950DF2A002B7532 /* lpeg.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 00D5A5D01566DF6200718681;
+			remoteInfo = liblpeg;
+		};
+		AAEABB1A2F84316F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 00B737B912B707B40057F594;
+			remoteInfo = ALmixer;
+		};
+		AAEABB1C2F84316F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C2A08C221950DF2A002B7532 /* lpeg.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 00D5A5D01566DF6200718681;
+			remoteInfo = liblpeg;
+		};
+		AAEABB1E2F84316F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 00FD0C011330445800716D46 /* car.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 8DD76FA90486AB0100D96B5E;
+			remoteInfo = car;
+		};
+		AAEABB202F84316F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0039BCEF132AF4570009B76B /* lua.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 004CED1C1339784D006ACF35;
+			remoteInfo = lua;
+		};
+		AAEABB222F84316F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0039BCEF132AF4570009B76B /* lua.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 004CED2913397858006ACF35;
+			remoteInfo = luac;
+		};
+		AAEABB242F84316F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A49186021641DCFD00A39286 /* plugins.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = A44308AC164C733E00B9117B;
+			remoteInfo = plugins;
+		};
+		AAEABB262F84316F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 50B013EA17558BCA00B822B8;
+			remoteInfo = Box2D;
+		};
+		AAEABB282F84316F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0039BCEF132AF4570009B76B /* lua.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = C24216D61CCACB6600D8E4BE;
+			remoteInfo = libluasocket;
+		};
+		AAEABB2A2F84316F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 00B733FA12B6F6BC0057F594;
+			remoteInfo = liblua;
+		};
+		AAEABB2C2F84316F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 00B733F212B6F6740057F594;
+			remoteInfo = librtt;
+		};
+		AAEABB2E2F84316F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 008955E31340466B00699C04;
+			remoteInfo = luafilesystem;
+		};
+		AAEABBED2F8431F9001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A4B66AB1176A7A370077B2BF /* libtachyon.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = AAEABBEB2F843199001954A5;
+			remoteInfo = "tachyon-angle";
+		};
+		AAEABBEF2F8435A9001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AAEABB182F84316F001954A5;
+			remoteInfo = "CoronaCards-angle";
+		};
+		AAEABBF12F8435A9001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AAEABAD72F84316B001954A5;
+			remoteInfo = "CoronaCore-angle";
+		};
+		AAEABBF42F84363F001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A4B66AB1176A7A370077B2BF /* libtachyon.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = A43287D9176A610100ACB6FF;
+			remoteInfo = tachyon;
+		};
+		AAEABBF62F84367B001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A4B66AB1176A7A370077B2BF /* libtachyon.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = AAEABBAF2F843199001954A5;
+			remoteInfo = "tachyon-angle";
+		};
+		AAEABBF92F8436A8001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A4B66AB1176A7A370077B2BF /* libtachyon.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = AAEABBAF2F843199001954A5;
+			remoteInfo = "tachyon-angle";
+		};
+		AAEABC5A2F846934001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C2EF85011B336B6300731A45 /* CoronaShell.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = AAEABC572F846875001954A5;
+			remoteInfo = "CoronaShell-angle";
+		};
+		AAEABC5C2F84693A001954A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C2EF85011B336B6300731A45 /* CoronaShell.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = AAEABC462F846875001954A5;
+			remoteInfo = "CoronaShell-angle";
 		};
 		C21995AC1C189E0300E88FD0 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -2179,20 +2780,6 @@
 			remoteGlobalIDString = A49186401641DDB800A39286;
 			remoteInfo = network;
 		};
-		F5567D4C2ADC73E1008CD550 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = F583ABD82ADAF4F2002799CB /* NetworkPlugin.xcodeproj */;
-			proxyType = 1;
-			remoteGlobalIDString = A49186331641DDB800A39286;
-			remoteInfo = network;
-		};
-		F5567D4E2ADC740E008CD550 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = F583ABD82ADAF4F2002799CB /* NetworkPlugin.xcodeproj */;
-			proxyType = 1;
-			remoteGlobalIDString = A49186331641DDB800A39286;
-			remoteInfo = network;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -2203,7 +2790,6 @@
 			dstSubfolderSpec = 10;
 			files = (
 				0052EBF412B73ADD006ED5BC /* ALmixer.framework in Copy Frameworks */,
-				F5567D4B2ADC73CB008CD550 /* network.dylib in Copy Frameworks */,
 			);
 			name = "Copy Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2219,6 +2805,56 @@
 				A4BCD6E61648D5EC00D8F41A /* ads.dylib in CopyFiles */,
 				A491868F1641FE2600A39286 /* analytics.dylib in CopyFiles */,
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAEABA4A2F843167001954A5 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 12;
+			dstPath = Skins;
+			dstSubfolderSpec = 7;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAEABABD2F843167001954A5 /* Copy Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				AAEABC622F859768001954A5 /* libEGL.dylib in Copy Frameworks */,
+				AAEABC632F859768001954A5 /* libGLESv2.dylib in Copy Frameworks */,
+				AAEABABE2F843167001954A5 /* ALmixer.framework in Copy Frameworks */,
+			);
+			name = "Copy Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAEABABF2F843167001954A5 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 7;
+			files = (
+				AAEABAC02F843167001954A5 /* licensing.dylib in CopyFiles */,
+				AAEABAC12F843167001954A5 /* gameNetwork.dylib in CopyFiles */,
+				AAEABAC22F843167001954A5 /* ads.dylib in CopyFiles */,
+				AAEABAC32F843167001954A5 /* analytics.dylib in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAEABB902F84316F001954A5 /* Copy Frameworks and dylibs */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				AAEABB912F84316F001954A5 /* ads.dylib in Copy Frameworks and dylibs */,
+				AAEABB922F84316F001954A5 /* analytics.dylib in Copy Frameworks and dylibs */,
+				AAEABB932F84316F001954A5 /* gameNetwork.dylib in Copy Frameworks and dylibs */,
+				AAEABB942F84316F001954A5 /* licensing.dylib in Copy Frameworks and dylibs */,
+				AAEABB952F84316F001954A5 /* ALmixer.framework in Copy Frameworks and dylibs */,
+			);
+			name = "Copy Frameworks and dylibs";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C2427BBA191865E20011CE7A /* CopyFiles */ = {
@@ -2237,7 +2873,6 @@
 			dstSubfolderSpec = 10;
 			files = (
 				C279452E1B585BD60046B6E8 /* ads.dylib in Copy Frameworks and dylibs */,
-				F5567D492ADC73BC008CD550 /* network.dylib in Copy Frameworks and dylibs */,
 				C279452F1B585BD60046B6E8 /* analytics.dylib in Copy Frameworks and dylibs */,
 				C27945301B585BD60046B6E8 /* gameNetwork.dylib in Copy Frameworks and dylibs */,
 				C27945311B585BD60046B6E8 /* licensing.dylib in Copy Frameworks and dylibs */,
@@ -3253,6 +3888,13 @@
 		AAA58114270D38A5002A51A7 /* CoronaObjects.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CoronaObjects.cpp; path = Corona/CoronaObjects.cpp; sourceTree = "<group>"; };
 		AAA5811B270D38A5002A51A7 /* CoronaObjects.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CoronaObjects.h; path = Corona/CoronaObjects.h; sourceTree = "<group>"; };
 		AAA5811C270D38A6002A51A7 /* CoronaPublicTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CoronaPublicTypes.h; path = Corona/CoronaPublicTypes.h; sourceTree = "<group>"; };
+		AAEABACF2F843167001954A5 /* rttplayer-angle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "rttplayer-angle.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAEABAD62F843169001954A5 /* rttplayer-angle-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "rttplayer-angle-Info.plist"; path = "/Users/steve/Desktop/Repos/corona/platform/mac/rttplayer-angle-Info.plist"; sourceTree = "<absolute>"; };
+		AAEABB172F84316B001954A5 /* libCoronaCore-angle.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libCoronaCore-angle.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAEABBAD2F84316F001954A5 /* CoronaCards-angle.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = "CoronaCards-angle.framework"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAEABBAE2F843170001954A5 /* CoronaCards-angle-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "CoronaCards-angle-Info.plist"; path = "/Users/steve/Desktop/Repos/corona/platform/mac/CoronaCards-angle-Info.plist"; sourceTree = "<absolute>"; };
+		AAEABBFC2F843769001954A5 /* libEGL.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libEGL.dylib; path = ../../external/Angle/bin/Mac/libEGL.dylib; sourceTree = "<group>"; };
+		AAEABBFD2F843769001954A5 /* libGLESv2.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libGLESv2.dylib; path = ../../external/Angle/bin/Mac/libGLESv2.dylib; sourceTree = "<group>"; };
 		AAF348FC29DF9BA800076706 /* Rtt_Profiling.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Rtt_Profiling.h; sourceTree = "<group>"; };
 		AAF348FF29DF9BDD00076706 /* Rtt_Profiling.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Rtt_Profiling.cpp; sourceTree = "<group>"; };
 		AAF34A7429F9CAA800076706 /* Rtt_TextureResourceCaptureAdapter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Rtt_TextureResourceCaptureAdapter.cpp; path = Display/Rtt_TextureResourceCaptureAdapter.cpp; sourceTree = "<group>"; };
@@ -3497,7 +4139,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				C2C59B2C1E2812FF001DF51E /* CoreMedia.framework in Frameworks */,
-				F5567D4A2ADC73CB008CD550 /* network.dylib in Frameworks */,
 				C2C59B2A1E2812F9001DF51E /* AVFoundation.framework in Frameworks */,
 				C2C59B2B1E2812F9001DF51E /* AVKit.framework in Frameworks */,
 				C2F911111CDBFA19004A5564 /* libluasocket.a in Frameworks */,
@@ -3535,6 +4176,81 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AAEABAA32F843167001954A5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABBFE2F843769001954A5 /* libEGL.dylib in Frameworks */,
+				AAEABBFF2F843769001954A5 /* libGLESv2.dylib in Frameworks */,
+				AAEABBF32F843613001954A5 /* libCoronaCore-angle.a in Frameworks */,
+				AAEABAA42F843167001954A5 /* CoreMedia.framework in Frameworks */,
+				AAEABAA52F843167001954A5 /* AVFoundation.framework in Frameworks */,
+				AAEABAA62F843167001954A5 /* AVKit.framework in Frameworks */,
+				AAEABAA72F843167001954A5 /* libluasocket.a in Frameworks */,
+				AAEABAA82F843167001954A5 /* GameController.framework in Frameworks */,
+				AAEABAA92F843167001954A5 /* CoreLocation.framework in Frameworks */,
+				AAEABAAB2F843167001954A5 /* libplugins.a in Frameworks */,
+				AAEABAAC2F843167001954A5 /* Cocoa.framework in Frameworks */,
+				AAEABAAD2F843167001954A5 /* Quartz.framework in Frameworks */,
+				AAEABAAE2F843167001954A5 /* AudioToolbox.framework in Frameworks */,
+				AAEABAAF2F843167001954A5 /* ApplicationServices.framework in Frameworks */,
+				AAEABAB02F843167001954A5 /* libluafilesystem.a in Frameworks */,
+				AAEABAB12F843167001954A5 /* IOKit.framework in Frameworks */,
+				AAEABAB22F843167001954A5 /* libsqlite3.dylib in Frameworks */,
+				AAEABAB32F843167001954A5 /* OpenAL.framework in Frameworks */,
+				AAEABAB52F843167001954A5 /* QuartzCore.framework in Frameworks */,
+				AAEABAB62F843167001954A5 /* Security.framework in Frameworks */,
+				AAEABAB72F843167001954A5 /* SystemConfiguration.framework in Frameworks */,
+				AAEABAB82F843167001954A5 /* WebKit.framework in Frameworks */,
+				AAEABAB92F843167001954A5 /* ALmixer.framework in Frameworks */,
+				AAEABABA2F843167001954A5 /* ForceFeedback.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAEABB072F84316B001954A5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABBF82F84368F001954A5 /* libtachyon-angle.a in Frameworks */,
+				AAEABB082F84316B001954A5 /* libBox2D.a in Frameworks */,
+				AAEABB092F84316B001954A5 /* liblua.a in Frameworks */,
+				AAEABB0A2F84316B001954A5 /* liblpeg.a in Frameworks */,
+				AAEABB0B2F84316B001954A5 /* librtt-simulator.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAEABB6C2F84316F001954A5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABC002F843783001954A5 /* libEGL.dylib in Frameworks */,
+				AAEABC012F843783001954A5 /* libGLESv2.dylib in Frameworks */,
+				AAEABBFB2F8436C1001954A5 /* libtachyon-angle.a in Frameworks */,
+				AAEABB6D2F84316F001954A5 /* StoreKit.framework in Frameworks */,
+				AAEABB6E2F84316F001954A5 /* CoreMedia.framework in Frameworks */,
+				AAEABB6F2F84316F001954A5 /* AVFoundation.framework in Frameworks */,
+				AAEABB702F84316F001954A5 /* AVKit.framework in Frameworks */,
+				AAEABB712F84316F001954A5 /* libluasocket.a in Frameworks */,
+				AAEABB722F84316F001954A5 /* libplugins.a in Frameworks */,
+				AAEABB732F84316F001954A5 /* libluafilesystem.a in Frameworks */,
+				AAEABB742F84316F001954A5 /* liblpeg.a in Frameworks */,
+				AAEABB762F84316F001954A5 /* libsqlite3.dylib in Frameworks */,
+				AAEABB772F84316F001954A5 /* libBox2D.a in Frameworks */,
+				AAEABB782F84316F001954A5 /* liblua.a in Frameworks */,
+				AAEABB792F84316F001954A5 /* librtt.a in Frameworks */,
+				AAEABB7A2F84316F001954A5 /* WebKit.framework in Frameworks */,
+				AAEABB7B2F84316F001954A5 /* GameController.framework in Frameworks */,
+				AAEABB7C2F84316F001954A5 /* ALmixer.framework in Frameworks */,
+				AAEABB7E2F84316F001954A5 /* OpenAL.framework in Frameworks */,
+				AAEABB7F2F84316F001954A5 /* SystemConfiguration.framework in Frameworks */,
+				AAEABB802F84316F001954A5 /* QuartzCore.framework in Frameworks */,
+				AAEABB812F84316F001954A5 /* AudioToolbox.framework in Frameworks */,
+				AAEABB822F84316F001954A5 /* Cocoa.framework in Frameworks */,
+				AAEABB832F84316F001954A5 /* ForceFeedback.framework in Frameworks */,
+				AAEABB842F84316F001954A5 /* CoreLocation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C229E2001B32221B00D87A7C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -3547,7 +4263,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F5567D482ADC73BC008CD550 /* network.dylib in Frameworks */,
 				F5FED0972512248E00AE2911 /* StoreKit.framework in Frameworks */,
 				C2C59B291E2812D6001DF51E /* CoreMedia.framework in Frameworks */,
 				C2C59B271E2812CE001DF51E /* AVFoundation.framework in Frameworks */,
@@ -4488,6 +5203,9 @@
 				C26E845E1A5DE0C1008950FB /* CoronaCards.framework */,
 				C229E2071B32221B00D87A7C /* librtt-simulator.a */,
 				C2CB35EA1B33A01D00B75550 /* libluafilesystem.a */,
+				AAEABACF2F843167001954A5 /* rttplayer-angle.app */,
+				AAEABB172F84316B001954A5 /* libCoronaCore-angle.a */,
+				AAEABBAD2F84316F001954A5 /* CoronaCards-angle.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -4516,6 +5234,8 @@
 				29B97323FDCFA39411CA2CEA /* Frameworks */,
 				19C28FACFE9D520D11CA2CBB /* Products */,
 				C2B5FEFA1B33705300DD49E6 /* libluafilesystem.a */,
+				AAEABAD62F843169001954A5 /* rttplayer-angle-Info.plist */,
+				AAEABBAE2F843170001954A5 /* CoronaCards-angle-Info.plist */,
 			);
 			name = ratatouille;
 			sourceTree = "<group>";
@@ -4523,6 +5243,8 @@
 		29B97323FDCFA39411CA2CEA /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				AAEABBFC2F843769001954A5 /* libEGL.dylib */,
+				AAEABBFD2F843769001954A5 /* libGLESv2.dylib */,
 				F5FED0962512248E00AE2911 /* StoreKit.framework */,
 				F5F0542520374CBC007E92B0 /* CoreAudioKit.framework */,
 				F5F0542320374CB5007E92B0 /* CoreAudio.framework */,
@@ -5186,6 +5908,7 @@
 			isa = PBXGroup;
 			children = (
 				A4B66AB6176A7A370077B2BF /* libtachyon.a */,
+				AAEABBEE2F8431F9001954A5 /* libtachyon-angle.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -5437,6 +6160,7 @@
 			isa = PBXGroup;
 			children = (
 				C2EF85061B336B6300731A45 /* CoronaShell.app */,
+				AAEABC5B2F846934001954A5 /* CoronaShell-angle.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -5836,6 +6560,35 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AAEABB0D2F84316B001954A5 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABB0E2F84316B001954A5 /* CoronaLuaObjC.h in Headers */,
+				AAEABB0F2F84316B001954A5 /* Rtt_FileSystem.h in Headers */,
+				AAEABB102F84316B001954A5 /* Rtt_NativeWindowMode.h in Headers */,
+				AAEABB112F84316B001954A5 /* Rtt_ProjectSettings.h in Headers */,
+				AAEABB122F84316B001954A5 /* Rtt_ReadOnlyProjectSettings.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAEABB852F84316F001954A5 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABB862F84316F001954A5 /* CoronaCards.h in Headers */,
+				AAEABB872F84316F001954A5 /* CoronaView.h in Headers */,
+				AAEABB882F84316F001954A5 /* CoronaViewController.h in Headers */,
+				AAEABB892F84316F001954A5 /* GLViewDelegate.h in Headers */,
+				AAEABB8A2F84316F001954A5 /* CoronaViewPrivate.h in Headers */,
+				AAEABB8B2F84316F001954A5 /* Rtt_FileSystem.h in Headers */,
+				AAEABB8C2F84316F001954A5 /* Rtt_AppleKeyServices.h in Headers */,
+				AAEABB8D2F84316F001954A5 /* Rtt_NativeWindowMode.h in Headers */,
+				AAEABB8E2F84316F001954A5 /* Rtt_ProjectSettings.h in Headers */,
+				AAEABB8F2F84316F001954A5 /* Rtt_ReadOnlyProjectSettings.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C229DFDE1B32221B00D87A7C /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
@@ -6195,7 +6948,6 @@
 				001F574112B6018500F52101 /* PBXBuildRule */,
 			);
 			dependencies = (
-				F5567D4D2ADC73E1008CD550 /* PBXTargetDependency */,
 				F533258E1D9DD3CC003613F7 /* PBXTargetDependency */,
 				C21995B01C18A2C000E88FD0 /* PBXTargetDependency */,
 				C2B5FEEE1B336C3D00DD49E6 /* PBXTargetDependency */,
@@ -6239,6 +6991,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				AAEABBF52F84363F001954A5 /* PBXTargetDependency */,
 				A4FBC5191A2D552C004D9A01 /* PBXTargetDependency */,
 				A4FBC5171A2D552C004D9A01 /* PBXTargetDependency */,
 				A4FBC5151A2D552C004D9A01 /* PBXTargetDependency */,
@@ -6247,12 +7000,110 @@
 				A4FBC5091A2D5495004D9A01 /* PBXTargetDependency */,
 				C229E20F1B32226600D87A7C /* PBXTargetDependency */,
 				A4FBC51B1A2D554D004D9A01 /* PBXTargetDependency */,
-				A4FBC5121A2D5509004D9A01 /* PBXTargetDependency */,
 			);
 			name = CoronaCore;
 			productName = libCoronaCards;
 			productReference = A4FBC4F71A2D5479004D9A01 /* libCoronaCore.a */;
 			productType = "com.apple.product-type.library.static";
+		};
+		AAEAB9DB2F843167001954A5 /* rttplayer-angle */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AAEABACB2F843167001954A5 /* Build configuration list for PBXNativeTarget "rttplayer-angle" */;
+			buildPhases = (
+				AAEAB9F02F843167001954A5 /* Override ENV */,
+				AAEAB9F12F843167001954A5 /* Resources */,
+				AAEABA4A2F843167001954A5 /* CopyFiles */,
+				AAEABA4B2F843167001954A5 /* Sources */,
+				AAEABAA32F843167001954A5 /* Frameworks */,
+				AAEABABB2F843167001954A5 /* Run Script (build resource.car) */,
+				AAEABABC2F843167001954A5 /* Run script (copy Simulator extensions) */,
+				AAEABABD2F843167001954A5 /* Copy Frameworks */,
+				AAEABABF2F843167001954A5 /* CopyFiles */,
+				AAEABAC42F843167001954A5 /* Run script (write AppSettings: customBuildID, buildBucket, etc if defined) */,
+				AAEABAC52F843167001954A5 /* Run script (codesign utilities) */,
+				AAEABAC62F843167001954A5 /* Run Script (copy Skins files) */,
+				AAEABAC72F843167001954A5 /* Run Script (build OSXAppTemplate.zip) */,
+				AAEABAC82F843167001954A5 /* Run Script (copy device-support files) */,
+				AAEABAC92F843167001954A5 /* Run Script (copy JRE if exists) */,
+			);
+			buildRules = (
+				AAEABACA2F843167001954A5 /* PBXBuildRule */,
+			);
+			dependencies = (
+				AAEABC5D2F84693A001954A5 /* PBXTargetDependency */,
+				AAEABBF02F8435A9001954A5 /* PBXTargetDependency */,
+				AAEABBF22F8435A9001954A5 /* PBXTargetDependency */,
+				AAEAB9DC2F843167001954A5 /* PBXTargetDependency */,
+				AAEAB9DE2F843167001954A5 /* PBXTargetDependency */,
+				AAEAB9E22F843167001954A5 /* PBXTargetDependency */,
+				AAEAB9E82F843167001954A5 /* PBXTargetDependency */,
+				AAEAB9EA2F843167001954A5 /* PBXTargetDependency */,
+				AAEAB9EC2F843167001954A5 /* PBXTargetDependency */,
+				AAEAB9EE2F843167001954A5 /* PBXTargetDependency */,
+			);
+			name = "rttplayer-angle";
+			productInstallPath = "$(HOME)/Applications";
+			productName = ratatouille;
+			productReference = AAEABACF2F843167001954A5 /* rttplayer-angle.app */;
+			productType = "com.apple.product-type.application";
+		};
+		AAEABAD72F84316B001954A5 /* CoronaCore-angle */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AAEABB132F84316B001954A5 /* Build configuration list for PBXNativeTarget "CoronaCore-angle" */;
+			buildPhases = (
+				AAEABAEA2F84316B001954A5 /* Sources */,
+				AAEABB072F84316B001954A5 /* Frameworks */,
+				AAEABB0D2F84316B001954A5 /* Headers */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AAEABBF72F84367B001954A5 /* PBXTargetDependency */,
+				AAEABAD82F84316B001954A5 /* PBXTargetDependency */,
+				AAEABADA2F84316B001954A5 /* PBXTargetDependency */,
+				AAEABADC2F84316B001954A5 /* PBXTargetDependency */,
+				AAEABADE2F84316B001954A5 /* PBXTargetDependency */,
+				AAEABAE02F84316B001954A5 /* PBXTargetDependency */,
+				AAEABAE22F84316B001954A5 /* PBXTargetDependency */,
+				AAEABAE42F84316B001954A5 /* PBXTargetDependency */,
+				AAEABAE62F84316B001954A5 /* PBXTargetDependency */,
+			);
+			name = "CoronaCore-angle";
+			productName = libCoronaCards;
+			productReference = AAEABB172F84316B001954A5 /* libCoronaCore-angle.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+		AAEABB182F84316F001954A5 /* CoronaCards-angle */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AAEABBA92F84316F001954A5 /* Build configuration list for PBXNativeTarget "CoronaCards-angle" */;
+			buildPhases = (
+				AAEABB312F84316F001954A5 /* Sources */,
+				AAEABB6C2F84316F001954A5 /* Frameworks */,
+				AAEABB852F84316F001954A5 /* Headers */,
+				AAEABB902F84316F001954A5 /* Copy Frameworks and dylibs */,
+				AAEABB962F84316F001954A5 /* Resources */,
+				AAEABBA82F84316F001954A5 /* Copy framework for CoronaShell */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AAEABBFA2F8436A8001954A5 /* PBXTargetDependency */,
+				AAEABB192F84316F001954A5 /* PBXTargetDependency */,
+				AAEABB1B2F84316F001954A5 /* PBXTargetDependency */,
+				AAEABB1D2F84316F001954A5 /* PBXTargetDependency */,
+				AAEABB1F2F84316F001954A5 /* PBXTargetDependency */,
+				AAEABB212F84316F001954A5 /* PBXTargetDependency */,
+				AAEABB232F84316F001954A5 /* PBXTargetDependency */,
+				AAEABB252F84316F001954A5 /* PBXTargetDependency */,
+				AAEABB272F84316F001954A5 /* PBXTargetDependency */,
+				AAEABB292F84316F001954A5 /* PBXTargetDependency */,
+				AAEABB2B2F84316F001954A5 /* PBXTargetDependency */,
+				AAEABB2D2F84316F001954A5 /* PBXTargetDependency */,
+			);
+			name = "CoronaCards-angle";
+			productName = CoronaCards;
+			productReference = AAEABBAD2F84316F001954A5 /* CoronaCards-angle.framework */;
+			productType = "com.apple.product-type.framework";
 		};
 		C229DFD71B32221B00D87A7C /* librtt-simulator */ = {
 			isa = PBXNativeTarget;
@@ -6290,7 +7141,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				F5567D4F2ADC740E008CD550 /* PBXTargetDependency */,
 				C226075C1B4B415D00172FB1 /* PBXTargetDependency */,
 				C2E993261A6B289D00E99F46 /* PBXTargetDependency */,
 				C2E9931C1A6B287500E99F46 /* PBXTargetDependency */,
@@ -6384,7 +7234,9 @@
 			projectRoot = "";
 			targets = (
 				8D1107260486CEB800E47090 /* rttplayer */,
+				AAEAB9DB2F843167001954A5 /* rttplayer-angle */,
 				A4FBC4F61A2D5479004D9A01 /* CoronaCore */,
+				AAEABAD72F84316B001954A5 /* CoronaCore-angle */,
 				50B013EA17558BCA00B822B8 /* Box2D */,
 				00B733FA12B6F6BC0057F594 /* liblua */,
 				008955E31340466B00699C04 /* luafilesystem */,
@@ -6394,6 +7246,7 @@
 				00873E4D1452352A0029C4EB /* ShellTools */,
 				A48B827C16D59A4000CA01A1 /* CoronaResources */,
 				C26E845D1A5DE0C0008950FB /* CoronaCards */,
+				AAEABB182F84316F001954A5 /* CoronaCards-angle */,
 			);
 		};
 /* End PBXProject section */
@@ -6481,6 +7334,20 @@
 			fileType = archive.ar;
 			path = libtachyon.a;
 			remoteRef = A4B66AB5176A7A370077B2BF /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AAEABBEE2F8431F9001954A5 /* libtachyon-angle.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libtachyon-angle.a";
+			remoteRef = AAEABBED2F8431F9001954A5 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AAEABC5B2F846934001954A5 /* CoronaShell-angle.app */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.application;
+			path = "CoronaShell-angle.app";
+			remoteRef = AAEABC5A2F846934001954A5 /* PBXContainerItemProxy */;
 			sourceTree = BUILT_PRODUCTS_DIR;
 		};
 		C21995AD1C189E0300E88FD0 /* ios-syslog-helper */ = {
@@ -6659,6 +7526,125 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AAEAB9F12F843167001954A5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABC322F84569D001954A5 /* CoronaCards-angle-Info.plist in Resources */,
+				AAEAB9F22F843167001954A5 /* Corona Live Server.app in Resources */,
+				AAEAB9F32F843167001954A5 /* ios-syslog-helper in Resources */,
+				AAEAB9F42F843167001954A5 /* CoronaConsole.app in Resources */,
+				AAEAB9F52F843167001954A5 /* android_sendapp.sh in Resources */,
+				AAEAB9F62F843167001954A5 /* xcodesim_sendapp.sh in Resources */,
+				AAEAB9F72F843167001954A5 /* IOSAppPackageSheet.xib in Resources */,
+				AAEAB9F82F843167001954A5 /* ios_sendapp.sh in Resources */,
+				AAEAB9F92F843167001954A5 /* widget_theme_ios7_sheet.lua in Resources */,
+				AAEAB9FA2F843167001954A5 /* _coronatest.jar in Resources */,
+				AAEAB9FB2F843167001954A5 /* CoronaResources.bundle in Resources */,
+				AAEAB9FC2F843167001954A5 /* OSXAppPackageSheet.xib in Resources */,
+				AAEAB9FD2F843167001954A5 /* widget_theme_android_holo_light.png in Resources */,
+				AAEAB9FE2F843167001954A5 /* widget_theme_ios.png in Resources */,
+				AAEAB9FF2F843167001954A5 /* codesign-framework.sh in Resources */,
+				AAEABA002F843167001954A5 /* Corona3rdPartyLicenses.txt in Resources */,
+				AAEABA012F843167001954A5 /* widget_theme_ios_sheet.lua in Resources */,
+				AAEABA022F843167001954A5 /* composer_scene.lua in Resources */,
+				AAEABA032F843167001954A5 /* ant-launcher.jar in Resources */,
+				AAEABA042F843167001954A5 /* ValidateSettings.lua in Resources */,
+				AAEABA052F843167001954A5 /* widget_theme_ios7@2x.png in Resources */,
+				AAEABA062F843167001954A5 /* webtemplate.zip in Resources */,
+				AAEABA072F843167001954A5 /* ant.jar in Resources */,
+				AAEABA082F843167001954A5 /* ListKeyStore.jar in Resources */,
+				AAEABA092F843167001954A5 /* AntInvoke.jar in Resources */,
+				AAEABA0A2F843167001954A5 /* InfoPlist.strings in Resources */,
+				AAEABA0B2F843167001954A5 /* widget_theme_android_holo_light.lua in Resources */,
+				AAEABA0C2F843167001954A5 /* widget_theme_android_sheet.lua in Resources */,
+				AAEABA0D2F843167001954A5 /* widget_theme_pickerWheel_mask.png in Resources */,
+				AAEABA0E2F843167001954A5 /* OSXCreateDMGSheet.xib in Resources */,
+				AAEABA0F2F843167001954A5 /* CoronaResources-Info.plist in Resources */,
+				AAEABA102F843167001954A5 /* tvOS-SDKs.json in Resources */,
+				AAEABA112F843167001954A5 /* widget_theme_android@2x.png in Resources */,
+				AAEABA122F843167001954A5 /* OSXApp.xcent in Resources */,
+				AAEABA132F843167001954A5 /* CoronaSimulator.icns in Resources */,
+				AAEABA142F843167001954A5 /* valid_config_lua.lua in Resources */,
+				AAEABA152F843167001954A5 /* RememberPreferenceCheckbox.xib in Resources */,
+				AAEABA162F843167001954A5 /* widget_theme_android_holo_dark@2x.png in Resources */,
+				AAEABA172F843167001954A5 /* widget_theme_ios7.png in Resources */,
+				AAEABA182F843167001954A5 /* widget_theme_android_holo_light@4x.png in Resources */,
+				AAEABA192F843167001954A5 /* debug.keystore in Resources */,
+				AAEABA1A2F843167001954A5 /* ios_syslog.sh in Resources */,
+				AAEABA1B2F843167001954A5 /* CoronaPListSupport.lua in Resources */,
+				AAEABA1C2F843167001954A5 /* zipalign in Resources */,
+				AAEABA1D2F843167001954A5 /* TVOSAppPackageSheet.xib in Resources */,
+				AAEABA1E2F843167001954A5 /* build.properties in Resources */,
+				AAEABA1F2F843167001954A5 /* xcodesim_syslog.sh in Resources */,
+				AAEABA202F843167001954A5 /* build.xml in Resources */,
+				AAEABA212F843167001954A5 /* CustomDevice.xib in Resources */,
+				AAEABA222F843167001954A5 /* TVOSAppBuild.xib in Resources */,
+				AAEABA232F843167001954A5 /* MainMenu.nib in Resources */,
+				AAEABA252F843167001954A5 /* AndroidKeyAliasPassword.xib in Resources */,
+				AAEABA262F843167001954A5 /* widget_theme_ios7.lua in Resources */,
+				AAEABA272F843167001954A5 /* AndroidKeyStorePassword.xib in Resources */,
+				AAEABA282F843167001954A5 /* BuildProgress.xib in Resources */,
+				AAEABA292F843167001954A5 /* iostemplate in Resources */,
+				AAEABA2A2F843167001954A5 /* License.xib in Resources */,
+				AAEABA2B2F843167001954A5 /* Login.xib in Resources */,
+				AAEABA2C2F843167001954A5 /* Password.xib in Resources */,
+				AAEABA2D2F843167001954A5 /* Preferences.xib in Resources */,
+				AAEABA2E2F843167001954A5 /* Localizable.strings in Resources */,
+				AAEABA2F2F843167001954A5 /* linuxtemplate_x64.tgz in Resources */,
+				AAEABA302F843167001954A5 /* widget_theme_ios@2x.png in Resources */,
+				AAEABA312F843167001954A5 /* widget_theme_onOff_mask.png in Resources */,
+				AAEABA322F843167001954A5 /* android_syslog.sh in Resources */,
+				AAEABA332F843167001954A5 /* widget_theme_onOff_mask_android_holo.png in Resources */,
+				AAEABA342F843167001954A5 /* widget_theme_android_holo_dark@4x.png in Resources */,
+				AAEABA352F843167001954A5 /* LinuxAppBuild.xib in Resources */,
+				AAEABA362F843167001954A5 /* widget_theme_ios.lua in Resources */,
+				AAEABA372F843167001954A5 /* NewProject.xib in Resources */,
+				AAEABA382F843167001954A5 /* widget_theme_android_holo_light_sheet.lua in Resources */,
+				AAEABA392F843167001954A5 /* OSXAppBuild.xib in Resources */,
+				AAEABA3A2F843167001954A5 /* widget_theme_ios7@4x.png in Resources */,
+				AAEABA3B2F843167001954A5 /* widget_theme_android_holo_dark.png in Resources */,
+				AAEABA3C2F843167001954A5 /* AppBuildProgressBanner.xib in Resources */,
+				AAEABA3D2F843167001954A5 /* widget_theme_android_holo_dark.lua in Resources */,
+				AAEABA3E2F843167001954A5 /* iOS-SDKs.json in Resources */,
+				AAEABA3F2F843167001954A5 /* IOSAppBuild.xib in Resources */,
+				AAEABA402F843167001954A5 /* valid_build_settings.lua in Resources */,
+				AAEABA412F843167001954A5 /* Credits.rtfd in Resources */,
+				AAEABA422F843167001954A5 /* AndroidAppBuild.xib in Resources */,
+				AAEABA432F843167001954A5 /* re.lua in Resources */,
+				AAEABA442F843167001954A5 /* widget_theme_android.png in Resources */,
+				AAEABA452F843167001954A5 /* WebAppBuild.xib in Resources */,
+				AAEABA462F843167001954A5 /* widget_theme_android_holo_light@2x.png in Resources */,
+				AAEABA472F843167001954A5 /* widget_theme_android.lua in Resources */,
+				AAEABA482F843167001954A5 /* widget_theme_android_holo_dark_sheet.lua in Resources */,
+				AAEABA492F843167001954A5 /* AntLiveManifest.jar in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAEABB962F84316F001954A5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABB972F84316F001954A5 /* widget_theme_ios7@4x.png in Resources */,
+				AAEABB982F84316F001954A5 /* widget_theme_onOff_mask_android_holo.png in Resources */,
+				AAEABB992F84316F001954A5 /* CoronaResources-Info.plist in Resources */,
+				AAEABB9A2F84316F001954A5 /* widget_theme_android_holo_dark.png in Resources */,
+				AAEABB9B2F84316F001954A5 /* widget_theme_android_holo_dark@2x.png in Resources */,
+				AAEABB9C2F84316F001954A5 /* widget_theme_android_holo_dark@4x.png in Resources */,
+				AAEABB9D2F84316F001954A5 /* widget_theme_android_holo_light.png in Resources */,
+				AAEABB9E2F84316F001954A5 /* widget_theme_android_holo_light@2x.png in Resources */,
+				AAEABB9F2F84316F001954A5 /* widget_theme_android_holo_light@4x.png in Resources */,
+				AAEABBA02F84316F001954A5 /* widget_theme_android.png in Resources */,
+				AAEABBA12F84316F001954A5 /* widget_theme_android@2x.png in Resources */,
+				AAEABBA22F84316F001954A5 /* widget_theme_ios.png in Resources */,
+				AAEABBA32F84316F001954A5 /* widget_theme_ios7.png in Resources */,
+				AAEABBA42F84316F001954A5 /* widget_theme_ios7@2x.png in Resources */,
+				AAEABBA52F84316F001954A5 /* widget_theme_ios@2x.png in Resources */,
+				AAEABBA62F84316F001954A5 /* widget_theme_onOff_mask.png in Resources */,
+				AAEABBA72F84316F001954A5 /* widget_theme_pickerWheel_mask.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C210C7371AD497CA00B51023 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -6763,6 +7749,168 @@
 			shellScript = "SIMEXT=\"$SRCROOT\"/../../simulator-extensions\necho \"Building Simulator Extensions...\"\necho \"BUILT_PRODUCTS_DIR: $BUILT_PRODUCTS_DIR\"\necho \"UNLOCALIZED_RESOURCES_FOLDER_PATH: $UNLOCALIZED_RESOURCES_FOLDER_PATH\"\n\"$SIMEXT\"/copyAndBuild.sh \"$SIMEXT\"/welcomescreen \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"/../Extensions/welcome \"$BUILT_PRODUCTS_DIR\"\n";
 			showEnvVarsInLog = 0;
 		};
+		AAEAB9F02F843167001954A5 /* Override ENV */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Override ENV";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "export CURRENT_ARCH=\"${ARCHS}\"\n";
+		};
+		AAEABABB2F843167001954A5 /* Run Script (build resource.car) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script (build resource.car)";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -x\nif [[ $CONFIGURATION =~ .*template.* ]]\nthen\n\techo \"Only include main.lu in resource.car for template (projector) builds\"\n\tfiles=main.lu\nelse\n\tfiles=*.lu\nfi\n\n# echo Archiving \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/\"*.lu into \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/resource.car\"\n# \"$BUILT_PRODUCTS_DIR/car\" \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/resource.car\" \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/\"*.lu\n\n# echo Removing: \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/\"*.lu\n# rm -f \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/\"*.lu\n";
+			showEnvVarsInLog = 0;
+		};
+		AAEABABC2F843167001954A5 /* Run script (copy Simulator extensions) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Run script (copy Simulator extensions)";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "SIMEXT=\"$SRCROOT\"/../../simulator-extensions\necho \"Building Simulator Extensions...\"\necho \"BUILT_PRODUCTS_DIR: $BUILT_PRODUCTS_DIR\"\necho \"UNLOCALIZED_RESOURCES_FOLDER_PATH: $UNLOCALIZED_RESOURCES_FOLDER_PATH\"\n\"$SIMEXT\"/copyAndBuild.sh \"$SIMEXT\"/welcomescreen \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"/../Extensions/welcome \"$BUILT_PRODUCTS_DIR\"\n";
+			showEnvVarsInLog = 0;
+		};
+		AAEABAC42F843167001954A5 /* Run script (write AppSettings: customBuildID, buildBucket, etc if defined) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../resources/AppSettings.lua",
+			);
+			name = "Run script (write AppSettings: customBuildID, buildBucket, etc if defined)";
+			outputPaths = (
+				$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AppSettings.lua,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -e\n\ncp \"${SCRIPT_INPUT_FILE_0}\" \"${SCRIPT_OUTPUT_FILE_0}\"\n\n# To define, do something like:\n# xcodebuild -project ratatouille.xcodeproj CUSTOM_BUILD_ID=01234ABC\nif [ \"$CUSTOM_BUILD_ID\" != \"\" ]; then\n\t# Our hardcoded Lua variable is named 'customBuildID'\n\t# should write out\n\t# customBuildId=\"01234ABC\"\n\techo \"customBuildId=\\\"$CUSTOM_BUILD_ID\\\"\" >> \"${SCRIPT_OUTPUT_FILE_0}\"\nfi\n\nif [ \"$BUILD_BUCKET\" != \"\" ]; then\n\t# Our hardcoded Lua variable is named 'buildBucket'\n\t# should write out\n\t# buildBucket=\"01234ABC\"\n\techo \"buildBucket=\\\"$BUILD_BUCKET\\\"\" >> \"${SCRIPT_OUTPUT_FILE_0}\"\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+		AAEABAC52F843167001954A5 /* Run script (codesign utilities) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Run script (codesign utilities)";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [[ $CONFIGURATION == *-template ]]; then\necho \"Skipping creation of agent app in template build\"\nexit 0\nfi\n\nif [[ $CONFIGURATION == \"Debug\" ]]; then\necho \"Skipping codesign of components in Debug build\"\nexit 0\nfi\n\n# Xcode will sign the main app for us via the normal Xcode settings.\n# But we need to sign any additional external tools we bundle with the simulator that aren't already signed.\n\n# sign zipalign\ncodesign -f -s \"Developer ID Application: Corona Labs Inc\" \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/zipalign\"\n\n# sign that annoying Corona Terminal shell script which needs to die\ncodesign -f -s \"Developer ID Application: Corona Labs Inc\" \"$SRCROOT/../../bin/mac/Corona Terminal\"\n\n";
+			showEnvVarsInLog = 0;
+		};
+		AAEABAC62F843167001954A5 /* Run Script (copy Skins files) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script (copy Skins files)";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -x\nmkdir -p \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Skins\"\n# Copy all Skins .lua files and the associated .png files, excluding dot files and\n# deleting any that no longer exist in the source directory\nrsync -av --delete --include='*.lua' --include='*.png' --include='*.template' --exclude='.*' --exclude='*' \"$SRCROOT/../resources/Skins/\" \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Skins/\"\n";
+			showEnvVarsInLog = 0;
+		};
+		AAEABAC72F843167001954A5 /* Run Script (build OSXAppTemplate.zip) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script (build OSXAppTemplate.zip)";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\necho \"Building OSXAppTemplate.zip ...\"\nif [ \"$CONFIGURATION\" == \"Release\" -a -d \"$BUILD_ROOT/../CoronaShell/build/$CONFIGURATION/CoronaShell.app\" ]\nthen\n    # this works for command line builds\n    OSX_TEMPLATE_SOURCE_DIR=\"$BUILD_ROOT/../CoronaShell/build/$CONFIGURATION/CoronaShell-angle.app\"\nelif [ -d \"$DSTROOT\" ]\nthen\n    # this works for \"Archive\" builds\n    OSX_TEMPLATE_SOURCE_DIR=\"$DSTROOT/Applications/CoronaShell.app\"\nelse\n    # this works for \"Debug\" builds\n    OSX_TEMPLATE_SOURCE_DIR=\"$TARGET_BUILD_DIR/CoronaShell-angle.app\"\nfi\n\necho \"     Source: $OSX_TEMPLATE_SOURCE_DIR\"\necho \"Destination: $BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/OSXAppTemplate.zip\"\nrm -f \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/OSXAppTemplate.zip\"\n(\n  cd \"$OSX_TEMPLATE_SOURCE_DIR\"\n  zip -rqy \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/OSXAppTemplate.zip\" Contents --exclude \"Contents/Resources/CoronaShell.icns\" --exclude \"*.DS_Store\" --exclude \"*_CodeSignature*\"\n  )\nls -l \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/OSXAppTemplate.zip\"\n";
+			showEnvVarsInLog = 0;
+		};
+		AAEABAC82F843167001954A5 /* Run Script (copy device-support files) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script (copy device-support files)";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Copy the device-support files (which are helpers for installing and running apps on devices)\nset -x\nDEVICE_SUPPORT_DIR=\"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/device-support\"\nmkdir -p \"$DEVICE_SUPPORT_DIR\"\n(cd \"$SRCROOT/../../external/libimobiledevice\" && cp -a device-support/* \"$DEVICE_SUPPORT_DIR\")\n# or to build and then install the tools:\n# (cd \"$SRCROOT/../../external/libimobiledevice\" && sh ./build.sh \"$DEVICE_SUPPORT_DIR\")\n";
+			showEnvVarsInLog = 0;
+		};
+		AAEABAC92F843167001954A5 /* Run Script (copy JRE if exists) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../../jre.macos.tgz",
+			);
+			name = "Run Script (copy JRE if exists)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH_SHALLOW_BUNDLE_YES)/jre",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -x\n\nif [ -f  \"$SRCROOT/../../jre.macos.tgz\" ]\nthen\n\ttar xzf \"$SRCROOT/../../jre.macos.tgz\" -C \"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH_SHALLOW_BUNDLE_YES\"\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+		AAEABBA82F84316F001954A5 /* Copy framework for CoronaShell */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Copy framework for CoronaShell";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# FIXME: There must be a better way of doing this\n\n# Copy CoronaCards.framework to a place the CoronaShell build will find it\n\nif [ \"$CONFIGURATION\" == \"Release\" ]\nthen\n    rm -rf \"$TARGET_BUILD_DIR\"/../../CoronaShell/build/Release/CoronaCards-angle.framework\n    mkdir -p \"$TARGET_BUILD_DIR\"/../../CoronaShell/build/Release/\n    cp -av \"$TARGET_BUILD_DIR\"/CoronaCards.framework \"$TARGET_BUILD_DIR\"/../../CoronaShell/build/Release/\nfi\n";
+		};
 		C22607511B4B368800172FB1 /* Copy framework for CoronaShell */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -6775,7 +7923,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# FIXME: There must be a better way of doing this\n\n# Copy CoronaCards.framework to a place the CoronaShell build will find it\n\nif [ \"$CONFIGURATION\" == \"Release\" ]\nthen\n    rm -rf \"$TARGET_BUILD_DIR\"/../../CoronaShell/build/Release/CoronaCards.framework\n    mkdir -p \"$TARGET_BUILD_DIR\"/../../CoronaShell/build/Release/\n    cp -av \"$TARGET_BUILD_DIR\"/CoronaCards.framework \"$TARGET_BUILD_DIR\"/../../CoronaShell/build/Release/\nfi";
+			shellScript = "# FIXME: There must be a better way of doing this\n\n# Copy CoronaCards.framework to a place the CoronaShell build will find it\n\nif [ \"$CONFIGURATION\" == \"Release\" ]\nthen\n    rm -rf \"$TARGET_BUILD_DIR\"/../../CoronaShell/build/Release/CoronaCards.framework\n    mkdir -p \"$TARGET_BUILD_DIR\"/../../CoronaShell/build/Release/\n    cp -av \"$TARGET_BUILD_DIR\"/CoronaCards.framework \"$TARGET_BUILD_DIR\"/../../CoronaShell/build/Release/\nfi\n";
 		};
 		C2B5FEF11B336C9000DD49E6 /* Run Script (build OSXAppTemplate.zip) */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -7520,6 +8668,200 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AAEABA4B2F843167001954A5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABA4C2F843167001954A5 /* IOSAppBuildController.mm in Sources */,
+				AAEABA4D2F843167001954A5 /* AndroidAppBuildController.mm in Sources */,
+				AAEABA4E2F843167001954A5 /* AndroidValidation.lua in Sources */,
+				AAEABA4F2F843167001954A5 /* AppBuildController.mm in Sources */,
+				AAEABA502F843167001954A5 /* AppDelegate.mm in Sources */,
+				AAEABA512F843167001954A5 /* AppleSigningIdentityController.mm in Sources */,
+				AAEABA522F843167001954A5 /* BuildSessionState.mm in Sources */,
+				AAEABA532F843167001954A5 /* Rtt_LinuxAppPackager.cpp in Sources */,
+				AAEABA542F843167001954A5 /* ButtonImageView.m in Sources */,
+				AAEABA552F843167001954A5 /* ButtonTextField.m in Sources */,
+				AAEABA562F843167001954A5 /* CoreAnimationUtilities.m in Sources */,
+				AAEABA572F843167001954A5 /* CoronaViewRuntimeDelegate.mm in Sources */,
+				AAEABA582F843167001954A5 /* Rtt_AppleInputHIDDeviceListener.mm in Sources */,
+				AAEABA592F843167001954A5 /* DimView.m in Sources */,
+				AAEABA5A2F843167001954A5 /* FileWatch.mm in Sources */,
+				AAEABA5B2F843167001954A5 /* FontHelper.m in Sources */,
+				AAEABA5C2F843167001954A5 /* FoundationUtilities.m in Sources */,
+				AAEABA5D2F843167001954A5 /* HomeScreenRuntimeDelegate.mm in Sources */,
+				AAEABA5E2F843167001954A5 /* IntegerValidationFormatter.m in Sources */,
+				AAEABA5F2F843167001954A5 /* Rtt_AppleInputDeviceManager.mm in Sources */,
+				AAEABA602F843167001954A5 /* Rtt_MacDialogController.mm in Sources */,
+				AAEABA612F843167001954A5 /* ListKeyStore.cpp in Sources */,
+				AAEABA622F843167001954A5 /* NSAlert-OAExtensions.m in Sources */,
+				AAEABA632F843167001954A5 /* NSWindow+ForFirstResponderMenu.m in Sources */,
+				AAEABA642F843167001954A5 /* NewProjectController.mm in Sources */,
+				AAEABA652F843167001954A5 /* OSXAppBuildController.mm in Sources */,
+				AAEABA662F843167001954A5 /* ResponderPassthroughTextField.m in Sources */,
+				AAEABA672F843167001954A5 /* NSString+Extensions.m in Sources */,
+				AAEABA682F843167001954A5 /* Rtt_AndroidAppPackager.cpp in Sources */,
+				AAEABA692F843167001954A5 /* Rtt_AppleKeyServices.mm in Sources */,
+				AAEABA6A2F843167001954A5 /* Rtt_AndroidSupportTools.c in Sources */,
+				AAEABA6B2F843167001954A5 /* Rtt_DeviceBuildData.cpp in Sources */,
+				AAEABA6C2F843167001954A5 /* Rtt_IOSAppPackager.mm in Sources */,
+				AAEABA6D2F843167001954A5 /* TVOSAppBuildController.mm in Sources */,
+				AAEABA6E2F843167001954A5 /* Rtt_KeyName.cpp in Sources */,
+				AAEABA6F2F843167001954A5 /* Rtt_LuaLibSimulator.cpp in Sources */,
+				AAEABA702F843167001954A5 /* Rtt_MacActivityIndicator.mm in Sources */,
+				AAEABA712F843167001954A5 /* Rtt_MacConsolePlatform.mm in Sources */,
+				AAEABA722F843167001954A5 /* Rtt_MacDisplayObject.mm in Sources */,
+				AAEABA732F843167001954A5 /* Rtt_MacExitCallback.mm in Sources */,
+				AAEABA742F843167001954A5 /* Rtt_MacFBConnect.mm in Sources */,
+				AAEABA752F843167001954A5 /* Rtt_MacImageProvider.mm in Sources */,
+				AAEABA762F843167001954A5 /* Rtt_MacMapViewObject.mm in Sources */,
+				AAEABA772F843167001954A5 /* Rtt_MacRemotePlayerHost.mm in Sources */,
+				AAEABA782F843167001954A5 /* Rtt_MacServer.mm in Sources */,
+				AAEABA792F843167001954A5 /* Rtt_MacSimulator.mm in Sources */,
+				AAEABA7A2F843167001954A5 /* Rtt_MacSimulatorServices.mm in Sources */,
+				AAEABA7B2F843167001954A5 /* Rtt_MacSurfaceVideoRecorder.mm in Sources */,
+				AAEABA7C2F843167001954A5 /* LinuxAppBuildController.mm in Sources */,
+				AAEABA7D2F843167001954A5 /* Rtt_MacTextBoxObject.mm in Sources */,
+				AAEABA7E2F843167001954A5 /* Rtt_MacTextFieldObject.mm in Sources */,
+				AAEABA7F2F843167001954A5 /* Rtt_MacVideoObject.mm in Sources */,
+				AAEABA802F843167001954A5 /* Rtt_MacVideoPlayer.mm in Sources */,
+				AAEABA812F843167001954A5 /* Rtt_MacVideoProvider.mm in Sources */,
+				AAEABA822F843167001954A5 /* Rtt_MacWebPopup.mm in Sources */,
+				AAEABA832F843167001954A5 /* Rtt_MacWebViewObject.mm in Sources */,
+				AAEABA842F843167001954A5 /* Rtt_OSXAppPackager.mm in Sources */,
+				AAEABA852F843167001954A5 /* Rtt_PlatformAppPackager.cpp in Sources */,
+				AAEABA862F843167001954A5 /* Rtt_PlatformDictionaryWrapper.cpp in Sources */,
+				AAEABA872F843167001954A5 /* Rtt_PlatformObjectWrapper.cpp in Sources */,
+				AAEABA882F843167001954A5 /* Rtt_PlatformPlayer.cpp in Sources */,
+				AAEABA892F843167001954A5 /* Rtt_PlatformSimulator.cpp in Sources */,
+				AAEABA8A2F843167001954A5 /* Rtt_SimulatorAnalytics.cpp in Sources */,
+				AAEABA8B2F843167001954A5 /* Rtt_TargetAndroidAppStore.cpp in Sources */,
+				AAEABA8C2F843167001954A5 /* Rtt_WebAppPackager.cpp in Sources */,
+				AAEABA8D2F843167001954A5 /* Rtt_AppleInputMFiDeviceListener.mm in Sources */,
+				AAEABA8E2F843167001954A5 /* SDKList.m in Sources */,
+				AAEABA8F2F843167001954A5 /* SPILDTopLayerView.m in Sources */,
+				AAEABA902F843167001954A5 /* Rtt_AppleInputDevice.mm in Sources */,
+				AAEABA912F843167001954A5 /* SampleCodeLocator.mm in Sources */,
+				AAEABA922F843167001954A5 /* SimulatorDeviceWindow.mm in Sources */,
+				AAEABA932F843167001954A5 /* SkinView.mm in Sources */,
+				AAEABA942F843167001954A5 /* SkinlessSimulatorWindow.mm in Sources */,
+				AAEABA952F843167001954A5 /* SkinnableWindow.mm in Sources */,
+				AAEABA962F843167001954A5 /* TextEditorSupport.m in Sources */,
+				AAEABA972F843167001954A5 /* AnalyticsProvider.mm in Sources */,
+				AAEABA982F843167001954A5 /* AppleAppBuildController.mm in Sources */,
+				AAEABA992F843167001954A5 /* ValidationSupportMacUI.m in Sources */,
+				AAEABA9A2F843167001954A5 /* Rtt_TVOSAppPackager.mm in Sources */,
+				AAEABA9B2F843167001954A5 /* ValidationToolOutputViewController.m in Sources */,
+				AAEABA9C2F843167001954A5 /* VersionLabel.m in Sources */,
+				AAEABA9D2F843167001954A5 /* WebAppBuildController.mm in Sources */,
+				AAEABA9E2F843167001954A5 /* XcodeToolHelper.m in Sources */,
+				AAEABA9F2F843167001954A5 /* YRKSpinningProgressIndicatorLayer.m in Sources */,
+				AAEABAA02F843167001954A5 /* hmac_sha2.c in Sources */,
+				AAEABAA12F843167001954A5 /* main.m in Sources */,
+				AAEABAA22F843167001954A5 /* sha2.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAEABAEA2F84316B001954A5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABAEB2F84316B001954A5 /* CoronaLuaObjC.mm in Sources */,
+				AAEABAEC2F84316B001954A5 /* CoronaViewPrivate.mm in Sources */,
+				AAEABAED2F84316B001954A5 /* CoronaWindowController.mm in Sources */,
+				AAEABAEE2F84316B001954A5 /* GLView.mm in Sources */,
+				AAEABAEF2F84316B001954A5 /* Rtt_AppleAudioPlayer.cpp in Sources */,
+				AAEABAF02F84316B001954A5 /* Rtt_AppleAudioRecorder.mm in Sources */,
+				AAEABAF12F84316B001954A5 /* Rtt_AppleBitmap.mm in Sources */,
+				AAEABAF22F84316B001954A5 /* Rtt_AppleCallback.mm in Sources */,
+				AAEABAF32F84316B001954A5 /* Rtt_AppleCrypto.cpp in Sources */,
+				AAEABAF42F84316B001954A5 /* Rtt_AppleData.mm in Sources */,
+				AAEABAF52F84316B001954A5 /* Rtt_AppleDictionaryWrapper.mm in Sources */,
+				AAEABAF62F84316B001954A5 /* Rtt_AppleEventSound.cpp in Sources */,
+				AAEABAF72F84316B001954A5 /* Rtt_ApplePlatform.mm in Sources */,
+				AAEABAF82F84316B001954A5 /* Rtt_AppleReachability.mm in Sources */,
+				AAEABAF92F84316B001954A5 /* Rtt_AppleTextAlignment.mm in Sources */,
+				AAEABAFA2F84316B001954A5 /* Rtt_AppleTextDelegateWrapperObjectHelper.m in Sources */,
+				AAEABAFB2F84316B001954A5 /* Rtt_AppleTimer.mm in Sources */,
+				AAEABAFC2F84316B001954A5 /* Rtt_FileSystem.cpp in Sources */,
+				AAEABAFD2F84316B001954A5 /* Rtt_MacDevice.mm in Sources */,
+				AAEABAFE2F84316B001954A5 /* Rtt_MacDeviceIdentifier.c in Sources */,
+				AAEABAFF2F84316B001954A5 /* Rtt_MacFont.mm in Sources */,
+				AAEABB002F84316B001954A5 /* Rtt_MacPlatform.mm in Sources */,
+				AAEABB012F84316B001954A5 /* Rtt_MacViewCallback.mm in Sources */,
+				AAEABB022F84316B001954A5 /* Rtt_MacViewSurface.mm in Sources */,
+				AAEABB032F84316B001954A5 /* Rtt_AppleFont.mm in Sources */,
+				AAEABB042F84316B001954A5 /* Rtt_NativeWindowMode.cpp in Sources */,
+				AAEABB052F84316B001954A5 /* Rtt_ProjectSettings.cpp in Sources */,
+				AAEABB062F84316B001954A5 /* Rtt_ReadOnlyProjectSettings.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAEABB312F84316F001954A5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABB322F84316F001954A5 /* Rtt_AppleInAppStoreAppleTransactionObjectWrapper.mm in Sources */,
+				AAEABB332F84316F001954A5 /* Rtt_MacImageProvider.mm in Sources */,
+				AAEABB342F84316F001954A5 /* Rtt_MacMapViewObject.mm in Sources */,
+				AAEABB352F84316F001954A5 /* CoronaLuaObjC.mm in Sources */,
+				AAEABB362F84316F001954A5 /* CoronaViewPrivate.mm in Sources */,
+				AAEABB372F84316F001954A5 /* CoronaViewRuntimeDelegate.mm in Sources */,
+				AAEABB382F84316F001954A5 /* CoronaWindowController.mm in Sources */,
+				AAEABB392F84316F001954A5 /* GLView.mm in Sources */,
+				AAEABB3A2F84316F001954A5 /* Rtt_AppleAudioPlayer.cpp in Sources */,
+				AAEABB3B2F84316F001954A5 /* Rtt_AppleInputDeviceManager.mm in Sources */,
+				AAEABB3C2F84316F001954A5 /* Rtt_AppleAudioRecorder.mm in Sources */,
+				AAEABB3D2F84316F001954A5 /* Rtt_AppleBitmap.mm in Sources */,
+				AAEABB3E2F84316F001954A5 /* Rtt_AppleCallback.mm in Sources */,
+				AAEABB3F2F84316F001954A5 /* Rtt_AppleCrypto.cpp in Sources */,
+				AAEABB402F84316F001954A5 /* Rtt_AppleData.mm in Sources */,
+				AAEABB412F84316F001954A5 /* Rtt_AppleDictionaryWrapper.mm in Sources */,
+				AAEABB422F84316F001954A5 /* Rtt_AppleEventSound.cpp in Sources */,
+				AAEABB432F84316F001954A5 /* Rtt_ApplePlatform.mm in Sources */,
+				AAEABB442F84316F001954A5 /* Rtt_AppleReachability.mm in Sources */,
+				AAEABB452F84316F001954A5 /* Rtt_AppleTextAlignment.mm in Sources */,
+				AAEABB462F84316F001954A5 /* Rtt_AppleTextDelegateWrapperObjectHelper.m in Sources */,
+				AAEABB472F84316F001954A5 /* Rtt_AppleTimer.mm in Sources */,
+				AAEABB482F84316F001954A5 /* Rtt_FileSystem.cpp in Sources */,
+				AAEABB492F84316F001954A5 /* Rtt_KeyName.cpp in Sources */,
+				AAEABB4A2F84316F001954A5 /* Rtt_MacActivityIndicator.mm in Sources */,
+				AAEABB4B2F84316F001954A5 /* Rtt_AppleInputHIDDeviceListener.mm in Sources */,
+				AAEABB4C2F84316F001954A5 /* Rtt_MacDevice.mm in Sources */,
+				AAEABB4D2F84316F001954A5 /* Rtt_AppleFont.mm in Sources */,
+				AAEABB4E2F84316F001954A5 /* Rtt_MacDeviceIdentifier.c in Sources */,
+				AAEABB4F2F84316F001954A5 /* Rtt_AppleKeyServices.mm in Sources */,
+				AAEABB502F84316F001954A5 /* Rtt_MacDisplayObject.mm in Sources */,
+				AAEABB512F84316F001954A5 /* Rtt_MacExitCallback.mm in Sources */,
+				AAEABB522F84316F001954A5 /* Rtt_MacFont.mm in Sources */,
+				AAEABB532F84316F001954A5 /* Rtt_MacPlatform.mm in Sources */,
+				AAEABB542F84316F001954A5 /* Rtt_MacTextBoxObject.mm in Sources */,
+				AAEABB552F84316F001954A5 /* Rtt_AppleInAppStore.mm in Sources */,
+				AAEABB562F84316F001954A5 /* Rtt_MacTextFieldObject.mm in Sources */,
+				AAEABB572F84316F001954A5 /* Rtt_MacVideoObject.mm in Sources */,
+				AAEABB582F84316F001954A5 /* Rtt_AppleInputMFiDeviceListener.mm in Sources */,
+				AAEABB592F84316F001954A5 /* Rtt_MacVideoPlayer.mm in Sources */,
+				AAEABB5A2F84316F001954A5 /* Rtt_AppleInputDevice.mm in Sources */,
+				AAEABB5B2F84316F001954A5 /* Rtt_MacVideoProvider.mm in Sources */,
+				AAEABB5C2F84316F001954A5 /* Rtt_MacViewCallback.mm in Sources */,
+				AAEABB5D2F84316F001954A5 /* Rtt_MacViewSurface.mm in Sources */,
+				AAEABB5E2F84316F001954A5 /* Rtt_AppleInAppStoreApple.mm in Sources */,
+				AAEABB5F2F84316F001954A5 /* Rtt_MacWebPopup.mm in Sources */,
+				AAEABB602F84316F001954A5 /* Rtt_MacWebViewObject.mm in Sources */,
+				AAEABB612F84316F001954A5 /* Rtt_NativeWindowMode.cpp in Sources */,
+				AAEABB622F84316F001954A5 /* Rtt_PlatformDictionaryWrapper.cpp in Sources */,
+				AAEABB632F84316F001954A5 /* Rtt_PlatformExitCallback.cpp in Sources */,
+				AAEABB642F84316F001954A5 /* Rtt_PlatformObjectWrapper.cpp in Sources */,
+				AAEABB652F84316F001954A5 /* Rtt_PlatformVideoPlayer.cpp in Sources */,
+				AAEABB662F84316F001954A5 /* Rtt_PlatformVideoProvider.cpp in Sources */,
+				AAEABB672F84316F001954A5 /* Rtt_PlatformWebPopup.cpp in Sources */,
+				AAEABB682F84316F001954A5 /* Rtt_ProjectSettings.cpp in Sources */,
+				AAEABB692F84316F001954A5 /* Rtt_ReadOnlyProjectSettings.cpp in Sources */,
+				AAEABB6A2F84316F001954A5 /* SPILDTopLayerView.m in Sources */,
+				AAEABB6B2F84316F001954A5 /* YRKSpinningProgressIndicatorLayer.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C229E0AF1B32221B00D87A7C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -8002,11 +9344,6 @@
 			target = 50B013EA17558BCA00B822B8 /* Box2D */;
 			targetProxy = A4FBC50A1A2D5495004D9A01 /* PBXContainerItemProxy */;
 		};
-		A4FBC5121A2D5509004D9A01 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = tachyon;
-			targetProxy = A4FBC5111A2D5509004D9A01 /* PBXContainerItemProxy */;
-		};
 		A4FBC5151A2D552C004D9A01 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = car;
@@ -8031,6 +9368,166 @@
 			isa = PBXTargetDependency;
 			target = A4FBC4F61A2D5479004D9A01 /* CoronaCore */;
 			targetProxy = A4FBC56B1A2D5A8A004D9A01 /* PBXContainerItemProxy */;
+		};
+		AAEAB9DC2F843167001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = CoronaLiveServer;
+			targetProxy = AAEAB9DD2F843167001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEAB9DE2F843167001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "ios-syslog-helper";
+			targetProxy = AAEAB9DF2F843167001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEAB9E22F843167001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = CoronaConsole;
+			targetProxy = AAEAB9E32F843167001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEAB9E82F843167001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A48B827C16D59A4000CA01A1 /* CoronaResources */;
+			targetProxy = AAEAB9E92F843167001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEAB9EA2F843167001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = debugger;
+			targetProxy = AAEAB9EB2F843167001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEAB9EC2F843167001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 00B737B912B707B40057F594 /* ALmixer */;
+			targetProxy = AAEAB9ED2F843167001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEAB9EE2F843167001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = plugins;
+			targetProxy = AAEAB9EF2F843167001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABAD82F84316B001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = luac;
+			targetProxy = AAEABAD92F84316B001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABADA2F84316B001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = lua;
+			targetProxy = AAEABADB2F84316B001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABADC2F84316B001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = car;
+			targetProxy = AAEABADD2F84316B001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABADE2F84316B001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 50B013EA17558BCA00B822B8 /* Box2D */;
+			targetProxy = AAEABADF2F84316B001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABAE02F84316B001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 00B733FA12B6F6BC0057F594 /* liblua */;
+			targetProxy = AAEABAE12F84316B001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABAE22F84316B001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 008955E31340466B00699C04 /* luafilesystem */;
+			targetProxy = AAEABAE32F84316B001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABAE42F84316B001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C229DFD71B32221B00D87A7C /* librtt-simulator */;
+			targetProxy = AAEABAE52F84316B001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABAE62F84316B001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = liblpeg;
+			targetProxy = AAEABAE72F84316B001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABB192F84316F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 00B737B912B707B40057F594 /* ALmixer */;
+			targetProxy = AAEABB1A2F84316F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABB1B2F84316F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = liblpeg;
+			targetProxy = AAEABB1C2F84316F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABB1D2F84316F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = car;
+			targetProxy = AAEABB1E2F84316F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABB1F2F84316F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = lua;
+			targetProxy = AAEABB202F84316F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABB212F84316F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = luac;
+			targetProxy = AAEABB222F84316F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABB232F84316F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = plugins;
+			targetProxy = AAEABB242F84316F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABB252F84316F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 50B013EA17558BCA00B822B8 /* Box2D */;
+			targetProxy = AAEABB262F84316F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABB272F84316F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = libluasocket;
+			targetProxy = AAEABB282F84316F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABB292F84316F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 00B733FA12B6F6BC0057F594 /* liblua */;
+			targetProxy = AAEABB2A2F84316F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABB2B2F84316F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 00B733F212B6F6740057F594 /* librtt */;
+			targetProxy = AAEABB2C2F84316F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABB2D2F84316F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 008955E31340466B00699C04 /* luafilesystem */;
+			targetProxy = AAEABB2E2F84316F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABBF02F8435A9001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AAEABB182F84316F001954A5 /* CoronaCards-angle */;
+			targetProxy = AAEABBEF2F8435A9001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABBF22F8435A9001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AAEABAD72F84316B001954A5 /* CoronaCore-angle */;
+			targetProxy = AAEABBF12F8435A9001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABBF52F84363F001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = tachyon;
+			targetProxy = AAEABBF42F84363F001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABBF72F84367B001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "tachyon-angle";
+			targetProxy = AAEABBF62F84367B001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABBFA2F8436A8001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "tachyon-angle";
+			targetProxy = AAEABBF92F8436A8001954A5 /* PBXContainerItemProxy */;
+		};
+		AAEABC5D2F84693A001954A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "CoronaShell-angle";
+			targetProxy = AAEABC5C2F84693A001954A5 /* PBXContainerItemProxy */;
 		};
 		C21995B01C18A2C000E88FD0 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -8136,16 +9633,6 @@
 			isa = PBXTargetDependency;
 			name = CoronaLiveServer;
 			targetProxy = F533258D1D9DD3CC003613F7 /* PBXContainerItemProxy */;
-		};
-		F5567D4D2ADC73E1008CD550 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = network;
-			targetProxy = F5567D4C2ADC73E1008CD550 /* PBXContainerItemProxy */;
-		};
-		F5567D4F2ADC740E008CD550 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = network;
-			targetProxy = F5567D4E2ADC740E008CD550 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -8537,14 +10024,13 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CODE_SIGN_ENTITLEMENTS = CoronaSimulator.entitlements;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_RESOURCE_RULES_PATH = "";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = NO;
 				DEAD_CODE_STRIPPING = NO;
-				DEVELOPMENT_TEAM = BG2J43EA88;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = BG2J43EA88;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -8869,6 +10355,478 @@
 			};
 			name = "Release-template";
 		};
+		AAEABACC2F843167001954A5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_SECURITY_FLOATLOOPCOUNTER = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CODE_SIGN_ENTITLEMENTS = CoronaSimulator.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_RESOURCE_RULES_PATH = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = NO;
+				DEAD_CODE_STRIPPING = NO;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../../external\"",
+				);
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = Rtt_Player.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					Rtt_AUTHORING_SIMULATOR,
+					"$(inherited)",
+					Rtt_ANGLE_BUILD,
+				);
+				HEADER_SEARCH_PATHS = (
+					"../../external/b2Separator-cpp",
+					../../external/Box2D,
+					../../external/smoothpolygon,
+					/System/Library/Frameworks/OpenAL.framework/Headers,
+					"../../external/kelan-yrk-spinning-progress-indicator-layer/Code",
+					"../../external/Simple-NSAlert-with-Blocks",
+					../shared,
+					../../external/Angle/include,
+				);
+				INFOPLIST_FILE = "rttplayer-angle-Info.plist";
+				INSTALL_PATH = "$(HOME)/Applications";
+				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../../plugins/build-core/gameNetwork/mac\"",
+					"\"$(SRCROOT)/../../plugins/build-core/licensing/mac\"",
+					/opt/X11/lib,
+					"$(SYSTEM_APPS_DIR)/Steam.app/Contents/MacOS",
+					"$(SRCROOT)/../../external/Angle/bin/Mac",
+				);
+				LIBRARY_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../../modules/platform/mac/build/Release\"";
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_BUNDLE_IDENTIFIER = com.coronalabs.Corona_Simulator;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				STRIP_STYLE = "non-global";
+				WARNING_CFLAGS = (
+					"-Wno-inconsistent-missing-override",
+					"-Werror=idiomatic-parentheses",
+				);
+			};
+			name = Debug;
+		};
+		AAEABACD2F843167001954A5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_SECURITY_FLOATLOOPCOUNTER = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CODE_SIGN_ENTITLEMENTS = CoronaSimulator.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_RESOURCE_RULES_PATH = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = NO;
+				DEAD_CODE_STRIPPING = NO;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../../external\"",
+				);
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = Rtt_Player.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					Rtt_AUTHORING_SIMULATOR,
+					"$(inherited)",
+					Rtt_ANGLE_BUILD,
+				);
+				HEADER_SEARCH_PATHS = (
+					"../../external/b2Separator-cpp",
+					../../external/Box2D,
+					../../external/smoothpolygon,
+					/System/Library/Frameworks/OpenAL.framework/Headers,
+					"../../external/kelan-yrk-spinning-progress-indicator-layer/Code",
+					"../../external/Simple-NSAlert-with-Blocks",
+					../shared,
+					../../external/Angle/include,
+				);
+				INFOPLIST_FILE = "rttplayer-angle-Info.plist";
+				INSTALL_PATH = "$(HOME)/Applications";
+				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../../plugins/build-core/gameNetwork/mac\"",
+					"\"$(SRCROOT)/../../plugins/build-core/licensing/mac\"",
+					/opt/X11/lib,
+					"$(SYSTEM_APPS_DIR)/Steam.app/Contents/MacOS",
+					"$(SRCROOT)/../../external/Angle/bin/Mac",
+				);
+				LIBRARY_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../../modules/platform/mac/build/Release\"";
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_BUNDLE_IDENTIFIER = com.coronalabs.Corona_Simulator;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				STRIP_STYLE = "non-global";
+			};
+			name = Release;
+		};
+		AAEABACE2F843167001954A5 /* Release-template */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_SECURITY_FLOATLOOPCOUNTER = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CODE_SIGN_ENTITLEMENTS = CoronaSimulator.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_RESOURCE_RULES_PATH = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = NO;
+				DEAD_CODE_STRIPPING = NO;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../../external\"",
+				);
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = Rtt_Player.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					Rtt_AUTHORING_SIMULATOR,
+					"$(inherited)",
+					Rtt_ANGLE_BUILD,
+				);
+				HEADER_SEARCH_PATHS = (
+					"../../external/b2Separator-cpp",
+					../../external/Box2D,
+					../../external/smoothpolygon,
+					/System/Library/Frameworks/OpenAL.framework/Headers,
+					"../../external/kelan-yrk-spinning-progress-indicator-layer/Code",
+					"../../external/Simple-NSAlert-with-Blocks",
+					../shared,
+					../../external/Angle/include,
+				);
+				INFOPLIST_FILE = "rttplayer-angle-Info.plist";
+				INSTALL_PATH = "$(HOME)/Applications";
+				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../../plugins/build-core/gameNetwork/mac\"",
+					"\"$(SRCROOT)/../../plugins/build-core/licensing/mac\"",
+					/opt/X11/lib,
+					"$(SYSTEM_APPS_DIR)/Steam.app/Contents/MacOS",
+					"$(SRCROOT)/../../external/Angle/bin/Mac",
+				);
+				LIBRARY_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"$(SRCROOT)/../../modules/platform/mac/build/Release\"";
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_BUNDLE_IDENTIFIER = com.coronalabs.Corona_Simulator;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				STRIP_STYLE = "non-global";
+			};
+			name = "Release-template";
+		};
+		AAEABB142F84316B001954A5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				COMBINE_HIDPI_IMAGES = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = Rtt_Player.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					Rtt_AUTHORING_SIMULATOR,
+					"$(inherited)",
+					Rtt_ANGLE_BUILD,
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				HEADER_SEARCH_PATHS = (
+					"../../external/b2Separator-cpp",
+					../../external/Box2D,
+					../../external/smoothpolygon,
+					/System/Library/Frameworks/OpenAL.framework/Headers,
+					../../external/Angle/include,
+				);
+				MTL_ENABLE_DEBUG_INFO = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		AAEABB152F84316B001954A5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				COMBINE_HIDPI_IMAGES = NO;
+				COPY_PHASE_STRIP = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = Rtt_Player.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					Rtt_AUTHORING_SIMULATOR,
+					"$(inherited)",
+					Rtt_ANGLE_BUILD,
+				);
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"../../external/b2Separator-cpp",
+					../../external/Box2D,
+					../../external/smoothpolygon,
+					/System/Library/Frameworks/OpenAL.framework/Headers,
+					../../external/Angle/include,
+				);
+				MTL_ENABLE_DEBUG_INFO = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		AAEABB162F84316B001954A5 /* Release-template */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				COMBINE_HIDPI_IMAGES = NO;
+				COPY_PHASE_STRIP = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = Rtt_Player.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					Rtt_MAC_ENV,
+					Rtt_LUA_COMPILER,
+					LUA_USE_MODERN_MACOSX,
+					LUA_USE_APICHECK,
+					NDEBUG,
+					ALMIXER_COMPILE_WITHOUT_SDL,
+					Rtt_ANGLE_BUILD,
+				);
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"../../external/b2Separator-cpp",
+					../../external/Box2D,
+					../../external/smoothpolygon,
+					/System/Library/Frameworks/OpenAL.framework/Headers,
+					../../external/Angle/include,
+				);
+				MTL_ENABLE_DEBUG_INFO = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-template";
+		};
+		AAEABBAA2F84316F001954A5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = NO;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CODE_SIGN_IDENTITY = "Mac Developer";
+				COMBINE_HIDPI_IMAGES = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = "";
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(USER_LIBRARY_DIR)/Developer/Xcode/DerivedData/XMLRPC-gxocbvbyxouamuftqwdiuyryfprl/Build/Products/Development",
+				);
+				FRAMEWORK_VERSION = A;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "CoronaCards/CoronaCards-Prefix.pch";
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					Rtt_CORONA_CARDS_ENV,
+					"DEBUG=1",
+					"$(inherited)",
+					Rtt_ANGLE_BUILD,
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				HEADER_SEARCH_PATHS = (
+					"../../external/b2Separator-cpp",
+					../../external/Box2D,
+					../../external/smoothpolygon,
+					"../../external/tiny-aes128-c",
+					/System/Library/Frameworks/OpenAL.framework/Headers,
+					"$(SRCROOT)/../../external/SDL_sound.framework/Headers",
+					"$(SRCROOT)/../../external/SDL.framework/Headers",
+					../../external/Angle/include,
+				);
+				INFOPLIST_FILE = "CoronaCards-angle-Info.plist";
+				INSTALL_PATH = "@executable_path/../Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+					"$(SRCROOT)/../../external/Angle/bin/Mac",
+				);
+				MTL_ENABLE_DEBUG_INFO = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		AAEABBAB2F84316F001954A5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = NO;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CODE_SIGN_IDENTITY = "Mac Developer";
+				COMBINE_HIDPI_IMAGES = NO;
+				COPY_PHASE_STRIP = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = "";
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_NS_ASSERTIONS = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(USER_LIBRARY_DIR)/Developer/Xcode/DerivedData/XMLRPC-gxocbvbyxouamuftqwdiuyryfprl/Build/Products/Development",
+				);
+				FRAMEWORK_VERSION = A;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "CoronaCards/CoronaCards-Prefix.pch";
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					Rtt_CORONA_CARDS_ENV,
+					"$(inherited)",
+					Rtt_ANGLE_BUILD,
+				);
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"../../external/b2Separator-cpp",
+					../../external/Box2D,
+					../../external/smoothpolygon,
+					"../../external/tiny-aes128-c",
+					/System/Library/Frameworks/OpenAL.framework/Headers,
+					"$(SRCROOT)/../../external/SDL_sound.framework/Headers",
+					"$(SRCROOT)/../../external/SDL.framework/Headers",
+					../../external/Angle/include,
+				);
+				INFOPLIST_FILE = "CoronaCards-angle-Info.plist";
+				INSTALL_PATH = "@executable_path/../Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+					"$(SRCROOT)/../../external/Angle/bin/Mac",
+				);
+				MTL_ENABLE_DEBUG_INFO = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Release;
+		};
+		AAEABBAC2F84316F001954A5 /* Release-template */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = NO;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CODE_SIGN_IDENTITY = "Mac Developer";
+				COMBINE_HIDPI_IMAGES = NO;
+				COPY_PHASE_STRIP = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = "";
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_NS_ASSERTIONS = NO;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(USER_LIBRARY_DIR)/Developer/Xcode/DerivedData/XMLRPC-gxocbvbyxouamuftqwdiuyryfprl/Build/Products/Development",
+				);
+				FRAMEWORK_VERSION = A;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "CoronaCards/CoronaCards-Prefix.pch";
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					Rtt_CORONA_CARDS_ENV,
+					"$(inherited)",
+					Rtt_ANGLE_BUILD,
+				);
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"../../external/b2Separator-cpp",
+					../../external/Box2D,
+					../../external/smoothpolygon,
+					"../../external/tiny-aes128-c",
+					/System/Library/Frameworks/OpenAL.framework/Headers,
+					"$(SRCROOT)/../../external/SDL_sound.framework/Headers",
+					"$(SRCROOT)/../../external/SDL.framework/Headers",
+					../../external/Angle/include,
+				);
+				INFOPLIST_FILE = "CoronaCards-angle-Info.plist";
+				INSTALL_PATH = "@executable_path/../Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+					"$(SRCROOT)/../../external/Angle/bin/Mac",
+				);
+				MTL_ENABLE_DEBUG_INFO = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = "Release-template";
+		};
 		C01FCF4B08A954540054247B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -8876,14 +10834,13 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CODE_SIGN_ENTITLEMENTS = CoronaSimulator.entitlements;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_RESOURCE_RULES_PATH = "";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = NO;
 				DEAD_CODE_STRIPPING = NO;
-				DEVELOPMENT_TEAM = BG2J43EA88;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = BG2J43EA88;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -8937,14 +10894,13 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CODE_SIGN_ENTITLEMENTS = CoronaSimulator.entitlements;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_RESOURCE_RULES_PATH = "";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = NO;
 				DEAD_CODE_STRIPPING = NO;
-				DEVELOPMENT_TEAM = BG2J43EA88;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = BG2J43EA88;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -9420,6 +11376,36 @@
 				A4FBC4F81A2D547A004D9A01 /* Debug */,
 				A4FBC4F91A2D547A004D9A01 /* Release */,
 				A4FBC4FA1A2D547A004D9A01 /* Release-template */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AAEABACB2F843167001954A5 /* Build configuration list for PBXNativeTarget "rttplayer-angle" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAEABACC2F843167001954A5 /* Debug */,
+				AAEABACD2F843167001954A5 /* Release */,
+				AAEABACE2F843167001954A5 /* Release-template */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AAEABB132F84316B001954A5 /* Build configuration list for PBXNativeTarget "CoronaCore-angle" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAEABB142F84316B001954A5 /* Debug */,
+				AAEABB152F84316B001954A5 /* Release */,
+				AAEABB162F84316B001954A5 /* Release-template */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AAEABBA92F84316F001954A5 /* Build configuration list for PBXNativeTarget "CoronaCards-angle" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAEABBAA2F84316F001954A5 /* Debug */,
+				AAEABBAB2F84316F001954A5 /* Release */,
+				AAEABBAC2F84316F001954A5 /* Release-template */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
