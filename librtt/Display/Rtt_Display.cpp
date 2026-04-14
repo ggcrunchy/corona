@@ -245,6 +245,22 @@ Display::~Display()
     Rtt_DELETE( fShaderFactory );
     Rtt_DELETE( fRenderer );
     Rtt_DELETE( fDefaults );
+    
+    GLRenderer::ResetGLES(); // no-op if not GLES
+}
+
+bool
+Display::IsUsingGLES(void)
+{
+    return GLRenderer::UsingGLES( NULL, NULL );
+}
+
+bool
+Display::IsUsingGLES3( int *minorVersion )
+{
+    int majorVersion;
+
+    return GLRenderer::UsingGLES( &majorVersion, minorVersion ) && 3 == majorVersion;
 }
 
 static void
@@ -858,11 +874,14 @@ Display::Capture( DisplayObject *object,
         x_in_pixels = 0;
         y_in_pixels = 0;
     }
+#if 0
 #    if defined( Rtt_OPENGLES )
         const Texture::Format kFormat = Texture::kRGBA;
 #    else
         const Texture::Format kFormat = Texture::kBGRA;
 #    endif
+#endif
+    const Texture::Format kFormat = IsUsingGLES() ? Texture::kRGBA : Texture::kBGRA;
 
     // Using Texture::kNearest and Texture::kClampToEdge here is absolutely
     // mandatory. See:
@@ -1029,7 +1048,7 @@ Display::Capture( DisplayObject *object,
             // We want the RGBA value of the first pixel.
 
             const unsigned char *bytes = static_cast< const unsigned char * >( bitmap->ReadAccess() );
-
+#if 0
 #            ifdef Rtt_OPENGLES
 
                 // IMPORTANT: We're assuming the format is GL_RGBA and GL_UNSIGNED_BYTE.
@@ -1047,6 +1066,23 @@ Display::Capture( DisplayObject *object,
                 optional_output_color->a = bytes[ 0 ];
 
 #            endif // Rtt_OPENGLES
+#endif
+            if ( IsUsingGLES() )
+            {
+                optional_output_color->r = bytes[ 0 ];
+                optional_output_color->g = bytes[ 1 ];
+                optional_output_color->b = bytes[ 2 ];
+                optional_output_color->a = bytes[ 3 ];
+            }
+
+            else
+            {
+                // IMPORTANT: We're assuming the format is GL_ARGB and GL_UNSIGNED_BYTE.
+                optional_output_color->r = bytes[ 1 ];
+                optional_output_color->g = bytes[ 2 ];
+                optional_output_color->b = bytes[ 3 ];
+                optional_output_color->a = bytes[ 0 ];
+            }
         }
     }
 

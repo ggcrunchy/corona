@@ -15,7 +15,7 @@
 #include "Rtt_RenderingStream.h"
 
 #include "Display/Rtt_Paint.h"
-#include "Rtt_GPU.h"
+//#include "Rtt_GPU.h"
 
 #if defined( Rtt_AUTHORING_SIMULATOR ) || defined( Rtt_ANDROID_ENV )
 #define RTT_SURFACE_ROTATION
@@ -49,10 +49,12 @@ class GPUStream : public RenderingStream
 		};
 
 	public:
+	#ifdef OLD_GRAPHICS
 		static int GetMaxTextureUnits();
-
+		
 	public:
 		static GLenum GetDataType();
+	#endif
 
 	public:
 		GPUStream( Rtt_Allocator* );
@@ -176,8 +178,13 @@ class GPUStream : public RenderingStream
 		TextureStackFrame fTextureStack[kMaxTextureStackDepth];
 
 	private:
+	#ifdef OLD_GRAPHICS
 		GLint fWindowWidth;
 		GLint fWindowHeight;
+	#else
+		int fWindowWidth;
+		int fWindowHeight;
+	#endif
 		S32 fRenderedContentWidth; // width of rect in which content is rendered (not necessarily same as content width)
 		S32 fRenderedContentHeight; // height of rect in which content is rendered (not necessarily same as content height)
 
@@ -196,10 +203,17 @@ class GPUStream : public RenderingStream
 		TextureFunction fTextureFunction;
 
 		// Clear color
+	#ifdef OLD_GRAPHICS
 		GLclampf fClearR;
 		GLclampf fClearG;
 		GLclampf fClearB;
 		GLclampf fClearA;
+	#else
+		float fClearR;
+		float fClearG;
+		float fClearB;
+		float fClearA;
+	#endif
 		
 	protected:
 		Rtt_Allocator* fAllocator;

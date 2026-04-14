@@ -12,6 +12,7 @@
 #include "Display/Rtt_PlatformBitmapTexture.h"
 
 #include "Display/Rtt_PlatformBitmap.h"
+#include "Display/Rtt_Display.h" // GLES query
 
 // ----------------------------------------------------------------------------
 
@@ -67,10 +68,12 @@ PlatformBitmapTexture::ConvertFormat( PlatformBitmap::Format format )
 		case PlatformBitmap::kBGRA:
 			result = Texture::kBGRA;
 			break;
+#if 0
 #ifdef Rtt_OPENGLES
 		case PlatformBitmap::kABGR:
 			result = Texture::kRGBA; // ???
 			break;
+#endif
 #endif
 		case PlatformBitmap::kMask:
 			// NOTE: We use kLuminance instead of kAlpha, b/c we want repeated
@@ -88,8 +91,16 @@ PlatformBitmapTexture::ConvertFormat( PlatformBitmap::Format format )
 			result = Texture::kLuminanceAlpha;
 			break;
 		default:
-			Rtt_ASSERT_NOT_IMPLEMENTED();
-			break;
+			if ( Display::IsUsingGLES() && PlatformBitmap::kABGR == format )
+			{
+				result = Texture::kRGBA; // ???
+				break;
+			}
+			else
+			{
+				Rtt_ASSERT_NOT_IMPLEMENTED();
+				break;
+			}
 	}
 
 	return result;

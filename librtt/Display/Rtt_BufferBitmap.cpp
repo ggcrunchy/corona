@@ -10,6 +10,7 @@
 #include "Core/Rtt_Build.h"
 
 #include "Rtt_BufferBitmap.h"
+#include "Rtt_Display.h" // GLES query
 
 // ----------------------------------------------------------------------------
 
@@ -183,6 +184,29 @@ BufferBitmap::Flip( bool flipHorizontally, bool flipVertically )
 	}
 }
 
+template<
+	int kRedIndex,
+	int kGreenIndex,
+	int kBlueIndex,
+	int kAlphaIndex
+>
+void DoPixel( U32 *p )
+{
+	U8 a = ((U8 *)p)[kAlphaIndex];
+
+	if ( a > 0 )
+	{
+		U8& r = ((U8 *)p)[kRedIndex];
+		U8& g = ((U8 *)p)[kGreenIndex];
+		U8& b = ((U8 *)p)[kBlueIndex];
+
+		float invAlpha = 255.f / (float)a;
+		r = invAlpha * r;
+		g = invAlpha * g;
+		b = invAlpha * b;
+	}
+}
+
 void
 BufferBitmap::UndoPremultipliedAlpha()
 {
@@ -192,7 +216,7 @@ BufferBitmap::UndoPremultipliedAlpha()
 	Rtt_ASSERT( sizeof( *p ) == PlatformBitmap::BytesPerPixel( GetFormat() ) );
 
 	int numPixels = ( Width() * Height() );
-
+#if 0
 	for( int i = 0;
 			i < numPixels;
 			++i )
@@ -226,6 +250,36 @@ BufferBitmap::UndoPremultipliedAlpha()
 		}
 
 		p++;
+	}
+#endif
+	if ( Display::IsUsingGLES() )
+	{
+		for( int i = 0;
+				i < numPixels;
+				++i )
+		{
+			DoPixel<
+				0, 1, 2, /* RGB */
+				3 /* Alpha */
+			>( p );
+		
+			p++;
+		}
+	}
+	
+	else
+	{
+		for( int i = 0;
+				i < numPixels;
+				++i )
+		{
+			DoPixel<
+				1, 2, 3, /* RGB */
+				0 /* Alpha */
+			>( p );
+		
+			p++;
+		}
 	}
 }
 

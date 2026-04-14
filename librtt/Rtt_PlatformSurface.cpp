@@ -11,8 +11,12 @@
 
 #include "Rtt_PlatformSurface.h"
 
+#ifdef OLD_GRAPHICS /* was this for OffscreenGPUSurface? (see note further down) */
+
 #if defined( Rtt_IPHONE_ENV )
 	#include <OpenGLES/ES1/glext.h>
+#endif
+
 #endif
 
 // Starting to work on OffscreenGPUSurface for Windows
@@ -114,7 +118,9 @@ PlatformSurface::SetDelegate( PlatformSurfaceDelegate* delegate )
 // ----------------------------------------------------------------------------
 
 // TODO: Replace platform ifdef's with a feature ifdef: Rtt_OFFSCREEN_SURFACE in Rtt_Config.h
-#if ! defined( Rtt_ANDROID_ENV ) && !defined( Rtt_WIN_ENV ) && !defined( Rtt_EMSCRIPTEN_ENV ) && !defined( Rtt_NXS_ENV )
+#if ! defined( Rtt_ANDROID_ENV ) && !defined( Rtt_WIN_ENV ) && !defined( Rtt_EMSCRIPTEN_ENV ) && !defined( Rtt_NXS_ENV ) && \
+\
+defined( OLD_GRAPHICS ) /* n.b. seems to be dead code (and always was?) */
 
 OffscreenGPUSurface::OffscreenGPUSurface( const PlatformSurface& parent )
 :	fWidth( parent.Width() ),

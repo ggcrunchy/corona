@@ -37,6 +37,9 @@ namespace /*anonymous*/
 {
     using namespace Rtt;
 
+	const GLenum kARGB_swizzle = 0xFFFF + 1;
+	const GLenum kBGRA_swizzle = 0xFFFF + 2;
+
     void getFormatTokens( Texture::Format format, GLint& internalFormat, GLenum& sourceFormat, GLenum& sourceType )
     {
         switch( format )
@@ -51,9 +54,21 @@ namespace /*anonymous*/
             case Texture::kRGBA:        internalFormat = GL_RGBA;        sourceFormat = GL_RGBA;            sourceType = GL_UNSIGNED_BYTE; break;
 #if defined( Rtt_WIN_PHONE_ENV )
             case Texture::kBGRA:        internalFormat = GL_BGRA_EXT;    sourceFormat = GL_BGRA_EXT;        sourceType = GL_UNSIGNED_BYTE; break;
-#elif !defined( Rtt_OPENGLES )
-            case Texture::kARGB:        internalFormat = GL_RGBA8;        sourceFormat = GL_BGRA;            sourceType = GL_UNSIGNED_INT_8_8_8_8_REV; break;
-            case Texture::kBGRA:        internalFormat = GL_RGBA8;        sourceFormat = GL_BGRA;            sourceType = GL_UNSIGNED_INT_8_8_8_8; break;
+#elif !defined( Rtt_OPENGLES )// || defined( Rtt_ANGLE_BUILD )
+            case Texture::kARGB:        internalFormat = GL_RGBA8;
+				#ifdef Rtt_ANGLE_BUILD
+					sourceFormat = 0;	sourceType = kARGB_swizzle;
+				#else
+                    sourceFormat = GL_BGRA;            sourceType = GL_UNSIGNED_INT_8_8_8_8_REV;
+				#endif
+                     break;
+            case Texture::kBGRA:        internalFormat = GL_RGBA8;
+				#ifdef Rtt_ANGLE_BUILD
+					sourceFormat = 0;	sourceType = kBGRA_swizzle;
+				#else
+                    sourceFormat = GL_BGRA;            sourceType = GL_UNSIGNED_INT_8_8_8_8;
+				#endif
+                     break;
             #ifdef GL_ABGR_EXT
             case Texture::kABGR:
                 internalFormat = GL_ABGR_EXT;
@@ -97,6 +112,40 @@ namespace /*anonymous*/
         }
 
         return result;
+    }
+    
+	void setSwizzle( GLenum& format, GLenum& type )
+    {
+    #ifdef kRtt_ANGLE_BUILD /* seems to be wrong; deal with at bitmap load... */
+		GLint comp1 = GL_RED, comp2 = GL_GREEN, comp3 = GL_BLUE, comp4 = GL_ALPHA;
+		
+		if ( 0 == format )
+		{
+			switch ( type )
+			{
+			case kARGB_swizzle:
+				comp1 = GL_ALPHA;
+				comp2 = GL_RED;
+				comp3 = GL_GREEN;
+				comp4 = GL_BLUE;
+				break;
+			case kBGRA_swizzle:
+			//	comp1 = GL_BLUE;
+			//	comp3 = GL_RED;
+				break;
+			default:
+				Rtt_ASSERT_NOT_REACHED();
+			}
+		
+			format = GL_RGBA;
+			type = GL_UNSIGNED_BYTE;
+		}
+		
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, comp1);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, comp2);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, comp3);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, comp4);
+	#endif
     }
 }
 
@@ -190,6 +239,7 @@ GLTexture::Create( CPUResource* resource )
     const U32 h = texture->GetHeight();
     const U8* data = texture->GetData();
     {
+		setSwizzle( format, type );
 //#if defined( Rtt_EMSCRIPTEN_ENV )
 //        glPixelStorei( GL_UNPACK_ALIGNMENT, texture->GetByteAlignment() );
 //        GL_CHECK_ERROR();
@@ -229,6 +279,7 @@ GLTexture::Update( CPUResource* resource )
         GLenum format;
         GLenum type;
         getFormatTokens( texture->GetFormat(), internalFormat, format, type );
+        setSwizzle( format, type );
 
         glBindTexture( GL_TEXTURE_2D, GetName() );
 

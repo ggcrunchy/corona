@@ -71,16 +71,26 @@ TextureResource::ConvertFormat( Texture::Format format )
 		case Texture::kBGRA:
 			result = PlatformBitmap::kBGRA;
 			break;
+#if 0
 #ifdef Rtt_OPENGLES
 		case Texture::kABGR:
 			result = PlatformBitmap::kRGBA; // ???
 			break;
 #endif
+#endif
 		case Texture::kLuminance:
 		case Texture::kAlpha:
 		default:
-			Rtt_ASSERT_NOT_IMPLEMENTED();
-			break;
+			if ( Display::IsUsingGLES() && Texture::kABGR == format )
+			{
+				result = PlatformBitmap::kRGBA; // ???
+				break;
+			}
+			else
+			{
+				Rtt_ASSERT_NOT_IMPLEMENTED();
+				break;
+			}
 	}
 
 	return result;

@@ -67,7 +67,11 @@ namespace Rtt
 @property (nonatomic, readwrite, copy) CLLocation *_currentLocation;
 @property (nonatomic, readwrite, copy) NSDictionary *_launchParams;
 
-- (id)initWithPath:(NSString *)path frame:(NSRect)frame;
+- (id)initWithPath:(NSString *)path frame:(NSRect)frame
+#ifdef Rtt_ANGLE_BUILD
+	window:(NSWindow *)window
+#endif
+;
 - (void) startLocationUpdating;
 - (void) endLocationUpdating;
 

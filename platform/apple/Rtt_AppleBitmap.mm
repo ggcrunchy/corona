@@ -502,7 +502,8 @@ AppleFileBitmap::GetBitsColor( Rtt_Allocator* context ) const
 
 		const size_t bytesPerRow = width << 2;
 		const CGBitmapInfo bitmapInfo =
-				#ifdef Rtt_MAC_ENV
+			//	#ifdef Rtt_MAC_ENVk
+				#if defined( Rtt_MAC_ENV ) && !defined( Rtt_ANGLE_BUILD )
 					kCGImageAlphaPremultipliedFirst;
 				#else
 					kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big;
@@ -695,7 +696,10 @@ AppleFileBitmap::GetFormat() const
 		return PlatformBitmap::kMask;
 	}
 
-#ifdef Rtt_MAC_ENV
+//#ifdef Rtt_MAC_ENV
+#if defined( Rtt_ANGLE_BUILD )
+	return PlatformBitmap::kRGBA;
+#elif defined(Rtt_MAC_ENV)
 	return PlatformBitmap::kBGRA;
 #else
 	return PlatformBitmap::kABGR;

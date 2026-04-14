@@ -46,7 +46,13 @@
 
 
 #import <QuartzCore/QuartzCore.h>
-#include <OpenGL/gl.h>
+
+#ifdef Rtt_ANGLE_BUILD
+#	include <GLES3/gl3.h>
+#else
+#	include <OpenGL/gl.h>
+#endif
+
 //#include <OpenGL/OpenGL.h>
 // Fallback intended for Snow Leopard headless Macs. On Lion, we don't seem to have a problem creating the main pixel format. 
 // (It just doesn't actually render which seems to be an Apple bug.)

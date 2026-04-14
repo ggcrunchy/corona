@@ -47,7 +47,11 @@
 #import <AppKit/NSAlert.h>
 #import <AppKit/NSApplication.h>
 #import <AppKit/NSFontManager.h>
-#import <AppKit/NSOpenGL.h>
+
+#ifndef Rtt_ANGLE_BUILD
+#	import <AppKit/NSOpenGL.h>
+#endif
+
 #import <AppKit/NSWindow.h>
 #import <AppKit/NSWorkspace.h>
 #import <Foundation/NSString.h>
@@ -1552,13 +1556,21 @@ MacPlatform::BeginRuntime( const Runtime& runtime ) const
 		pthread_mutex_lock( & fMutex );
 
 		// calls setNeedDisplay
+	#ifdef Rtt_ANGLE_BUILD
+		[fView swapBuffersANGLE];
+	#else
 		[fView update];
+	#endif
 
 		// When async, we do not guarantee the context is current
 		// unless we're in the Runtime::Render() call.
 		if ( runtime.IsProperty( Runtime::kRenderAsync ) )
 		{
+		#ifdef Rtt_ANGLE_BUILD
+			[fView makeContextCurrentANGLE];
+		#else
 			[[fView openGLContext] makeCurrentContext];
+		#endif
 		}
 	}
 }

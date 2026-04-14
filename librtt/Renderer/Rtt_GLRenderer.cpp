@@ -53,6 +53,53 @@ GLRenderer::Create( const CPUResource* resource )
 	}
 }
 
+static int sMajorVersion = -1, sMinorVersion;
+
+bool GLRenderer::UsingGLES( int* major, int* minor )
+{
+	#ifdef Rtt_OPENGLES
+
+		if (-1 == sMajorVersion)
+		{
+			const char * version = (const char *)glGetString( GL_VERSION );
+			const char * ES = strstr( version, "ES" );
+			
+			Rtt_ASSERT( ES );
+			
+			while ( *ES && ( *ES < '2' || *ES > '3' ) )
+			{
+				++ES;
+			}
+			
+			Rtt_ASSERT( '2' == *ES || '3' == *ES );
+			Rtt_ASSERT( '.' == *( ES + 1 ) );
+			Rtt_ASSERT( *( ES + 2 ) >= '0' && *( ES + 2 ) <= '2' );
+			
+			sMajorVersion = *ES - '0';
+			sMinorVersion = *( ES + 2 ) - '0';
+		}
+
+		if ( major )
+		{
+			*major = sMajorVersion;
+		}
+		
+		if ( minor )
+		{
+			*minor = sMinorVersion;
+		}
+	
+		return true;
+	#else
+		return false;
+	#endif
+}
+
+void GLRenderer::ResetGLES()
+{
+	sMajorVersion = -1;
+}
+
 // ----------------------------------------------------------------------------
 
 } // namespace Rtt

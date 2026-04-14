@@ -139,7 +139,7 @@ GLModeForMode( RenderTypes::Mode mode )
 }
 #endif
 // ----------------------------------------------------------------------------
-
+#ifdef OLD_GRAPHICS
 int
 GPUStream::GetMaxTextureUnits()
 {
@@ -161,16 +161,18 @@ GPUStream::GetMaxTextureUnits()
 	static const GLenum kDataType = GL_FLOAT;
 #endif
 
+#endif
+
 #ifdef Rtt_DEBUG
 	static int sTextureStackSize = -1;
 #endif
 
-GLenum
-GPUStream::GetDataType()
+#ifdef OLD_GRAPHICS
+GLenum GPUStream::GetDataType()
 {
 	return kDataType;
 }
-
+#endif
 GPUStream::GPUStream( Rtt_Allocator* pAllocator )
 :	Super(),
 	fCurrentPaint( NULL ),
@@ -1373,6 +1375,8 @@ GPUStream::SetAlpha( U8 newValue, bool accumuluate )
 	return result;
 }
 
+#ifdef OLD_GRAPHICS /* details moved to Rtt_FrameBufferObject / Rtt_GLFrameBufferObject */
+
 GLenum
 GPU_GetPixelFormat( PlatformBitmap::Format format )
 {
@@ -1462,10 +1466,15 @@ GPU_GetPixelType( PlatformBitmap::Format format )
 #	endif // Rtt_OPENGLES
 }
 
+#endif
+
 // Performs a screen capture and outputs the image to the given "outBuffer" bitmap.
 void
 GPUStream::CaptureFrameBuffer( BufferBitmap& outBuffer, S32 xScreen, S32 yScreen, S32 wScreen, S32 hScreen )
 {
+
+#ifdef OLD_GRAPHICS /* details moved to Rtt_FrameBufferObject / Rtt_GLFrameBufferObject */
+
 //	GLint x = Rtt_RealToInt( bounds.xMin );
 //	GLint y = Rtt_RealToInt( bounds.yMin );
 //	GLint w = Rtt_RealToInt( bounds.xMax ) - x;
@@ -1486,6 +1495,9 @@ GPUStream::CaptureFrameBuffer( BufferBitmap& outBuffer, S32 xScreen, S32 yScreen
 					kFormat,
 					kType,
 					outBuffer.WriteAccess() );
+					
+#endif
+
 }
 
 void

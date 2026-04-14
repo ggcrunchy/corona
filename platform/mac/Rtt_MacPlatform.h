@@ -15,7 +15,13 @@
 
 #include "Rtt_MacDevice.h"
 #import <AppKit/NSView.h>
-#import <AppKit/NSOpenGLView.h>
+
+#ifdef Rtt_ANGLE_BUILD
+	// ???
+#else
+#	import <AppKit/NSOpenGLView.h>
+#endif
+
 #include <Security/Authorization.h>
 
 #include <sys/types.h>

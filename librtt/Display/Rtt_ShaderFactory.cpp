@@ -315,6 +315,7 @@ ShaderFactory::NewProgram(
 
 		else
 		{
+		#if 0
 		#if defined( Rtt_OPENGLES )
 			// We are using OpenGL ES, so assume it's v.2.0
 			// We could also look at GL_ES_VERSION_2_0 and GL_ES_VERSION_3_0.
@@ -324,6 +325,21 @@ ShaderFactory::NewProgram(
 			// We could also look at GL_VERSION_2_0 and GL_VERSION_2_1.
 			language = Program::kOpenGL_2_1;
 		#endif
+		#endif
+
+			if ( Display::IsUsingGLES() )
+			{
+			// TODO: ES 3, etc...
+				// We are using OpenGL ES, so assume it's v.2.0
+				// We could also look at GL_ES_VERSION_2_0 and GL_ES_VERSION_3_0.
+				language = Program::kOpenGL_ES_2;
+			}
+			else
+			{
+				// We are using Desktop OpenGL, so assume it's OpenGL 2.1
+				// We could also look at GL_VERSION_2_0 and GL_VERSION_2_1.
+				language = Program::kOpenGL_2_1;
+			}
 		}
 		
 		std::string header = Program::HeaderForLanguage( language, * fProgramHeader );

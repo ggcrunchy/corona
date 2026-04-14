@@ -332,11 +332,14 @@ TextureFactory::GetDefault()
 	// Check if ptr is valid, recreate resource if needed
 	if ( result.IsNull() )
 	{
+#if 0
 #if defined( Rtt_OPENGLES )
 		const Texture::Format kFormat = Texture::kRGBA;
 #else
 		const Texture::Format kFormat = Texture::kBGRA;
 #endif
+#endif
+		const Texture::Format kFormat = Display::IsUsingGLES() ? Texture::kRGBA : Texture::kBGRA;
 
 		result = SharedPtr< TextureResource >( TextureResourceBitmap::CreateDefault(* this, kFormat, Texture::kNearest ) );
 		
@@ -364,11 +367,15 @@ TextureFactory::GetVideo()
 		videoTexture->SetSource(fVideoSource);
 		
 #else
+	#if 0
 	#if defined( Rtt_OPENGLES )
 		const Texture::Format kFormat = Texture::kRGBA;
 	#else
 		const Texture::Format kFormat = Texture::kBGRA;
 	#endif
+	#endif
+		const Texture::Format kFormat = Display::IsUsingGLES() ? Texture::kRGBA : Texture::kBGRA;
+	
 		result = SharedPtr< TextureResource >( TextureResourceBitmap::CreateDefault(* this, kFormat, Texture::kNearest ) );
 #endif
 		

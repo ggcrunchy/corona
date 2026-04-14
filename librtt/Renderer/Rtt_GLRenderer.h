@@ -33,6 +33,10 @@ class GLRenderer : public Renderer
 	public:
 		GLRenderer( Rtt_Allocator* allocator );
 
+	public:
+		static bool UsingGLES( int* major, int* minor );
+		static void ResetGLES(void);
+
 	protected:
 		// Create an OpenGL resource appropriate for the given CPUResource.
 		virtual GPUResource* Create( const CPUResource* resource );

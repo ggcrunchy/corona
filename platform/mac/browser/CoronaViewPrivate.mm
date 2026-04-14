@@ -7,7 +7,9 @@
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#import <AppKit/NSOpenGL.h>
+#ifndef Rtt_ANGLE_BUILD
+#	import <AppKit/NSOpenGL.h>
+#endif
 
 #include "Core/Rtt_Build.h"
 

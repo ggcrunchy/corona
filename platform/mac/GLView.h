@@ -14,6 +14,10 @@
 
 #include "Rtt_DeviceOrientation.h"
 
+#ifdef Rtt_ANGLE_BUILD
+#	include <EGL/egl.h>
+#endif
+
 namespace Rtt
 {
 	class ApplePlatform;
@@ -23,7 +27,13 @@ namespace Rtt
 @class NSImage;
 @class SPILDTopLayerView;
 
-@interface GLView : NSOpenGLView
+@interface GLView :
+
+#ifdef Rtt_ANGLE_BUILD
+	NSView
+#else
+	NSOpenGLView
+#endif
 {
 	Rtt::Runtime* fRuntime;
 	NSPoint fStartPosition;
@@ -44,6 +54,13 @@ namespace Rtt
     NSMutableArray *fCursorRects;
 	NSTrackingRectTag trackingRectTag;
 	int numCursorHides;
+
+#ifdef Rtt_ANGLE_BUILD
+	EGLDisplay eglDisplay;// = EGL_NO_DISPLAY;
+    EGLContext eglContext;// = EGL_NO_CONTEXT;
+    EGLSurface eglSurface;// = EGL_NO_SURFACE;
+#endif
+	
 #if Rtt_AUTHORING_SIMULATOR
 	float lastTouchPressure;
 	NSPoint lastPressurePoint;
@@ -64,7 +81,16 @@ namespace Rtt
 @property (nonatomic, assign) BOOL cursorHidden;
 @property (nonatomic, assign) NSPoint initialLocation;
 
+#ifdef Rtt_ANGLE_BUILD
+- (void) setupANGLE;
+- (void) makeContextCurrentANGLE;
+- (void) swapBuffersANGLE;
+- (void) flushBufferANGLE;
+#else
+
 + (NSOpenGLPixelFormat*) basicPixelFormat;
+
+#endif
 
 - (void)setDelegate:(id< GLViewDelegate >)delegate;
 

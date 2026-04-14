@@ -319,6 +319,20 @@ RuntimeDelegateWrapper::SetDelegate( RuntimeDelegate *delegate )
 			NSView *contentView = [fWindow contentView];
 			[contentView addSubview:fView];
 
+		#ifdef Rtt_ANGLE_BUILD
+			[fView.glView setupANGLE];
+				
+			// TODO: need to validate the timing here
+			// without a slight gap some things are not yet created,
+			// but this could probably immediately fire too? is there
+			// a "safe" timer, that isn't noticeable? or can we plug
+			// into the right logic somehow?
+			dispatch_async(dispatch_get_main_queue(), ^{
+				[fView.glView prepareOpenGL];
+			});
+			
+		#endif
+
 			fIsInitialized = NO;
 			fWindowTitle = windowTitle;
 		}
@@ -395,6 +409,7 @@ RuntimeDelegateWrapper::SetDelegate( RuntimeDelegate *delegate )
 - (void)didLoadApplication:(CoronaView*)sender
 {
 	fIsInitialized = YES;
+
 	[self show];
 }
 

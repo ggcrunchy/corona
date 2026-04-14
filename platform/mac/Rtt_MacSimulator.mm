@@ -29,7 +29,11 @@
 #include "Rtt_Runtime.h"
 
 #import <AppKit/NSApplication.h>
-#import <AppKit/NSOpenGL.h>
+
+#ifndef Rtt_ANGLE_BUILD
+#	import <AppKit/NSOpenGL.h>
+#endif
+
 #import <AppKit/NSScreen.h>
 
 #include "Rtt_AppleKeyServices.h"
@@ -417,6 +421,10 @@ MacSimulator::Initialize(
 
 	Rtt_TRACE_SIM( ( "Loading project from:   %s\n", [[[NSString stringWithExternalString:resourcePath] stringByAbbreviatingWithTildeInPath] UTF8String] ) );
 	Rtt_TRACE_SIM( ( "Project sandbox folder: %s\n", [[platform->GetSandboxPath() stringByAbbreviatingWithTildeInPath] UTF8String] ) );
+	#ifdef Rtt_ANGLE_BUILD
+		[screenView setupANGLE];
+		[screenView prepareOpenGL];
+	#endif
 }
 
 const char *

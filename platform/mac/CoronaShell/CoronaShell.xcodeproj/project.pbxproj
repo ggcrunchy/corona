@@ -7,6 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AAEABC482F846875001954A5 /* NSString+Extensions.m in Sources */ = {isa = PBXBuildFile; fileRef = C24B5CE71C57EF9500A8E813 /* NSString+Extensions.m */; };
+		AAEABC492F846875001954A5 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = C2D9272E1ACA098800B7F9AC /* main.m */; };
+		AAEABC4A2F846875001954A5 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = C2D9272C1ACA098800B7F9AC /* AppDelegate.m */; };
+		AAEABC4E2F846875001954A5 /* Icon-osx.icns in Resources */ = {isa = PBXBuildFile; fileRef = C2A3776C1B33C69F00BB5B88 /* Icon-osx.icns */; };
+		AAEABC4F2F846875001954A5 /* CoronaShell.icns in Resources */ = {isa = PBXBuildFile; fileRef = C2D927521ACA1C3800B7F9AC /* CoronaShell.icns */; };
+		AAEABC502F846875001954A5 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C2D927301ACA098800B7F9AC /* Images.xcassets */; };
+		AAEABC512F846875001954A5 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = C2D927321ACA098800B7F9AC /* MainMenu.xib */; };
+		AAEABC602F846A26001954A5 /* CoronaCards-angle.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AAEABC5F2F846A26001954A5 /* CoronaCards-angle.framework */; };
+		AAEABC612F846A3A001954A5 /* CoronaCards-angle.framework in Copy CoronaCards framework */ = {isa = PBXBuildFile; fileRef = AAEABC5F2F846A26001954A5 /* CoronaCards-angle.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C22039381B4B21E700942B73 /* CoronaCards.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C22039371B4B21E600942B73 /* CoronaCards.framework */; };
 		C22225351B4B28C300D84E64 /* CoronaCards.framework in Copy CoronaCards framework */ = {isa = PBXBuildFile; fileRef = C22039371B4B21E600942B73 /* CoronaCards.framework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C22607581B4B3CEB00172FB1 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = C2D927321ACA098800B7F9AC /* MainMenu.xib */; };
@@ -19,6 +28,17 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		AAEABC522F846875001954A5 /* Copy CoronaCards framework */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				AAEABC612F846A3A001954A5 /* CoronaCards-angle.framework in Copy CoronaCards framework */,
+			);
+			name = "Copy CoronaCards framework";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C2D9274B1ACA0C1B00B7F9AC /* Copy CoronaCards framework */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -33,6 +53,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AAEABC452F8467DD001954A5 /* CoronaShell copy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "CoronaShell copy-Info.plist"; path = "/Users/steve/Desktop/Repos/corona/platform/mac/CoronaShell/CoronaShell copy-Info.plist"; sourceTree = "<absolute>"; };
+		AAEABC572F846875001954A5 /* CoronaShell-angle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CoronaShell-angle.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAEABC582F846876001954A5 /* CoronaShell copy2-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "CoronaShell copy2-Info.plist"; path = "/Users/steve/Desktop/Repos/corona/platform/mac/CoronaShell/CoronaShell copy2-Info.plist"; sourceTree = "<absolute>"; };
+		AAEABC5F2F846A26001954A5 /* CoronaCards-angle.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = "CoronaCards-angle.framework"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C22039371B4B21E600942B73 /* CoronaCards.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = CoronaCards.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C24B5CE61C57EF9500A8E813 /* NSString+Extensions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "NSString+Extensions.h"; path = "../../../apple/NSString+Extensions.h"; sourceTree = "<group>"; };
 		C24B5CE71C57EF9500A8E813 /* NSString+Extensions.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "NSString+Extensions.m"; path = "../../../apple/NSString+Extensions.m"; sourceTree = "<group>"; };
@@ -49,6 +73,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		AAEABC4B2F846875001954A5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABC602F846A26001954A5 /* CoronaCards-angle.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C2D927231ACA098800B7F9AC /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -60,6 +92,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		AAEABC5E2F846A26001954A5 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				AAEABC5F2F846A26001954A5 /* CoronaCards-angle.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		C2D9271D1ACA098800B7F9AC = {
 			isa = PBXGroup;
 			children = (
@@ -68,6 +108,9 @@
 				C2A3776C1B33C69F00BB5B88 /* Icon-osx.icns */,
 				C2D927521ACA1C3800B7F9AC /* CoronaShell.icns */,
 				C2D927281ACA098800B7F9AC /* CoronaShell */,
+				AAEABC452F8467DD001954A5 /* CoronaShell copy-Info.plist */,
+				AAEABC582F846876001954A5 /* CoronaShell copy2-Info.plist */,
+				AAEABC5E2F846A26001954A5 /* Frameworks */,
 				C2D927271ACA098800B7F9AC /* Products */,
 			);
 			sourceTree = "<group>";
@@ -76,6 +119,7 @@
 			isa = PBXGroup;
 			children = (
 				C2D927261ACA098800B7F9AC /* CoronaShell.app */,
+				AAEABC572F846875001954A5 /* CoronaShell-angle.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -106,6 +150,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		AAEABC462F846875001954A5 /* CoronaShell-angle */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AAEABC542F846875001954A5 /* Build configuration list for PBXNativeTarget "CoronaShell-angle" */;
+			buildPhases = (
+				AAEABC472F846875001954A5 /* Sources */,
+				AAEABC4B2F846875001954A5 /* Frameworks */,
+				AAEABC4D2F846875001954A5 /* Resources */,
+				AAEABC522F846875001954A5 /* Copy CoronaCards framework */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "CoronaShell-angle";
+			productName = CoronaShell;
+			productReference = AAEABC572F846875001954A5 /* CoronaShell-angle.app */;
+			productType = "com.apple.product-type.application";
+		};
 		C2D927251ACA098800B7F9AC /* CoronaShell */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C2D927431ACA098800B7F9AC /* Build configuration list for PBXNativeTarget "CoronaShell" */;
@@ -153,11 +215,23 @@
 			projectRoot = "";
 			targets = (
 				C2D927251ACA098800B7F9AC /* CoronaShell */,
+				AAEABC462F846875001954A5 /* CoronaShell-angle */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		AAEABC4D2F846875001954A5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABC4E2F846875001954A5 /* Icon-osx.icns in Resources */,
+				AAEABC4F2F846875001954A5 /* CoronaShell.icns in Resources */,
+				AAEABC502F846875001954A5 /* Images.xcassets in Resources */,
+				AAEABC512F846875001954A5 /* MainMenu.xib in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C2D927241ACA098800B7F9AC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -172,6 +246,16 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		AAEABC472F846875001954A5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAEABC482F846875001954A5 /* NSString+Extensions.m in Sources */,
+				AAEABC492F846875001954A5 /* main.m in Sources */,
+				AAEABC4A2F846875001954A5 /* AppDelegate.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C2D927221ACA098800B7F9AC /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -196,6 +280,42 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		AAEABC552F846875001954A5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				INFOPLIST_FILE = "CoronaShell copy2-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				OTHER_CODE_SIGN_FLAGS = "";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.coronalabs.osx.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				USER_HEADER_SEARCH_PATHS = ../;
+			};
+			name = Debug;
+		};
+		AAEABC562F846875001954A5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				INFOPLIST_FILE = "CoronaShell copy2-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				OTHER_CODE_SIGN_FLAGS = "";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.coronalabs.osx.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				USER_HEADER_SEARCH_PATHS = ../;
+			};
+			name = Release;
+		};
 		C2D927411ACA098800B7F9AC /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -318,6 +438,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		AAEABC542F846875001954A5 /* Build configuration list for PBXNativeTarget "CoronaShell-angle" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAEABC552F846875001954A5 /* Debug */,
+				AAEABC562F846875001954A5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		C2D927211ACA098800B7F9AC /* Build configuration list for PBXProject "CoronaShell" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

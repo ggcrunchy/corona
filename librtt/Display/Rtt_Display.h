@@ -123,6 +123,10 @@ class Display
         virtual ~Display();
 
 	public:
+		static bool IsUsingGLES(void);
+		static bool IsUsingGLES3( int *minorVersion );
+
+	public:
 		//! \Return true for success. False for failure.
 		virtual bool Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orientation, const char * backend, void * backendContext );
 		virtual void Teardown();

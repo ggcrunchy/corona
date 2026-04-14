@@ -624,6 +624,8 @@ ApplePlatform::CreateOffscreenSurface( const PlatformSurface& parent ) const
 #ifdef Rtt_NO_GUI
     return NULL;
 #else
+
+#ifdef OLD_GRAPHICS
     OffscreenGPUSurface *result = Rtt_NEW( Allocator(), OffscreenGPUSurface( parent ) );
 
     if ( result && ! result->IsValid() )
@@ -633,6 +635,10 @@ ApplePlatform::CreateOffscreenSurface( const PlatformSurface& parent ) const
     }
 
     return result;
+#else
+	return NULL; // n.b. doesn't SEEM like this is used now? (or ever was?)
+#endif
+
 #endif
 }
 

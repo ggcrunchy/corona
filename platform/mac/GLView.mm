@@ -10,11 +10,16 @@
 #include "Core/Rtt_Build.h"
 
 #import "GLView.h"
-#include <OpenGL/gl.h>
+
+#ifdef Rtt_ANGLE_BUILD
+#	include <GLES3/gl3.h>
+#else
+#	include <OpenGL/gl.h>
+#	import <AppKit/NSOpenGL.h>
+#endif
 
 #import <AppKit/NSApplication.h>
 #import <AppKit/NSEvent.h>
-#import <AppKit/NSOpenGL.h>
 #import <AppKit/AppKit.h>
 #import <Carbon/Carbon.h>
 
@@ -161,6 +166,62 @@
 @synthesize cursorHidden;
 @synthesize initialLocation;
 
+#ifdef Rtt_ANGLE_BUILD
+- (void) setupANGLE
+{
+	eglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+	
+	EGLBoolean ok;
+	
+	ok = eglInitialize(eglDisplay, 0, 0);
+
+	EGLConfig config;
+	EGLint numConfigs;
+	
+	EGLint attr[] = {
+		EGL_COLOR_BUFFER_TYPE, EGL_RGB_BUFFER,
+		EGL_RED_SIZE, 8,
+		EGL_GREEN_SIZE, 8,
+		EGL_BLUE_SIZE, 8,
+		EGL_ALPHA_SIZE, 8,
+	
+		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
+		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+		EGL_NONE
+	};
+
+	ok = eglChooseConfig(eglDisplay, attr, &config, 1, &numConfigs);	
+	eglSurface = eglCreateWindowSurface(eglDisplay, config, (EGLNativeWindowType)self.layer, NULL);
+
+	EGLint ctxattr[] = {
+		EGL_CONTEXT_MAJOR_VERSION, 3,
+		EGL_NONE
+	};
+        
+	eglContext = eglCreateContext(eglDisplay, config, EGL_NO_CONTEXT, ctxattr);
+
+//	eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
+
+NSColorSpace *linearSpace = [NSColorSpace genericRGBColorSpace];  // Linear!
+[self.window setColorSpace:linearSpace];
+}
+
+- (void) makeContextCurrentANGLE
+{
+	eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
+}
+
+- (void) swapBuffersANGLE
+{
+	eglSwapBuffers(eglDisplay, eglSurface);
+}
+
+- (void) flushBufferANGLE
+{
+	eglSwapBuffers(eglDisplay, eglSurface);
+}
+#else
+
 // pixel format definition
 + (NSOpenGLPixelFormat*) basicPixelFormat
 {
@@ -220,6 +281,8 @@ NSOpenGLPixelFormatAttribute attributes1 [] = {
 
 }
 
+#endif
+
 - (void) setRuntime:(Rtt::Runtime *)runtime
 {
 	fRuntime = runtime;
@@ -234,10 +297,20 @@ NSOpenGLPixelFormatAttribute attributes1 [] = {
 - (id)initWithFrame:(NSRect)frameRect
 {
     NSDEBUG(@"GLView: initWithFrame: %@", NSStringFromRect(frameRect));
-	NSOpenGLPixelFormat * pf = [GLView basicPixelFormat];
 
-	self = [super initWithFrame: frameRect pixelFormat: pf];
+#ifdef Rtt_ANGLE_BUILD
+	self = [super initWithFrame: frameRect];// pixelFormat: pf];
+
+	eglDisplay = EGL_NO_DISPLAY;
+    eglContext = EGL_NO_CONTEXT;
+    eglSurface = EGL_NO_SURFACE;	
+
+#else
+	NSOpenGLPixelFormat * pf = [GLView basicPixelFormat];
 	
+	self = [super initWithFrame: frameRect pixelFormat: pf];
+#endif
+
 	if ( self )
 	{
 		isReady = NO;
@@ -303,7 +376,11 @@ NSOpenGLPixelFormatAttribute attributes1 [] = {
     NSDEBUG(@"XXX: GLView: prepareOpenGL: fRuntime %p, self.isReady %s", fRuntime, (self.isReady ? "YES" : "NO"));
 	//[super prepareOpenGL];
 
+#ifdef Rtt_ANGLE_BUILD
+	[self makeContextCurrentANGLE];
+#else
 	[[self openGLContext] makeCurrentContext];
+#endif
 
 	Rtt::Display *display = NULL;
 
@@ -356,9 +433,11 @@ NSOpenGLPixelFormatAttribute attributes1 [] = {
 		[self invalidate];
 	}
 
+#ifdef Rtt_ANGLE_BUILD
+	[self makeContextCurrentANGLE];
+#else
 	[[self openGLContext] makeCurrentContext];
-
-    
+#endif
     
 	// This should be called by the layer, not NSTimer!!!
 	// That's b/c the OGL context is valid and ready for new OGL commands
@@ -367,7 +446,11 @@ NSOpenGLPixelFormatAttribute attributes1 [] = {
 		fRuntime->Render();
 	}
     
+#ifdef Rtt_ANGLE_BUILD
+	[self flushBufferANGLE];
+#else
     [[self openGLContext] flushBuffer];
+#endif
 }
 
 - (void)setDelegate:(id< GLViewDelegate >)delegate
@@ -383,7 +466,11 @@ NSOpenGLPixelFormatAttribute attributes1 [] = {
 		fRuntime->GetDisplay().Invalidate();
 	}
 
+#ifdef Rtt_ANGLE_BUILD
+//	[self swapBuffersANGLE];
+#else
 	[self update];
+#endif
 }
 
 - (BOOL) isOpaque
