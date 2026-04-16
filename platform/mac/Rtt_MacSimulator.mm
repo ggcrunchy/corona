@@ -422,6 +422,13 @@ MacSimulator::Initialize(
 	Rtt_TRACE_SIM( ( "Loading project from:   %s\n", [[[NSString stringWithExternalString:resourcePath] stringByAbbreviatingWithTildeInPath] UTF8String] ) );
 	Rtt_TRACE_SIM( ( "Project sandbox folder: %s\n", [[platform->GetSandboxPath() stringByAbbreviatingWithTildeInPath] UTF8String] ) );
 	#ifdef Rtt_ANGLE_BUILD
+		// Without NSOpenGLView, `setWantsBestResolutionOpenGLSurface` seems to be falling
+		// on deaf ears. This is a guess that the Retina-ness is being ignored and the view
+		// gets translated twice as far as it should. Further investigation so far seems to
+		// be that this agrees with negating the scale factor.
+		float scale = -[scalefactor floatValue];
+		[screenView translateOriginToPoint:NSMakePoint(scale * screenRect.origin.x, scale * screenRect.origin.y)];
+
 		[screenView setupANGLE];
 		[screenView prepareOpenGL];
 	#endif

@@ -1557,7 +1557,7 @@ MacPlatform::BeginRuntime( const Runtime& runtime ) const
 
 		// calls setNeedDisplay
 	#ifdef Rtt_ANGLE_BUILD
-		[fView swapBuffersANGLE];
+		[fView swapBuffersANGLE]; // ???
 	#else
 		[fView update];
 	#endif

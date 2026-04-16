@@ -190,7 +190,7 @@
 		EGL_NONE
 	};
 
-	ok = eglChooseConfig(eglDisplay, attr, &config, 1, &numConfigs);	
+	ok = eglChooseConfig(eglDisplay, attr, &config, 1, &numConfigs);
 	eglSurface = eglCreateWindowSurface(eglDisplay, config, (EGLNativeWindowType)self.layer, NULL);
 
 	EGLint ctxattr[] = {
@@ -199,11 +199,6 @@
 	};
         
 	eglContext = eglCreateContext(eglDisplay, config, EGL_NO_CONTEXT, ctxattr);
-
-//	eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
-
-NSColorSpace *linearSpace = [NSColorSpace genericRGBColorSpace];  // Linear!
-[self.window setColorSpace:linearSpace];
 }
 
 - (void) makeContextCurrentANGLE
@@ -299,7 +294,7 @@ NSOpenGLPixelFormatAttribute attributes1 [] = {
     NSDEBUG(@"GLView: initWithFrame: %@", NSStringFromRect(frameRect));
 
 #ifdef Rtt_ANGLE_BUILD
-	self = [super initWithFrame: frameRect];// pixelFormat: pf];
+	self = [super initWithFrame: frameRect];
 
 	eglDisplay = EGL_NO_DISPLAY;
     eglContext = EGL_NO_CONTEXT;
@@ -363,6 +358,16 @@ NSOpenGLPixelFormatAttribute attributes1 [] = {
 	fRuntime = NULL; // Don't delete. We do not own this pointer
     
     [fCursorRects release];
+
+#ifdef Rtt_ANGLE_BUILD
+	eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+	eglDestroySurface(eglDisplay, eglSurface);
+	eglDestroyContext(eglDisplay, eglContext);
+
+// TODO: when closing the application itself
+//	eglTerminate(eglDisplay);
+//	eglReleaseThread();
+#endif
 
 	[super dealloc];
 }
@@ -467,7 +472,7 @@ NSOpenGLPixelFormatAttribute attributes1 [] = {
 	}
 
 #ifdef Rtt_ANGLE_BUILD
-//	[self swapBuffersANGLE];
+	[self swapBuffersANGLE]; // ???
 #else
 	[self update];
 #endif
