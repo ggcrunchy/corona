@@ -35,6 +35,9 @@ typedef enum {
 - (void) setScaleFactor:(CGFloat)scaleFactor;
 - (void) restoreWindowProperties;
 
+- (void) glSetup;
+- (void) prepare;
+
 - (BOOL) settingsIsWindowResizable;
 - (BOOL) settingsIsWindowCloseButtonEnabled;
 - (BOOL) settingsIsWindowMinimizeButtonEnabled;

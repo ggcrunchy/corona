@@ -322,15 +322,15 @@ RuntimeDelegateWrapper::SetDelegate( RuntimeDelegate *delegate )
 		#ifdef Rtt_ANGLE_BUILD
 			[fView.glView setupANGLE];
 				
-			// TODO: need to validate the timing here
-			// without a slight gap some things are not yet created,
-			// but this could probably immediately fire too? is there
-			// a "safe" timer, that isn't noticeable? or can we plug
-			// into the right logic somehow?
+			// TODO!!!!
+			// if we attempt to immediately execute this, some resources
+			// are not ready; however, it isn't obvious this is 100% safe
+			// either, though it seems to fare well in some quick testing;
+			// is there a way to nail down dispatch timing, or better yet
+			// to find a "nice" event where we could do prepareOpenGL()?
 			dispatch_async(dispatch_get_main_queue(), ^{
 				[fView.glView prepareOpenGL];
 			});
-			
 		#endif
 
 			fIsInitialized = NO;

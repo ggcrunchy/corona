@@ -105,6 +105,20 @@ Rtt_EXPORT const luaL_Reg* Rtt_GetCustomModulesList()
     return [self runWithPath:_projectPath parameters:nil];
 }
 
+- (void)glSetup
+{
+#if defined( Rtt_ANGLE_BUILD ) && !defined( Rtt_AUTHORING_SIMULATOR )
+	[_GLView setupANGLE];
+#endif
+}
+
+- (void)prepare
+{
+#if defined( Rtt_ANGLE_BUILD ) && !defined( Rtt_AUTHORING_SIMULATOR )
+	[_GLView prepareOpenGL];
+#endif
+}
+
 // Note: Should only be called in CoronaCards contexts
 - (NSInteger)runWithPath:(NSString*)path parameters:(NSDictionary *)params
 {

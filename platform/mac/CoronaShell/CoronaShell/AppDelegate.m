@@ -167,6 +167,8 @@
 	[_coronaView setCoronaViewDelegate:self];
 	[_coronaView runWithPath:_appPath parameters:launchArgs];
 
+[_coronaView glSetup];
+
 	// Listen for "open URL" Apple Events (which will be sent to us if the Info.plist is
 	// customized with a "CFBundleURLTypes" section)
 	// NOTE: if CoronaShell has already put up an open file dialog to choose an app then
@@ -331,7 +333,9 @@
 		[[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"NSFullScreenMenuItemEverywhere"];
 	}
 
+[_coronaView prepare];
 	// NSDEBUG(@"awakeFromNib: view: %@ (%@)", _coronaView, NSStringFromRect([_coronaView frame]));
+
 }
 
 - (void) setWindowStyles

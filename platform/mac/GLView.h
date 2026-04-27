@@ -56,9 +56,9 @@ namespace Rtt
 	int numCursorHides;
 
 #ifdef Rtt_ANGLE_BUILD
-	EGLDisplay eglDisplay;// = EGL_NO_DISPLAY;
-    EGLContext eglContext;// = EGL_NO_CONTEXT;
-    EGLSurface eglSurface;// = EGL_NO_SURFACE;
+	EGLDisplay eglDisplay;
+    EGLContext eglContext;
+    EGLSurface eglSurface;
 #endif
 	
 #if Rtt_AUTHORING_SIMULATOR
