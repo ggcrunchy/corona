@@ -13,9 +13,12 @@
 
 #include "Renderer/Rtt_GL.h"
 #include "Renderer/Rtt_Texture.h"
+#include "Renderer/Rtt_Renderer.h"
 #include "Core/Rtt_Assert.h"
 
 #include "Rtt_Profiling.h"
+
+#include "Corona/CoronaGraphics.h"
 
 // ----------------------------------------------------------------------------
 
@@ -153,7 +156,7 @@ GLint CalculateOptimalAlignment(U32 width, GLenum format)
 }
 
 void
-GLTexture::Create( CPUResource* resource )
+GLTexture::Create( CPUResource* resource, const RenderContext* context )
 {
     Rtt_ASSERT( CPUResource::kTexture == resource->GetType() || CPUResource::kVideoTexture == resource->GetType() );
     Texture* texture = static_cast<Texture*>( resource );
@@ -213,7 +216,7 @@ GLTexture::Create( CPUResource* resource )
 }
 
 void
-GLTexture::Update( CPUResource* resource )
+GLTexture::Update( CPUResource* resource, const RenderContext* context )
 {
     Rtt_ASSERT( CPUResource::kTexture == resource->GetType() );
     Texture* texture = static_cast<Texture*>( resource );
@@ -272,6 +275,8 @@ GLTexture::Bind( U32 unit )
 {
     glActiveTexture( GL_TEXTURE0 + unit );
     glBindTexture( GL_TEXTURE_2D, GetName() );
+// ^^^ TODO: allow other targets... U32 can very easily accommodate a (target | unit) pair,
+// or just break up into two parameters
     GL_CHECK_ERROR();
 }
 
@@ -279,6 +284,308 @@ GLuint
 GLTexture::GetName()
 {
     return HandleToName( fHandle );
+}
+
+// ----------------------------------------------------------------------------
+
+struct ProbeRAII {
+	ProbeRAII( const CoronaTextureDefinitionBase* common )
+	{
+		glGenTextures( 1, &fTexture );
+		GL_CHECK_ERROR();
+
+		const GLsizei kDim = 1;
+
+		glBindTexture( GL_TEXTURE_2D, fTexture );
+		glTexImage2D( GL_TEXTURE_2D, 0, common->internalFormat, kDim, kDim, 0, common->format, common->type, NULL );
+
+		GLenum err = glGetError();
+		fOK = GL_NO_ERROR == err;
+		
+		if ( !fOK )
+		{
+			Rtt_TRACE_SIM((
+				"Error %u defining format with internal = %u, source = %u, type = %u",
+				err,
+				common->internalFormat,
+				common->format,
+				common->type
+			));
+		}
+	}
+
+	~ProbeRAII()
+	{
+		glDeleteTextures( 1, &fTexture );
+	}
+
+	bool CheckRenderability( GLenum attachment = GL_COLOR_ATTACHMENT0 )
+	{
+		GLuint fbo;
+		glGenFramebuffers( 1, &fbo );
+		GL_CHECK_ERROR();
+
+		// https://community.khronos.org/t/depth-only-fbo-incomplete-draw-buffer/65283/4
+	#if !defined(Rtt_OPENGLES)
+		if ( GL_COLOR_ATTACHMENT0 != attachment )
+		{
+			glDrawBuffer( GL_NONE );
+			GL_CHECK_ERROR();
+			glReadBuffer( GL_NONE );
+			GL_CHECK_ERROR();
+		}
+	#endif
+
+		glBindFramebuffer( GL_FRAMEBUFFER, fbo );
+		GL_CHECK_ERROR();
+		glFramebufferTexture2D( GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, fTexture, 0 );
+		GL_CHECK_ERROR();
+		GLenum status = glCheckFramebufferStatus( GL_FRAMEBUFFER );
+		GL_CHECK_ERROR();
+
+		glDeleteFramebuffers( 1, &fbo );
+		GL_CHECK_ERROR();
+
+		return ( GL_FRAMEBUFFER_COMPLETE == status );
+	}
+	
+	GLuint fTexture;
+	bool fOK;
+};
+
+static bool
+MatchNormalFormat( const CoronaTextureFormat* texDef, TextureFormatDescription* desc )
+{
+	struct {
+		int flags;
+		const char* message;
+	} combos[] = {
+		{ kIsIntegral | kIsFloatingPoint, "Mixing floating-point and integral flags" },
+		{ kIsFloatingPoint | kIsSigned, "Mixing floating-point and signed flags" },
+		{ kProbeRenderability | kIsRenderable1, "Mixing renderability probe with assertion (#1)" }
+	};
+
+	for ( auto && c : combos )
+	{
+		if ( ( texDef->common.flags & c.flags ) == c.flags )
+		{
+			Rtt_TRACE_SIM(( "WARNING: %s\n", c.message ));
+		
+			return false;
+		}
+	}
+
+	ProbeRAII probe( &texDef->common );
+	if ( !probe.fOK )
+	{
+		return false;
+	}
+	
+	desc->fInternal = texDef->common.internalFormat;
+	desc->fDataType = texDef->common.type;
+	desc->fFormat = texDef->common.format;
+
+	struct {
+		int to, from;
+	} pairs[] = {
+		TextureFormatDescription::kIsIntegral, kIsIntegral,
+		TextureFormatDescription::kIsSigned, kIsSigned,
+		TextureFormatDescription::kHasLinearFiltering, kHasLinearFiltering,
+		TextureFormatDescription::kIsRenderable1, kIsRenderable1,
+		TextureFormatDescription::kIssRGB, kIssRGB
+	};
+	
+	for ( auto && p : pairs )
+	{
+		if ( texDef->common.flags & p.from )
+		{
+			desc->fFlags |= p.to;
+		}
+	}
+
+	desc->fFlags |= TextureFormatDescription::kIsColorRelated;
+	if ( texDef->common.flags & kProbeRenderability )
+	{
+		bool canRender = probe.CheckRenderability();
+		if ( canRender )
+		{
+			desc->fFlags |= TextureFormatDescription::kIsRenderable1;
+		}
+	}
+	
+	// TODO: texDef->componentKind;
+	
+	desc->fNumComponents = texDef->numComponents;
+	desc->fBytesPerComponent = texDef->bytesPerComponent;
+
+	return true;
+}
+
+static bool
+MatchPackedFormat( const CoronaPackedTextureFormat* texDef, TextureFormatDescription* desc )
+{
+// TODO:	texDef->componentKind;
+// TODO: reasonable packing check...
+// TODO: finite number of packing possibilities
+	int zi = 0, n = 0;
+	for ( ; zi < 4 && 0 != texDef->bitCounts[zi]; zi++)
+	{
+		n += texDef->bitCounts[zi];
+	}
+
+	if ( n % 8 != 0 )
+	{
+		Rtt_TRACE_SIM(( "Non-multiple-of-8 total bits in packed layout = %i", n ));
+		
+		return false;
+	}
+
+	if (zi < 4)
+	{
+		if ( zi < 2 )
+		{
+			Rtt_TRACE_SIM(( "Too few non-zero components in packed layout: %i", zi ));
+			
+			return false;
+		}
+
+		for (int i = zi + 1; i < 4; i++)
+		{
+			if ( 0 != texDef->bitCounts[i] )
+			{
+				Rtt_TRACE_SIM(( "Non-trailing zero in packed layout at position %i", zi ));
+			
+				return false;
+			}
+		}
+	}
+	
+	ProbeRAII probe( &texDef->common );
+	if ( !probe.fOK )
+	{
+		return false;
+	}
+	
+	for (int i = 0; i < 4; i++)
+	{
+		desc->fSizes[i] = (U8)texDef->bitCounts[i];
+	}
+
+	desc->fInternal = texDef->common.internalFormat;
+	desc->fDataType = texDef->common.type;
+	desc->fFormat = texDef->common.format;
+
+	struct {
+		int to, from;
+	} pairs[] = {
+		TextureFormatDescription::kIsFloatingPoint, kIsFloatingPoint,
+	//	TextureFormatDescription::kIsIntegral, kIsIntegral,
+	//	TextureFormatDescription::kIsSigned, kIsSigned,
+		TextureFormatDescription::kHasLinearFiltering, kHasLinearFiltering,
+		TextureFormatDescription::kIsRenderable1, kIsRenderable1,
+	//	TextureFormatDescription::kIssRGB, kIssRGB
+	};
+	// ^^^ TODO: check if other options make any sense, e.g. outside ES 3.2
+		// all are "integral" in the underlying type, more or less...
+		// "floating point" here = UNSIGNED_INT_10F_11F_11F_REV or similar
+	
+	for ( auto && p : pairs )
+	{
+		if ( texDef->common.flags & p.from )
+		{
+			desc->fFlags |= p.to;
+		}
+	}
+
+	desc->fFlags |= TextureFormatDescription::kIsColorRelated;
+	if ( texDef->common.flags & kProbeRenderability )
+	{
+		bool canRender = probe.CheckRenderability();
+		if ( canRender )
+		{
+			desc->fFlags |= TextureFormatDescription::kIsRenderable1;
+		}
+	}
+
+	desc->fFlags |= TextureFormatDescription::kIsPacked;
+
+	return true;
+}
+
+static bool
+MatchCompressedFormat( const CoronaCompressedTextureFormat* texDef, TextureFormatDescription* desc )
+{
+	// TODO: reasonable block width, height restrictions
+	// ditto blockSize
+	// only so many in the wild...
+
+	GLuint tex;
+	glGenTextures( 1, &tex );
+	GL_CHECK_ERROR();
+
+	glCompressedTexImage2D( GL_TEXTURE_2D, 0, texDef->common.internalFormat, 4, 4, 0, texDef->blockSize, NULL );
+	GLenum err = glGetError();
+
+	glDeleteTextures( 1, &tex );
+
+	if ( GL_NO_ERROR != err )
+	{
+		// MESSAGE
+		return false;
+	}
+
+	desc->fInternal = texDef->common.internalFormat;
+	desc->fDataType = texDef->common.type;
+texDef->common.flags; // filtering, float, sRGB?
+	desc->fBlockWidth = texDef->blockWidth;
+	desc->fBlockHeight = texDef->blockHeight;
+	desc->fBlockSize = texDef->blockSize;
+// TODO: ??? in theory we can render, but seems pretty uncommon
+// TODO: can we (in GL) render to a compressed format?
+// anything needed for 3D formats? (seem to be spottily supported, though that's per a few-years-old thread)
+	return true;
+}
+
+static bool
+MatchDepthStencilFormat( const CoronaDepthStencilTextureFormat* texDef, TextureFormatDescription* desc )
+{
+/*
+texDef->common.type;
+texDef->common.flags;
+texDef->common.format;
+texDef->common.internalFormat;
+	texDef->depthBits;
+	texDef->isDepthFloat;
+	texDef->stencilBits;
+// TODO: ^^^ haven't done anything with this yet
+*/
+	if ( 0 != texDef->depthBits && 0 != texDef->stencilBits && ( texDef->common.flags & kProbeRenderability ) )
+	{
+		// TODO: renderablity1, *2
+	}
+
+	return false;
+}
+
+bool
+Renderer::MatchToFormatDescription( const CoronaTextureDefinitionBase* texDef, TextureFormatDescription* desc )
+{
+	switch ( texDef->family )
+	{
+		case kNormalTextureFormatDefinition:
+			return MatchNormalFormat( (CoronaTextureFormat*)texDef, desc );
+
+		case kPackedTextureFormatDefinition:
+			return MatchPackedFormat( (CoronaPackedTextureFormat*)texDef, desc );
+
+		case kCompressedTextureFormatDefinition:
+			return MatchCompressedFormat( (CoronaCompressedTextureFormat*)texDef, desc );
+	
+		case kDepthStencilTextureFormatDefinition:
+			return MatchDepthStencilFormat( (CoronaDepthStencilTextureFormat*)texDef, desc );
+	}
+
+	return false;
 }
 
 // ----------------------------------------------------------------------------

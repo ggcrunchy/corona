@@ -215,6 +215,8 @@ enum {
 	kStockFormatBits = 3 // bits alloted to built-in formats, for Texture::FormatValue and bitmap counterpart
 };
 
+int GetFormatIndexBitCount();
+
 bool HasFormatFlag( U32 v );
 U32 GetStockFormatAndFlag( U32 v );
 U32 GetFormatIndex( U32 v );
@@ -234,38 +236,12 @@ void SetData( U32* v, U32 data );
 
 // ----------------------------------------------------------------------------
 
-struct FormatDetails {
-	// TODO
-/*
-	typedef enum _InputType
-	{
-		kByte,
-		kUint16,
-		kUint32,
-		kFloat16,
-		kFloat32,
-		kNumTypes
-	}
-	InputType;
+U32 PackDescription( const TextureFormatDescription* desc );
 
-	InputType fInputType = kByte
-*/
-	int fBytesPerComponent = 1;
-	int fNumComponents = 4;
-	int fRedIndex = 0;
-	int fGreenIndex = 1;
-	int fBlueIndex = 2;
-	int fAlphaIndex = 3;
-	U8 fBlockWidth = 0;
-	U8 fBlockHeight = 0;
-	U8 fBlockSize = 0; // if > 0, compressed
-	bool fIsFloat = false;
-	bool fIsPacked = false;
-	// TODO? bool fIssRGB = false;
-
-	bool PackToValue( U32* v );
-	static FormatDetails UnpackFromValue( U32 v );
-};
+size_t GetSizeFromPacking( U16 w, U16 h, U32 packedDesc );
+bool IsCompressedFromPacking( U32 packedDesc );
+bool HasAlphaChannelFromPacking( U32 packedDesc );
+void GetComponentIndicesFromPacking( U32 packedDesc, int& redIndex, int& greenIndex, int& blueIndex, int& alphaIndex );
 
 // ----------------------------------------------------------------------------
 

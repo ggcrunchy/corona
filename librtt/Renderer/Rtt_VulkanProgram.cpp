@@ -154,7 +154,7 @@ VulkanProgram::VulkanProgram( VulkanContext * context )
 }
 
 void 
-VulkanProgram::Create( CPUResource* resource )
+VulkanProgram::Create( CPUResource* resource, const RenderContext* )
 {
 	Rtt_ASSERT( CPUResource::kProgram == resource->GetType() );
 	fResource = resource;
@@ -186,7 +186,7 @@ VulkanProgram::Create( CPUResource* resource )
 }
 
 void
-VulkanProgram::Update( CPUResource* resource )
+VulkanProgram::Update( CPUResource* resource, const RenderContext* )
 {
 	Rtt_ASSERT( CPUResource::kProgram == resource->GetType() );
 	if( fData[Program::kMaskCount0].IsValid() ) Update( Program::kMaskCount0, fData[Program::kMaskCount0] );

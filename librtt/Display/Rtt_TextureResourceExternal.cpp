@@ -30,6 +30,8 @@ public:
 	ExternalBitmap(const CoronaExternalTextureCallbacks* sourceCallbacks, void* context)
 	: fSrc(*sourceCallbacks)
 	, fContext(context)
+	, fCustomFormat(0)
+	, fCustomTarget(0)
 	{
 		
 	}
@@ -88,7 +90,7 @@ public:
 		return 0;
 	}
 	
-	virtual Format GetFormat() const override
+	Format AuxGetFormat() const
 	{
 		CoronaExternalBitmapFormat fmt = kExternalBitmapFormat_Undefined;
 		if( fSrc.getFormat )
@@ -109,6 +111,33 @@ public:
 		return PlatformBitmap::kRGBA;
 	}
 	
+	virtual Format GetFormat() const override
+	{
+		Format format;
+		
+		if ( !fCustomFormat )
+		{
+			format = AuxGetFormat();
+		}
+		else
+		{
+			format.SetBackingValue( fCustomFormat );
+		}
+		
+		if ( fCustomTarget )
+		{
+			U32 value = format.GetBackingValue();
+
+			SetFamily( &value, GetFamily( fCustomTarget ) );
+			SetTarget( &value, GetTarget( fCustomTarget ) );
+			SetTargetSubtype( &value, GetTargetSubtype( fCustomTarget ) );
+			
+			format.SetBackingValue(value);
+		}
+		
+		return format;
+	}
+	
 	int GetField(lua_State* L, const char* field)
 	{
 		if ( fSrc.onGetField )
@@ -123,9 +152,16 @@ public:
 		return fContext;
 	}
 	
+	void SetCustomFormat( U32 format ) { fCustomFormat = format; }
+	void SetCustomTarget( U32 target ) { fCustomTarget = target; }
+	
 private:
 	CoronaExternalTextureCallbacks fSrc;
 	void* fContext;
+
+	// Current extension details.
+	U32 fCustomFormat;
+	U32 fCustomTarget;
 };
 
 	
@@ -139,7 +175,7 @@ TextureResourceExternal::Create(TextureFactory& factory,
 {	
 	Display& display = factory.GetDisplay();
 	
-	PlatformBitmap *bitmap = Rtt_NEW(display.GetAllocator(),
+	ExternalBitmap *bitmap = Rtt_NEW(display.GetAllocator(),
 									ExternalBitmap(callbacks, callbacksContext));
 	
 	bitmap->SetMagFilter( display.GetDefaults().GetMagTextureFilter() );
@@ -154,6 +190,47 @@ TextureResourceExternal::Create(TextureFactory& factory,
 									TextureResourceExternal( factory, texture, bitmap ) );
 	
 	texture->SetRetina( isRetina );
+	
+	if ( sizeof(CoronaExternalTextureCallbacks2) == callbacks->size )
+	{
+		CoronaExternalTextureCallbacks2* callbacks2 = (CoronaExternalTextureCallbacks2*)callbacks;
+	
+		for ( CoronaExternalTextureExtensionBase* ext = callbacks2->firstExtension; NULL != ext; ext = ext->next )
+		{
+			switch ( ext->type )
+			{
+			case kTextureTarget:
+				{
+					const CoronaExternalTextureExtension_TextureTarget* tt = (CoronaExternalTextureExtension_TextureTarget*)ext;
+					U32 value = 0;
+					
+					SetFamily( &value, tt->family );
+					SetTarget( &value, tt->target );
+					SetTargetSubtype( &value, tt->subtype );
+					
+					bitmap->SetCustomTarget( value );
+				}
+				break;
+			case kCustomFormat:
+				{
+					U32 index = ( (CoronaExternalTextureExtension_CustomFormat*)ext )->formatIndex;
+					if ( index > 0 && index < factory.GetCurrentFormatCount() )
+					{
+						const TextureFormatDescription& desc = factory.GetCurrentFormatList()[index - 1];
+						U32 value = PackDescription( &desc );
+					
+						SetFormatIndex( &value, index );
+						// TODO: further need to validate? value != ~0
+					
+						bitmap->SetCustomFormat( value );
+					}
+				}
+				break;
+			default:
+				Rtt_ASSERT_NOT_REACHED();
+			}
+		}
+	}
 	
 	return result;
 }

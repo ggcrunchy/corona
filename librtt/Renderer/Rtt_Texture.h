@@ -117,7 +117,7 @@ class Texture : public CPUResource
 			kFloatingPoint, // default
 			kSignedInteger,
 			kUnsignedInteger,
-			kOtherFamily, // shadow formats, atomic_uint
+			kOtherFamily, // depth formats / shadow samplers, atomic_uint
 			kNumFamilies
 		}
 		Family;
@@ -156,6 +156,45 @@ class Texture : public CPUResource
 	private:
 		bool fIsRetina;
 		bool fIsTarget;
+};
+
+struct TextureFormatDescription
+{
+	enum : U16 {
+		kIsColorRelated = 1 << 0,
+		kIsDepthRelated = 1 << 1,
+		kIsStencilRelated = 1 << 2,
+		kIsRenderable1 = 1 << 3, // first or only possiblity
+		kIsRenderable2 = 1 << 4, // depth-stencil, for example
+		kHasLinearFiltering = 1 << 5,
+		kIsPacked = 1 << 6,
+		kIsSigned = 1 << 7,
+		kIsFloatingPoint = 1 << 8,
+		kIsIntegral = 1 << 9,
+		kIssRGB = 1 << 10
+// TODO: there is some redundancy here, should we need to cram
+	};
+
+	bool IsCompressed() const { return !IsPacked() && 0 != fBlockSize; }
+	bool IsPacked() const { return 0 != ( fFlags & kIsPacked ); }
+
+	U16 fFormat;
+	U16 fInternal; // mostly for GL, but e.g. Vulkan has some "large" format values
+	U16 fDataType;
+	U16 fFlags;
+	union {
+		struct {
+			U8 fNumComponents;
+			U8 fBytesPerComponent;
+		};
+		struct {
+			U8 fUnused; // allow fNumComponents here too
+			U8 fBlockWidth;
+			U8 fBlockHeight;
+			U8 fBlockSize; // !packed && != 0 -> compressed
+		};
+		U8 fSizes[4];
+	};
 };
 
 // ----------------------------------------------------------------------------

@@ -234,7 +234,7 @@ VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanRenderer & renderer )
 }
 
 void 
-VulkanFrameBufferObject::Create( CPUResource* resource )
+VulkanFrameBufferObject::Create( CPUResource* resource, const RenderContext* )
 {
 	Rtt_ASSERT( CPUResource::kFrameBufferObject == resource->GetType() );
 
@@ -242,7 +242,7 @@ VulkanFrameBufferObject::Create( CPUResource* resource )
 }
 
 void 
-VulkanFrameBufferObject::Update( CPUResource* resource )
+VulkanFrameBufferObject::Update( CPUResource* resource, const RenderContext* )
 {
 	Rtt_ASSERT( CPUResource::kFrameBufferObject == resource->GetType() );
 	FrameBufferObject * fbo = static_cast< FrameBufferObject * >( resource );

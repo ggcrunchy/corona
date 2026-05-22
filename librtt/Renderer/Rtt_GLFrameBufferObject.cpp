@@ -41,7 +41,7 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 void 
-GLFrameBufferObject::Create( CPUResource* resource )
+GLFrameBufferObject::Create( CPUResource* resource, const RenderContext* context )
 {
 	Rtt_ASSERT( CPUResource::kFrameBufferObject == resource->GetType() );
 //	FrameBufferObject* fbo = static_cast<FrameBufferObject*>( resource );
@@ -52,7 +52,7 @@ GLFrameBufferObject::Create( CPUResource* resource )
 	fHandle = NameToHandle( name );
 	GL_CHECK_ERROR();
 
-	Update( resource );
+	Update( resource, context );
 
 	DEBUG_PRINT( "%s : OpenGL name: %d\n",
 					__FUNCTION__,
@@ -60,7 +60,7 @@ GLFrameBufferObject::Create( CPUResource* resource )
 }
 
 void 
-GLFrameBufferObject::Update( CPUResource* resource )
+GLFrameBufferObject::Update( CPUResource* resource, const RenderContext* )
 {
 	SUMMED_TIMING( glfu, "Framebuffer GPU Resource: Update" );
 

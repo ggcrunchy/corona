@@ -164,9 +164,7 @@ PlatformBitmap::HasAlphaChannel() const
 		default:
 			if ( format.IsNonCore() )
 			{
-				FormatDetails details = FormatDetails::UnpackFromValue( format.GetBackingValue() );
-				
-				result = -1 != details.fAlphaIndex;
+				result = HasAlphaChannelFromPacking( format.GetBackingValue() ); 
 			}
 			break;
 	}
@@ -230,9 +228,9 @@ PlatformBitmap::BytesPerPixel( Format format )
 		default:
 			if ( format.IsNonCore() )
 			{
-				FormatDetails details = FormatDetails::UnpackFromValue( format.GetBackingValue() );
-				
-				return details.fBytesPerComponent * details.fNumComponents;
+				// TODO: does "per pixel" have the right meaning, if compressed?
+			
+				return GetSizeFromPacking( 1, 1, format.GetBackingValue() );
 			}
 			break;
 	}
@@ -358,12 +356,7 @@ PlatformBitmap::GetColorByteIndexesFor(
 		default:
 			if ( format.IsNonCore() )
 			{
-				FormatDetails details = FormatDetails::UnpackFromValue( format.GetBackingValue() );
-				
-				redIndexOut = details.fRedIndex;
-				greenIndexOut = details.fGreenIndex;
-				blueIndexOut = details.fBlueIndex;
-				alphaIndexOut = details.fAlphaIndex;
+				GetComponentIndicesFromPacking( format.GetBackingValue(), redIndexOut, greenIndexOut, blueIndexOut, alphaIndexOut );
 			}
 			else
 			{

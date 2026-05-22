@@ -437,7 +437,7 @@ GLGeometry::SpliceVertexRateData( const Geometry::Vertex* vertexData, Geometry::
 }
 
 void
-GLGeometry::Create( CPUResource* resource )
+GLGeometry::Create( CPUResource* resource, const RenderContext* context )
 {
     Rtt_ASSERT( CPUResource::kGeometry == resource->GetType() );
     Geometry* geometry = static_cast<Geometry*>( resource );
@@ -477,12 +477,12 @@ GLGeometry::Create( CPUResource* resource )
     }
     else
     {
-        Update( resource );
+        Update( resource, context );
     }
 }
 
 void
-GLGeometry::Update( CPUResource* resource )
+GLGeometry::Update( CPUResource* resource, const RenderContext* )
 {
 	SUMMED_TIMING( glgu, "Geometry GPU Resource: Update" );
 

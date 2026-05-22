@@ -191,15 +191,7 @@ Texture::GetSizeInBytes() const
 		default:
 			if ( format.IsNonCore() )
 			{
-				FormatDetails details = FormatDetails::UnpackFromValue( format.GetBackingValue() );
-				if ( 0 == details.fBlockSize ) // not compressed?
-				{
-					return w * h * details.fBytesPerComponent * details.fNumComponents;
-				}
-				else
-				{
-					return Format::GetCompressedSize( w, h, details.fBlockWidth, details.fBlockHeight, details.fBlockSize );
-				}
+				return GetSizeFromPacking( w, h, format.GetBackingValue() );
 			}
 			else
 			{

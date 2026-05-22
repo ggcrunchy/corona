@@ -147,7 +147,7 @@ GLProgram::GLProgram()
 }
 
 void
-GLProgram::Create( CPUResource* resource )
+GLProgram::Create( CPUResource* resource, const RenderContext* )
 {
 	SUMMED_TIMING( glpc, "Program GPU Resource: Create" );
 
@@ -190,7 +190,7 @@ GLProgram::Create( CPUResource* resource )
 }
 
 void
-GLProgram::Update( CPUResource* resource )
+GLProgram::Update( CPUResource* resource, const RenderContext* )
 {
 	SUMMED_TIMING( glpu, "Program GPU Resource: Update" );
 

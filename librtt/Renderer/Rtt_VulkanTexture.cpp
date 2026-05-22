@@ -66,7 +66,7 @@ VulkanTexture::VulkanTexture( VulkanContext * context )
 }
 
 void 
-VulkanTexture::Create( CPUResource* resource )
+VulkanTexture::Create( CPUResource* resource, const RenderContext* )
 {
 	Rtt_ASSERT( CPUResource::kTexture == resource->GetType() || CPUResource::kVideoTexture == resource->GetType() );
 	Texture* texture = static_cast< Texture* >( resource );
@@ -164,7 +164,7 @@ VulkanTexture::Create( CPUResource* resource )
 }
 
 void 
-VulkanTexture::Update( CPUResource* resource )
+VulkanTexture::Update( CPUResource* resource, const RenderContext* )
 {
 	Rtt_ASSERT( CPUResource::kTexture == resource->GetType() );
 	Texture* texture = static_cast<Texture*>( resource );

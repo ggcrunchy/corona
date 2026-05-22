@@ -43,7 +43,8 @@
 CORONA_API
 int CoronaExternalPushTexture( lua_State *L, const CoronaExternalTextureCallbacks *callbacks, void* context)
 {
-    if ( callbacks->size != sizeof(CoronaExternalTextureCallbacks) )
+	// scoop up extensions, validate, etc.
+    if ( callbacks->size != sizeof(CoronaExternalTextureCallbacks) && callbacks->size != sizeof(CoronaExternalTextureCallbacks2) )
     {
         CoronaLuaError(L, "TextureResourceExternal - invalid binary version for callback structure; size value isn't valid");
         return 0;
@@ -53,6 +54,30 @@ int CoronaExternalPushTexture( lua_State *L, const CoronaExternalTextureCallback
     {
         CoronaLuaError(L, "TextureResourceExternal - bitmap, width and height callbacks are required");
         return 0;
+    }
+    
+    if ( sizeof(CoronaExternalTextureCallbacks2) == callbacks->size )
+    {
+		CoronaExternalTextureCallbacks2* callbacks2 = (CoronaExternalTextureCallbacks2*)callbacks;
+		if ( NULL == callbacks2->firstExtension )
+		{
+			CoronaLuaError(L, "TextureResourceExternal - no extensions provided to version 2 callbacks");
+			return 0;
+		}
+		
+		U64 used = 0;
+		for ( const CoronaExternalTextureExtensionBase* ext = callbacks2->firstExtension; NULL != ext; ext = ext->next )
+		{
+			U64 mask = 1U << ext->type;
+			if ( used & mask )
+			{
+				CoronaLuaError(L, "TextureResourceExternal - extension %i seen more than once", ext->type);
+				return 0;
+			}
+			used |= mask;
+		}
+		// TODO: at some point might want to validate certain combinations
+		// TODO: validate legal setups...
     }
     
     static unsigned int sNextExternalTextureId = 1;
@@ -97,6 +122,42 @@ int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format)
     }
 }
 
+
+// ----------------------------------------------------------------------------
+
+static Rtt::Renderer &
+GetRenderer( lua_State * L )
+{
+    return Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer();
+}
+
+CORONA_API
+int CoronaDefineTextureFormat( lua_State * L, const CoronaTextureDefinitionBase * texDef )
+{
+    Rtt::Renderer& renderer = GetRenderer( L );
+    Rtt::TextureFormatDescription desc = {};
+	if ( renderer.MatchToFormatDescription( texDef, &desc ) )
+    {
+		Rtt::TextureFactory& factory = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetTextureFactory();
+    
+		if ( factory.AddCustomFormat( desc ) )
+		{
+			U32 count = factory.GetCurrentFormatCount();
+			Rtt_ASSERT( count > 0 );
+			
+			renderer.UpdateCustomFormats( factory.GetCurrentFormatList(), count );
+	 
+			return count;
+		}
+		else
+		{
+			Rtt_TRACE_SIM(( "Too many texture formats defined" ));
+		}
+	}
+	
+	return 0;
+}
+
 // ----------------------------------------------------------------------------
 
 OBJECT_HANDLE_DEFINE_TYPE( Renderer );
@@ -106,12 +167,6 @@ OBJECT_HANDLE_DEFINE_TYPE( ShaderData );
 OBJECT_HANDLE_DEFINE_TYPE( CommandBuffer );
 
 // ----------------------------------------------------------------------------
-
-static Rtt::Renderer &
-GetRenderer( lua_State * L )
-{
-    return Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer();
-}
 
 CORONA_API
 void CoronaRendererInvalidate( lua_State * L )

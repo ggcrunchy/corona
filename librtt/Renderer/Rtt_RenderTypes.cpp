@@ -1267,6 +1267,12 @@ SetBits( U32* v, U32 bits, const MaskInfo& info )
 
 // ----------------------------------------------------------------------------
 
+int
+GetFormatIndexBitCount()
+{
+	return kFormatIndexBits;
+}
+
 bool
 HasFormatFlag( U32 v )
 {
@@ -1376,57 +1382,63 @@ SetData( U32* v, U32 data )
 
 const U32 kASTCMask = 1U << ( kComponentBits - 1 ); // high bit, when compressed = has ASTC-style block
 
-bool
-FormatDetails::PackToValue( U32* v )
+
+U32
+PackDescription( const TextureFormatDescription* desc )
 {
-	// ensure power-of-2 in (1, 2, 4, 8)
-	Rtt_ASSERT( fBytesPerComponent > 0 );
-	Rtt_ASSERT( fBytesPerComponent < 16 );
-	Rtt_ASSERT( 0 == ( fBytesPerComponent & ( fBytesPerComponent - 1 ) ) );
-
-	// ensure power-of-2 in (1, 2, 4)
-	bool isCompressed = 0 != fBlockSize;
-
-	Rtt_ASSERT( !isCompressed || ( 0 != fBlockWidth && 0 != fBlockHeight ) );
-	Rtt_ASSERT( isCompressed || fBytesPerComponent > 0 );
-	Rtt_ASSERT( isCompressed || fBytesPerComponent < 8 );
-	Rtt_ASSERT( isCompressed || 0 == ( fBytesPerComponent & ( fBytesPerComponent - 1 ) ) );
-
+	if ( desc->IsPacked() )
+	{
+		Rtt_ASSERT( ( 0 != desc->fSizes[0] ) && ( 0 != desc->fSizes[1] ) );
+		Rtt_ASSERT( ( 0 != desc->fSizes[2] ) || ( 0 == desc->fSizes[3] ) );
+		Rtt_ASSERT( ( desc->fSizes[0] + desc->fSizes[1] + desc->fSizes[2] + desc->fSizes[3] ) % 8 == 0 );
+	}
+	else if ( desc->IsCompressed() )
+	{
+		Rtt_ASSERT( desc->fBlockWidth != 0 && desc->fBlockHeight != 0 && desc->fBlockSize != 0 );
+		// TODO: components?
+	}
+	else
+	{
+		Rtt_ASSERT( desc->fNumComponents >= 1 && desc->fNumComponents <= 4 );
+		Rtt_ASSERT( desc->fBytesPerComponent == 1 || desc->fBytesPerComponent == 2 || desc->fBytesPerComponent == 4 );
+	}
+	
 	// TODO: so far we only have simple schemes; fix up
 	// if and when more sophisticated cases arise
 
-	int componentCount = 1;
-	int indices[] = { fRedIndex, fGreenIndex, fBlueIndex, fAlphaIndex };
-	const char * names[] = { "red", "green", "blue", "index" };
-
-	for (int i = 0; i < 4; i++)
+	int componentCount;
+	if ( desc->IsPacked() )
 	{
-		if (indices[i] != i)
-		{
-			if (-1 == indices[i] && i > 0)
-			{
-				break;
-			}
-			else
-			{
-				// CORONA_LOG_ERROR( "Formats with non-%i %s index not yet supported", i, names[i] );
-
-				return false;
-			}
-		}
-		else if (i > 0)
-		{
-			componentCount++;
-		}
+		componentCount = 2 + ( 0 != desc->fSizes[2] ) + ( 0 != desc->fSizes[3] );
+		
+		// TODO: actually want a scheme for this... there are a finite set, probably within existing kDataBits
+	}
+	else
+	{
+		componentCount = desc->fNumComponents;
 	}
 
 	U32 shift = 0, components = componentCount - 1, data = 0;
-	
-	if ( !isCompressed )
+
+	if ( desc->IsCompressed() )
+	{
+		shift = 3; // 1 << 3 (8) != valid component size, so encodes compression
+
+		if ( 16 == desc->fBlockSize ) // ASTC or BC7?
+		{
+			Rtt_ASSERT( 0 == ( components & kASTCMask ) );
+
+			components |= kASTCMask;
+			data = Texture::Format::BlockDimsID( desc->fBlockWidth, desc->fBlockHeight );
+
+			Rtt_ASSERT( data >= 0 && data < ( 1 << kDataBits ) );
+		}
+	}
+	else if ( !desc->IsPacked() )
 	{
 		for ( ; shift < 3; shift++ )
 		{
-			if ( fBytesPerComponent == ( 1 << shift ) )
+			if ( desc->fBytesPerComponent == ( 1 << shift ) )
 			{
 				break;
 			}
@@ -1434,81 +1446,81 @@ FormatDetails::PackToValue( U32* v )
 
 		Rtt_ASSERT( shift < 3 );
 	}
-	else
-	{
-		// TODO: any reason to worry about non-Texture case?
-		shift = 3; // cf. UnpackDetails()
 
-		if ( 16 == fBlockSize ) // ASTC or BC7?
-		{
-			Rtt_ASSERT( 0 == ( components & kASTCMask ) );
+	U32 value = 0;
+	
+	SetShift( &value, shift );
+	SetComponents( &value, components );
+	SetData( &value, data );
 
-			components |= kASTCMask;
-			data = Texture::Format::BlockDimsID( fBlockWidth, fBlockHeight );
-
-			Rtt_ASSERT( data >= 0 && data < ( 1 << kDataBits ) );
-		}
-	}
-
-	SetShift( v, shift );
-	SetComponents( v, components );
-	SetData( v, data );
-
-	return true;
+	return value;//true;
 }
 
-FormatDetails
-FormatDetails::UnpackFromValue( U32 v )
+size_t GetSizeFromPacking( U16 w, U16 h, U32 packedDesc )
 {
-	FormatDetails details;
-
-	details.fBytesPerComponent = 1U << GetShift( v );
-
-	U32 components = GetComponents( v );
-	if ( 8 == details.fBytesPerComponent ) // 8 not a valid bpc, encodes "compressed"
+	U32 shift = GetShift( packedDesc );
+	U32 components = GetComponents( packedDesc );
+	if ( 3 == shift ) // compressed? cf. PackDescription()
 	{
-		details.fBytesPerComponent = 1;
-
+		U8 blockWidth, blockHeight, blockSize;
 		bool isASTCish = 0 != ( components & kASTCMask );
 		if ( isASTCish )
 		{
-			components &= ~kASTCMask;
+			Texture::Format::GetBlockDims( GetData( packedDesc ), blockWidth, blockHeight );
 			
-			Texture::Format::GetBlockDims( GetData( v ), details.fBlockWidth, details.fBlockHeight );
+			blockSize = 16;
 		}
 		else
 		{
-			details.fBlockWidth = 4;
-			details.fBlockHeight = 4;
+			blockWidth = 4;
+			blockHeight = 4;
+			blockSize = 8;
 		}
 		
-		details.fBlockSize = isASTCish ? 16 : 8;
-	}
-
-	if ( components < 4 ) // 0-3: "normal" case, value = #components - 1
-	{
-		details.fNumComponents = components + 1;
-		switch ( details.fNumComponents )
-		{
-			case 1:
-				details.fAlphaIndex = -1;
-				// ...and fall through
-			case 2:
-				details.fBlueIndex = -1;
-				// ...and fall through
-			case 3:
-				details.fGreenIndex = -1;
-				// ...and fall through
-			default:
-				break;
-		}
+		return Texture::Format::GetCompressedSize( w, h, blockWidth, blockHeight, blockSize );
 	}
 	else
 	{
-		// CORONA_LOG_ERROR( "NYI: unpacking non-count component formats" );
+		Rtt_ASSERT( components < 4 ); // TODO? (packing, say)
+		U32 bytesPerComponent = 1 << shift;
+		return ( w * h ) * ( components + 1 ) * bytesPerComponent;
 	}
+}
+
+bool IsCompressedFromPacking( U32 packedDesc )
+{
+	return 3 == GetShift( packedDesc ); // cf. PackDescription()
+}
+
+static U32
+GetASTCAwareComponentCount( U32 packedDesc )
+{
+	U32 components = GetComponents( packedDesc );
+	if ( IsCompressedFromPacking( packedDesc ) )
+	{
+		components &= ~kASTCMask;
+	}
+
+	Rtt_ASSERT( components < 4 ); // TODO: decide how to use high bit
+
+	return components + 1;
+}
+
+bool HasAlphaChannelFromPacking( U32 packedDesc )
+{
+	return GetASTCAwareComponentCount( packedDesc ) == 4;
+	// TODO: RA, etc.
+}
+
+void GetComponentIndicesFromPacking( U32 packedDesc, int& redIndex, int& greenIndex, int& blueIndex, int& alphaIndex )
+{
+	U32 componentCount = GetASTCAwareComponentCount( packedDesc );
 	
-	return details;
+	redIndex = 0;
+	greenIndex = componentCount > 1 ? 1 : -1;
+	blueIndex = componentCount > 2 ? 2 : -1;
+	alphaIndex = componentCount > 3 ? 3 : -1;
+	// TODO: BGRA, etc.
 }
 
 // ----------------------------------------------------------------------------

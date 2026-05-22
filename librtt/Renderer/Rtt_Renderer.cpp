@@ -184,6 +184,8 @@ Renderer::Renderer( Rtt_Allocator* allocator )
     fMultisampleEnabled( false ),
     fFrameBufferObject( NULL ),
     fInsertionLimit( (std::numeric_limits<U32>::max)() ),
+    fCustomFormats( NULL ),
+    fCustomFormatCount( 0 ),
     fRenderDataCount( 0 ),
 	fVertexOffset( 0 ),
 	fCurrentGeometry( NULL ),
@@ -980,11 +982,16 @@ Renderer::Swap()
 
     // Create GPUResources
     Rtt_AbsoluteTime start = START_TIMING();
+    GPUResource::RenderContext context = {};
+    context.fCustomFormats = fCustomFormats;
+    context.fCustomFormatCount = fCustomFormatCount;
+    
     for(S32 i = 0; i < fCreateQueue.Length(); ++i)
     {
         CPUResource* data = fCreateQueue[i];
         GPUResource* gpuResource = data->GetGPUResource();
-        gpuResource->Create( data );
+// TODO: add way for resource to refer back to Renderer...
+        gpuResource->Create( data, &context );
     }
     fCreateQueue.Remove(0, fCreateQueue.Length(), false);
     fStatistics.fResourceCreateTime = STOP_TIMING(start);
@@ -994,7 +1001,7 @@ Renderer::Swap()
     for(S32 i = 0; i < fUpdateQueue.Length(); ++i)
     {
         CPUResource* data = fUpdateQueue[i];
-        data->GetGPUResource()->Update( data );
+        data->GetGPUResource()->Update( data, &context );
     }
     fUpdateQueue.Remove(0, fUpdateQueue.Length(), false);
     fStatistics.fResourceUpdateTime = STOP_TIMING(start);
@@ -2060,6 +2067,13 @@ Renderer::AddedUsesTime()
 	ShaderResource::SetAddedUsesTime( false );
 
 	return addedUsesTime;
+}
+
+void
+Renderer::UpdateCustomFormats( const TextureFormatDescription* formats, U32 count )
+{
+	fCustomFormats = formats;
+	fCustomFormatCount = count;
 }
 
 void

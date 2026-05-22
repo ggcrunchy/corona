@@ -27,6 +27,7 @@
 struct Rtt_Allocator;
 struct CoronaCommand;
 struct CoronaStateBlock;
+struct CoronaTextureDefinitionBase;
 
 namespace Rtt
 {
@@ -70,6 +71,8 @@ class Renderer
 
 		virtual void CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bitmap, S32 x_in_pixels, S32 y_in_pixels, S32 w_in_pixels, S32 h_in_pixels );
 		virtual void EndCapture() {}
+
+		virtual bool MatchToFormatDescription( const CoronaTextureDefinitionBase* texDef, TextureFormatDescription* desc );
 
 		// Get the current view and projection matrices. These 4x4 matrices are
 		// returned via the given pointers, which are assumed to be non-null.
@@ -324,6 +327,9 @@ class Renderer
 	public:
 		bool AddedUsesTime();
 
+	public:
+		void UpdateCustomFormats( const TextureFormatDescription* formats, U32 count );
+
 	protected:
 		Rtt_Allocator* fAllocator;
 		
@@ -378,6 +384,10 @@ class Renderer
         Geometry* fCurrentGeometry;
         Geometry::Vertex* fCurrentInstancingVertex;
         Geometry* fCurrentInstancingGeometry;
+
+		// Non-owning:
+		const TextureFormatDescription* fCustomFormats;
+		U32 fCustomFormatCount;
 
         Real fContentScaleX; // Temporary holder.
         Real fContentScaleY; // Temporary holder.

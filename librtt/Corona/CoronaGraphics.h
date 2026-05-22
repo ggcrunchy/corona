@@ -153,6 +153,83 @@ typedef struct CoronaExternalTextureCallbacks
     int (*onGetField)(lua_State *L, const char *field, void* userData);   // optional; called Lua texture property lookup
 } CoronaExternalTextureCallbacks;
 
+// ----------------------------------------------------------------------------
+
+/**
+*/
+typedef enum {
+	// TODO: suss out where these belong... some of this is more like a display.setDefault()...
+	/**
+	*/
+	kTextureTarget,
+	
+	/**
+	*/
+	kCustomFormat, // must be registered, but thus can change what component count, etc. are
+} CoronaExternalTextureExtensionType;
+
+// TODO: future possibilities... kAllowSubimage, e.g. some "window" method, picked up by invalidate(); kNoPremultiply
+
+/**
+*/
+typedef struct CoronaExternalTextureExtensionBase {
+	/**
+	*/
+	struct CoronaExternalTextureExtensionBase * next;
+	
+	/**
+	*/
+	CoronaExternalTextureExtensionType type;
+} CoronaExternalTextureExtensionBase;
+
+/*
+enum { kUnorm, kSnorm, kUint, kSint, kFloat, kOther }
+	// kSInt, kUInt, kOther }; (or see suggestions by P)
+enum { k1D, k2D, k3D, kCube, kBuffer, kRectangle, kMultisample };
+enum { kNormal, kArray, kImage, kImageArray }; (does the "image" bit matter here?)
+*/
+
+/**
+*/
+typedef struct CoronaExternalTextureExtension_TextureTarget {
+	/**
+	*/
+	CoronaExternalTextureExtensionBase common;
+
+	/**
+	*/
+	int family;
+	int target;
+	int subtype;
+	// ^^ TODO: clean this up; have it agree with Texture::* (target, subtype, family)
+	// TODO: these actually describe the samplers; family and array-ness is more or less right
+	// there are some target + array-ness combinations to work out
+} CoronaExternalTextureExtension_TextureTarget;
+
+/**
+*/
+typedef struct CoronaExternalTextureExtension_CustomFormat {
+	/**
+	*/
+	CoronaExternalTextureExtensionBase common;
+
+	/**
+	*/
+	unsigned int formatIndex;
+} CoronaExternalTextureExtension_CustomFormat;
+
+/**
+*/
+typedef struct CoronaExternalTextureCallbacks2 {
+	/**
+	*/
+	CoronaExternalTextureCallbacks base;
+	
+	/**
+	*/
+	CoronaExternalTextureExtensionBase * firstExtension;
+} CoronaExternalTextureCallbacks2;
+
 // C API
 // ----------------------------------------------------------------------------
 
@@ -184,6 +261,179 @@ void* CoronaExternalGetUserData( lua_State *L, int index ) CORONA_PUBLIC_SUFFIX;
 */
 CORONA_API
 int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format) CORONA_PUBLIC_SUFFIX;
+
+// ----------------------------------------------------------------------------
+
+/**
+*/
+typedef enum {
+	/**
+	*/
+	kNorm,
+
+	/**
+	*/
+	kFloat,
+// TODO: byte, short (where do these go???)
+	/**
+	*/
+	kInt
+} CoronaFormatComponentKind;
+
+/**
+*/
+typedef enum {
+	/**
+	*/
+	kNormalTextureFormatDefinition,
+
+	/**
+	*/	
+	kPackedTextureFormatDefinition,
+
+	/**
+	*/
+	kCompressedTextureFormatDefinition,
+	
+	/**
+	*/
+	kDepthStencilTextureFormatDefinition
+} CoronaTextureFormatDefinitionFamily;
+
+
+/**
+*/
+typedef enum {
+	kProbeRenderability = 1 << 0,
+	kIsRenderable1 = 1 << 1,
+	kIsRenderable2 = 1 << 2,
+	kHasLinearFiltering = 1 << 3,
+	kIsFloatingPoint = 1 << 4,
+	kIsIntegral = 1 << 5,
+	kIsSigned = 1 << 6,
+	kIssRGB = 1 << 7
+} CoronaTextureFormatFlags;
+
+/**
+*/
+typedef struct
+CoronaTextureDefinitionBase
+{
+	/**
+	*/
+	CoronaTextureFormatDefinitionFamily family;
+	
+	/**
+	*/
+	int flags;
+	
+	/**
+	*/
+	int format;
+	
+	/**
+	*/
+	int internalFormat;
+	
+	/**
+	*/
+	int type;
+} CoronaTextureDefinitionBase;
+
+/**
+*/
+typedef struct
+CoronaTextureFormat
+{
+	/**
+	*/
+	CoronaTextureDefinitionBase common;
+	
+	/**
+	*/
+	CoronaFormatComponentKind componentKind;
+	
+	/**
+	*/
+	int bytesPerComponent; // find from type?
+	
+	/**
+	*/
+	int numComponents; // ditto...
+} CoronaTextureFormat;
+
+/**
+*/
+typedef struct
+CoronaPackedTextureFormat
+{
+// TODO: can we figure most of this out from the "type"?
+// does that carry over to non-GL APIs?
+// there are UNSIGNED_INT_10F_11F_11F_REV and FLOAT_32_UNSIGNED_INT_24_8_REV
+// then signed (implicit), unsigned, byte, short, int, float
+	/**
+	*/
+	CoronaTextureDefinitionBase common;
+	
+	/**
+	*/
+	CoronaFormatComponentKind componentKind;
+
+	/**
+	*/
+	int bitCounts[4];
+} CoronaPackedTextureFormat;
+
+/**
+*/
+typedef struct
+CoronaCompressedTextureFormat
+{
+	/**
+	*/
+	CoronaTextureDefinitionBase common;
+
+	/**
+	*/
+	unsigned int blockWidth;
+	
+	/**
+	*/
+	unsigned int blockHeight;
+	
+	/**
+	*/
+	unsigned int blockSize;
+} CoronaCompressedTextureFormat;
+
+/**
+*/
+typedef struct
+CoronaDepthStencilTextureFormat
+{
+	/**
+	*/
+	CoronaTextureDefinitionBase common;
+	
+	/**
+	*/
+	int isDepthFloat;
+	
+	/**
+	*/
+	int depthBits;
+	
+	/**
+	*/
+	int stencilBits; 
+} CoronaDepthStencilTextureFormat;
+
+/**
+ @param L
+ @param texDef
+*/
+CORONA_API
+int CoronaDefineTextureFormat( lua_State * L, const CoronaTextureDefinitionBase * texDef ) CORONA_PUBLIC_SUFFIX;
 
 // ----------------------------------------------------------------------------
 
