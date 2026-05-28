@@ -155,6 +155,18 @@ GLint CalculateOptimalAlignment(U32 width, GLenum format)
     return 1; // No alignment
 }
 
+static GLint
+CalculateAlignementFromBytesPerPixel(U32 width, int bytesPerPixel)
+{
+    const U32 rowBytes = width * bytesPerPixel;
+   
+    if(rowBytes % 8 == 0) return 8;
+    if(rowBytes % 4 == 0) return 4;
+    if(rowBytes % 2 == 0) return 2;
+    
+    return 1; // No alignment
+}
+
 void
 GLTexture::Create( CPUResource* resource, const RenderContext* context )
 {
@@ -168,9 +180,33 @@ GLTexture::Create( CPUResource* resource, const RenderContext* context )
     fHandle = NameToHandle( name );
     GL_CHECK_ERROR();
 
+    TextureFormatDescription texDesc;
+    Texture::Format textureFormat = texture->GetFormat();
+    bool isNonCore = textureFormat.IsNonCore();
+    bool mightHaveLinearFiltering = true;
+    if ( isNonCore )
+    {
+		U32 formatIndex = FormatDetails::GetFormatIndex( textureFormat.GetBackingValue() );
+		Rtt_ASSERT( formatIndex <= context->fCustomFormatCount );
+		texDesc = context->fCustomFormats[ formatIndex - 1 ];
+
+		if ( 0 == ( texDesc.fFlags & TextureFormatDescription::kHasLinearFiltering ) )
+		{
+			mightHaveLinearFiltering = false;
+		}
+    }
+    
     GLenum minFilter;
     GLenum magFilter;
-    getFilterTokens( texture->GetFilter(), minFilter, magFilter );
+    if ( mightHaveLinearFiltering )
+    {
+		getFilterTokens( texture->GetFilter(), minFilter, magFilter );
+	}
+	else
+	{
+		minFilter = GL_NEAREST;
+		magFilter = GL_NEAREST;
+	}
 
     glBindTexture( GL_TEXTURE_2D, name );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter );
@@ -186,8 +222,16 @@ GLTexture::Create( CPUResource* resource, const RenderContext* context )
     GLint internalFormat;
     GLenum format;
     GLenum type;
-    Texture::Format textureFormat = texture->GetFormat();
-    getFormatTokens( textureFormat, internalFormat, format, type );
+    if ( !isNonCore )
+    {
+		getFormatTokens( textureFormat, internalFormat, format, type );
+	}
+	else
+	{
+		internalFormat = texDesc.fInternal;
+		format = texDesc.fFormat;
+		type = texDesc.fDataType;
+	}
 
     const U32 w = texture->GetWidth();
     const U32 h = texture->GetHeight();
@@ -197,11 +241,27 @@ GLTexture::Create( CPUResource* resource, const RenderContext* context )
 //        glPixelStorei( GL_UNPACK_ALIGNMENT, texture->GetByteAlignment() );
 //        GL_CHECK_ERROR();
 //#endif
-        glPixelStorei(GL_UNPACK_ALIGNMENT, CalculateOptimalAlignment(w, internalFormat));
+		if ( !isNonCore )
+		{
+			glPixelStorei(GL_UNPACK_ALIGNMENT, CalculateOptimalAlignment(w, internalFormat));
+		}
+		else if ( !texDesc.IsCompressed() ) // some digging suggest this is irrelevant when compressed
+		{
+			size_t bytesPerPixel = FormatDetails::GetSize( w, 1, textureFormat.GetBackingValue() );
+			glPixelStorei(GL_UNPACK_ALIGNMENT, CalculateAlignementFromBytesPerPixel(w, bytesPerPixel));
+		}
         GL_CHECK_ERROR();
 
         // It is valid to pass a NULL pointer, so allocation is done either way
-        glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
+		if ( isNonCore && texDesc.IsCompressed() )
+		{
+			U32 imageSize = Texture::Format::GetCompressedSize( w, h, texDesc.fBlockWidth, texDesc.fBlockHeight, texDesc.fBlockSize );
+			glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, imageSize, data );
+		}
+		else
+		{
+			glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
+		}
         GL_CHECK_ERROR();
         
         fCachedFormat = internalFormat;
@@ -231,20 +291,59 @@ GLTexture::Update( CPUResource* resource, const RenderContext* context )
         GLint internalFormat;
         GLenum format;
         GLenum type;
-        getFormatTokens( texture->GetFormat(), internalFormat, format, type );
+		TextureFormatDescription texDesc;
+		Texture::Format textureFormat = texture->GetFormat();
+		bool isNonCore = textureFormat.IsNonCore();
+		if ( !isNonCore )
+		{
+			getFormatTokens( texture->GetFormat(), internalFormat, format, type );
+		}
+		else
+		{
+			U32 formatIndex = FormatDetails::GetFormatIndex( textureFormat.GetBackingValue() );
+			Rtt_ASSERT( formatIndex <= context->fCustomFormatCount );
+			texDesc = context->fCustomFormats[ formatIndex - 1 ];
+			internalFormat = texDesc.fInternal;
+			format = texDesc.fFormat;
+			type = texDesc.fDataType;
+		}
 
         glBindTexture( GL_TEXTURE_2D, GetName() );
 
-        glPixelStorei(GL_UNPACK_ALIGNMENT, CalculateOptimalAlignment(w, internalFormat));
+		if ( !isNonCore )
+		{
+			glPixelStorei(GL_UNPACK_ALIGNMENT, CalculateOptimalAlignment(w, internalFormat));
+		}
+		else if ( !texDesc.IsCompressed() ) // some digging suggest this is irrelevant when compressed
+		{
+			size_t bytesPerPixel = FormatDetails::GetSize( w, 1, textureFormat.GetBackingValue() );
+			glPixelStorei(GL_UNPACK_ALIGNMENT, CalculateAlignementFromBytesPerPixel(w, bytesPerPixel));
+		}
         GL_CHECK_ERROR();
 
-        if (internalFormat == fCachedFormat && w == fCachedWidth && h == fCachedHeight )
+        if ( internalFormat == fCachedFormat && w == fCachedWidth && h == fCachedHeight )
         {
-            glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, type, data );
+			if ( isNonCore && texDesc.IsCompressed() )
+			{
+				U32 imageSize = Texture::Format::GetCompressedSize( w, h, texDesc.fBlockWidth, texDesc.fBlockHeight, texDesc.fBlockSize );
+				glCompressedTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, internalFormat, imageSize, data );
+			}
+			else
+			{
+				glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, w, h, format, type, data );
+			}
         }
         else
         {
-            glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
+			if ( isNonCore && texDesc.IsCompressed() )
+			{
+				U32 imageSize = Texture::Format::GetCompressedSize( w, h, texDesc.fBlockWidth, texDesc.fBlockHeight, texDesc.fBlockSize );
+				glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, imageSize, data );
+			}
+			else
+			{
+				glTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, data );
+			}
             fCachedFormat = internalFormat;
             fCachedWidth = w;
             fCachedHeight = h;
@@ -305,7 +404,7 @@ struct ProbeRAII {
 		if ( !fOK )
 		{
 			Rtt_TRACE_SIM((
-				"Error %u defining format with internal = %u, source = %u, type = %u",
+				"ERROR: (%u): defining format with internal = %u, source = %u, type = %u",
 				err,
 				common->internalFormat,
 				common->format,
@@ -354,25 +453,39 @@ struct ProbeRAII {
 };
 
 static bool
+CheckMaybeColorRenderable( const CoronaTextureDefinitionBase& common, U8 inputKind, U8 inputFamily )
+{
+	if ( (U8)common.inputKind != inputKind )
+	{
+		Rtt_TRACE_SIM(( "ERROR: unknown input kind (%i)\n", common.inputKind ));
+		return false;
+	}
+	
+	if ( (U8)common.family!= inputFamily )
+	{
+		Rtt_TRACE_SIM(( "ERROR: unknown input family (%i)\n", common.family ));
+		return false;
+	}
+
+	const U16 renderabilityFlags = kProbeRenderability | kIsRenderable1;
+	if ( ( common.flags & renderabilityFlags ) == renderabilityFlags )
+	{
+		Rtt_TRACE_SIM(( "ERROR: %s\n", "Mixing renderability probe with assertion (#1)" ));
+		return false;
+	}
+	
+	return true;
+}
+
+static bool
 MatchNormalFormat( const CoronaTextureFormat* texDef, TextureFormatDescription* desc )
 {
-	struct {
-		int flags;
-		const char* message;
-	} combos[] = {
-		{ kIsIntegral | kIsFloatingPoint, "Mixing floating-point and integral flags" },
-		{ kIsFloatingPoint | kIsSigned, "Mixing floating-point and signed flags" },
-		{ kProbeRenderability | kIsRenderable1, "Mixing renderability probe with assertion (#1)" }
-	};
-
-	for ( auto && c : combos )
+	U8 inputKind = texDef->common.inputKind & TextureFormatDescription::kInputKindsMask;
+	U8 inputFamily = texDef->common.family & TextureFormatDescription::kInputFamiliesMask;
+	
+	if ( !CheckMaybeColorRenderable( texDef->common, inputKind, inputFamily ) )
 	{
-		if ( ( texDef->common.flags & c.flags ) == c.flags )
-		{
-			Rtt_TRACE_SIM(( "WARNING: %s\n", c.message ));
-		
-			return false;
-		}
+		return false;
 	}
 
 	ProbeRAII probe( &texDef->common );
@@ -388,11 +501,8 @@ MatchNormalFormat( const CoronaTextureFormat* texDef, TextureFormatDescription* 
 	struct {
 		int to, from;
 	} pairs[] = {
-		TextureFormatDescription::kIsIntegral, kIsIntegral,
-		TextureFormatDescription::kIsSigned, kIsSigned,
 		TextureFormatDescription::kHasLinearFiltering, kHasLinearFiltering,
 		TextureFormatDescription::kIsRenderable1, kIsRenderable1,
-		TextureFormatDescription::kIssRGB, kIssRGB
 	};
 	
 	for ( auto && p : pairs )
@@ -403,7 +513,6 @@ MatchNormalFormat( const CoronaTextureFormat* texDef, TextureFormatDescription* 
 		}
 	}
 
-	desc->fFlags |= TextureFormatDescription::kIsColorRelated;
 	if ( texDef->common.flags & kProbeRenderability )
 	{
 		bool canRender = probe.CheckRenderability();
@@ -413,39 +522,43 @@ MatchNormalFormat( const CoronaTextureFormat* texDef, TextureFormatDescription* 
 		}
 	}
 	
-	// TODO: texDef->componentKind;
-	
-	desc->fNumComponents = texDef->numComponents;
+	desc->fInputInfo |= inputKind << TextureFormatDescription::kInputKindsShift;
+	desc->fInputInfo |= inputFamily << TextureFormatDescription::kInputFamiliesShift;
+
+	desc->fNumComponents = texDef->componentCount;
 	desc->fBytesPerComponent = texDef->bytesPerComponent;
 
 	return true;
 }
 
 static bool
-MatchPackedFormat( const CoronaPackedTextureFormat* texDef, TextureFormatDescription* desc )
+MatchWordPackedFormat( const CoronaWordPackedTextureFormat* texDef, TextureFormatDescription* desc )
 {
-// TODO:	texDef->componentKind;
-// TODO: reasonable packing check...
-// TODO: finite number of packing possibilities
+	U8 inputKind = texDef->common.inputKind & TextureFormatDescription::kInputKindsMask;
+	U8 inputFamily = texDef->common.family & TextureFormatDescription::kInputFamiliesMask;
+	
+	if ( !CheckMaybeColorRenderable( texDef->common, inputKind, inputFamily ) )
+	{
+		return false;
+	}
+	
 	int zi = 0, n = 0;
 	for ( ; zi < 4 && 0 != texDef->bitCounts[zi]; zi++)
 	{
 		n += texDef->bitCounts[zi];
 	}
 
-	if ( n % 8 != 0 )
+	if ( ( n % 8 != 0 ) || ( 24 == n ) || ( n > 32 ) )
 	{
-		Rtt_TRACE_SIM(( "Non-multiple-of-8 total bits in packed layout = %i", n ));
-		
+		Rtt_TRACE_SIM(( "Word-packed layout has %i total bits (must be 8, 16, or 32", n ));
 		return false;
 	}
 
-	if (zi < 4)
+	if ( zi < 4 )
 	{
 		if ( zi < 2 )
 		{
-			Rtt_TRACE_SIM(( "Too few non-zero components in packed layout: %i", zi ));
-			
+			Rtt_TRACE_SIM(( "Too few non-zero components in word-packed layout: %i", zi ));
 			return false;
 		}
 
@@ -453,8 +566,7 @@ MatchPackedFormat( const CoronaPackedTextureFormat* texDef, TextureFormatDescrip
 		{
 			if ( 0 != texDef->bitCounts[i] )
 			{
-				Rtt_TRACE_SIM(( "Non-trailing zero in packed layout at position %i", zi ));
-			
+				Rtt_TRACE_SIM(( "Non-trailing zero in word-packed layout at position %i", zi ));
 				return false;
 			}
 		}
@@ -478,16 +590,9 @@ MatchPackedFormat( const CoronaPackedTextureFormat* texDef, TextureFormatDescrip
 	struct {
 		int to, from;
 	} pairs[] = {
-		TextureFormatDescription::kIsFloatingPoint, kIsFloatingPoint,
-	//	TextureFormatDescription::kIsIntegral, kIsIntegral,
-	//	TextureFormatDescription::kIsSigned, kIsSigned,
 		TextureFormatDescription::kHasLinearFiltering, kHasLinearFiltering,
-		TextureFormatDescription::kIsRenderable1, kIsRenderable1,
-	//	TextureFormatDescription::kIssRGB, kIssRGB
+		TextureFormatDescription::kIsRenderable1, kIsRenderable1
 	};
-	// ^^^ TODO: check if other options make any sense, e.g. outside ES 3.2
-		// all are "integral" in the underlying type, more or less...
-		// "floating point" here = UNSIGNED_INT_10F_11F_11F_REV or similar
 	
 	for ( auto && p : pairs )
 	{
@@ -497,7 +602,6 @@ MatchPackedFormat( const CoronaPackedTextureFormat* texDef, TextureFormatDescrip
 		}
 	}
 
-	desc->fFlags |= TextureFormatDescription::kIsColorRelated;
 	if ( texDef->common.flags & kProbeRenderability )
 	{
 		bool canRender = probe.CheckRenderability();
@@ -507,7 +611,9 @@ MatchPackedFormat( const CoronaPackedTextureFormat* texDef, TextureFormatDescrip
 		}
 	}
 
-	desc->fFlags |= TextureFormatDescription::kIsPacked;
+	desc->fFlags |= TextureFormatDescription::kIsWordPacked;
+	desc->fInputInfo |= inputKind << TextureFormatDescription::kInputKindsShift;
+	desc->fInputInfo |= inputFamily << TextureFormatDescription::kInputFamiliesShift;
 
 	return true;
 }
@@ -530,19 +636,23 @@ MatchCompressedFormat( const CoronaCompressedTextureFormat* texDef, TextureForma
 
 	if ( GL_NO_ERROR != err )
 	{
-		// MESSAGE
+		Rtt_TRACE_SIM((
+			"ERROR: (%u): defining compressed format with internal = %u",
+			err,
+			texDef->common.internalFormat ));
 		return false;
 	}
 
 	desc->fInternal = texDef->common.internalFormat;
-	desc->fDataType = texDef->common.type;
-texDef->common.flags; // filtering, float, sRGB?
+
+//	desc->fNumComponents = ???
+	// TODO: ^^^ do we care about this? (on the CPU side, that is)
+		// not a whole lot we can do with it...
+	// TODO: can this be non-color?
 	desc->fBlockWidth = texDef->blockWidth;
 	desc->fBlockHeight = texDef->blockHeight;
 	desc->fBlockSize = texDef->blockSize;
-// TODO: ??? in theory we can render, but seems pretty uncommon
-// TODO: can we (in GL) render to a compressed format?
-// anything needed for 3D formats? (seem to be spottily supported, though that's per a few-years-old thread)
+	
 	return true;
 }
 
@@ -570,13 +680,14 @@ texDef->common.internalFormat;
 bool
 Renderer::MatchToFormatDescription( const CoronaTextureDefinitionBase* texDef, TextureFormatDescription* desc )
 {
+// TODO: a lot of this isn't GL-specific, outside the probes...
 	switch ( texDef->family )
 	{
 		case kNormalTextureFormatDefinition:
 			return MatchNormalFormat( (CoronaTextureFormat*)texDef, desc );
 
-		case kPackedTextureFormatDefinition:
-			return MatchPackedFormat( (CoronaPackedTextureFormat*)texDef, desc );
+		case kWordPackedTextureFormatDefinition:
+			return MatchWordPackedFormat( (CoronaWordPackedTextureFormat*)texDef, desc );
 
 		case kCompressedTextureFormatDefinition:
 			return MatchCompressedFormat( (CoronaCompressedTextureFormat*)texDef, desc );

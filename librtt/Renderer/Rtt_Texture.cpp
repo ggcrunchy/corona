@@ -29,13 +29,20 @@ namespace Rtt
 Texture::FormatValue
 Texture::Format::GetValue() const
 {
-	return (FormatValue)GetStockFormatAndFlag( fValue );
+	if ( !IsNonCore() )
+	{
+		return (FormatValue)FormatDetails::GetStockFormat( fValue );
+	}
+	else
+	{
+		return kNumFormats; // arbitrary invalid value
+	}
 }
 
 bool
 Texture::Format::IsNonCore() const
 {
-	return HasFormatFlag( fValue );
+	return ( 0 != FormatDetails::GetFormatIndex( fValue ) );
 }
 
 #define PACK_ASTC( WIDTH, HEIGHT ) ( ( WIDTH << 4 ) | ( HEIGHT ) )
@@ -191,7 +198,7 @@ Texture::GetSizeInBytes() const
 		default:
 			if ( format.IsNonCore() )
 			{
-				return GetSizeFromPacking( w, h, format.GetBackingValue() );
+				return FormatDetails::GetSize( w, h, format.GetBackingValue() );
 			}
 			else
 			{

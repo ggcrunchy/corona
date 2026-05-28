@@ -684,7 +684,7 @@ void TextureFactory::RemoveFromTeardownList( const std::string &key )
 
 bool TextureFactory::AddCustomFormat( const TextureFormatDescription &format )
 {
-	const int maxValueWithBits = ( 1 << GetFormatIndexBitCount() ) - 1;
+	const int maxValueWithBits = ( 1 << FormatDetails::GetFormatIndexBitCount() ) - 1;
 	const int maxCount = maxValueWithBits - 1; // one value set aside for 0, which is not a custom format
 
 	if ( fCustomFormats.Length() < maxCount )

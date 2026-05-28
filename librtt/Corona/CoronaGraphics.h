@@ -186,8 +186,56 @@ typedef struct CoronaExternalTextureExtensionBase {
 enum { kUnorm, kSnorm, kUint, kSint, kFloat, kOther }
 	// kSInt, kUInt, kOther }; (or see suggestions by P)
 enum { k1D, k2D, k3D, kCube, kBuffer, kRectangle, kMultisample };
-enum { kNormal, kArray, kImage, kImageArray }; (does the "image" bit matter here?)
 */
+
+/**
+*/
+typedef enum {
+	/**
+	*/
+	kFloat,
+	
+	/**
+	*/
+	kUnsignedInteger,
+	
+	/**
+	*/
+	kSignedInteger,
+	
+	/**
+	*/
+	kOther
+// TODO: better names...
+} CoronaTextureFamily;
+
+/**
+*/
+typedef enum {
+	/**
+	*/
+	kTexture1D,
+
+	/**
+	*/
+	kTexture2D,
+
+	/**
+	*/
+	kTexture3D,
+
+	/**
+	*/
+	kTextureCube,
+
+	/**
+	*/
+	kTextureRectangle
+	
+// TODO? seems like buffer and ms probably would use an extension?
+	// latter is target only, I think, and former wants potentially large buffers?
+	// maybe some indirection thing?
+} CoronaTextureShape;
 
 /**
 */
@@ -198,11 +246,18 @@ typedef struct CoronaExternalTextureExtension_TextureTarget {
 
 	/**
 	*/
-	int family;
-	int target;
-	int subtype;
-	// ^^ TODO: clean this up; have it agree with Texture::* (target, subtype, family)
+	CoronaTextureFamily family;
+
+	/**
+	*/
+	CoronaTextureShape shape;
+	
+	/**
+	*/
+	int isArray;
 	// TODO: these actually describe the samplers; family and array-ness is more or less right
+		// TODO: want some way to specify layers (and levels, with mipmaps)...
+		// any way to do so that doesn't just blow up combinatorically?
 	// there are some target + array-ness combinations to work out
 } CoronaExternalTextureExtension_TextureTarget;
 
@@ -269,27 +324,11 @@ int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format) CORONA_PUBLIC_SUF
 typedef enum {
 	/**
 	*/
-	kNorm,
-
-	/**
-	*/
-	kFloat,
-// TODO: byte, short (where do these go???)
-	/**
-	*/
-	kInt
-} CoronaFormatComponentKind;
-
-/**
-*/
-typedef enum {
-	/**
-	*/
 	kNormalTextureFormatDefinition,
 
 	/**
 	*/	
-	kPackedTextureFormatDefinition,
+	kWordPackedTextureFormatDefinition,
 
 	/**
 	*/
@@ -308,11 +347,19 @@ typedef enum {
 	kIsRenderable1 = 1 << 1,
 	kIsRenderable2 = 1 << 2,
 	kHasLinearFiltering = 1 << 3,
-	kIsFloatingPoint = 1 << 4,
-	kIsIntegral = 1 << 5,
-	kIsSigned = 1 << 6,
-	kIssRGB = 1 << 7
+	kIsTypeReversed = 1 << 4
 } CoronaTextureFormatFlags;
+
+/**
+*/
+typedef enum {
+	kUnorms,
+	kSnorms,
+	kFloats,
+	kUints,
+	kSints,
+	kNumTextureInputKinds
+} CoronaTextureInputKind;
 
 /**
 */
@@ -322,6 +369,10 @@ CoronaTextureDefinitionBase
 	/**
 	*/
 	CoronaTextureFormatDefinitionFamily family;
+	
+	/**
+	*/
+	CoronaTextureInputKind inputKind;
 	
 	/**
 	*/
@@ -351,38 +402,26 @@ CoronaTextureFormat
 	
 	/**
 	*/
-	CoronaFormatComponentKind componentKind;
+	int componentCount;
 	
 	/**
 	*/
-	int bytesPerComponent; // find from type?
-	
-	/**
-	*/
-	int numComponents; // ditto...
+	int bytesPerComponent;
 } CoronaTextureFormat;
 
 /**
 */
 typedef struct
-CoronaPackedTextureFormat
+CoronaWordPackedTextureFormat
 {
-// TODO: can we figure most of this out from the "type"?
-// does that carry over to non-GL APIs?
-// there are UNSIGNED_INT_10F_11F_11F_REV and FLOAT_32_UNSIGNED_INT_24_8_REV
-// then signed (implicit), unsigned, byte, short, int, float
 	/**
 	*/
 	CoronaTextureDefinitionBase common;
-	
-	/**
-	*/
-	CoronaFormatComponentKind componentKind;
 
 	/**
 	*/
 	int bitCounts[4];
-} CoronaPackedTextureFormat;
+} CoronaWordPackedTextureFormat;
 
 /**
 */
@@ -414,10 +453,6 @@ CoronaDepthStencilTextureFormat
 	/**
 	*/
 	CoronaTextureDefinitionBase common;
-	
-	/**
-	*/
-	int isDepthFloat;
 	
 	/**
 	*/

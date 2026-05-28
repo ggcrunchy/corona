@@ -126,13 +126,7 @@ public:
 		
 		if ( fCustomTarget )
 		{
-			U32 value = format.GetBackingValue();
-
-			SetFamily( &value, GetFamily( fCustomTarget ) );
-			SetTarget( &value, GetTarget( fCustomTarget ) );
-			SetTargetSubtype( &value, GetTargetSubtype( fCustomTarget ) );
-			
-			format.SetBackingValue(value);
+			format.SetBackingValue( format.GetBackingValue() | fCustomTarget );
 		}
 		
 		return format;
@@ -167,6 +161,87 @@ private:
 	
 #pragma mark == Texture Resource External ==
 
+static void
+ProcessFormat( TextureFactory& factory, const CoronaExternalTextureExtension_CustomFormat* format_ext, ExternalBitmap* bitmap )
+{
+	U32 index = format_ext->formatIndex;
+	if ( index > 0 && index <= factory.GetCurrentFormatCount() )
+	{
+		const TextureFormatDescription& desc = factory.GetCurrentFormatList()[index - 1];
+		U32 value = FormatDetails::BuildFromDescription( &desc, index );
+
+		bitmap->SetCustomFormat( value );
+		// TODO: further need to validate? value != ~0
+	}
+}
+
+static void
+ProcessTarget( const CoronaExternalTextureExtension_TextureTarget* target_ext, ExternalBitmap* bitmap )
+{
+	int family = -1;
+	switch ( target_ext->family )
+	{
+	case kFloat:
+		family = Texture::kFloatingPoint;
+		break;
+	case kUnsignedInteger:
+		family = Texture::kUnsignedInteger;
+		break;
+	case kSignedInteger:
+		family = Texture::kSignedInteger;
+		break;
+	case kOther:
+		family = Texture::kOtherFamily;
+		break;
+	default:
+		Rtt_ASSERT_NOT_REACHED();
+	}
+	
+	int target = -1;
+	switch ( target_ext->shape ) // TODO: assumed to validate first... might want these as separate extensions to add methods...
+	{
+	case kTexture1D:
+		target = Texture::k1D;
+		break;
+	case kTexture2D:
+		target = Texture::k2D;
+		break;
+	case kTexture3D:
+		target = Texture::k3D;
+		break;
+	case kTextureCube:
+		target = Texture::kCube;
+		break;
+	case kTextureRectangle:
+		target = Texture::kRectangle;
+		break;
+	default:
+		Rtt_ASSERT_NOT_REACHED();
+	}
+	
+	U32 value = FormatDetails::GatherFamilyInfo( family, target, target_ext->isArray );
+	bitmap->SetCustomTarget( value );
+}
+
+static void
+ProcessExtensions( TextureFactory& factory, const CoronaExternalTextureCallbacks2* callbacks2, ExternalBitmap* bitmap )
+{
+	for ( CoronaExternalTextureExtensionBase* ext = callbacks2->firstExtension; NULL != ext; ext = ext->next )
+	{
+		switch ( ext->type )
+		{
+		case kTextureTarget:
+			ProcessTarget( (CoronaExternalTextureExtension_TextureTarget*)ext, bitmap );
+			break;
+		case kCustomFormat:
+			ProcessFormat( factory, (CoronaExternalTextureExtension_CustomFormat*)ext, bitmap );
+			break;
+		default:
+			Rtt_ASSERT_NOT_REACHED();
+		}
+	}
+}
+
 TextureResourceExternal *
 TextureResourceExternal::Create(TextureFactory& factory,
 									const CoronaExternalTextureCallbacks *callbacks,
@@ -177,6 +252,11 @@ TextureResourceExternal::Create(TextureFactory& factory,
 	
 	ExternalBitmap *bitmap = Rtt_NEW(display.GetAllocator(),
 									ExternalBitmap(callbacks, callbacksContext));
+	
+	if ( sizeof(CoronaExternalTextureCallbacks2) == callbacks->size )
+	{
+		ProcessExtensions( factory, (CoronaExternalTextureCallbacks2*)callbacks, bitmap );
+	}
 	
 	bitmap->SetMagFilter( display.GetDefaults().GetMagTextureFilter() );
 	bitmap->SetMinFilter( display.GetDefaults().GetMinTextureFilter() );
@@ -190,47 +270,6 @@ TextureResourceExternal::Create(TextureFactory& factory,
 									TextureResourceExternal( factory, texture, bitmap ) );
 	
 	texture->SetRetina( isRetina );
-	
-	if ( sizeof(CoronaExternalTextureCallbacks2) == callbacks->size )
-	{
-		CoronaExternalTextureCallbacks2* callbacks2 = (CoronaExternalTextureCallbacks2*)callbacks;
-	
-		for ( CoronaExternalTextureExtensionBase* ext = callbacks2->firstExtension; NULL != ext; ext = ext->next )
-		{
-			switch ( ext->type )
-			{
-			case kTextureTarget:
-				{
-					const CoronaExternalTextureExtension_TextureTarget* tt = (CoronaExternalTextureExtension_TextureTarget*)ext;
-					U32 value = 0;
-					
-					SetFamily( &value, tt->family );
-					SetTarget( &value, tt->target );
-					SetTargetSubtype( &value, tt->subtype );
-					
-					bitmap->SetCustomTarget( value );
-				}
-				break;
-			case kCustomFormat:
-				{
-					U32 index = ( (CoronaExternalTextureExtension_CustomFormat*)ext )->formatIndex;
-					if ( index > 0 && index < factory.GetCurrentFormatCount() )
-					{
-						const TextureFormatDescription& desc = factory.GetCurrentFormatList()[index - 1];
-						U32 value = PackDescription( &desc );
-					
-						SetFormatIndex( &value, index );
-						// TODO: further need to validate? value != ~0
-					
-						bitmap->SetCustomFormat( value );
-					}
-				}
-				break;
-			default:
-				Rtt_ASSERT_NOT_REACHED();
-			}
-		}
-	}
 	
 	return result;
 }

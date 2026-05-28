@@ -26,13 +26,20 @@ namespace Rtt
 PlatformBitmap::FormatValue
 PlatformBitmap::Format::GetValue() const
 {
-	return (FormatValue)GetStockFormatAndFlag( fValue );
+	if ( !IsNonCore() )
+	{
+		return (FormatValue)FormatDetails::GetStockFormat( fValue );
+	}
+	else
+	{
+		return kUndefined; // arbitrary invalid value
+	}
 }
 
 bool
 PlatformBitmap::Format::IsNonCore() const
 {
-	return HasFormatFlag( fValue );
+	return 0 != FormatDetails::GetFormatIndex( fValue );
 }
 
 // ----------------------------------------------------------------------------
@@ -164,7 +171,7 @@ PlatformBitmap::HasAlphaChannel() const
 		default:
 			if ( format.IsNonCore() )
 			{
-				result = HasAlphaChannelFromPacking( format.GetBackingValue() ); 
+				result = FormatDetails::HasAlphaChannel( format.GetBackingValue() ); 
 			}
 			break;
 	}
@@ -230,7 +237,7 @@ PlatformBitmap::BytesPerPixel( Format format )
 			{
 				// TODO: does "per pixel" have the right meaning, if compressed?
 			
-				return GetSizeFromPacking( 1, 1, format.GetBackingValue() );
+				return FormatDetails::GetSize( 1, 1, format.GetBackingValue() );
 			}
 			break;
 	}
@@ -356,7 +363,7 @@ PlatformBitmap::GetColorByteIndexesFor(
 		default:
 			if ( format.IsNonCore() )
 			{
-				GetComponentIndicesFromPacking( format.GetBackingValue(), redIndexOut, greenIndexOut, blueIndexOut, alphaIndexOut );
+				FormatDetails::GetComponentIndices( format.GetBackingValue(), redIndexOut, greenIndexOut, blueIndexOut, alphaIndexOut );
 			}
 			else
 			{
@@ -443,7 +450,7 @@ using FV2 = PlatformBitmap::FormatValue;
 
 // These details are basically frozen, but enforce them.
 Rtt_STATIC_ASSERT( (U32)FV1::kNumFormats == (U32)FV2::kNumFormats );
-Rtt_STATIC_ASSERT( (U32)( 1U << kStockFormatBits ) >= (U32)FV1::kNumFormats );
+Rtt_STATIC_ASSERT( (U32)( 1U << FormatDetails::kStockFormatBits ) >= (U32)FV1::kNumFormats );
 
 // ----------------------------------------------------------------------------
 

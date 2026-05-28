@@ -211,37 +211,27 @@ struct BlendMode
 
 // ----------------------------------------------------------------------------
 
-enum {
-	kStockFormatBits = 3 // bits alloted to built-in formats, for Texture::FormatValue and bitmap counterpart
+namespace FormatDetails {
+	enum {
+		kStockFormatBits = 3 // bits alloted to built-in formats, for Texture::FormatValue and bitmap counterpart
+	};
+
+	int GetFormatIndexBitCount();
+
+	U32 GetStockFormat( U32 backingValue );
+	U32 GetFormatIndex( U32 backingValue );
+	U32 GetFamily( U32 backingValue );
+	U32 GetTarget( U32 backingValue );
+	bool HasArrayFlag( U32 backingValue );
+
+	U32 BuildFromDescription( const TextureFormatDescription* desc, U32 formatIndex );
+	U32 GatherFamilyInfo( U32 family, U32 target, bool isArray );
+
+	size_t GetSize( U16 w, U16 h, U32 backingValue );
+	bool IsCompressed( U32 backingValue );
+	bool HasAlphaChannel( U32 backingValue );
+	void GetComponentIndices( U32 backingValue, int& redIndex, int& greenIndex, int& blueIndex, int& alphaIndex );
 };
-
-int GetFormatIndexBitCount();
-
-bool HasFormatFlag( U32 v );
-U32 GetStockFormatAndFlag( U32 v );
-U32 GetFormatIndex( U32 v );
-void SetFormatIndex( U32* v, U32 index );
-U32 GetFamily( U32 v );
-void SetFamily( U32* v, U32 family );
-U32 GetTarget( U32 v );
-void SetTarget( U32* v, U32 target );
-U32 GetTargetSubtype( U32 v );
-void SetTargetSubtype( U32* v, U32 targetSubtype );
-U32 GetComponents( U32 v );
-void SetComponents( U32* v, U32 components );
-U32 GetShift( U32 v );
-void SetShift( U32* v, U32 shift );
-U32 GetData( U32 v );
-void SetData( U32* v, U32 data );
-
-// ----------------------------------------------------------------------------
-
-U32 PackDescription( const TextureFormatDescription* desc );
-
-size_t GetSizeFromPacking( U16 w, U16 h, U32 packedDesc );
-bool IsCompressedFromPacking( U32 packedDesc );
-bool HasAlphaChannelFromPacking( U32 packedDesc );
-void GetComponentIndicesFromPacking( U32 packedDesc, int& redIndex, int& greenIndex, int& blueIndex, int& alphaIndex );
 
 // ----------------------------------------------------------------------------
 
