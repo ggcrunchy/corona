@@ -74,6 +74,7 @@
         (void*)CoronaExternalFormatBPP,
         (void*)CoronaExternalGetUserData,
         (void*)CoronaExternalPushTexture,
+        (void*)CoronaDefineTextureFormat,
         (void*)CoronaGeometrySetComponentWriter,
         (void*)CoronaGeometryRegisterVertexExtension,
         (void*)CoronaGeometryUnregisterVertexExtension,

@@ -629,6 +629,9 @@ MatchCompressedFormat( const CoronaCompressedTextureFormat* texDef, TextureForma
 	glGenTextures( 1, &tex );
 	GL_CHECK_ERROR();
 
+	glBindTexture( GL_TEXTURE_2D, tex );
+	GL_CHECK_ERROR();
+	
 	glCompressedTexImage2D( GL_TEXTURE_2D, 0, texDef->common.internalFormat, 4, 4, 0, texDef->blockSize, NULL );
 	GLenum err = glGetError();
 
