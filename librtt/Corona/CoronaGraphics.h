@@ -158,7 +158,6 @@ typedef struct CoronaExternalTextureCallbacks
 /**
 */
 typedef enum {
-	// TODO: suss out where these belong... some of this is more like a display.setDefault()...
 	/**
 	*/
 	kTextureTarget,
@@ -322,27 +321,6 @@ int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format) CORONA_PUBLIC_SUF
 /**
 */
 typedef enum {
-	/**
-	*/
-	kNormalTextureFormatDefinition,
-
-	/**
-	*/	
-	kWordPackedTextureFormatDefinition,
-
-	/**
-	*/
-	kCompressedTextureFormatDefinition,
-	
-	/**
-	*/
-	kDepthStencilTextureFormatDefinition
-} CoronaTextureFormatDefinitionFamily;
-
-
-/**
-*/
-typedef enum {
 	kProbeRenderability = 1 << 0,
 	kIsRenderable1 = 1 << 1,
 	kIsRenderable2 = 1 << 2,
@@ -364,12 +342,8 @@ typedef enum {
 /**
 */
 typedef struct
-CoronaTextureDefinitionBase
-{
-	/**
-	*/
-	CoronaTextureFormatDefinitionFamily family;
-	
+CoronaTextureFormatDetails
+{	
 	/**
 	*/
 	CoronaTextureInputKind inputKind;
@@ -389,70 +363,44 @@ CoronaTextureDefinitionBase
 	/**
 	*/
 	int type;
-} CoronaTextureDefinitionBase;
+} CoronaTextureFormatDetails;
 
 /**
 */
 typedef struct
-CoronaTextureFormat
+CoronaCompressedTextureFormatDetails
 {
 	/**
 	*/
-	CoronaTextureDefinitionBase common;
-	
-	/**
-	*/
-	int componentCount;
-	
-	/**
-	*/
-	int bytesPerComponent;
-} CoronaTextureFormat;
-
-/**
-*/
-typedef struct
-CoronaWordPackedTextureFormat
-{
-	/**
-	*/
-	CoronaTextureDefinitionBase common;
+	int internalFormat;
 
 	/**
 	*/
-	int bitCounts[4];
-} CoronaWordPackedTextureFormat;
-
-/**
-*/
-typedef struct
-CoronaCompressedTextureFormat
-{
-	/**
-	*/
-	CoronaTextureDefinitionBase common;
+	int has16Bytes;
 
 	/**
 	*/
-	unsigned int blockWidth;
-	
-	/**
-	*/
-	unsigned int blockHeight;
-	
-	/**
-	*/
-	unsigned int blockSize;
-} CoronaCompressedTextureFormat;
+	unsigned int width;
 
-/**
-*/
+	/**
+	*/
+	unsigned int height;
+
+	/**
+	*/
+	unsigned int depth;
+} CoronaCompressedTextureFormatDetails;
+
+#if 0
 typedef struct
 CoronaDepthStencilTextureFormat
 {
 	/**
 	*/
-	CoronaTextureDefinitionBase common;
+	// TODO!
+		// do we want to use format details from above and have the next couple as arguments?
+		// anything special to do for 32F? (maybe a flag?)
+		// (only needs to service a tiny number of formats, so can hash it out)
 	
 	/**
 	*/
@@ -462,13 +410,46 @@ CoronaDepthStencilTextureFormat
 	*/
 	int stencilBits; 
 } CoronaDepthStencilTextureFormat;
+#endif
+/**
+ @param L
+ @param details
+ @param componentCount
+ @param bytesPerComponent
+*/
+CORONA_API
+int CoronaDefineStandardTextureFormat( lua_State * L, const CoronaTextureFormatDetails * details, unsigned int componentCount, unsigned int bytesPerComponent ) CORONA_PUBLIC_SUFFIX;
 
 /**
  @param L
- @param texDef
+ @param details
+ @param bitCounts
 */
 CORONA_API
-int CoronaDefineTextureFormat( lua_State * L, const CoronaTextureDefinitionBase * texDef ) CORONA_PUBLIC_SUFFIX;
+int CoronaDefineWordPackedTextureFormat( lua_State * L, const CoronaTextureFormatDetails * details, unsigned int bitCounts[4] ) CORONA_PUBLIC_SUFFIX;
+
+/**
+ @param L
+ @param details
+ @param componentCount
+ @param bytesPerComponent
+*/
+CORONA_API
+int CoronaDefineCompressedTextureFormat( lua_State * L, const CoronaCompressedTextureFormatDetails * details ) CORONA_PUBLIC_SUFFIX;
+
+/**
+ @param L
+ @param details
+ @param componentCount
+ @param bytesPerComponent
+*/
+#if 0
+CORONA_API
+int CoronaDefineDepthStencilTextureFormat( lua_State * L, const CoronaTextureDefinitionBase * texDef ) CORONA_PUBLIC_SUFFIX;
+#endif
+	// then just ditch the "base" type, or rename it to something like "info"
+	// vanilla and WordPacked could use it, then differ in their "struct" members
+	// compressed would just be something with internalFormat and block*, plus an "is16bit" bool
 
 // ----------------------------------------------------------------------------
 

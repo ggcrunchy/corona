@@ -131,30 +131,62 @@ GetRenderer( lua_State * L )
     return Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetRenderer();
 }
 
+static int
+TryToCommitDescription( lua_State* L, Rtt::Renderer& renderer, const Rtt::TextureFormatDescription& desc )
+{
+	Rtt::TextureFactory& factory = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetTextureFactory();
+
+	if ( factory.AddCustomFormat( desc ) )
+	{
+		U32 count = factory.GetCurrentFormatCount();
+		Rtt_ASSERT( count > 0 );
+		
+		renderer.UpdateCustomFormats( factory.GetCurrentFormatList(), count );
+ 
+		return count;
+	}
+	else
+	{
+		Rtt_TRACE_SIM(( "Too many texture formats defined" ));
+		
+		return 0;
+	}
+}
+
 CORONA_API
-int CoronaDefineTextureFormat( lua_State * L, const CoronaTextureDefinitionBase * texDef )
+int CoronaDefineStandardTextureFormat( lua_State * L, const CoronaTextureFormatDetails * details, unsigned int componentCount, unsigned int bytesPerComponent )
 {
     Rtt::Renderer& renderer = GetRenderer( L );
     Rtt::TextureFormatDescription desc = {};
-	if ( renderer.MatchToFormatDescription( texDef, &desc ) )
+    U32 data2[] = { componentCount, bytesPerComponent };
+	if ( renderer.MatchToFormatDescription( 'S', details, data2, &desc ) )
     {
-		Rtt::TextureFactory& factory = Rtt::LuaContext::GetRuntime( L )->GetDisplay().GetTextureFactory();
-    
-		if ( factory.AddCustomFormat( desc ) )
-		{
-			U32 count = factory.GetCurrentFormatCount();
-			Rtt_ASSERT( count > 0 );
-			
-			renderer.UpdateCustomFormats( factory.GetCurrentFormatList(), count );
-	 
-			return count;
-		}
-		else
-		{
-			Rtt_TRACE_SIM(( "Too many texture formats defined" ));
-		}
+		return TryToCommitDescription( L, renderer, desc );
 	}
-	
+	return 0;
+}
+
+CORONA_API
+int CoronaDefineWordPackedTextureFormat( lua_State * L, const CoronaTextureFormatDetails * details, unsigned int bitCounts[4] )
+{
+    Rtt::Renderer& renderer = GetRenderer( L );
+    Rtt::TextureFormatDescription desc = {};
+	if ( renderer.MatchToFormatDescription( 'W', details, bitCounts, &desc ) )
+    {
+		return TryToCommitDescription( L, renderer, desc );
+	}
+	return 0;
+}
+
+CORONA_API
+int CoronaDefineCompressedTextureFormat( lua_State * L, const CoronaCompressedTextureFormatDetails * details )
+{
+    Rtt::Renderer& renderer = GetRenderer( L );
+    Rtt::TextureFormatDescription desc = {};
+	if ( renderer.MatchToFormatDescription( 'C', details, NULL, &desc ) )
+    {
+		return TryToCommitDescription( L, renderer, desc );
+	}
 	return 0;
 }
 

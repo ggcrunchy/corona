@@ -1408,7 +1408,7 @@ FormatDetails::BuildFromDescription( const TextureFormatDescription* desc, U32 f
 	{
 		bits.SetCount( 3, BytesPerComponentMask ); // 3 != valid size, so encodes compression
 
-		if ( 16 == desc->fBlockSize ) // ASTC or BC7?
+		if ( 16 == desc->fBlockSize ) // ASTC or certain BC format?
 		{
 			U32 data = Texture::Format::BlockDimsID( desc->fBlockWidth, desc->fBlockHeight );
 
@@ -1510,8 +1510,8 @@ FormatDetails::GetSize( U16 w, U16 h, U32 backingValue )
 	if ( 3 == bytesPerComponent ) // compressed? cf. BuildFromDescription()
 	{
 		U8 blockWidth, blockHeight, blockSize;
-		bool isASTCish = bits.HasFlag( SpecialFlagMask );
-		if ( isASTCish )
+		bool has16Bytes = bits.HasFlag( SpecialFlagMask );
+		if ( has16Bytes )
 		{
 			Texture::Format::GetBlockDims( bits.Get( DataMask ), blockWidth, blockHeight );
 			

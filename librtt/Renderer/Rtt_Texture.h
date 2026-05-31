@@ -172,11 +172,8 @@ struct TextureFormatDescription
 	
 	enum : U8 {
 		kInputKindsMask = ( 1U << 3 ) - 1, // cf. CoronaTextureKind, CoronaGraphics.h (verified elsewhere)
-		kInputFamiliesMask = ( 1U << 2 ) - 1, // cf. CoronaTextureFamily
 
-		kInputKindsShift = 0,
-		kInputFamiliesShift = 3
-// TODO: there is some redundancy here, should we need to cram
+		kInputKindsShift = 0
 	};
 
 	bool IsCompressed() const { return !IsWordPacked() && ( 0 != fBlockSize ); }
@@ -193,7 +190,6 @@ struct TextureFormatDescription
 			U8 fBytesPerComponent;
 		};
 		struct {
-			U8 fUnused; // allow fNumComponents here too
 			U8 fBlockWidth;
 			U8 fBlockHeight;
 			U8 fBlockSize;

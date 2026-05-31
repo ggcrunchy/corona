@@ -388,7 +388,7 @@ GLTexture::GetName()
 // ----------------------------------------------------------------------------
 
 struct ProbeRAII {
-	ProbeRAII( const CoronaTextureDefinitionBase* common )
+	ProbeRAII( const CoronaTextureFormatDetails* details )
 	{
 		glGenTextures( 1, &fTexture );
 		GL_CHECK_ERROR();
@@ -396,7 +396,7 @@ struct ProbeRAII {
 		const GLsizei kDim = 1;
 
 		glBindTexture( GL_TEXTURE_2D, fTexture );
-		glTexImage2D( GL_TEXTURE_2D, 0, common->internalFormat, kDim, kDim, 0, common->format, common->type, NULL );
+		glTexImage2D( GL_TEXTURE_2D, 0, details->internalFormat, kDim, kDim, 0, details->format, details->type, NULL );
 
 		GLenum err = glGetError();
 		fOK = GL_NO_ERROR == err;
@@ -406,9 +406,9 @@ struct ProbeRAII {
 			Rtt_TRACE_SIM((
 				"ERROR: (%u): defining format with internal = %u, source = %u, type = %u",
 				err,
-				common->internalFormat,
-				common->format,
-				common->type
+				details->internalFormat,
+				details->format,
+				details->type
 			));
 		}
 	}
@@ -453,22 +453,16 @@ struct ProbeRAII {
 };
 
 static bool
-CheckMaybeColorRenderable( const CoronaTextureDefinitionBase& common, U8 inputKind, U8 inputFamily )
+CheckMaybeColorRenderable( const CoronaTextureFormatDetails* details, U8 inputKind )
 {
-	if ( (U8)common.inputKind != inputKind )
+	if ( (U8)details->inputKind != inputKind )
 	{
-		Rtt_TRACE_SIM(( "ERROR: unknown input kind (%i)\n", common.inputKind ));
-		return false;
-	}
-	
-	if ( (U8)common.family!= inputFamily )
-	{
-		Rtt_TRACE_SIM(( "ERROR: unknown input family (%i)\n", common.family ));
+		Rtt_TRACE_SIM(( "ERROR: unknown input kind (%i)\n", details->inputKind ));
 		return false;
 	}
 
 	const U16 renderabilityFlags = kProbeRenderability | kIsRenderable1;
-	if ( ( common.flags & renderabilityFlags ) == renderabilityFlags )
+	if ( ( details->flags & renderabilityFlags ) == renderabilityFlags )
 	{
 		Rtt_TRACE_SIM(( "ERROR: %s\n", "Mixing renderability probe with assertion (#1)" ));
 		return false;
@@ -478,25 +472,24 @@ CheckMaybeColorRenderable( const CoronaTextureDefinitionBase& common, U8 inputKi
 }
 
 static bool
-MatchNormalFormat( const CoronaTextureFormat* texDef, TextureFormatDescription* desc )
+MatchStandardFormat( const CoronaTextureFormatDetails* details, const U32* compInfo, TextureFormatDescription* desc )
 {
-	U8 inputKind = texDef->common.inputKind & TextureFormatDescription::kInputKindsMask;
-	U8 inputFamily = texDef->common.family & TextureFormatDescription::kInputFamiliesMask;
+	U8 inputKind = details->inputKind & TextureFormatDescription::kInputKindsMask;
 	
-	if ( !CheckMaybeColorRenderable( texDef->common, inputKind, inputFamily ) )
+	if ( !CheckMaybeColorRenderable( details, inputKind ) )
 	{
 		return false;
 	}
 
-	ProbeRAII probe( &texDef->common );
+	ProbeRAII probe( details );
 	if ( !probe.fOK )
 	{
 		return false;
 	}
 	
-	desc->fInternal = texDef->common.internalFormat;
-	desc->fDataType = texDef->common.type;
-	desc->fFormat = texDef->common.format;
+	desc->fInternal = details->internalFormat;
+	desc->fDataType = details->type;
+	desc->fFormat = details->format;
 
 	struct {
 		int to, from;
@@ -507,13 +500,13 @@ MatchNormalFormat( const CoronaTextureFormat* texDef, TextureFormatDescription* 
 	
 	for ( auto && p : pairs )
 	{
-		if ( texDef->common.flags & p.from )
+		if ( details->flags & p.from )
 		{
 			desc->fFlags |= p.to;
 		}
 	}
 
-	if ( texDef->common.flags & kProbeRenderability )
+	if ( details->flags & kProbeRenderability )
 	{
 		bool canRender = probe.CheckRenderability();
 		if ( canRender )
@@ -523,29 +516,27 @@ MatchNormalFormat( const CoronaTextureFormat* texDef, TextureFormatDescription* 
 	}
 	
 	desc->fInputInfo |= inputKind << TextureFormatDescription::kInputKindsShift;
-	desc->fInputInfo |= inputFamily << TextureFormatDescription::kInputFamiliesShift;
 
-	desc->fNumComponents = texDef->componentCount;
-	desc->fBytesPerComponent = texDef->bytesPerComponent;
+	desc->fNumComponents = compInfo[0];
+	desc->fBytesPerComponent = compInfo[1];
 
 	return true;
 }
 
 static bool
-MatchWordPackedFormat( const CoronaWordPackedTextureFormat* texDef, TextureFormatDescription* desc )
+MatchWordPackedFormat( const CoronaTextureFormatDetails* details, const U32* bitCounts, TextureFormatDescription* desc )
 {
-	U8 inputKind = texDef->common.inputKind & TextureFormatDescription::kInputKindsMask;
-	U8 inputFamily = texDef->common.family & TextureFormatDescription::kInputFamiliesMask;
+	U8 inputKind = details->inputKind & TextureFormatDescription::kInputKindsMask;
 	
-	if ( !CheckMaybeColorRenderable( texDef->common, inputKind, inputFamily ) )
+	if ( !CheckMaybeColorRenderable( details, inputKind ) )
 	{
 		return false;
 	}
 	
 	int zi = 0, n = 0;
-	for ( ; zi < 4 && 0 != texDef->bitCounts[zi]; zi++)
+	for ( ; zi < 4 && 0 != bitCounts[zi]; zi++)
 	{
-		n += texDef->bitCounts[zi];
+		n += bitCounts[zi];
 	}
 
 	if ( ( n % 8 != 0 ) || ( 24 == n ) || ( n > 32 ) )
@@ -564,7 +555,7 @@ MatchWordPackedFormat( const CoronaWordPackedTextureFormat* texDef, TextureForma
 
 		for (int i = zi + 1; i < 4; i++)
 		{
-			if ( 0 != texDef->bitCounts[i] )
+			if ( 0 != bitCounts[i] )
 			{
 				Rtt_TRACE_SIM(( "Non-trailing zero in word-packed layout at position %i", zi ));
 				return false;
@@ -572,7 +563,7 @@ MatchWordPackedFormat( const CoronaWordPackedTextureFormat* texDef, TextureForma
 		}
 	}
 	
-	ProbeRAII probe( &texDef->common );
+	ProbeRAII probe( details );
 	if ( !probe.fOK )
 	{
 		return false;
@@ -580,12 +571,12 @@ MatchWordPackedFormat( const CoronaWordPackedTextureFormat* texDef, TextureForma
 	
 	for (int i = 0; i < 4; i++)
 	{
-		desc->fSizes[i] = (U8)texDef->bitCounts[i];
+		desc->fSizes[i] = bitCounts[i];
 	}
 
-	desc->fInternal = texDef->common.internalFormat;
-	desc->fDataType = texDef->common.type;
-	desc->fFormat = texDef->common.format;
+	desc->fInternal = details->internalFormat;
+	desc->fDataType = details->type;
+	desc->fFormat = details->format;
 
 	struct {
 		int to, from;
@@ -596,13 +587,13 @@ MatchWordPackedFormat( const CoronaWordPackedTextureFormat* texDef, TextureForma
 	
 	for ( auto && p : pairs )
 	{
-		if ( texDef->common.flags & p.from )
+		if ( details->flags & p.from )
 		{
 			desc->fFlags |= p.to;
 		}
 	}
 
-	if ( texDef->common.flags & kProbeRenderability )
+	if ( details->flags & kProbeRenderability )
 	{
 		bool canRender = probe.CheckRenderability();
 		if ( canRender )
@@ -613,18 +604,13 @@ MatchWordPackedFormat( const CoronaWordPackedTextureFormat* texDef, TextureForma
 
 	desc->fFlags |= TextureFormatDescription::kIsWordPacked;
 	desc->fInputInfo |= inputKind << TextureFormatDescription::kInputKindsShift;
-	desc->fInputInfo |= inputFamily << TextureFormatDescription::kInputFamiliesShift;
 
 	return true;
 }
 
 static bool
-MatchCompressedFormat( const CoronaCompressedTextureFormat* texDef, TextureFormatDescription* desc )
+AuxDoCompressedFormat( GLenum internalFormat, TextureFormatDescription* desc, int w, int h, int blockSize )
 {
-	// TODO: reasonable block width, height restrictions
-	// ditto blockSize
-	// only so many in the wild...
-
 	GLuint tex;
 	glGenTextures( 1, &tex );
 	GL_CHECK_ERROR();
@@ -632,7 +618,7 @@ MatchCompressedFormat( const CoronaCompressedTextureFormat* texDef, TextureForma
 	glBindTexture( GL_TEXTURE_2D, tex );
 	GL_CHECK_ERROR();
 	
-	glCompressedTexImage2D( GL_TEXTURE_2D, 0, texDef->common.internalFormat, 4, 4, 0, texDef->blockSize, NULL );
+	glCompressedTexImage2D( GL_TEXTURE_2D, 0, internalFormat, w, h, 0, blockSize, NULL );
 	GLenum err = glGetError();
 
 	glDeleteTextures( 1, &tex );
@@ -642,25 +628,55 @@ MatchCompressedFormat( const CoronaCompressedTextureFormat* texDef, TextureForma
 		Rtt_TRACE_SIM((
 			"ERROR: (%u): defining compressed format with internal = %u",
 			err,
-			texDef->common.internalFormat ));
+			internalFormat ));
 		return false;
 	}
 
-	desc->fInternal = texDef->common.internalFormat;
+	desc->fInternal = internalFormat;
 
-//	desc->fNumComponents = ???
-	// TODO: ^^^ do we care about this? (on the CPU side, that is)
-		// not a whole lot we can do with it...
-	// TODO: can this be non-color?
-	desc->fBlockWidth = texDef->blockWidth;
-	desc->fBlockHeight = texDef->blockHeight;
-	desc->fBlockSize = texDef->blockSize;
+	desc->fBlockWidth = (U8)w;
+	desc->fBlockHeight = (U8)h;
+	desc->fBlockSize = (U8)blockSize;
 	
 	return true;
 }
 
 static bool
-MatchDepthStencilFormat( const CoronaDepthStencilTextureFormat* texDef, TextureFormatDescription* desc )
+MatchCompressedFormat( const CoronaCompressedTextureFormatDetails* details, TextureFormatDescription* desc )
+{
+	if ( 0 != details->depth )
+	{
+	
+		Rtt_TRACE_SIM((
+			"WARNING: depth %u ignored; no such formats supported yet",
+			details->depth ));
+	}
+
+	int w = 4, h = 4;
+	bool has16Bytes = 0 != details->has16Bytes;
+	if ( 0 != details->width || 0 != details->height )
+	{
+		bool isValid = -1 != Texture::Format::BlockDimsID( (U8)details->width, (U8)details->height );
+		if ( isValid )
+		{
+			w = details->width;
+			h = details->height;
+			has16Bytes = true;
+		}
+		else
+		{
+			Rtt_TRACE_SIM((
+				"ERROR: (%u, %u) are not recognized block dimensions",
+				details->width, details->height ));
+			return false;
+		}
+	}
+	
+	return AuxDoCompressedFormat( details->internalFormat, desc, w, h, has16Bytes ? 16 : 8 );
+}
+
+static bool
+MatchDepthStencilFormat( /*const CoronaDepthStencilTextureFormat* texDef, */TextureFormatDescription* desc )
 {
 /*
 texDef->common.type;
@@ -672,7 +688,7 @@ texDef->common.internalFormat;
 	texDef->stencilBits;
 // TODO: ^^^ haven't done anything with this yet
 */
-	if ( 0 != texDef->depthBits && 0 != texDef->stencilBits && ( texDef->common.flags & kProbeRenderability ) )
+//	if ( 0 != texDef->depthBits && 0 != texDef->stencilBits && ( texDef->common.flags & kProbeRenderability ) )
 	{
 		// TODO: renderablity1, *2
 	}
@@ -681,22 +697,23 @@ texDef->common.internalFormat;
 }
 
 bool
-Renderer::MatchToFormatDescription( const CoronaTextureDefinitionBase* texDef, TextureFormatDescription* desc )
+Renderer::MatchToFormatDescription( int kind, const void* data1, const U32* data2, TextureFormatDescription* desc )
 {
 // TODO: a lot of this isn't GL-specific, outside the probes...
-	switch ( texDef->family )
+	switch ( kind )
 	{
-		case kNormalTextureFormatDefinition:
-			return MatchNormalFormat( (CoronaTextureFormat*)texDef, desc );
+		case 'S':
+			return MatchStandardFormat( (CoronaTextureFormatDetails*)data1, data2, desc );
 
-		case kWordPackedTextureFormatDefinition:
-			return MatchWordPackedFormat( (CoronaWordPackedTextureFormat*)texDef, desc );
+		case 'W':
+			return MatchWordPackedFormat( (CoronaTextureFormatDetails*)data1, data2, desc );
 
-		case kCompressedTextureFormatDefinition:
-			return MatchCompressedFormat( (CoronaCompressedTextureFormat*)texDef, desc );
+		case 'C':
+			return MatchCompressedFormat( (CoronaCompressedTextureFormatDetails*)data1, desc );
 	
-		case kDepthStencilTextureFormatDefinition:
-			return MatchDepthStencilFormat( (CoronaDepthStencilTextureFormat*)texDef, desc );
+		case 'D':
+			Rtt_ASSERT_NOT_REACHED();
+		//	return MatchDepthStencilFormat( (CoronaDepthStencilTextureFormat*)texDef, desc );
 	}
 
 	return false;
