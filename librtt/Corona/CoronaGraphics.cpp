@@ -157,9 +157,12 @@ CORONA_API
 int CoronaDefineStandardTextureFormat( lua_State * L, const CoronaTextureFormatDetails * details, unsigned int componentCount, unsigned int bytesPerComponent )
 {
     Rtt::Renderer& renderer = GetRenderer( L );
-    Rtt::TextureFormatDescription desc = {};
-    U32 data2[] = { componentCount, bytesPerComponent };
-	if ( renderer.MatchToFormatDescription( 'S', details, data2, &desc ) )
+    Rtt::TextureFormatDescription desc = Rtt::TextureFormatDescription::MakeStandard();
+
+	desc.fNumComponents = componentCount;
+	desc.fBytesPerComponent = bytesPerComponent;
+
+	if ( renderer.MatchToFormatDescription( &desc, details ) )
     {
 		return TryToCommitDescription( L, renderer, desc );
 	}
@@ -170,8 +173,15 @@ CORONA_API
 int CoronaDefineWordPackedTextureFormat( lua_State * L, const CoronaTextureFormatDetails * details, unsigned int bitCounts[4] )
 {
     Rtt::Renderer& renderer = GetRenderer( L );
-    Rtt::TextureFormatDescription desc = {};
-	if ( renderer.MatchToFormatDescription( 'W', details, bitCounts, &desc ) )
+    Rtt::TextureFormatDescription desc = Rtt::TextureFormatDescription::MakeWordPacked();
+    
+    for ( int i = 0; i < 4; i++ )
+    {
+		desc.fSizes[i] = bitCounts[i];
+    }
+    desc.fFlags |= Rtt::TextureFormatDescription::kIsWordPacked;
+    
+	if ( renderer.MatchToFormatDescription( &desc, details ) )
     {
 		return TryToCommitDescription( L, renderer, desc );
 	}
@@ -182,8 +192,8 @@ CORONA_API
 int CoronaDefineCompressedTextureFormat( lua_State * L, const CoronaCompressedTextureFormatDetails * details )
 {
     Rtt::Renderer& renderer = GetRenderer( L );
-    Rtt::TextureFormatDescription desc = {};
-	if ( renderer.MatchToFormatDescription( 'C', details, NULL, &desc ) )
+    Rtt::TextureFormatDescription desc = Rtt::TextureFormatDescription::MakeCompressed();
+	if ( renderer.MatchToFormatDescription( &desc, details ) )
     {
 		return TryToCommitDescription( L, renderer, desc );
 	}

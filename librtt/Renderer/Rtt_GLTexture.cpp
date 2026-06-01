@@ -453,7 +453,7 @@ struct ProbeRAII {
 };
 
 static bool
-CheckMaybeColorRenderable( const CoronaTextureFormatDetails* details, U8 inputKind )
+CheckMaybeColorRenderable( const CoronaTextureFormatDetails* details, U8 inputKind, U8 family )
 {
 	if ( (U8)details->inputKind != inputKind )
 	{
@@ -461,7 +461,13 @@ CheckMaybeColorRenderable( const CoronaTextureFormatDetails* details, U8 inputKi
 		return false;
 	}
 
-	const U16 renderabilityFlags = kProbeRenderability | kIsRenderable1;
+	if ( (U8)details->family != family )
+	{
+		Rtt_TRACE_SIM(( "ERROR: unknown family (%i)\n", details->family ));
+		return false;
+	}
+
+	const U16 renderabilityFlags = ( kTextureFormatFlag_ProbeRenderability | kTextureFormatFlag_IsRenderable1 );
 	if ( ( details->flags & renderabilityFlags ) == renderabilityFlags )
 	{
 		Rtt_TRACE_SIM(( "ERROR: %s\n", "Mixing renderability probe with assertion (#1)" ));
@@ -472,11 +478,12 @@ CheckMaybeColorRenderable( const CoronaTextureFormatDetails* details, U8 inputKi
 }
 
 static bool
-MatchStandardFormat( const CoronaTextureFormatDetails* details, const U32* compInfo, TextureFormatDescription* desc )
+MatchStandardFormat( const CoronaTextureFormatDetails* details, TextureFormatDescription* desc )
 {
 	U8 inputKind = details->inputKind & TextureFormatDescription::kInputKindsMask;
+	U8 family = details->family & TextureFormatDescription::kFamiliesMask;
 	
-	if ( !CheckMaybeColorRenderable( details, inputKind ) )
+	if ( !CheckMaybeColorRenderable( details, inputKind, family ) )
 	{
 		return false;
 	}
@@ -494,8 +501,8 @@ MatchStandardFormat( const CoronaTextureFormatDetails* details, const U32* compI
 	struct {
 		int to, from;
 	} pairs[] = {
-		TextureFormatDescription::kHasLinearFiltering, kHasLinearFiltering,
-		TextureFormatDescription::kIsRenderable1, kIsRenderable1,
+		TextureFormatDescription::kHasLinearFiltering, kTextureFormatFlag_HasLinearFiltering,
+		TextureFormatDescription::kIsRenderable1, kTextureFormatFlag_IsRenderable1,
 	};
 	
 	for ( auto && p : pairs )
@@ -506,7 +513,7 @@ MatchStandardFormat( const CoronaTextureFormatDetails* details, const U32* compI
 		}
 	}
 
-	if ( details->flags & kProbeRenderability )
+	if ( details->flags & kTextureFormatFlag_ProbeRenderability )
 	{
 		bool canRender = probe.CheckRenderability();
 		if ( canRender )
@@ -515,28 +522,29 @@ MatchStandardFormat( const CoronaTextureFormatDetails* details, const U32* compI
 		}
 	}
 	
-	desc->fInputInfo |= inputKind << TextureFormatDescription::kInputKindsShift;
+	// n.b. component info already set
 
-	desc->fNumComponents = compInfo[0];
-	desc->fBytesPerComponent = compInfo[1];
+	desc->fInputInfo |= inputKind << TextureFormatDescription::kInputKindsShift;
+	desc->fInputInfo |= family << TextureFormatDescription::kFamiliesShift;
 
 	return true;
 }
 
 static bool
-MatchWordPackedFormat( const CoronaTextureFormatDetails* details, const U32* bitCounts, TextureFormatDescription* desc )
+MatchWordPackedFormat( const CoronaTextureFormatDetails* details, TextureFormatDescription* desc )
 {
 	U8 inputKind = details->inputKind & TextureFormatDescription::kInputKindsMask;
+	U8 family = details->family & TextureFormatDescription::kFamiliesMask;
 	
-	if ( !CheckMaybeColorRenderable( details, inputKind ) )
+	if ( !CheckMaybeColorRenderable( details, inputKind, family ) )
 	{
 		return false;
 	}
 	
 	int zi = 0, n = 0;
-	for ( ; zi < 4 && 0 != bitCounts[zi]; zi++)
+	for ( ; zi < 4 && 0 != desc->fSizes[zi]; zi++)
 	{
-		n += bitCounts[zi];
+		n += desc->fSizes[zi];
 	}
 
 	if ( ( n % 8 != 0 ) || ( 24 == n ) || ( n > 32 ) )
@@ -555,7 +563,7 @@ MatchWordPackedFormat( const CoronaTextureFormatDetails* details, const U32* bit
 
 		for (int i = zi + 1; i < 4; i++)
 		{
-			if ( 0 != bitCounts[i] )
+			if ( 0 != desc->fSizes[i] )
 			{
 				Rtt_TRACE_SIM(( "Non-trailing zero in word-packed layout at position %i", zi ));
 				return false;
@@ -568,11 +576,6 @@ MatchWordPackedFormat( const CoronaTextureFormatDetails* details, const U32* bit
 	{
 		return false;
 	}
-	
-	for (int i = 0; i < 4; i++)
-	{
-		desc->fSizes[i] = bitCounts[i];
-	}
 
 	desc->fInternal = details->internalFormat;
 	desc->fDataType = details->type;
@@ -581,8 +584,8 @@ MatchWordPackedFormat( const CoronaTextureFormatDetails* details, const U32* bit
 	struct {
 		int to, from;
 	} pairs[] = {
-		TextureFormatDescription::kHasLinearFiltering, kHasLinearFiltering,
-		TextureFormatDescription::kIsRenderable1, kIsRenderable1
+		TextureFormatDescription::kHasLinearFiltering, kTextureFormatFlag_HasLinearFiltering,
+		TextureFormatDescription::kIsRenderable1, kTextureFormatFlag_IsRenderable1
 	};
 	
 	for ( auto && p : pairs )
@@ -593,7 +596,7 @@ MatchWordPackedFormat( const CoronaTextureFormatDetails* details, const U32* bit
 		}
 	}
 
-	if ( details->flags & kProbeRenderability )
+	if ( details->flags & kTextureFormatFlag_ProbeRenderability )
 	{
 		bool canRender = probe.CheckRenderability();
 		if ( canRender )
@@ -602,8 +605,10 @@ MatchWordPackedFormat( const CoronaTextureFormatDetails* details, const U32* bit
 		}
 	}
 
-	desc->fFlags |= TextureFormatDescription::kIsWordPacked;
+	// n.b. flag, sizes already set
+
 	desc->fInputInfo |= inputKind << TextureFormatDescription::kInputKindsShift;
+	desc->fInputInfo |= family << TextureFormatDescription::kFamiliesShift;
 
 	return true;
 }
@@ -636,7 +641,7 @@ AuxDoCompressedFormat( GLenum internalFormat, TextureFormatDescription* desc, in
 
 	desc->fBlockWidth = (U8)w;
 	desc->fBlockHeight = (U8)h;
-	desc->fBlockSize = (U8)blockSize;
+	desc->fBlockSize = (U8)blockSize; // overwrites bogus size
 	
 	return true;
 }
@@ -646,10 +651,17 @@ MatchCompressedFormat( const CoronaCompressedTextureFormatDetails* details, Text
 {
 	if ( 0 != details->depth )
 	{
-	
 		Rtt_TRACE_SIM((
 			"WARNING: depth %u ignored; no such formats supported yet",
 			details->depth ));
+	}
+
+	U8 family = details->family & TextureFormatDescription::kFamiliesMask;
+
+	if ( (U8)details->family != family )
+	{
+		Rtt_TRACE_SIM(( "ERROR: unknown family (%i)\n", details->family ));
+		return false;
 	}
 
 	int w = 4, h = 4;
@@ -671,6 +683,8 @@ MatchCompressedFormat( const CoronaCompressedTextureFormatDetails* details, Text
 			return false;
 		}
 	}
+
+	desc->fInputInfo |= family << TextureFormatDescription::kFamiliesShift;
 	
 	return AuxDoCompressedFormat( details->internalFormat, desc, w, h, has16Bytes ? 16 : 8 );
 }
@@ -697,22 +711,21 @@ texDef->common.internalFormat;
 }
 
 bool
-Renderer::MatchToFormatDescription( int kind, const void* data1, const U32* data2, TextureFormatDescription* desc )
+Renderer::MatchToFormatDescription( TextureFormatDescription* desc, const void* data )
 {
 // TODO: a lot of this isn't GL-specific, outside the probes...
-	switch ( kind )
+	if ( desc->IsWordPacked() )
 	{
-		case 'S':
-			return MatchStandardFormat( (CoronaTextureFormatDetails*)data1, data2, desc );
-
-		case 'W':
-			return MatchWordPackedFormat( (CoronaTextureFormatDetails*)data1, data2, desc );
-
-		case 'C':
-			return MatchCompressedFormat( (CoronaCompressedTextureFormatDetails*)data1, desc );
-	
-		case 'D':
-			Rtt_ASSERT_NOT_REACHED();
+		return MatchWordPackedFormat( (const CoronaTextureFormatDetails*)data, desc );
+	}
+	else if ( desc->IsCompressed() )
+	{
+		return MatchCompressedFormat( (const CoronaCompressedTextureFormatDetails*)data, desc );
+	}
+	else
+	{
+		// Rtt_ASSERT( !desc->IsDepthStencil() );
+		return MatchStandardFormat( (const CoronaTextureFormatDetails*)data, desc );
 		//	return MatchDepthStencilFormat( (CoronaDepthStencilTextureFormat*)texDef, desc );
 	}
 

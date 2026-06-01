@@ -172,12 +172,21 @@ struct TextureFormatDescription
 	
 	enum : U8 {
 		kInputKindsMask = ( 1U << 3 ) - 1, // cf. CoronaTextureKind, CoronaGraphics.h (verified elsewhere)
+		kFamiliesMask = ( 1U << 2 ) - 1, // cf. CoronaTextureFamily
 
-		kInputKindsShift = 0
+		kInputKindsShift = 0,
+		kFamiliesShift = 3
 	};
 
 	bool IsCompressed() const { return !IsWordPacked() && ( 0 != fBlockSize ); }
 	bool IsWordPacked() const { return 0 != ( fFlags & kIsWordPacked ); }
+	// TODO: IsDepthOrStencil()... 0 != (flags&...)
+		// still needs some accompanying logic
+
+	static TextureFormatDescription MakeStandard();
+	static TextureFormatDescription MakeCompressed();
+	static TextureFormatDescription MakeWordPacked();
+	static TextureFormatDescription MakeDepthStencil();
 
 	U16 fFormat;
 	U16 fInternal; // mostly for GL, but e.g. Vulkan has some "large" format values

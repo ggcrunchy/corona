@@ -71,7 +71,7 @@ class Renderer
 		virtual void CaptureFrameBuffer( RenderingStream & stream, BufferBitmap & bitmap, S32 x_in_pixels, S32 y_in_pixels, S32 w_in_pixels, S32 h_in_pixels );
 		virtual void EndCapture() {}
 
-		virtual bool MatchToFormatDescription( int kind, const void* data1, const U32* data2, TextureFormatDescription* desc );
+		virtual bool MatchToFormatDescription( TextureFormatDescription* desc, const void* data );
 
 		// Get the current view and projection matrices. These 4x4 matrices are
 		// returned via the given pointers, which are assumed to be non-null.

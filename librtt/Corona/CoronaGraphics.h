@@ -181,55 +181,55 @@ typedef struct CoronaExternalTextureExtensionBase {
 	CoronaExternalTextureExtensionType type;
 } CoronaExternalTextureExtensionBase;
 
-/*
-enum { kUnorm, kSnorm, kUint, kSint, kFloat, kOther }
-	// kSInt, kUInt, kOther }; (or see suggestions by P)
-enum { k1D, k2D, k3D, kCube, kBuffer, kRectangle, kMultisample };
-*/
-
 /**
+	TODO: what sort of sampler / texture data
 */
 typedef enum {
 	/**
+		"standard", floating point
 	*/
-	kFloat,
+	kTextureFamily_Float,
 	
 	/**
+		unsigned integral
 	*/
-	kUnsignedInteger,
+	kTextureFamily_Uint,
 	
 	/**
+		signed integral
 	*/
-	kSignedInteger,
+	kTextureFamily_Sint,
 	
 	/**
+		other: shadow, etc.
 	*/
-	kOther
-// TODO: better names...
+	kTextureFamily_Other
 } CoronaTextureFamily;
 
 /**
+	TODO: dimensions and such of sampler / texture data
 */
 typedef enum {
 	/**
 	*/
-	kTexture1D,
+	kTextureShape_1D,
 
 	/**
 	*/
-	kTexture2D,
+	kTextureShape_2D,
 
 	/**
 	*/
-	kTexture3D,
+	kTextureShape_3D,
 
 	/**
 	*/
-	kTextureCube,
+	kTextureShape_Cube,
 
 	/**
+		non-normalized
 	*/
-	kTextureRectangle
+	kTextureShape_Rectangle
 	
 // TODO? seems like buffer and ms probably would use an extension?
 	// latter is target only, I think, and former wants potentially large buffers?
@@ -237,9 +237,11 @@ typedef enum {
 } CoronaTextureShape;
 
 /**
+	TODO: non-sampler2D target
 */
 typedef struct CoronaExternalTextureExtension_TextureTarget {
 	/**
+		inherited
 	*/
 	CoronaExternalTextureExtensionBase common;
 
@@ -261,6 +263,7 @@ typedef struct CoronaExternalTextureExtension_TextureTarget {
 } CoronaExternalTextureExtension_TextureTarget;
 
 /**
+	TODO: non-builtin format
 */
 typedef struct CoronaExternalTextureExtension_CustomFormat {
 	/**
@@ -268,18 +271,22 @@ typedef struct CoronaExternalTextureExtension_CustomFormat {
 	CoronaExternalTextureExtensionBase common;
 
 	/**
+		as returned by CoronaDefine??Format
 	*/
 	unsigned int formatIndex;
 } CoronaExternalTextureExtension_CustomFormat;
 
 /**
+	TODO: extended
 */
 typedef struct CoronaExternalTextureCallbacks2 {
 	/**
+		inherited
 	*/
 	CoronaExternalTextureCallbacks base;
 	
 	/**
+		linked list of textensiosn
 	*/
 	CoronaExternalTextureExtensionBase * firstExtension;
 } CoronaExternalTextureCallbacks2;
@@ -319,31 +326,80 @@ int CoronaExternalFormatBPP(CoronaExternalBitmapFormat format) CORONA_PUBLIC_SUF
 // ----------------------------------------------------------------------------
 
 /**
+	TODO: information flags
 */
 typedef enum {
-	kProbeRenderability = 1 << 0,
-	kIsRenderable1 = 1 << 1,
-	kIsRenderable2 = 1 << 2,
-	kHasLinearFiltering = 1 << 3,
-	kIsTypeReversed = 1 << 4
+	/**
+		should test for renderabliity? else use defaults
+	*/
+	kTextureFormatFlag_ProbeRenderability = 1 << 0,
+	
+	/**
+		assert "#1" is renderable? (mut. ex. with probe); else default is false
+	*/
+	kTextureFormatFlag_IsRenderable1 = 1 << 1,
+	
+	/**
+		ditto, "#2" (viz. 1 = depth, 2 = stencil)
+	*/
+	kTextureFormatFlag_IsRenderable2 = 1 << 2,
+	
+	/**
+		does this format support linear filtering?
+	*/
+	kTextureFormatFlag_HasLinearFiltering = 1 << 3,
+	
+	/**
+		if word packed, is a REV format?
+	*/
+	kTextureFormatFlag_IsTypeReversed = 1 << 4
 } CoronaTextureFormatFlags;
 
 /**
+	TODO: what kind of data is the bitmap
 */
 typedef enum {
-	kUnorms,
-	kSnorms,
-	kFloats,
-	kUints,
-	kSints,
-	kNumTextureInputKinds
+	/**
+		unsigned integers, normalized to [0, 1]
+	*/
+	kTextureInputKind_Unorms,
+	
+	/**
+		signed integers, normalized to [-1, +1]
+	*/
+	kTextureInputKind_Snorms,
+	
+	/**
+		floating point
+	*/
+	kTextureInputKind_Floats,
+
+	/**
+		unsigned integers
+	*/
+	kTextureInputKind_Uints,
+	
+	/**
+		signed integers
+	*/	
+	kTextureInputKind_Sints,
+
+	/**
+		how many kinds?
+	*/
+	kTextureInputKind_NumKinds
 } CoronaTextureInputKind;
 
 /**
+	TODO: Color format details
 */
 typedef struct
 CoronaTextureFormatDetails
-{	
+{
+	/**
+	*/
+	CoronaTextureFamily family;
+		
 	/**
 	*/
 	CoronaTextureInputKind inputKind;
@@ -353,51 +409,62 @@ CoronaTextureFormatDetails
 	int flags;
 	
 	/**
+		e.g. GL format
 	*/
 	int format;
 	
 	/**
+		e.g. GL internalFormat
 	*/
 	int internalFormat;
 	
 	/**
+		e.g. GL type
 	*/
 	int type;
 } CoronaTextureFormatDetails;
 
 /**
+	TODO: ditto, for compressed
 */
 typedef struct
 CoronaCompressedTextureFormatDetails
 {
 	/**
 	*/
+	CoronaTextureFamily family;
+	
+	/**
+	*/
 	int internalFormat;
 
 	/**
+		if true, 16 byte format (used to allow defaults of 0 for 4x4)
 	*/
 	int has16Bytes;
 
 	/**
+		if 0, assumed to be 4; if non-0, type is assumed 16 bytes
 	*/
 	unsigned int width;
 
 	/**
+		ditto; if one specificed, both must be
 	*/
 	unsigned int height;
 
 	/**
+		NYI: for 3D ASTC
 	*/
 	unsigned int depth;
 } CoronaCompressedTextureFormatDetails;
 
-#if 0
+#if 0 /* TODO! */
 typedef struct
 CoronaDepthStencilTextureFormat
 {
 	/**
 	*/
-	// TODO!
 		// do we want to use format details from above and have the next couple as arguments?
 		// anything special to do for 32F? (maybe a flag?)
 		// (only needs to service a tiny number of formats, so can hash it out)
@@ -431,25 +498,14 @@ int CoronaDefineWordPackedTextureFormat( lua_State * L, const CoronaTextureForma
 /**
  @param L
  @param details
- @param componentCount
- @param bytesPerComponent
 */
 CORONA_API
 int CoronaDefineCompressedTextureFormat( lua_State * L, const CoronaCompressedTextureFormatDetails * details ) CORONA_PUBLIC_SUFFIX;
 
-/**
- @param L
- @param details
- @param componentCount
- @param bytesPerComponent
-*/
-#if 0
+#if 0 /* TODO! */
 CORONA_API
 int CoronaDefineDepthStencilTextureFormat( lua_State * L, const CoronaTextureDefinitionBase * texDef ) CORONA_PUBLIC_SUFFIX;
 #endif
-	// then just ditch the "base" type, or rename it to something like "info"
-	// vanilla and WordPacked could use it, then differ in their "struct" members
-	// compressed would just be something with internalFormat and block*, plus an "is16bit" bool
 
 // ----------------------------------------------------------------------------
 

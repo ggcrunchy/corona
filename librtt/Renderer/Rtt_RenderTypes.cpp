@@ -1238,7 +1238,7 @@ enum {
 	// Some validation of these is done in corresponding C++ files.
 };
 
-Rtt_STATIC_ASSERT( kNumTextureInputKinds <= ( 1U << kInputKindBits ) );
+Rtt_STATIC_ASSERT( kTextureInputKind_NumKinds <= ( 1U << kInputKindBits ) );
 Rtt_STATIC_ASSERT( kAllBits <= 32 );
 
 // ----------------------------------------------------------------------------

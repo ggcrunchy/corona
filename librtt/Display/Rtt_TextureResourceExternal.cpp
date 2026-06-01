@@ -181,16 +181,16 @@ ProcessTarget( const CoronaExternalTextureExtension_TextureTarget* target_ext, E
 	int family = -1;
 	switch ( target_ext->family )
 	{
-	case kFloat:
+	case kTextureFamily_Float:
 		family = Texture::kFloatingPoint;
 		break;
-	case kUnsignedInteger:
+	case kTextureFamily_Uint:
 		family = Texture::kUnsignedInteger;
 		break;
-	case kSignedInteger:
+	case kTextureFamily_Sint:
 		family = Texture::kSignedInteger;
 		break;
-	case kOther:
+	case kTextureFamily_Other:
 		family = Texture::kOtherFamily;
 		break;
 	default:
@@ -200,19 +200,19 @@ ProcessTarget( const CoronaExternalTextureExtension_TextureTarget* target_ext, E
 	int target = -1;
 	switch ( target_ext->shape ) // TODO: assumed to validate first... might want these as separate extensions to add methods...
 	{
-	case kTexture1D:
+	case kTextureShape_1D:
 		target = Texture::k1D;
 		break;
-	case kTexture2D:
+	case kTextureShape_2D:
 		target = Texture::k2D;
 		break;
-	case kTexture3D:
+	case kTextureShape_3D:
 		target = Texture::k3D;
 		break;
-	case kTextureCube:
+	case kTextureShape_Cube:
 		target = Texture::kCube;
 		break;
-	case kTextureRectangle:
+	case kTextureShape_Rectangle:
 		target = Texture::kRectangle;
 		break;
 	default:

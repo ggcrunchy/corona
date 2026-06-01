@@ -141,6 +141,64 @@ Texture::Format::GetCompressedSize( U16 w, U16 h, U8 blockWidth, U8 blockHeight,
 
 // ----------------------------------------------------------------------------
 
+TextureFormatDescription
+TextureFormatDescription::MakeStandard()
+{
+	TextureFormatDescription desc = {};
+	
+	Rtt_ASSERT( !desc.IsCompressed() );
+	Rtt_ASSERT( !desc.IsWordPacked() );
+//	Rtt_ASSERT( !desc.IsDepthStencil() );
+	
+	return desc;
+
+}
+
+TextureFormatDescription
+TextureFormatDescription::MakeCompressed()
+{
+	TextureFormatDescription desc = {};
+	
+	// This is a nonsense provisional value, used to do some registration.
+	desc.fBlockSize = 0xFF;
+	
+	Rtt_ASSERT( desc.IsCompressed() );
+	Rtt_ASSERT( !desc.IsWordPacked() );
+	Rtt_ASSERT( !desc.IsWordPacked() );
+	
+	return desc;
+}
+
+TextureFormatDescription
+TextureFormatDescription::MakeWordPacked()
+{
+	TextureFormatDescription desc = {};
+
+	desc.fFlags |= kIsWordPacked;
+	
+	Rtt_ASSERT( !desc.IsCompressed() );
+//	Rtt_ASSERT( !desc.IsDepthStencil() );
+	
+	return desc;
+}
+
+TextureFormatDescription
+TextureFormatDescription::MakeDepthStencil()
+{
+	TextureFormatDescription desc = {};
+	
+	// N.B. this flag is provisional, used to do some registration. The format in question
+	// might even be strictly stencil (and then we might have the other extreme).
+	desc.fFlags |= kIsDepthRelated;
+	
+	Rtt_ASSERT( !desc.IsCompressed() );
+	Rtt_ASSERT( !desc.IsWordPacked() );
+	
+	return desc;
+}
+
+// ----------------------------------------------------------------------------
+
 Texture::Texture( Rtt_Allocator* allocator )
 :	Super( allocator ),
 	fIsRetina( false ),

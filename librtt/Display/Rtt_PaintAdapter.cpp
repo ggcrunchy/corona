@@ -212,6 +212,11 @@ PaintAdapter::SetValueForKey(
 
                                 bool isFill = DisplayPath::ExtensionAdapter::IsFillPaint( observer, paint );
                                 
+                                // TODO: if ( isFill ) are paint textures compatible with samplers?
+                                // this must also handle "first frame", since the sampler info will still be pending
+                                // effect adapter should still "work", but renderer should just see default shader
+                                // check that this doesn't mess up texture binding
+                                
                                 geometry = DisplayPath::ExtensionAdapter::GetGeometry( observer, isFill );
                             }
                         }
