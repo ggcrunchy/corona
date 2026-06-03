@@ -490,12 +490,12 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
                         
                         char version[64] = {};
                         
-                        while ('\n' != shader_source[0][offset])
+                        for ( ; '\n' != shader_source[0][offset]; offset++ )
                         {
                             Rtt_ASSERT( offset < 63 );
                             Rtt_ASSERT( shader_source[0][offset] );
                             
-                            version[offset++] = shader_source[0][offset];
+                            version[offset] = shader_source[0][offset];
                         }
                         
                         sprintf( buf,
