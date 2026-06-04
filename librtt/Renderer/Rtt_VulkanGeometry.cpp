@@ -78,7 +78,7 @@ VulkanGeometry::Create( CPUResource* resource, const RenderContext* )
 }
 
 void
-VulkanGeometry::Update( CPUResource* resource, const RenderContext* )
+VulkanGeometry::Update( CPUResource* resource, const RenderContext* context )
 {
 	Rtt_ASSERT( CPUResource::kGeometry == resource->GetType() );
 	Geometry* geometry = static_cast<Geometry*>( resource );
@@ -92,7 +92,7 @@ VulkanGeometry::Update( CPUResource* resource, const RenderContext* )
 			 fIndexCount < geometry->GetIndicesAllocated() )
 		{
 			Destroy();
-			Create( resource );
+			Create( resource, context );
 		}
 		
 		// Copy the vertex data from main memory to GPU memory.

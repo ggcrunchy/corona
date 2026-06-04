@@ -234,11 +234,11 @@ VulkanFrameBufferObject::VulkanFrameBufferObject( VulkanRenderer & renderer )
 }
 
 void 
-VulkanFrameBufferObject::Create( CPUResource* resource, const RenderContext* )
+VulkanFrameBufferObject::Create( CPUResource* resource, const RenderContext* context )
 {
 	Rtt_ASSERT( CPUResource::kFrameBufferObject == resource->GetType() );
 
-	Update( resource );
+	Update( resource, context );
 }
 
 void 
