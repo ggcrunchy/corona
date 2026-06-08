@@ -39,8 +39,8 @@ CompositePaint::UpdatePaint( RenderData& data )
 {
 	Super::UpdatePaint( data );
 
-	data.fFillTexture0 = fPaint0->GetTexture();
-	data.fFillTexture1 = fPaint1->GetTexture();
+	data.fTextures.SetFill0( fPaint0->GetTexture() );
+	data.fTextures.SetFill1( fPaint1->GetTexture() );
 }
 
 Texture *

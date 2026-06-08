@@ -176,13 +176,13 @@ ShaderComposite::UpdateCache( const TextureInfo& textureInfo, const RenderData& 
 	if ( fInput0.NotNull() )
 	{
 		fInput0->SetTextureBounds( textureInfo );
-		fRenderData->fFillTexture0 = fInput0->GetTexture();
+		fRenderData->fTextures.SetFill0( fInput0->GetTexture() );
 	}
 
 	if ( fInput1.NotNull() )
 	{
 		fInput1->SetTextureBounds( textureInfo );
-		fRenderData->fFillTexture1 = fInput1->GetTexture();
+		fRenderData->fTextures.SetFill1( fInput1->GetTexture() );
 	}
 }
 
@@ -259,7 +259,7 @@ ShaderComposite::UpdateGeometry(const TextureInfo& textureInfo)
 void
 ShaderComposite::Prepare( RenderData& objectData, int w, int h, ShaderResource::ProgramMod mod )
 {
-	Texture *objectTexture = objectData.fFillTexture0;
+	Texture *objectTexture = objectData.fTextures.GetFill0();
 
 	bool hasInput0 = fInput0.NotNull();
 	bool hasInput1 = fInput1.NotNull();
@@ -289,12 +289,12 @@ ShaderComposite::Prepare( RenderData& objectData, int w, int h, ShaderResource::
 
 	if ( hasInput0 )
 	{
-		objectData.fFillTexture0 = fInput0->GetTexture();
+		objectData.fTextures.SetFill0( fInput0->GetTexture() );
 	}
 	
 	if ( hasInput1 )
 	{
-		objectData.fFillTexture1 = fInput1->GetTexture();
+		objectData.fTextures.SetFill1( fInput1->GetTexture() );
 	}
 
 }

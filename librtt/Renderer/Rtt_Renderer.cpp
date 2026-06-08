@@ -560,10 +560,13 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
     Rtt_ASSERT( fBackCommandBuffer != NULL );
     Rtt_ASSERT( fFrontCommandBuffer != NULL );
 
+	Texture* fillTexture0 = data->fTextures.GetFill0();
+	Texture* fillTexture1 = data->fTextures.GetFill1();
+
 	bool blendDirty = data->fBlendMode != fPrevious.fBlendMode;
 	bool blendEquationDirty = data->fBlendEquation != fPrevious.fBlendEquation;
-	bool fillDirty0 = data->fFillTexture0 != fPrevious.fFillTexture0 && data->fFillTexture0;
-	bool fillDirty1 = data->fFillTexture1 != fPrevious.fFillTexture1 && data->fFillTexture1;
+	bool fillDirty0 = fillTexture0 != fPrevious.fTextures.GetFill0() && fillTexture0;
+	bool fillDirty1 = fillTexture1 != fPrevious.fTextures.GetFill1() && fillTexture1;
 	bool maskTextureDirty = data->fMaskTexture != fPrevious.fMaskTexture; // since PushMask() can stomp on the previous texture, a "not NULL" check here is unreliable
 	bool maskUniformDirty = data->fMaskUniform != fPrevious.fMaskUniform; // ...ditto
 	bool programDirty = data->fProgram != fPrevious.fProgram || MaskCount() != fCurrentProgramMaskCount;
@@ -780,27 +783,27 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
 	// Fill texture [0]
 	if( fillDirty0 )
 	{
-		if( !data->fFillTexture0->fGPUResource )
+		if( !fillTexture0->fGPUResource )
 		{
-			QueueCreate( data->fFillTexture0 );
+			QueueCreate( fillTexture0 );
 		}
 
 		bool postponeBind = fCaptureGroups.Length() > 0 && !HasFramebufferBlit( NULL );
 		if (!postponeBind)
 		{
-			fBackCommandBuffer->BindTexture( data->fFillTexture0, Texture::kFill0 );
+			fBackCommandBuffer->BindTexture( fillTexture0, Texture::kFill0 );
 		}
 
-		fPrevious.fFillTexture0 = data->fFillTexture0;
+		fPrevious.fTextures.SetFill0( fillTexture0 );
 		INCREMENT( fStatistics.fTextureBindCount );
 
         // TODO: Eliminate duplication with fFillTexture1
-        float f0 = 1.0f / (float)data->fFillTexture0->GetWidth();
-        float f1 = 1.0f / (float)data->fFillTexture0->GetHeight();
+        float f0 = 1.0f / (float)fillTexture0->GetWidth();
+        float f1 = 1.0f / (float)fillTexture0->GetHeight();
 
         float f2;
         float f3;
-        if( data->fFillTexture0->IsRetina() )
+        if( fillTexture0->IsRetina() )
         {
             f2 = ( f0 / fContentScaleX );
             f3 = ( f1 / fContentScaleY );
@@ -823,22 +826,22 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
 	// Fill texture [1]
 	if( fillDirty1 )
 	{
-		if( !data->fFillTexture1->fGPUResource )
+		if( !fillTexture1->fGPUResource )
 		{
-			QueueCreate( data->fFillTexture1 );
+			QueueCreate( fillTexture1 );
 		}
 
-        fBackCommandBuffer->BindTexture( data->fFillTexture1, Texture::kFill1 );
-        fPrevious.fFillTexture1 = data->fFillTexture1;
+        fBackCommandBuffer->BindTexture( fillTexture1, Texture::kFill1 );
+        fPrevious.fTextures.SetFill1( fillTexture1 );
         INCREMENT( fStatistics.fTextureBindCount );
 
         // TODO: Eliminate duplication with above
         // TODO: Need to use a different Uniform since fTexelSize is used for fFillTexture0
-        float f0 = 1.0f / (float)data->fFillTexture1->GetWidth();
-        float f1 = 1.0f / (float)data->fFillTexture1->GetHeight();
+        float f0 = 1.0f / (float)fillTexture1->GetWidth();
+        float f1 = 1.0f / (float)fillTexture1->GetHeight();
         float f2;
         float f3;
-        if( data->fFillTexture1->IsRetina() )
+        if( fillTexture1->IsRetina() )
         {
             f2 = ( f0 / fContentScaleX );
             f3 = ( f1 / fContentScaleY );
@@ -946,7 +949,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
     
     if (fCaptureGroups.Length() > 0)
 	{
-		IssueCaptures( data->fFillTexture0 );
+		IssueCaptures( fillTexture0 );
 	}
 
     if (mustReconcileFormats)

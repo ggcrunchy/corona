@@ -304,6 +304,71 @@ Texture::SetWrapY( Wrap newValue )
 }
 
 // ----------------------------------------------------------------------------
+	
+Texture*
+TextureList::GetFill0() const
+{
+	if ( !IsArray() )
+	{
+		return fFill0;
+	}
+	else
+	{
+		U32 n = GetCount();
+		return ( n >= 1 ) ? GetArray()[0] : NULL;
+	}
+}
+
+Texture*
+TextureList::GetFill1() const
+{
+	if ( !IsArray() )
+	{
+		return fFill1;
+	}
+	else
+	{
+		U32 n = GetCount();
+		return ( n >= 2 ) ? GetArray()[1] : NULL;
+	}
+}
+
+void
+TextureList::PointToArray( Texture** texArray, U32 count )
+{
+	Rtt_STATIC_ASSERT( sizeof(texArray) <= sizeof(fFill0) );
+	Rtt_STATIC_ASSERT( sizeof(uintptr_t) <= sizeof(fFill1) );
+
+	fFill0 = (Texture*)texArray;
+	fFill1 = (Texture*)(uintptr_t)( 0x1 | ( count << 1 ) ); // ensure low bit set
+}
+
+bool
+TextureList::IsArray() const
+{
+	uintptr_t asUint = (uintptr_t)fFill1;
+	return ( 0 != ( asUint & 0x1 ) );
+}
+
+U32
+TextureList::GetCount() const
+{
+	Rtt_ASSERT( IsArray() );
+
+	uintptr_t asUint = (uintptr_t)fFill1;
+	return (U32)( asUint >> 1 );
+}
+
+Texture**
+TextureList::GetArray() const
+{
+	Rtt_ASSERT( IsArray() );
+	
+	return (Texture**)fFill0;
+}
+
+
+// ----------------------------------------------------------------------------
 
 } // namespace Rtt
 

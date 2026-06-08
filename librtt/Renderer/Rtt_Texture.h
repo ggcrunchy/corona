@@ -207,6 +207,30 @@ struct TextureFormatDescription
 	};
 };
 
+class TextureList {
+public:
+	TextureList() : fFill0( NULL ), fFill1( NULL )
+	{
+	}
+	
+	void SetFill0( Texture* newValue ) { fFill0 = newValue; }
+	void SetFill1( Texture* newValue ) { fFill1 = newValue; }
+
+	Texture* GetFill0() const;
+	Texture* GetFill1() const;
+
+	void PointToArray( Texture** texArray, U32 count );
+	bool IsArray() const;
+	
+	// these two assume we're using an array:
+	U32 GetCount() const;
+	Texture** GetArray() const;
+
+private:
+	Texture * fFill0; // n.b. might be texture array
+	Texture * fFill1; // when fill0 is an array, has low bit set (assumes pointer alignment)
+};
+
 // ----------------------------------------------------------------------------
 
 } // namespace Rtt
