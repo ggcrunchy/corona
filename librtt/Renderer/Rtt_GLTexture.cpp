@@ -207,7 +207,7 @@ GLTexture::Create( CPUResource* resource, const RenderContext* context )
 		minFilter = GL_NEAREST;
 		magFilter = GL_NEAREST;
 	}
-
+// SAS TDOO: generalize target...
     glBindTexture( GL_TEXTURE_2D, name );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter );
@@ -308,6 +308,8 @@ GLTexture::Update( CPUResource* resource, const RenderContext* context )
 			type = texDesc.fDataType;
 		}
 
+// SAS TODO: generalize target
+
         glBindTexture( GL_TEXTURE_2D, GetName() );
 
 		if ( !isNonCore )
@@ -374,7 +376,7 @@ GLTexture::Bind( U32 unit )
 {
     glActiveTexture( GL_TEXTURE0 + unit );
     glBindTexture( GL_TEXTURE_2D, GetName() );
-// ^^^ TODO: allow other targets... U32 can very easily accommodate a (target | unit) pair,
+// ^^^ SAS TODO: allow other targets... U32 can very easily accommodate a (target | unit) pair,
 // or just break up into two parameters
     GL_CHECK_ERROR();
 }

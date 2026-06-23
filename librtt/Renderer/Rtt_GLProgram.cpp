@@ -554,6 +554,354 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 #endif
 }
 
+// The following LUTs were largely script-generated (see PR, also with verification), and comprise the
+// inlined image / sampler type constants from OpenGL 4.6 + ES 3.2, plus some metadata and lookup info.
+
+// Some investigation revealed that among the 73 such (16-bit) values, any given low byte occurs at most
+// twice. Additionally, these byte representations always appear in clusters, and the gap may be narrow
+// enough to simply merge them, cf. the 0s in the third range in ClassifySampler().
+
+// The constants are kept in one list for efficient searching, and are pointed to via the aforementioned
+// low byte. Since this might address TWO constants, a tuple of values (in fact four of them--so actually
+// more than one low byte is serviced--in all cases nicely aligned) is actually looked up. Since each of
+// the constants in question is unique, all members of the tuple are tried at once and only the proper
+// lane is chosen. (If the value is not even an image / sampler it will fail gracefully too.)
+
+// The lane can also be used to look up the corresponding metadata.
+
+struct SamplerTypeConstantQuad {
+	U16 fValues[4];
+};
+
+static const SamplerTypeConstantQuad kConstantQuads[] = {
+	{
+	  0x906A, /* SENTINEL */
+	  0x906A, /* SENTINEL */
+	  0x906A, /* SENTINEL */
+	  0x906A  /* SENTINEL */
+	}, {
+	  0x900D, /* SAMPLER_CUBE_MAP_ARRAY_SHADOW */
+	  0x910D, /* UNSIGNED_INT_SAMPLER_MULTISAMPLE_ARRAY */
+	  0x8B64, /* SAMPLER_RECT_SHADOW */
+	  0x9064  /* UNSIGNED_INT_IMAGE_3D */
+	}, {
+	  0x9063, /* UNSIGNED_INT_IMAGE_2D */
+	  0x8B63, /* SAMPLER_RECT */
+	  0x8B62, /* SAMPLER_2D_SHADOW */
+	  0x9062  /* UNSIGNED_INT_IMAGE_1D */
+	}, {
+	  0x9061, /* INT_IMAGE_MULTISAMPLE_ARRAY */
+	  0x8B61, /* SAMPLER_1D_SHADOW */
+	  0x8B5D, /* SAMPLER_1D */
+	  0x905D  /* INT_IMAGE_1D_ARRAY */
+	}, {
+	  0x9060, /* INT_IMAGE_MULTISAMPLE */
+	  0x8B60, /* SAMPLER_CUBE */
+	  0x905F, /* INT_IMAGE_CUBE_MAP_ARRAY */
+	  0x8B5F  /* SAMPLER_3D */
+	}, {
+	  0x905E, /* INT_IMAGE_2D_ARRAY */
+	  0x8B5E, /* SAMPLER_2D */
+	  0x910C, /* INT_SAMPLER_MULTISAMPLE_ARRAY */
+	  0x900C  /* SAMPLER_CUBE_MAP_ARRAY */
+	}, {
+	  0x910A, /* UNSIGNED_INT_SAMPLER_MULTISAMPLE */
+	  0x905A, /* INT_IMAGE_RECTANGLE */
+	  0x8DD1, /* UNSIGNED_INT_SAMPLER_1D */
+	  0x9055  /* IMAGE_MULTISAMPLE */
+	}, {
+	  0x9069, /* UNSIGNED_INT_IMAGE_2D_ARRAY */
+	  0x9059, /* INT_IMAGE_3D */
+	  0x8DCF, /* INT_SAMPLER_2D_ARRAY */
+	  0x8DC0  /* SAMPLER_1D_ARRAY	 */
+	}, {
+	  0x9068, /* UNSIGNED_INT_IMAGE_1D_ARRAY */
+	  0x9058, /* INT_IMAGE_2D */
+	  0x8DCD, /* INT_SAMPLER_RECT */
+	  0x8DC4  /* SAMPLER_2D_ARRAY_SHADOW */
+	}, {
+	  0x9067, /* UNSIGNED_INT_IMAGE_BUFFER */
+	  0x9057, /* INT_IMAGE_1D  */
+	  0x8DCB, /* INT_SAMPLER_3D */
+	  0x8DCA  /* INT_SAMPLER_2D */
+	}, {
+	  0x9066, /* UNSIGNED_INT_IMAGE_CUBE */
+	  0x9056, /* IMAGE_MULTISAMPLE_ARRAY */
+	  0x8DC9, /* INT_SAMPLER_1D */
+	  0x900F  /* UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY */
+	}, {
+	  0x910B, /* SAMPLER_MULTISAMPLE_ARRAY */
+	  0x9109, /* INT_SAMPLER_MULTISAMPLE */
+	  0x8DCC, /* INT_SAMPLER_CUBE */
+	  0x9054  /* IMAGE_CUBE_MAP_ARRAY */
+	}, {
+	  0x8DC5, /* SAMPLER_CUBE_SHADOW */
+	  0x8DC2, /* SAMPLER_BUFFER */
+	  0x9053, /* IMAGE_2D_ARRAY */
+	  0x8DC3  /* SAMPLER_1D_ARRAY_SHADOW */
+	}, {
+	  0x8DCE, /* INT_SAMPLER_1D_ARRAY */
+	  0x9052, /* IMAGE_1D_ARRAY */
+	  0x8DC1, /* SAMPLER_2D_ARRAY */
+	  0x9065  /* UNSIGNED_INT_IMAGE_RECTANGLE */
+	}, {
+	  0x9051, /* IMAGE_BUFFER */
+	  0x8DD0, /* INT_SAMPLER_BUFFER */
+	  0x9050, /* IMAGE_CUBE */
+	  0x8DD2  /* UNSIGNED_INT_SAMPLER_2D */
+	}, {
+	  0x8DD4, /* UNSIGNED_INT_SAMPLER_CUBE */
+	  0x904F, /* IMAGE_RECTANGLE */
+	  0x8DD5, /* UNSIGNED_INT_SAMPLER_RECT */
+	  0x8DD6  /* UNSIGNED_INT_SAMPLER_1D_ARRAY */
+	}, {
+	  0x904E, /* IMAGE_3D */
+	  0x8DD7, /* UNSIGNED_INT_SAMPLER_2D_ARRAY */
+	  0x900E, /* INT_SAMPLER_CUBE_MAP_ARRAY */
+	  0x904D  /* IMAGE_2D */
+	}, {
+	  0x9108, /* SAMPLER_MULTISAMPLE */
+	  0x906C, /* UNSIGNED_INT_IMAGE_MULTISAMPLE_ARRAY */
+	  0x905C, /* INT_IMAGE_BUFFER */
+	  0x904C  /* IMAGE_1D */
+	}, {
+	  0x8DD8, /* UNSIGNED_INT_SAMPLER_BUFFER  */
+	  0x906B, /* UNSIGNED_INT_IMAGE_MULTISAMPLE */
+	  0x905B, /* INT_IMAGE_CUBE */
+	  0x8DD3  /* UNSIGNED_INT_SAMPLER_3D */
+	}, {
+	  0x906A, /* UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY */
+	  0x900D, /* SENTINEL */
+	  0x900D, /* SENTINEL */
+	  0x900D  /* SENTINEL */
+	}
+};
+
+Rtt_STATIC_ASSERT( Texture::kNumFamilies <= ( 1 << 2 ) );
+Rtt_STATIC_ASSERT( Texture::kNumTargets <= ( 1 << 3 ) );
+
+#define INTEGER_IMAGE( KIND, TARGET ) { Texture::k##KIND##Integer, Texture::k##TARGET, 1, 0 }
+#define INTEGER_IMAGE_ARRAY( KIND, TARGET ) { Texture::k##KIND##Integer, Texture::k##TARGET, 1, 1 }
+#define IMAGE( TARGET ) { Texture::kFloatingPoint, Texture::k##TARGET, 1, 0 }
+#define IMAGE_ARRAY( TARGET ) { Texture::kFloatingPoint, Texture::k##TARGET, 1, 1 }
+#define INTEGER_SAMPLER( KIND, TARGET ) { Texture::k##KIND##Integer, Texture::k##TARGET, 0, 0 }
+#define INTEGER_SAMPLER_ARRAY( KIND, TARGET ) { Texture::k##KIND##Integer, Texture::k##TARGET, 0, 1 }
+#define SAMPLER( TARGET ) { Texture::kFloatingPoint, Texture::k##TARGET, 0, 0 }
+#define SAMPLER_ARRAY( TARGET ) { Texture::kFloatingPoint, Texture::k##TARGET, 0, 1 }
+#define SHADOW_SAMPLER( TARGET ) { Texture::kOtherFamily, Texture::k##TARGET, 0, 0 }
+#define SHADOW_SAMPLER_ARRAY( TARGET ) { Texture::kOtherFamily, Texture::k##TARGET, 0, 1 }
+
+static const SamplerTypeDetails kDetails[] = {
+	{ /* SENTINEL */ },
+	SHADOW_SAMPLER_ARRAY( Cube ), /* SAMPLER_CUBE_MAP_ARRAY_SHADOW */
+	INTEGER_SAMPLER_ARRAY( Unsigned, Multisample ), /* UNSIGNED_INT_SAMPLER_MULTISAMPLE_ARRAY */
+	SHADOW_SAMPLER( Rectangle ), /* SAMPLER_RECT_SHADOW */
+	INTEGER_IMAGE( Unsigned, 3D ), /* UNSIGNED_INT_IMAGE_3D */
+	INTEGER_IMAGE( Unsigned, 2D ), /* UNSIGNED_INT_IMAGE_2D */
+	SAMPLER( Rectangle ), /* SAMPLER_RECT */
+	SHADOW_SAMPLER( 2D ), /* SAMPLER_2D_SHADOW */
+	INTEGER_IMAGE( Unsigned, 1D ), /* UNSIGNED_INT_IMAGE_1D */
+	INTEGER_IMAGE_ARRAY( Signed, Multisample ), /* INT_IMAGE_MULTISAMPLE_ARRAY */
+	SHADOW_SAMPLER( 1D ), /* SAMPLER_1D_SHADOW */
+	SAMPLER( 1D ), /* SAMPLER_1D */
+	INTEGER_IMAGE_ARRAY( Signed, 1D ), /* INT_IMAGE_1D_ARRAY */
+	INTEGER_IMAGE( Signed, Multisample ), /* INT_IMAGE_MULTISAMPLE */
+	SAMPLER( Cube ), /* SAMPLER_CUBE */
+	INTEGER_IMAGE_ARRAY( Signed, Cube ), /* INT_IMAGE_CUBE_MAP_ARRAY */
+	SAMPLER( 3D ), /* SAMPLER_3D */
+	INTEGER_IMAGE_ARRAY( Signed, 2D ), /* INT_IMAGE_2D_ARRAY */
+	SAMPLER( 2D ), /* SAMPLER_2D */
+	INTEGER_SAMPLER_ARRAY( Signed, Multisample ), /* INT_SAMPLER_MULTISAMPLE_ARRAY */
+	SAMPLER_ARRAY( Cube ), /* SAMPLER_CUBE_MAP_ARRAY */
+	INTEGER_SAMPLER( Unsigned, Multisample ), /* UNSIGNED_INT_SAMPLER_MULTISAMPLE */
+	INTEGER_IMAGE( Signed, Rectangle ), /* INT_IMAGE_RECTANGLE */
+	INTEGER_SAMPLER( Unsigned, 1D ), /* UNSIGNED_INT_SAMPLER_1D */
+	IMAGE( Multisample ), /* IMAGE_MULTISAMPLE */
+	INTEGER_IMAGE_ARRAY( Unsigned, 2D ), /* UNSIGNED_INT_IMAGE_2D_ARRAY */
+	INTEGER_IMAGE( Signed, 3D ), /* INT_IMAGE_3D */
+	INTEGER_SAMPLER_ARRAY( Signed, 2D ), /* INT_SAMPLER_2D_ARRAY */
+	SAMPLER_ARRAY( 1D ), /* SAMPLER_1D_ARRAY	 */
+	INTEGER_IMAGE_ARRAY( Unsigned, 1D ), /* UNSIGNED_INT_IMAGE_1D_ARRAY */
+	INTEGER_IMAGE( Signed, 2D ), /* INT_IMAGE_2D */
+	INTEGER_SAMPLER( Signed, Rectangle ), /* INT_SAMPLER_RECT */
+	SHADOW_SAMPLER_ARRAY( 2D ), /* SAMPLER_2D_ARRAY_SHADOW */
+	INTEGER_IMAGE( Unsigned, Buffer ), /* UNSIGNED_INT_IMAGE_BUFFER */
+	INTEGER_IMAGE( Signed, 1D ), /* INT_IMAGE_1D  */
+	INTEGER_SAMPLER( Signed, 3D ), /* INT_SAMPLER_3D */
+	INTEGER_SAMPLER( Signed, 2D ), /* INT_SAMPLER_2D */
+	INTEGER_IMAGE( Unsigned, Cube ), /* UNSIGNED_INT_IMAGE_CUBE */
+	IMAGE_ARRAY( Multisample ), /* IMAGE_MULTISAMPLE_ARRAY */
+	INTEGER_SAMPLER( Signed, 1D ), /* INT_SAMPLER_1D */
+	INTEGER_SAMPLER_ARRAY( Unsigned, Cube ), /* UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY */
+	SAMPLER_ARRAY( Multisample ), /* SAMPLER_MULTISAMPLE_ARRAY */
+	INTEGER_SAMPLER( Signed, Multisample ), /* INT_SAMPLER_MULTISAMPLE */
+	INTEGER_SAMPLER( Signed, Cube ), /* INT_SAMPLER_CUBE */
+	IMAGE_ARRAY( Cube ), /* IMAGE_CUBE_MAP_ARRAY */
+	SHADOW_SAMPLER( Cube ), /* SAMPLER_CUBE_SHADOW */
+	SAMPLER( Buffer ), /* SAMPLER_BUFFER */
+	IMAGE_ARRAY( 2D ), /* IMAGE_2D_ARRAY */
+	SHADOW_SAMPLER_ARRAY( 1D ), /* SAMPLER_1D_ARRAY_SHADOW */
+	INTEGER_SAMPLER_ARRAY( Signed, 1D ), /* INT_SAMPLER_1D_ARRAY */
+	IMAGE_ARRAY( 1D ), /* IMAGE_1D_ARRAY */
+	SAMPLER_ARRAY( 2D ), /* SAMPLER_2D_ARRAY */
+	INTEGER_IMAGE( Unsigned, Rectangle ), /* UNSIGNED_INT_IMAGE_RECTANGLE */
+	IMAGE( Buffer ), /* IMAGE_BUFFER */
+	INTEGER_SAMPLER( Signed, Buffer ), /* INT_SAMPLER_BUFFER */
+	IMAGE( Cube ), /* IMAGE_CUBE */
+	INTEGER_SAMPLER( Unsigned, 2D ), /* UNSIGNED_INT_SAMPLER_2D */
+	INTEGER_SAMPLER( Unsigned, Cube ), /* UNSIGNED_INT_SAMPLER_CUBE */
+	IMAGE( Rectangle ), /* IMAGE_RECTANGLE */
+	INTEGER_SAMPLER( Unsigned, Rectangle ), /* UNSIGNED_INT_SAMPLER_RECT */
+	INTEGER_SAMPLER_ARRAY( Unsigned, 1D ), /* UNSIGNED_INT_SAMPLER_1D_ARRAY */
+	IMAGE( 3D ), /* IMAGE_3D */
+	INTEGER_SAMPLER_ARRAY( Unsigned, 2D ), /* UNSIGNED_INT_SAMPLER_2D_ARRAY */
+	INTEGER_SAMPLER_ARRAY( Signed, Cube ), /* INT_SAMPLER_CUBE_MAP_ARRAY */
+	IMAGE( 2D ), /* IMAGE_2D */
+	SAMPLER( Multisample ), /* SAMPLER_MULTISAMPLE */
+	INTEGER_IMAGE_ARRAY( Unsigned, Multisample ), /* UNSIGNED_INT_IMAGE_MULTISAMPLE_ARRAY */
+	INTEGER_IMAGE( Signed, Buffer ), /* INT_IMAGE_BUFFER */
+	IMAGE( 1D ), /* IMAGE_1D */
+	INTEGER_SAMPLER( Unsigned, Buffer ), /* UNSIGNED_INT_SAMPLER_BUFFER  */
+	INTEGER_IMAGE( Unsigned, Multisample ), /* UNSIGNED_INT_IMAGE_MULTISAMPLE */
+	INTEGER_IMAGE( Signed, Cube ), /* INT_IMAGE_CUBE */
+	INTEGER_SAMPLER( Unsigned, 3D ), /* UNSIGNED_INT_SAMPLER_3D */
+	INTEGER_IMAGE_ARRAY( Unsigned, Cube ), /* UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY */
+};
+
+#undef INTEGER_IMAGE
+#undef INTEGER_IMAGE_ARRAY
+#undef IMAGE
+#undef IMAGE_ARRAY
+#undef INTEGER_SAMPLER
+#undef INTEGER_SAMPLER_ARRAY
+#undef SAMPLER
+#undef SAMPLER_ARRAY
+#undef SHADOW_SAMPLER
+#undef SHADOW_SAMPLER_ARRAY
+
+#define COUNT_IN_RANGE( low, high ) ( high - low + 1 )
+#define GET_OFFSET_IN_RANGE( low, high, base, value ) ( ( ( value >= low ) & ( value <= high ) ) ? ( base + value - low ) : 0 )
+
+static int
+ClassifySampler( GLenum type )
+{
+	static const U8 kQuadOffsets[] = {
+		0,
+		
+		/* 0x8-0xF */
+		17, 11, 6, 11, 5, 1, 16, 10,
+
+		/* 0x4C-0x6C */
+		17, 16, 16, 15, 14, 14, 13, 12, 11, 6, 10, 9, 8, 7, 6, 18, 17, 3, 5, 4, 4, 3, 2, 2, 1, 13, 10, 9, 8, 7, 19, 18, 17,
+
+		/* 0xC0-0xD8 */
+		7, 13, 12, 12, 8, 12, 0, 0, 0, 10, 9, 9, 11, 8, 13, 7, 14, 6, 14, 18, 15, 15, 15, 16, 18
+	};
+	
+	const int Base1 = 1;
+	const int Base2 = Base1 + COUNT_IN_RANGE( 0x8, 0xF );
+	const int Base3 = Base2 + COUNT_IN_RANGE( 0x4C, 0x6C );
+
+	GLenum low = type & 0xFF;
+	
+	int offset_index = GET_OFFSET_IN_RANGE( 0x8, 0xF, Base1, low )
+					| GET_OFFSET_IN_RANGE( 0x4C, 0x6C, Base2, low )
+					| GET_OFFSET_IN_RANGE( 0xC0, 0xD8, Base3, low );
+
+	int offset = kQuadOffsets[offset_index];
+	SamplerTypeConstantQuad quad = kConstantQuads[offset];
+
+	int value_index = ( type == quad.fValues[0] ? 1 : 0 )
+					| ( type == quad.fValues[1] ? 2 : 0 )
+					| ( type == quad.fValues[2] ? 3 : 0 )
+					| ( type == quad.fValues[3] ? 4 : 0 );
+
+	return value_index ? ( offset - 1 ) * 4 + value_index : 0;
+}
+
+#undef COUNT_IN_RANGE
+#undef GET_OFFSET_IN_RANGE
+
+const size_t kFillSamplerNameLength = sizeof( "u_FillSampler?" ) - 1;
+const size_t kMaskSamplerNameLength = sizeof( "u_MaskSampler?" ) - 1;
+
+Rtt_STATIC_ASSERT( kFillSamplerNameLength == kMaskSamplerNameLength );
+
+static bool
+IsBuiltInSampler( GLchar* buf )
+{
+	memset( buf + kFillSamplerNameLength, 0, 2 ); // clear out junk, cf. kFourth below
+
+	const U64* name = (U64*)buf;
+
+	const union {
+		U8 b[4];
+		U32 u32;
+	}
+	kUFill1 = { 'u', '_', 'F', 'i' }, kUFill2 = { 'l', 'l', 'S', 'a' },
+	kUmask1 = { 'u', '_', 'M', 'a' }, kUmask2 = { 's', 'k', 'S', 'a' },
+	kThird = { 'm', 'p', 'l', 'e' },
+	kFourth1 = { 'r', '0', 0, 0 },
+	kFourth2 = { 'r', '1', 0, 0 },
+	kFourth3 = { 'r', '2', 0, 0 };
+	
+	const union {
+		U32 u[2];
+		U64 u64;
+	}
+	kUFill = { kUFill1.u32, kUFill2.u32 },
+	kUmask = { kUmask1.u32, kUmask2.u32 },
+	kSuffix1 = { kThird.u32, kFourth1.u32 },
+	kSuffix2 = { kThird.u32, kFourth2.u32 },
+	kSuffix3 = { kThird.u32, kFourth3.u32 };
+	
+	// n.b. 1 (01) and 3 = (11) both match 1, but only the latter will match 2 (10), i.e. only masks allow the '2' suffix
+	int prefix_mask = ( kUFill.u64 == name[0] ? 1 : 0 ) | ( kUmask.u64 == name[0] ? 3 : 0 );
+	int suffix_mask = ( kSuffix1.u64 == name[1] ? 1 : 0 ) | ( kSuffix2.u64 == name[1] ? 1 : 0 ) | ( kSuffix3.u64 == name[1] ? 2 : 0 );
+
+	return !!( prefix_mask & suffix_mask );
+}
+
+static bool
+ValidateLaterVersion( const ShaderResource* shaderResource, const U8 builtinInfo[2], GLint numUnits, const GLchar stash[], const U8 details[], const U8 counts[], U8 locIndices[] )
+{
+	if ( (U8)shaderResource->GetExtraTextureCount() != numUnits )
+	{
+		Rtt_LogException( "ERROR: shader versions disagree about extra texture counts" );
+		return false;
+	}
+	else if ( shaderResource->GetFillInfo(0) != builtinInfo[0] || shaderResource->GetFillInfo(1) != builtinInfo[1] )
+	{
+		Rtt_LogException( "ERROR: shader versions disagree in fill sampler details" );
+		return false;
+	}
+	else
+	{
+		const U8* extraDetails = shaderResource->GetExtraTextureDetails();
+		const U8* extraTextureNames = shaderResource->GetExtraTextureNames();
+		
+		for (int i = 0; i < numUnits; i++)
+		{
+			U8 name[ExtraTextureInfo::kMaxPackedNameLength];
+			
+			ExtraTextureInfo::EncodeName( name, &stash[i * ExtraTextureInfo::kMaxNameLength] );
+
+			int pos = ExtraTextureInfo::FindNameInList( name, extraTextureNames, numUnits );
+			if ( pos >= 0 && details[pos] == extraDetails[pos] ) // if found, check that details also agree
+			{
+				locIndices[i] = (U8)pos;
+			}
+			else
+			{
+				Rtt_LogException( "ERROR: shader versions disagree about extra bound textures or their sampler details" );
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
 void
 GLProgram::Update( Program::Version version, VersionData& data )
 {
@@ -658,13 +1006,175 @@ GLProgram::Update( Program::Version version, VersionData& data )
     GL_CHECK_ERROR();
     data.fUniformLocations[Uniform::kUserData3] = glGetUniformLocation( data.fProgram, "u_UserData3" );
     GL_CHECK_ERROR();
-    
+   
     glUseProgram( data.fProgram );
-    glUniform1i( glGetUniformLocation( data.fProgram, "u_FillSampler0" ), Texture::kFill0 );
-    glUniform1i( glGetUniformLocation( data.fProgram, "u_FillSampler1" ), Texture::kFill1 );
+    GLint fillLoc0, fillLoc1;
+    fillLoc0 = glGetUniformLocation( data.fProgram, "u_FillSampler0" );
+    glUniform1i( fillLoc0, Texture::kFill0 );
+    fillLoc1 = glGetUniformLocation( data.fProgram, "u_FillSampler1" );
+    glUniform1i( fillLoc1, Texture::kFill1 );
     glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler0" ), Texture::kMask0 );
     glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler1" ), Texture::kMask1 );
     glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler2" ), Texture::kMask2 );
+
+	ShaderResource* shaderResource = program->GetShaderResource();
+	bool hasTextureInfo = -1 != shaderResource->GetExtraTextureCount();
+		
+	GLint maxLength;
+	glGetProgramiv( data.fProgram, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLength );
+
+	if ( maxLength > ExtraTextureInfo::kMaxNameLength )
+	{
+		Rtt_LogException( "WARNING: at least one uniform greater than %i character in length (%i)", ExtraTextureInfo::kMaxNameLength, maxLength );
+	}
+    Rtt_STATIC_ASSERT( sizeof( kDetails ) / sizeof( kDetails[0] ) < 256 );
+    
+    U8 details[ 32 - Texture::kNumUnits ];
+    
+    const U32 kNumDetails = sizeof( details ) / sizeof( *details );
+    
+    U32 total = 0;
+    U8 counts[kNumDetails];
+	U8 locIndices[kNumDetails];
+    GLint extraLocs[kNumDetails];
+    GLchar stash[kNumDetails * ExtraTextureInfo::kMaxNameLength + 2]; // n.b. 2 bytes for NUL + one guard character
+    
+    // TODO: see about consolidating the ones above stash into a kNumDetails-sized array,
+    // with GLchar* to the stash level (buf, below); then do a sort by the latter (can be
+    // skipped when doing validation instead)
+    // might need to reassess this, which at first seemed like it might provide a cheaper
+    // way to assign to units
+    
+	GLint maxUnits, numUnits = 0;
+	glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits );
+    
+    if ( maxUnits > kNumDetails )
+    {
+		maxUnits = kNumDetails;
+	}
+
+	U8 builtinInfo[3] = {}; // 0-1 = fill(0|1); 2 = mask (junk)
+
+	GLint activeUniformCount;
+	glGetProgramiv( data.fProgram, GL_ACTIVE_UNIFORMS, &activeUniformCount );
+
+	GLchar * buf = stash;
+    for ( GLint i = 0; i < activeUniformCount; i++ )
+    {
+		GLint size;
+		GLenum type;
+		GLsizei length;
+		glGetActiveUniform( data.fProgram, i, ExtraTextureInfo::kMaxNameLength + 1, &length, &size, &type, buf );
+
+		int details_index = ClassifySampler( type );
+		if ( 0 == details_index ) // not a sampler?
+		{
+			continue;
+		}
+	
+		if ( kFillSamplerNameLength == length && IsBuiltInSampler( buf ) ) // built-in?
+		{
+			int index = ( 'F' == buf[2] ) ? buf[length - 1] - '0' : 2;
+			builtinInfo[index] = details_index;
+		
+			continue;
+		}
+		else if ( ExtraTextureInfo::kMaxNameLength + 1 == length )
+		{
+			Rtt_LogException( "WARNING: sampler name `%s` is too long; skipping", buf );
+			continue;
+		}
+		else if ( kNumDetails == numUnits )
+		{
+			Rtt_LogException( "WARNING: sampler `%s` potentially valid, but %u units already allocated; ignoring", buf, kNumDetails );
+			continue;
+		}
+		else if ( ( 'g' == buf[0] && 'l' == buf[1] && '_' == buf[2] ) || ( '_' == buf[0] && '_' == buf[1] ) )
+		{
+			Rtt_LogException( "WARNING: samplers with `%s` prefix are reserved", 'g' == buf[0] ? "gl_" : "__" );
+			continue;
+		}
+	
+		GLint loc = glGetUniformLocation( data.fProgram, buf );
+	
+		Rtt_ASSERT( -1 != loc );
+		
+		extraLocs[numUnits] = loc;
+		locIndices[numUnits] = numUnits;
+		counts[numUnits] = (U8)length;
+
+		memcpy( &details[numUnits], &kDetails[details_index], sizeof(U8) );
+		
+		total += ExtraTextureInfo::BinsForLength( length );
+		buf += ExtraTextureInfo::kMaxNameLength;
+		
+		numUnits++;
+	}
+	
+	if ( !hasTextureInfo )
+	{
+		U8* extraTextureInfo = NULL;
+		if ( numUnits > 0 )
+		{
+			extraTextureInfo = (U8*)Rtt_MALLOC( NULL, numUnits * 2 + total ); // details array + (count, name) array
+
+			memcpy( extraTextureInfo, details, numUnits );
+			
+			U8* names = extraTextureInfo + numUnits;
+
+			for (int i = 0; i < numUnits; i++)
+			{
+				U8 packedCount = ExtraTextureInfo::BinsForLength( counts[i] );
+				
+				*names++ = packedCount;
+				
+				int n = ExtraTextureInfo::EncodeName( names, &stash[i * ExtraTextureInfo::kMaxNameLength] );
+				
+				Rtt_ASSERT( n >= 0 && n == ExtraTextureInfo::NamesSize( packedCount ) );
+				
+				names += n;
+			}
+		}
+		
+		shaderResource->SetTextureInfo( extraTextureInfo, (U8)numUnits, builtinInfo );
+	}
+	else if ( !ValidateLaterVersion( shaderResource, builtinInfo, numUnits, stash, details, counts, locIndices ) )
+	{
+		// ???
+	}
+	
+	for (int i = 0; i < numUnits; i++)
+	{
+		glUniform1i( extraLocs[i], Texture::kNumUnits + locIndices[i] );
+	}
+	
+// SAS TODO: find extra samplers (and check 0, 1) and cache info
+	// TODO:
+		// prefers-local = largest < 6
+		// if !prefers-local or already non-local
+			// add version to internal list
+			// absorb list (probably duplicate per version)
+			// ensure non-local
+    
+    // TODO:
+    // decaying to non-local implies a sampler was #ifdef'd out in
+    // some mask counts but not others; this is very unlikely to
+    // happen by accident, though... most likely should error
+    // ACTUALLY, what could be done is sweeping an existing list
+    // and ensuring all valid names still show up... any "new"
+    // ones would then be ignored (THIS could also be applied to
+    // other uniforms, actually)
+    
+    // so then amend the above
+		// if old
+			// take current list as normative, check for consistency
+		// else
+			// if largest < 6
+				// add local list
+			// else
+				// keep inside
+    
+    
     glUseProgram( 0 );
     GL_CHECK_ERROR();
 }

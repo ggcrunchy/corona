@@ -109,24 +109,24 @@ RoundUpToMultiple( U16 dim, U8 size )
 {
 	switch (size)
 	{
-		case 4: // most cases
-			return RoundUp<4>( dim );
-		case 8: // ASTC...
-			return RoundUp<8>( dim );
-		case 3: // ...and ditto the rest, albeit not powers of 2
-			return RoundUp<3>( dim );
-		case 5:
-			return RoundUp<5>( dim );
-		case 6:
-			return RoundUp<6>( dim );
-		case 10:
-			return RoundUp<10>( dim );
-		case 12:
-			return RoundUp<12>( dim );
-		default:
-			Rtt_ASSERT_NOT_REACHED();
-		
-			return 0;
+	case 4: // most cases
+		return RoundUp<4>( dim );
+	case 8: // ASTC...
+		return RoundUp<8>( dim );
+	case 3: // ...and ditto the rest, albeit not powers of 2
+		return RoundUp<3>( dim );
+	case 5:
+		return RoundUp<5>( dim );
+	case 6:
+		return RoundUp<6>( dim );
+	case 10:
+		return RoundUp<10>( dim );
+	case 12:
+		return RoundUp<12>( dim );
+	default:
+		Rtt_ASSERT_NOT_REACHED();
+	
+		return 0;
 	}
 }
 

@@ -212,11 +212,6 @@ PaintAdapter::SetValueForKey(
 
                                 bool isFill = DisplayPath::ExtensionAdapter::IsFillPaint( observer, paint );
                                 
-                                // TODO: if ( isFill ) are paint textures compatible with samplers?
-                                // this must also handle "first frame", since the sampler info will still be pending
-                                // effect adapter should still "work", but renderer should just see default shader
-                                // check that this doesn't mess up texture binding
-                                
                                 geometry = DisplayPath::ExtensionAdapter::GetGeometry( observer, isFill );
                             }
                         }
@@ -225,6 +220,44 @@ PaintAdapter::SetValueForKey(
                     if (shader && !shader->IsCompatible( geometry ))
                     {
                         result = false;
+                    }
+                    
+                    else if (shader)
+                    {
+						if ( paint->IsType( Paint::kColor ) || paint->IsType( Paint::kGradient ) || paint->IsType( Paint::kCamera ) )
+						{
+							shader->SetSyncState( Shader::kSynced );
+						}
+						else
+						{
+						    // TODO: if ( isFill ) are paint textures compatible with samplers?
+								// no real support, but 
+                                // this must also handle "first frame", since the sampler info will still be pending
+                                // effect adapter should still "work", but renderer should just see default shader
+                                // check that this doesn't mess up texture binding
+                                
+							// shader->TryToReconcileTextures( paint );
+								// fResource->Count() >= 0? (has evaluated names)
+								// fResource->Fill0 -> and Fill0 in paint with matching details
+								// ...->Fill1, ditto
+								// Count() <= paint->count and each one in resource found in paint
+								// need to negotiate units, too
+								
+								// if possible, consult the resource and compare textures
+									// this means the samplers, but here also means names
+										// could park names in the environment... still need to hook up indices
+										// could swap out effect, so names must persist
+											// weak-keyed table, maybe belonging to the factory?
+											// very likely to be stable (almost has to be); variance for RAD or typos
+								// ideally synced, else maybe unsynced or... 
+							
+							if ( Shader::kBroken == shader->GetSyncState() )
+							{
+								// some error?
+							
+								result = false;
+							}
+						}
                     }
                     
                     else

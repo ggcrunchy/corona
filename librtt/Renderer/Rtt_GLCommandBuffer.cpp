@@ -178,7 +178,24 @@ CommandBuffer::GetMaxVertexTextureUnits()
     {
         GLint maxUnits = 0;
 
-        glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits ); // TODO: check if this is same on Android, etc.
+        glGetIntegerv( GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS, &maxUnits ); // TODO: check if this is same on Android, etc.
+        sMaxUnits = maxUnits;
+        GL_CHECK_ERROR();
+    }
+
+    return sMaxUnits;
+}
+
+size_t
+CommandBuffer::GetMaxTextureUnits()
+{
+    static size_t sMaxUnits;
+    
+    if ( 0 == sMaxUnits )
+    {
+        GLint maxUnits = 0;
+
+        glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits );
         sMaxUnits = maxUnits;
         GL_CHECK_ERROR();
     }

@@ -190,6 +190,8 @@ class Renderer
 		static bool GetGpuSupportsHighPrecisionFragmentShaders();
         static U32 GetMaxUniformVectorsCount();
 		static U32 GetMaxVertexTextureUnits();
+		
+		U32 GetMaxTextureUnits();
 
         bool HasFramebufferBlit(  bool * canScale ) const;
         void GetVertexAttributes( VertexAttributeSupport & support ) const;
@@ -420,6 +422,19 @@ class Renderer
         Array< GeometryWriter > fGeometryWriters;
         const GeometryWriter* fCurrentGeometryWriterList; // to detect change in writer; assumed to be stable object, i.e. either NULL (default) or some static array
         bool fCanAddGeometryWriters;
+
+// SAS TODO:
+		LightPtrArray<Program> fProgramsWithUpdateBindings;
+		LightPtrArray<Texture> fExtraTextures;
+		U16 fMaxExtraTexturesThisFrame;
+
+		// GetLightPtrArray() (then can reserve)
+			// something to set dirty
+// get() with index < len: null
+		// how do we populate these without blowing up RenderData?
+			// something particular to, say, composite shaders?
+			// should behave like a normal texture when shader has fewer textures...
+// /SAS TODO
 };
 
 // ----------------------------------------------------------------------------

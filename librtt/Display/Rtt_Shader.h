@@ -123,7 +123,21 @@ class Shader
         void DoAnyAfterDraw( const DrawState & state, Renderer & renderer, const RenderData & objectData ) const;
 
     public:
-        bool IsCompatible( const Geometry* geometry );
+        bool IsCompatible( const Geometry* geometry ) const;
+		bool IsPaintConsistent() const;
+		bool CanCheckConsistency() const;
+    
+    public:
+		typedef enum : U8
+		{
+			kUnsynced, // unable to resolve textures at creation; must try on the fly
+			kSynced, // successfully synced
+			kBroken // made unsuccessfuly attempt to sync; shader exists but effectively unusable
+		}
+		SyncState;
+		
+		void SetSyncState( SyncState newValue ) { fSyncState = newValue; }
+		SyncState GetSyncState() const { return fSyncState; }
     
     protected:
         SharedPtr< ShaderResource > fResource;
@@ -134,6 +148,7 @@ class Shader
         FrameBufferObject *fFBO;
         Texture *fTexture;
         const Shader *fRoot; // Weak reference
+        SyncState fSyncState;
         
         
         // Cache for a shader's output

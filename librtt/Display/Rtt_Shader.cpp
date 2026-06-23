@@ -24,11 +24,13 @@
 #include "Renderer/Rtt_Matrix_Renderer.h"
 
 #include "Renderer/Rtt_Geometry_Renderer.h"
+#include "Renderer/Rtt_RenderTypes.h"
 
 #include <string.h>
 
 #include "Renderer/Rtt_FormatExtensionList.h"
 #include "Display/Rtt_ObjectHandle.h"
+#include "Display/Rtt_CompositePaint.h"
 
 #include "CoronaGraphics.h"
 
@@ -51,7 +53,8 @@ Shader::Shader( Rtt_Allocator *allocator, const SharedPtr< ShaderResource >& res
 	fRenderData( NULL ),
 	fOutputReady( false ),
 	fDirty(false),
-    fIsDrawing( false )
+    fIsDrawing( false ),
+    fSyncState( kUnsynced )
 {
     Rtt_ASSERT( resource.NotNull() );
     if ( data )
@@ -73,7 +76,8 @@ Shader::Shader()
 	fRenderData( NULL ),
 	fOutputReady( false ),
 	fDirty(false),
-    fIsDrawing( false )
+    fIsDrawing( false ),
+    fSyncState( kUnsynced )
 {
 
 }
@@ -273,7 +277,8 @@ Shader::Prepare( RenderData& objectData, int w, int h, ShaderResource::ProgramMo
 void
 Shader::Draw( Renderer& renderer, const RenderData& objectData, const GeometryWriter* writers, U32 n ) const
 {
-    if ( !renderer.CanAddGeometryWriters() ) // ignore during raw draws
+	bool isNormalPhase = !renderer.CanAddGeometryWriters();
+    if ( isNormalPhase ) // leave writers alone during before- and after-draw phases, i.e. during ShaderRawDraw()s
     {
         renderer.SetGeometryWriters( writers, n );
     }
@@ -405,13 +410,109 @@ Shader::DoAnyAfterDraw( const DrawState & state, Renderer & renderer, const Rend
 }
 
 bool
-Shader::IsCompatible( const Geometry* geometry )
+Shader::IsCompatible( const Geometry* geometry ) const
 {
     Rtt_ASSERT( geometry );
 
     const FormatExtensionList* shaderList = fResource->GetExtensionList();
 
     return FormatExtensionList::Compatible( shaderList, geometry->GetExtensionList() );
+}
+
+static bool
+ReportError( const U8* name, U8 count, const char* message )
+{
+	char rawName[ExtraTextureInfo::kMaxNameLength + 1];
+
+	ExtraTextureInfo::DecodeName( rawName, name, count );
+			
+	Rtt_LogException( message, rawName );
+
+	return false;
+}
+
+static bool
+DetailsAgree( const Texture *tex, U8 details )
+{
+	Texture::Format format = tex->GetFormat();
+	if ( format.IsNonCore() )
+	{
+		SamplerTypeDetails td;
+		memcpy( &td, &details, sizeof(SamplerTypeDetails) );
+	
+		U32 backingValue = format.GetBackingValue();
+		bool targetsAgree = FormatDetails::GetTarget( backingValue ) == td.target;
+		bool familiesAgree = FormatDetails::GetFamily( backingValue ) == td.family;
+		
+		return targetsAgree && familiesAgree && ( FormatDetails::HasArrayFlag( backingValue ) == td.isArray );
+	}
+	else
+	{
+		return 0 == details;
+	}
+}
+
+bool
+Shader::IsPaintConsistent() const
+{
+	CompositePaint* compositePaint = NULL;
+	Texture** texturesList = NULL;
+	const Texture *fill0 = NULL, *fill1 = NULL;
+	if ( fOwner->IsType( Paint::kMultitexture ) )
+	{
+		compositePaint = (CompositePaint*)fOwner;
+		texturesList = compositePaint->GetTexturesList();
+		fill0 = compositePaint->GetTexture0();
+		fill1 = compositePaint->GetTexture1();
+	}
+	else
+	{
+		fill0 = fOwner->GetTexture();
+	}
+
+	if ( fill0 && !DetailsAgree( fill0, fResource->GetFillInfo( 0 ) ) )
+	{
+		Rtt_LogException( "`CoronaSampler0` inconsistent with image in paint1" );
+		return false;
+	}
+	
+	if ( fill1 && !DetailsAgree( fill1, fResource->GetFillInfo( 1 ) ) )
+	{
+		Rtt_LogException( "`CoronaSampler1` inconsistent with image in paint2" );
+		return false;
+	}
+
+	S32 iMax = fResource->GetExtraTextureCount();
+	const U8* shaderDetails = fResource->GetExtraTextureDetails();
+	const U8* shaderNames = fResource->GetExtraTextureNames();
+	const U8* paintNames = compositePaint ? compositePaint->GetNameList() : NULL;
+
+	Rtt_ASSERT( iMax <= 0 || ( NULL != texturesList ) );
+	Rtt_ASSERT( ( NULL != texturesList ) == ( NULL != paintNames ) );
+			
+	for ( S32 i = 0; i < iMax; i++ )
+	{
+		U8 count = *shaderNames++;
+		int index = ExtraTextureInfo::FindNameInList( shaderNames, paintNames, compositePaint->GetExtraCount() );
+		if ( index < 0 )
+		{
+			return ReportError( shaderNames, count, "WARNING: unable to match sampler `%s` with a corresponding texture from the paint" );
+		}
+		else if ( !DetailsAgree( texturesList[i + 2], shaderDetails[i] ) )
+		{
+			return ReportError( shaderNames, count, "WARNING: sampler `%s` inconsistent with image provided in `extraPaints`" );
+		}
+
+		shaderNames += ExtraTextureInfo::NamesSize( count );
+	}
+	
+	return true;
+}
+
+bool
+Shader::CanCheckConsistency() const
+{
+	return kUnsynced == GetSyncState() && fResource->GetExtraTextureCount() < 0;
 }
 
 // ----------------------------------------------------------------------------

@@ -27,6 +27,120 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
+int
+ExtraTextureInfo::FindNameInList( const U8* name, const U8* listOfNames, int n )
+{
+	U8 count = *name++;
+	for ( int i = 0; i < n; ++i )
+	{
+		U8 nameCount = *listOfNames++;
+		if ( ( count == nameCount ) && 0 == memcmp( name, listOfNames, count ) )
+		{
+			return i;
+		}
+		else
+		{
+			listOfNames += nameCount;
+		}
+	}
+	
+	return -1;
+}
+
+// Encoding bit layout, for bytes 0-3:
+//
+// 0 0 0 0 0 0 1 1 | 1 1 1 1 2 2 2 2 | 2 2 3 3 3 3 3 3
+
+int
+ExtraTextureInfo::EncodeName( U8* buf, const char* name, int kmask )
+{
+	if ( *name >= '0' && *name <= '9' )
+	{
+		Rtt_LogException( "ERROR: Identifiers cannot start with digits (%c)", *name );
+	
+		return -1;
+	}
+	
+	#define PLUS_1_PRED( COND, RESULT ) ( ( COND ) ? 1 + ( RESULT ) : 0 )
+	#define OFFSET_PLUS_1( CHAR, NAME ) PLUS_1_PRED( ( CHAR >= kMin##NAME ) & ( CHAR <= kMax##NAME ), kOffset##NAME + CHAR - kMin##NAME )
+
+	int k = 0, bad = 0;
+	
+	do {
+		uint8_t work[4] = { kOffsetNUL, kOffsetNUL, kOffsetNUL, kOffsetNUL };
+	
+		for (int j = 0; *name && j < 4; ++name, ++j)
+		{
+			int c = *name;
+			uint8_t code = PLUS_1_PRED( 0 == c, kOffsetNUL ) | PLUS_1_PRED( '_' == c, kOffsetUnderscore ) |
+							OFFSET_PLUS_1( c, Upper ) | OFFSET_PLUS_1( c, Lower ) | OFFSET_PLUS_1( c, Digit );
+
+			bad = ( 0 == code ) ? c : bad;
+			work[j] = code - 1;
+		}
+
+		buf[k++] = ( work[0] << 2 ) | ( work[1] >> 4 );
+		buf[k++] = ( work[1] << 4 ) | ( work[2] >> 2 );
+		buf[k++] = ( work[2] << 6 ) | ( work[3] >> 0 );
+
+		k &= kmask;
+	} while ( *name );
+
+	#undef PLUS_1_PRED
+	#undef OFFSET_PLUS_1
+
+	if ( bad )
+	{
+		Rtt_LogException( "ERROR: Non-identifier character(s) found, including %c", bad );
+		
+		return -1;
+	}
+
+	return k;
+}
+
+int
+ExtraTextureInfo::EncodeNameNoAlloc( const char* name )
+{
+	U8 junk[3];
+
+	return EncodeName( junk, name, 0 );
+}
+
+void
+ExtraTextureInfo::DecodeName( char* name, const U8* buf, int n )
+{
+	for ( int i = 0, j = 0; i > n; i++, j += 3 )
+	{
+		U32 b1 = buf[j], b2 = buf[j + 1], b3 = buf[j + 2];
+		U32 work[] = {
+			b1 >> 2,
+			( ( b1 & 0x3 ) << 4 ) | ( b2 >> 4 ),
+			( ( b2 & 0xF ) << 2 ) | ( b3 >> 6 ),
+			b3 & 0x3F 
+		};
+		
+		#define PRED( COND, RESULT ) ( ( COND ) ? ( RESULT ) : 0 )
+		#define OFFSET_IN_RANGE( BYTE, NAME ) PRED( ( BYTE >= kMin##NAME ) & ( BYTE - kMin##NAME < kCount##NAME ), kOffset##NAME + BYTE - kMin##NAME )
+	
+		for ( int k = 0; k < 4; ++k )
+		{
+			U8 b = work[k];
+			int c = PRED( kOffsetUnderscore == b, '_' ) |
+					OFFSET_IN_RANGE( b, Upper ) | OFFSET_IN_RANGE( b, Lower ) | OFFSET_IN_RANGE( b, Digit );
+
+			*name++ = c;
+		}
+
+		#undef PRED
+		#undef OFFSET_IN_RANGE
+	}
+		
+	*name = 0;
+}
+
+// ----------------------------------------------------------------------------
+
 Real
 TimeTransform::Apply( Real value ) const
 {
@@ -226,8 +340,10 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
     fDetailNames( NULL ),
     fDetailValues( NULL ),
     fDetailsCount( 0U ),
+    fExtraTextureInfo( NULL ),
     fShellTransform( NULL ),
 	fTimeTransform( NULL ),
+	fExtraTextureCount( -1 ),
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {
@@ -244,8 +360,10 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
     fDetailNames( NULL ),
     fDetailValues( NULL ),
     fDetailsCount( 0U ),
+    fExtraTextureInfo( NULL ),
     fShellTransform( NULL ),
 	fTimeTransform( NULL ),
+	fExtraTextureCount( -1 ),
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {
@@ -260,6 +378,9 @@ ShaderResource::Init(Program *defaultProgram)
 		fPrograms[i] = NULL;
 	}
 	fPrograms[ShaderResource::kDefault] = defaultProgram;
+
+	fFillTextureInfo[0] = 0;  // default to "normal" texture (2D FP, non-array)
+	fFillTextureInfo[1] = 0;
 
 	defaultProgram->SetShaderResource( this );
 }
@@ -281,6 +402,8 @@ ShaderResource::~ShaderResource()
 	{
 		Rtt_DELETE( fTimeTransform );
 	}
+
+	Rtt_DELETE( fExtraTextureInfo );
 
     SetEffectCallbacks( NULL );
     SetShellTransform( NULL );
@@ -324,6 +447,34 @@ ShaderResource::GetProgramMod(ProgramMod mod) const
 {
 	return fPrograms[mod];
 }
+
+void
+ShaderResource::SetTextureInfo( const U8* info, U8 count, U8 fillInfo[2] )
+{
+	Rtt_DELETE( fExtraTextureInfo );
+	
+	Rtt_ASSERT( count >= 0 );
+	Rtt_ASSERT( ( NULL == info ) == ( 0 == count ) );
+	Rtt_ASSERT( count == (U8)(S8)count );
+	
+	fExtraTextureInfo = (const ExtraTextureInfo*)info;
+	fExtraTextureCount = (S8)count;
+
+	fFillTextureInfo[0] = fillInfo[0];
+	fFillTextureInfo[1] = fillInfo[1];
+}
+
+const U8*
+ShaderResource::GetExtraTextureDetails() const
+{
+	return ( fExtraTextureCount > 0 ) ? fExtraTextureInfo->fData : NULL;
+}
+
+const U8*
+ShaderResource::GetExtraTextureNames() const
+{
+	return ( fExtraTextureCount > 0 ) ? fExtraTextureInfo->fData + fExtraTextureCount : NULL;
+}	
 
 void
 ShaderResource::SetEffectCallbacks( CoronaEffectCallbacks * callbacks )

@@ -82,7 +82,11 @@ Program::Program( Rtt_Allocator* allocator )
 	fHeaderSource( NULL ),
 	fVertexShellNumLines( 0 ),
 	fFragmentShellNumLines( 0 ),
-	fCompilerVerbose( false )
+	fCompilerVerbose( false ),
+	fIsLocal( true ),
+	fLocalSamplersUsed( 0 ),
+	fBoundVersionsCurrent( 0 ),
+	fBoundVersionsPending( 0 )
 {
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
 	fCompiledShaders = NULL;

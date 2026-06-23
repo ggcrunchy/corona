@@ -58,6 +58,7 @@ class CommandBuffer
 		
 	public:
 		static size_t GetMaxUniformVectorsCount();
+		static size_t GetMaxTextureUnits();
 		static size_t GetMaxVertexTextureUnits();
 		static size_t GetMaxTextureSize();
 		static const char *GetGlString( const char *s );

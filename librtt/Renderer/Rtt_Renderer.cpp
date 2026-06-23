@@ -175,6 +175,9 @@ Renderer::Renderer( Rtt_Allocator* allocator )
     fGeometryWriters( allocator ),
     fCurrentGeometryWriterList( NULL ),
     fCanAddGeometryWriters( false ),
+    fProgramsWithUpdateBindings( allocator ),
+    fExtraTextures( allocator ),
+    fMaxExtraTexturesThisFrame( 0 ),
     fMaskCountIndex( 0 ),
     fMaskCount( allocator ),
     fCurrentProgramMaskCount( 0 ),
@@ -272,6 +275,11 @@ Renderer::BeginFrame( Real totalTime, Real deltaTime, const TimeTransform *defTi
     fBackCommandBuffer->SetBlendEquation( fPrevious.fBlendEquation );
 
     fTimeDependencyCount = 0;
+
+	fProgramsWithUpdateBindings.Clear();
+	fExtraTextures.Clear();
+	
+	fMaxExtraTexturesThisFrame = 0;
     
     DEBUG_PRINT( "--Begin Frame: Renderer--\n" );
 }
@@ -547,6 +555,20 @@ Renderer::PopMaskCount()
     --fMaskCountIndex;
 }
 
+static bool
+DoExtraTexturesDiffer( const LightPtrArray<Texture>& extraTextures, const TextureList& list, U32 count )
+{
+	for ( int i = 0; i < count; i++ )
+	{
+		if ( extraTextures[i] != list.GetArray()[i + 2] )
+		{
+			return true;
+		}
+	}
+	
+	return false;
+}
+
 void
 Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
 {
@@ -575,6 +597,22 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
 	bool userUniformDirty2 = data->fUserUniform2 != fPrevious.fUserUniform2 && data->fUserUniform2;
 	bool userUniformDirty3 = data->fUserUniform3 != fPrevious.fUserUniform3 && data->fUserUniform3;
 	
+	U32 extraTextureCount = 0;
+	if ( data->fTextures.IsArray() )
+	{
+		U32 count = data->fTextures.GetCount();
+		Rtt_ASSERT( count > 2 ); // fills will be in first two slots
+		extraTextureCount = count - 2;
+		if ( extraTextureCount > fMaxExtraTexturesThisFrame )
+		{
+			fExtraTextures.PadToSize( extraTextureCount, NULL );
+			fMaxExtraTexturesThisFrame = extraTextureCount;
+		}
+		else if ( !DoExtraTexturesDiffer( fExtraTextures, data->fTextures, extraTextureCount ) )
+		{
+			extraTextureCount = 0;
+		}
+	}
 
     ArrayS32 dirtyIndices( fAllocator );
     U32 largestDirtySize = EnumerateDirtyBlocks( dirtyIndices );
@@ -651,6 +689,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
                 || blendEquationDirty
                 || fillDirty0
                 || fillDirty1
+                || extraTextureCount > 0
                 || maskTextureDirty
                 || maskUniformDirty
                 || programDirty
@@ -861,6 +900,25 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
         INCREMENT( fStatistics.fUniformBindCount );
     }
 
+	for ( U32 i = 0; i < extraTextureCount; i++ )
+	{
+		Texture* extra = data->fTextures.GetArray()[i + 2]; // n.b. skip fill0 and fill1
+		if ( extra == fExtraTextures[i] )
+		{
+			continue;
+		}
+		
+		if( !extra->fGPUResource )
+		{
+			QueueCreate( extra );
+		}
+
+        fBackCommandBuffer->BindTexture( extra, Texture::kNumUnits + i );
+        fExtraTextures[i] = extra;
+        
+        // n.b. does not bind uniform
+	}
+
     // Program
     if( data->fMaskTexture )
     {
@@ -881,6 +939,16 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
         fPrevious.fProgram = data->fProgram;
         INCREMENT( fStatistics.fProgramBindCount );
         fCurrentProgramMaskCount = MaskCount();
+
+		if ( !fWireframeEnabled && !data->fProgram->IsCurrent( version ) )
+		{
+			if ( !data->fProgram->AnyPending() )
+			{
+				fProgramsWithUpdateBindings.Append( data->fProgram );
+			}
+			
+			data->fProgram->SetPending( version );
+		}
         
         if (shaderData)
         {
@@ -1021,6 +1089,12 @@ Renderer::Swap()
     fBackCommandBuffer = temp;
     fGeometryPool->Swap();
     fInstancingGeometryPool->Swap();
+
+	// Commit pending first-frame program version syncs.
+	for ( S32 i = 0, iMax = fProgramsWithUpdateBindings.Length(); i < iMax; i++ )
+	{
+		fProgramsWithUpdateBindings[i]->SyncPending();
+	}
 
     // Add pending commands
     U16 length = (U16)fCustomInfo->fCommands.Length();
@@ -1498,6 +1572,12 @@ U32
 Renderer::GetMaxVertexTextureUnits()
 {
     return CommandBuffer::GetMaxVertexTextureUnits();
+}
+
+U32
+Renderer::GetMaxTextureUnits()
+{
+	return CommandBuffer::GetMaxTextureUnits();
 }
 
 void

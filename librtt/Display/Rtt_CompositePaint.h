@@ -17,6 +17,8 @@
 namespace Rtt
 {
 
+struct ExtraTextureInfo;
+
 // ----------------------------------------------------------------------------
 
 class CompositePaint : public Paint
@@ -34,14 +36,27 @@ class CompositePaint : public Paint
 		virtual Texture *GetTexture() const;
 
 	public:
+		const Texture* GetTexture0() const;
+		const Texture* GetTexture1() const;
+
+	public:
 		virtual const Paint* AsPaint( Type t ) const;
 		virtual void ApplyPaintUVTransformations( ArrayVertex2& vertices ) const override;
 
+		void PrepareExtraTextures( U32 count, U32 nameBinCount );
+		void CommitExtraTextures(); // merge extra textures after populating list
+		void ClearExtraInfo();
+		U8* GetNameList() const;
+		U32 GetExtraCount() const { return fExtraCount; }
+		void* GetTextureResourceList() const; // void* = SharedPtr<TextureResource>*
+		Texture** GetTexturesList() const;
 //		virtual const MLuaUserdataAdapter& GetAdapter() const;
 
 	private:
 		Paint *fPaint0;
 		Paint *fPaint1;
+		ExtraTextureInfo *fExtraInfo;
+		U32 fExtraCount;
 };
 
 // ----------------------------------------------------------------------------

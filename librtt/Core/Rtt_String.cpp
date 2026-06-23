@@ -213,7 +213,7 @@ template<typename T, T kPrime, T kOffsetBasis>
 T
 GetHash( const char* buffer )
 {
-	// https://en.wikipedia.org/wiki/Fowler–Noll–Vo_hash_function
+	// https://en.wikipedia.org/wiki/FowlerÐNollÐVo_hash_function
     T hash = kOffsetBasis;
 
 	if ( NULL != buffer ) // if absent, interpret as empty string

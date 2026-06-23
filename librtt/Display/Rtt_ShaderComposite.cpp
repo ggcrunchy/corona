@@ -303,7 +303,8 @@ ShaderComposite::Prepare( RenderData& objectData, int w, int h, ShaderResource::
 void
 ShaderComposite::Draw( Renderer& renderer, const RenderData& objectData, const GeometryWriter* writers, U32 n ) const
 {
-    if ( !renderer.CanAddGeometryWriters() ) // ignore during raw draws
+	bool isNormalPhase = !renderer.CanAddGeometryWriters();
+    if ( isNormalPhase ) // leave writers alone during before- and after-draw phases, i.e. during ShaderRawDraw()s
     {
         renderer.SetGeometryWriters( writers, n );
     }
