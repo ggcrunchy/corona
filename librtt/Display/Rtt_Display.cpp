@@ -253,6 +253,22 @@ InvalidateDisplay( void * display )
 	static_cast< Display * >( display )->GetScene().Invalidate();
 }
 
+void
+Display::SetDefaultPrograms()
+{
+    RenderData data;
+    Program* defaultPrograms[2];
+    const ShaderResource::ProgramMod mods[] = { ShaderResource::kDefault, ShaderResource::k25D };
+    for ( int i = 0; i < 2; i++ )
+    {
+        fShaderFactory->GetDefault().Prepare( data, 0, 0, mods[i] );
+    
+        defaultPrograms[i] = data.fProgram;
+    }
+    
+    fRenderer->SetDefaultPrograms( defaultPrograms );
+}
+
 bool
 Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orientation, const char * backend, void * backendContext )
 {
@@ -308,6 +324,8 @@ Display::Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orie
         result = true;
 
 		fShaderFactory = Rtt_NEW( allocator, ShaderFactory( *this, programHeader, backend ) );
+  
+        SetDefaultPrograms();      
 	}
 
     return result;
@@ -1094,6 +1112,8 @@ Display::ReloadResources()
 {
     GetRenderer().ReleaseGPUResources();
     GetRenderer().Initialize();
+
+    SetDefaultPrograms();
 
     // Special case: Text objects use textures that are not backed by a file
 ///    TextObject::Reload( GetScene().CurrentStage() );

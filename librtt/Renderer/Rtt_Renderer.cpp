@@ -196,6 +196,9 @@ Renderer::Renderer( Rtt_Allocator* allocator )
 {
     // Always have at least 1 mask count.
     fMaskCount.Append( 0 );
+
+	fDefaultPrograms[0] = NULL;
+	fDefaultPrograms[1] = NULL;
 }
 
 Renderer::~Renderer()
@@ -227,6 +230,13 @@ Renderer::Initialize()
 {
     fBackCommandBuffer->Initialize();
     fFrontCommandBuffer->Initialize();
+}
+
+void
+Renderer::SetDefaultPrograms( Program *defaultPrograms[] )
+{
+	fDefaultPrograms[0] = defaultPrograms[0];
+	fDefaultPrograms[1] = defaultPrograms[1];
 }
 
 void

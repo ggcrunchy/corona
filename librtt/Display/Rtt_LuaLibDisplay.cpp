@@ -3547,7 +3547,7 @@ GatherExtraPaint( lua_State *L, Array<ArrayData> &arr )
 		
 	lua_getfield( L, -1, "type" );
 	
-	const char* typeString = ( LUA_TSTRING == lua_type( L, -1 ) ) ? luaL_optstring( L, -1, "" ) : NULL;
+	const char* typeString = ( LUA_TSTRING == lua_type( L, -1 ) ) ? lua_tostring( L, -1 ) : "";
 
 	lua_pop( L, 1 );
 
@@ -3663,7 +3663,7 @@ LuaLibDisplay::LuaNewCompositePaint( lua_State *L, int paramsIndex )
 				GatherExtraPaint( L, prepArr );
 			}
 
-			qsort( arr.WriteAccess(), arr.Length(), sizeof(ArrayData), ArrayData::Compare ); // also done by BACKEND_Program
+			qsort( arr.WriteAccess(), arr.Length(), sizeof(ArrayData), ArrayData::Compare ); // also done by ShaderResource
 
 			arr.Reserve( (U32)prepArr.Length() );
 

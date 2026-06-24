@@ -58,6 +58,8 @@ class Renderer
         // be called when a valid rendering context is active.
         virtual void Initialize();
 
+		void SetDefaultPrograms( Program* defaultPrograms[2] );
+
 		// Perform any per-frame preparation. Total time is the time in seconds
 		// since the start of the application. Delta time is the amount of time
 		// in seconds it took to complete the previous frame.
@@ -385,6 +387,8 @@ class Renderer
         Geometry* fCurrentGeometry;
         Geometry::Vertex* fCurrentInstancingVertex;
         Geometry* fCurrentInstancingGeometry;
+
+		Program* fDefaultPrograms[2]; // default and 2.5D
 
 		// Non-owning:
 		const TextureFormatDescription* fCustomFormats;

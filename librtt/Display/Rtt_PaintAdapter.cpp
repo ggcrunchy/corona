@@ -228,43 +228,31 @@ PaintAdapter::SetValueForKey(
 						{
 							shader->SetSyncState( Shader::kSynced );
 						}
-						else
+						else if ( shader->CanCheckConsistency() )
 						{
-						    // TODO: if ( isFill ) are paint textures compatible with samplers?
-								// no real support, but 
-                                // this must also handle "first frame", since the sampler info will still be pending
-                                // effect adapter should still "work", but renderer should just see default shader
-                                // check that this doesn't mess up texture binding
-                                
-							// shader->TryToReconcileTextures( paint );
-								// fResource->Count() >= 0? (has evaluated names)
-								// fResource->Fill0 -> and Fill0 in paint with matching details
-								// ...->Fill1, ditto
-								// Count() <= paint->count and each one in resource found in paint
-								// need to negotiate units, too
-								
-								// if possible, consult the resource and compare textures
-									// this means the samplers, but here also means names
-										// could park names in the environment... still need to hook up indices
-										// could swap out effect, so names must persist
-											// weak-keyed table, maybe belonging to the factory?
-											// very likely to be stable (almost has to be); variance for RAD or typos
-								// ideally synced, else maybe unsynced or... 
-							
-							if ( Shader::kBroken == shader->GetSyncState() )
+							if ( shader->IsPaintConsistent() )
 							{
-								// some error?
-							
-								result = false;
+								shader->SetSyncState( Shader::kSynced );
 							}
+							else
+							{
+								Rtt_LogException( "WARNING: effect `%s` is incompatible with the paint's textures", lua_tostring( L, valueIndex ) );
+								
+								shader->SetSyncState( Shader::kBroken );
+							}
+// TODO:
+	// no real support, but 
+	// this must also handle "first frame", since the sampler info will still be pending
+	// effect adapter should still "work", but renderer should just see default shader
+	// check that this doesn't mess up texture binding
 						}
+						
+						result = Shader::kBroken != shader->GetSyncState();
                     }
                     
-                    else
+                    if ( result )
                     {
                         paint->SetShader( shader );
-
-                        result = true;
                     }
                 }
                 break;

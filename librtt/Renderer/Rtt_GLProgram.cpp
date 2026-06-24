@@ -1126,7 +1126,7 @@ GLProgram::Update( Program::Version version, VersionData& data )
 		{
 			qsort( items, numUnits, sizeof(SamplerItem), SamplerItem::Compare ); // n.b. also done by Paint
 		
-			extraTextureInfo = (U8*)Rtt_MALLOC( NULL, numUnits * ( 1 + sizeof(SamplerTypeDetails) ) + total ); // details array + (count, name) array
+			extraTextureInfo = (U8*)Rtt_MALLOC( NULL, numUnits * ( 1 + sizeof(SamplerTypeDetails) ) + total ); // details + (count, name) arrays
 
 			SamplerTypeDetails* details = (SamplerTypeDetails*)extraTextureInfo;
 			U8* names = extraTextureInfo + numUnits * sizeof(SamplerTypeDetails);

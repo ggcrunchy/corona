@@ -127,6 +127,8 @@ class Display
 		virtual bool Initialize( lua_State *L, int configIndex, DeviceOrientation::Type orientation, const char * backend, void * backendContext );
 		virtual void Teardown();
 
+		void SetDefaultPrograms();
+
     protected:
         void ReadRenderingConfig( lua_State *L, int index, ProgramHeader& programHeader );
 
