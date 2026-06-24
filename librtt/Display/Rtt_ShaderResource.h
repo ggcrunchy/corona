@@ -95,7 +95,7 @@ struct ExtraTextureInfo
 	Rtt_STATIC_ASSERT( ( kOffsetNUL + 1 == 64 ) && ( kMaxPackedNameLength % 3 == 0 ) && ( kMaxNameLength % 4 == 0 ) );
 
 	static U32 BinsForLength( U32 length ) { return ( length + 3 ) / 4; }
-	static U32 NamesSize( U32 binCount ) { return binCount * 3; }
+	static U32 Advance( U32 binCount ) { return binCount * 3; }
 	
 	static int FindNameInList( const U8* name, const U8* listOfNames, int n );
 	static int EncodeName( U8* buf, const char* name, int kmask = kMaxPackedNameLength - 1 );

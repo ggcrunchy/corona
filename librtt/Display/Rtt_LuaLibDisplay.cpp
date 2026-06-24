@@ -3608,7 +3608,7 @@ CommitExtraPaints( CompositePaint *paint, Array<ArrayData> &arr, U32 numExtra, U
 		
 		int n = ExtraTextureInfo::EncodeName( nameList, arr[i].name );
 		
-		Rtt_ASSERT( n == ExtraTextureInfo::NamesSize( count ) );
+		Rtt_ASSERT( n == ExtraTextureInfo::Advance( count ) );
 		
 		nameList += n;
 	}

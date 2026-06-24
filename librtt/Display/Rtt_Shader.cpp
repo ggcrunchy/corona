@@ -503,7 +503,7 @@ Shader::IsPaintConsistent() const
 			return ReportError( shaderNames, count, "WARNING: sampler `%s` inconsistent with image provided in `extraPaints`" );
 		}
 
-		shaderNames += ExtraTextureInfo::NamesSize( count );
+		shaderNames += ExtraTextureInfo::Advance( count );
 	}
 	
 	return true;

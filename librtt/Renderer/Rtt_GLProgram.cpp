@@ -22,6 +22,7 @@
 #include "Core/Rtt_Traits.h"
 #include <cstdio>
 #include <string.h> // memset.
+#include <stdlib.h>
 #ifdef Rtt_WIN_PHONE_ENV
     #include <GLES2/gl2ext.h>
 #endif
@@ -830,40 +831,57 @@ Rtt_STATIC_ASSERT( kFillSamplerNameLength == kMaskSamplerNameLength );
 static bool
 IsBuiltInSampler( GLchar* buf )
 {
-	memset( buf + kFillSamplerNameLength, 0, 2 ); // clear out junk, cf. kFourth below
+	#define NONE
+	#define NUL '\0'
+	#define KEEP "\xff"
+	#define WIPE "\0"
 
-	const U64* name = (U64*)buf;
+	// n.b. kMask has some artificial padding to get the KEEP / WIPE to align with characters
+	const size_t kLengthFitToQuads = ( kFillSamplerNameLength + 3 ) & ~3;
+	const GLchar kMask[kLengthFitToQuads] = NONE KEEP KEEP WIPE WIPE WIPE WIPE KEEP KEEP KEEP KEEP KEEP KEEP KEEP WIPE;
+	const GLchar kPattern[kLengthFitToQuads] = { 'u', '_', NUL, NUL, NUL, NUL, 'S', 'a', 'm', 'p', 'l', 'e', 'r', NUL };
 
-	const union {
-		U8 b[4];
-		U32 u32;
-	}
-	kUFill1 = { 'u', '_', 'F', 'i' }, kUFill2 = { 'l', 'l', 'S', 'a' },
-	kUmask1 = { 'u', '_', 'M', 'a' }, kUmask2 = { 's', 'k', 'S', 'a' },
-	kThird = { 'm', 'p', 'l', 'e' },
-	kFourth1 = { 'r', '0', 0, 0 },
-	kFourth2 = { 'r', '1', 0, 0 },
-	kFourth3 = { 'r', '2', 0, 0 };
-	
-	const union {
-		U32 u[2];
-		U64 u64;
-	}
-	kUFill = { kUFill1.u32, kUFill2.u32 },
-	kUmask = { kUmask1.u32, kUmask2.u32 },
-	kSuffix1 = { kThird.u32, kFourth1.u32 },
-	kSuffix2 = { kThird.u32, kFourth2.u32 },
-	kSuffix3 = { kThird.u32, kFourth3.u32 };
-	
-	// n.b. 1 (01) and 3 = (11) both match 1, but only the latter will match 2 (10), i.e. only masks allow the '2' suffix
-	int prefix_mask = ( kUFill.u64 == name[0] ? 1 : 0 ) | ( kUmask.u64 == name[0] ? 3 : 0 );
-	int suffix_mask = ( kSuffix1.u64 == name[1] ? 1 : 0 ) | ( kSuffix2.u64 == name[1] ? 1 : 0 ) | ( kSuffix3.u64 == name[1] ? 2 : 0 );
+	#undef NONE
+	#undef NUL
+	#undef KEEP
+	#undef WIPE
 
-	return !!( prefix_mask & suffix_mask );
+	Rtt_STATIC_ASSERT( kLengthFitToQuads <= ExtraTextureInfo::kMaxNameLength );	// sanity check for the "fit to quads"
+	Rtt_STATIC_ASSERT( kLengthFitToQuads == sizeof(U64) * 2 );
+
+	const U64* kBufAsU64s = (const U64*)buf;
+	const U64* kMaskAsU64s = (const U64*)kMask;
+	const U64* kPatternAsU64s = (const U64*)kPattern;
+
+	int masked1 = ( kMaskAsU64s[0] & kBufAsU64s[0] ) == kPatternAsU64s[0];
+	int masked2 = ( kMaskAsU64s[1] & kBufAsU64s[1] ) == kPatternAsU64s[1];
+	int const_mask = ( masked1 & masked2 ) ? 0b11 : 0;	
+	int digit = buf[kFillSamplerNameLength - 1];
+
+	// n.b. 01 satisfies both 01 and 11, but only the latter matches 10, i.e. limiting '2' to mask samplers
+	int prefix_mask = ( 0 == memcmp( &buf[2], "Fill", 4 ) ? 0xb01 : 0 ) | ( 0 == memcmp( &buf[2], "Mask", 4 ) ? 0b11 : 0 );
+	int suffix_mask = ( '0' == digit ? 0b01 : 0 ) | ( '1' == digit ? 0b01 : 0 ) | ( '2' == digit ? 0b10 : 0 );
+
+	return !!( const_mask & prefix_mask & suffix_mask );
 }
 
+struct SamplerItem {
+	GLchar* buf;
+	GLint extraLoc;
+	U8 locIndex;
+	U8 count;
+	U8 detail;
+	
+	static int Compare( const void* p1, const void* p2 )
+	{
+		const SamplerItem *si1 = (const SamplerItem*)p1, *si2 = (const SamplerItem*)p2;
+
+		return strcmp( (const char*)si1->buf, (const char*)si2->buf );
+	}
+};
+
 static bool
-ValidateLaterVersion( const ShaderResource* shaderResource, const U8 builtinInfo[2], GLint numUnits, const GLchar stash[], const U8 details[], const U8 counts[], U8 locIndices[] )
+ValidateLaterVersion( const ShaderResource* shaderResource, const U8 builtinInfo[2], GLint numUnits, SamplerItem items[] )
 {
 	if ( (U8)shaderResource->GetExtraTextureCount() != numUnits )
 	{
@@ -880,16 +898,16 @@ ValidateLaterVersion( const ShaderResource* shaderResource, const U8 builtinInfo
 		const U8* extraDetails = shaderResource->GetExtraTextureDetails();
 		const U8* extraTextureNames = shaderResource->GetExtraTextureNames();
 		
-		for (int i = 0; i < numUnits; i++)
+		for ( int i = 0; i < numUnits; i++ )
 		{
 			U8 name[ExtraTextureInfo::kMaxPackedNameLength];
 			
-			ExtraTextureInfo::EncodeName( name, &stash[i * ExtraTextureInfo::kMaxNameLength] );
+			ExtraTextureInfo::EncodeName( name, items[i].buf );
 
 			int pos = ExtraTextureInfo::FindNameInList( name, extraTextureNames, numUnits );
-			if ( pos >= 0 && details[pos] == extraDetails[pos] ) // if found, check that details also agree
+			if ( pos >= 0 && items[i].detail == extraDetails[pos] ) // if found, check that details also agree
 			{
-				locIndices[i] = (U8)pos;
+				items[i].locIndex = (U8)pos;
 			}
 			else
 			{
@@ -1008,10 +1026,9 @@ GLProgram::Update( Program::Version version, VersionData& data )
     GL_CHECK_ERROR();
    
     glUseProgram( data.fProgram );
-    GLint fillLoc0, fillLoc1;
-    fillLoc0 = glGetUniformLocation( data.fProgram, "u_FillSampler0" );
+    GLint fillLoc0 = glGetUniformLocation( data.fProgram, "u_FillSampler0" );
     glUniform1i( fillLoc0, Texture::kFill0 );
-    fillLoc1 = glGetUniformLocation( data.fProgram, "u_FillSampler1" );
+    GLint fillLoc1 = glGetUniformLocation( data.fProgram, "u_FillSampler1" );
     glUniform1i( fillLoc1, Texture::kFill1 );
     glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler0" ), Texture::kMask0 );
     glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler1" ), Texture::kMask1 );
@@ -1029,28 +1046,19 @@ GLProgram::Update( Program::Version version, VersionData& data )
 	}
     Rtt_STATIC_ASSERT( sizeof( kDetails ) / sizeof( kDetails[0] ) < 256 );
     
-    U8 details[ 32 - Texture::kNumUnits ];
+    SamplerItem items[ 32 - Texture::kNumUnits ];
     
-    const U32 kNumDetails = sizeof( details ) / sizeof( *details );
-    
+    const U32 kNumItems = sizeof( items ) / sizeof( *items );
+
     U32 total = 0;
-    U8 counts[kNumDetails];
-	U8 locIndices[kNumDetails];
-    GLint extraLocs[kNumDetails];
-    GLchar stash[kNumDetails * ExtraTextureInfo::kMaxNameLength + 2]; // n.b. 2 bytes for NUL + one guard character
-    
-    // TODO: see about consolidating the ones above stash into a kNumDetails-sized array,
-    // with GLchar* to the stash level (buf, below); then do a sort by the latter (can be
-    // skipped when doing validation instead)
-    // might need to reassess this, which at first seemed like it might provide a cheaper
-    // way to assign to units
+    GLchar stash[kNumItems * ExtraTextureInfo::kMaxNameLength + 2]; // n.b. 2 bytes for NUL + one guard character
     
 	GLint maxUnits, numUnits = 0;
 	glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits );
     
-    if ( maxUnits > kNumDetails )
+    if ( maxUnits > kNumItems )
     {
-		maxUnits = kNumDetails;
+		maxUnits = kNumItems;
 	}
 
 	U8 builtinInfo[3] = {}; // 0-1 = fill(0|1); 2 = mask (junk)
@@ -1075,7 +1083,8 @@ GLProgram::Update( Program::Version version, VersionData& data )
 		if ( kFillSamplerNameLength == length && IsBuiltInSampler( buf ) ) // built-in?
 		{
 			int index = ( 'F' == buf[2] ) ? buf[length - 1] - '0' : 2;
-			builtinInfo[index] = details_index;
+			
+			memcpy( &builtinInfo[index], &kDetails[details_index], sizeof(U8) );
 		
 			continue;
 		}
@@ -1084,26 +1093,26 @@ GLProgram::Update( Program::Version version, VersionData& data )
 			Rtt_LogException( "WARNING: sampler name `%s` is too long; skipping", buf );
 			continue;
 		}
-		else if ( kNumDetails == numUnits )
+		else if ( kNumItems == numUnits )
 		{
-			Rtt_LogException( "WARNING: sampler `%s` potentially valid, but %u units already allocated; ignoring", buf, kNumDetails );
+			Rtt_LogException( "WARNING: sampler `%s` potentially valid, but %u units already allocated; ignoring", buf, kNumItems );
 			continue;
 		}
-		else if ( ( 'g' == buf[0] && 'l' == buf[1] && '_' == buf[2] ) || ( '_' == buf[0] && '_' == buf[1] ) )
+		else if ( 0 == strncmp( buf, "gl_", 3 ) || 0 == strncmp( buf, "__", 2 ) )
 		{
-			Rtt_LogException( "WARNING: samplers with `%s` prefix are reserved", 'g' == buf[0] ? "gl_" : "__" );
+			Rtt_LogException( "WARNING: samplers with `%s` prefix are reserved", 'g' == *buf ? "gl_" : "__" );
 			continue;
 		}
 	
 		GLint loc = glGetUniformLocation( data.fProgram, buf );
 	
 		Rtt_ASSERT( -1 != loc );
-		
-		extraLocs[numUnits] = loc;
-		locIndices[numUnits] = numUnits;
-		counts[numUnits] = (U8)length;
 
-		memcpy( &details[numUnits], &kDetails[details_index], sizeof(U8) );
+		items[numUnits].buf = buf;
+		items[numUnits].extraLoc = loc;
+		items[numUnits].count = (U8)length;
+		
+		memcpy( &items[numUnits].detail, &kDetails[details_index], sizeof(U8) );
 		
 		total += ExtraTextureInfo::BinsForLength( length );
 		buf += ExtraTextureInfo::kMaxNameLength;
@@ -1116,21 +1125,23 @@ GLProgram::Update( Program::Version version, VersionData& data )
 		U8* extraTextureInfo = NULL;
 		if ( numUnits > 0 )
 		{
+			qsort( items, numUnits, sizeof(SamplerItem), SamplerItem::Compare ); // n.b. also done by Paint
+		
 			extraTextureInfo = (U8*)Rtt_MALLOC( NULL, numUnits * 2 + total ); // details array + (count, name) array
 
-			memcpy( extraTextureInfo, details, numUnits );
-			
 			U8* names = extraTextureInfo + numUnits;
-
-			for (int i = 0; i < numUnits; i++)
+			for ( U32 i = 0; i < numUnits; i++ )
 			{
-				U8 packedCount = ExtraTextureInfo::BinsForLength( counts[i] );
+				items[i].extraLoc = i;
+				extraTextureInfo[i] = items[i].detail;
+
+				U8 packedCount = ExtraTextureInfo::BinsForLength( items[i].count );
 				
 				*names++ = packedCount;
 				
-				int n = ExtraTextureInfo::EncodeName( names, &stash[i * ExtraTextureInfo::kMaxNameLength] );
+				int n = ExtraTextureInfo::EncodeName( names, items[i].buf );
 				
-				Rtt_ASSERT( n >= 0 && n == ExtraTextureInfo::NamesSize( packedCount ) );
+				Rtt_ASSERT( n >= 0 && n == ExtraTextureInfo::Advance( packedCount ) );
 				
 				names += n;
 			}
@@ -1138,14 +1149,14 @@ GLProgram::Update( Program::Version version, VersionData& data )
 		
 		shaderResource->SetTextureInfo( extraTextureInfo, (U8)numUnits, builtinInfo );
 	}
-	else if ( !ValidateLaterVersion( shaderResource, builtinInfo, numUnits, stash, details, counts, locIndices ) )
+	else if ( !ValidateLaterVersion( shaderResource, builtinInfo, numUnits, items ) )
 	{
 		// ???
 	}
 	
 	for (int i = 0; i < numUnits; i++)
 	{
-		glUniform1i( extraLocs[i], Texture::kNumUnits + locIndices[i] );
+		glUniform1i( items[i].extraLoc, Texture::kNumUnits + items[i].locIndex );
 	}
 	
 // SAS TODO: find extra samplers (and check 0, 1) and cache info
