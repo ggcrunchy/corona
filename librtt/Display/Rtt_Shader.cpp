@@ -432,23 +432,20 @@ ReportError( const U8* name, U8 count, const char* message )
 }
 
 static bool
-DetailsAgree( const Texture *tex, U8 details )
+DetailsAgree( const Texture *tex, const SamplerTypeDetails& details )
 {
 	Texture::Format format = tex->GetFormat();
 	if ( format.IsNonCore() )
 	{
-		SamplerTypeDetails td;
-		memcpy( &td, &details, sizeof(SamplerTypeDetails) );
-	
 		U32 backingValue = format.GetBackingValue();
-		bool targetsAgree = FormatDetails::GetTarget( backingValue ) == td.target;
-		bool familiesAgree = FormatDetails::GetFamily( backingValue ) == td.family;
+		bool targetsAgree = FormatDetails::GetTarget( backingValue ) == details.target;
+		bool familiesAgree = FormatDetails::GetFamily( backingValue ) == details.family;
 		
-		return targetsAgree && familiesAgree && ( FormatDetails::HasArrayFlag( backingValue ) == td.isArray );
+		return targetsAgree && familiesAgree && ( FormatDetails::HasArrayFlag( backingValue ) == details.isArray );
 	}
 	else
 	{
-		return 0 == details;
+		return details.IsDefault();
 	}
 }
 
@@ -483,7 +480,7 @@ Shader::IsPaintConsistent() const
 	}
 
 	S32 iMax = fResource->GetExtraTextureCount();
-	const U8* shaderDetails = fResource->GetExtraTextureDetails();
+	const SamplerTypeDetails* shaderDetails = fResource->GetExtraTextureDetails();
 	const U8* shaderNames = fResource->GetExtraTextureNames();
 	const U8* paintNames = compositePaint ? compositePaint->GetNameList() : NULL;
 

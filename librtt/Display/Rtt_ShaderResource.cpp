@@ -379,8 +379,8 @@ ShaderResource::Init(Program *defaultProgram)
 	}
 	fPrograms[ShaderResource::kDefault] = defaultProgram;
 
-	fFillTextureInfo[0] = 0;  // default to "normal" texture (2D FP, non-array)
-	fFillTextureInfo[1] = 0;
+	fFillTextureInfo[0] = {};
+	fFillTextureInfo[1] = {};
 
 	defaultProgram->SetShaderResource( this );
 }
@@ -449,7 +449,7 @@ ShaderResource::GetProgramMod(ProgramMod mod) const
 }
 
 void
-ShaderResource::SetTextureInfo( const U8* info, U8 count, U8 fillInfo[2] )
+ShaderResource::SetTextureInfo( const U8* info, U8 count, SamplerTypeDetails fillInfo[2] )
 {
 	Rtt_DELETE( fExtraTextureInfo );
 	
@@ -464,16 +464,18 @@ ShaderResource::SetTextureInfo( const U8* info, U8 count, U8 fillInfo[2] )
 	fFillTextureInfo[1] = fillInfo[1];
 }
 
-const U8*
+const SamplerTypeDetails*
 ShaderResource::GetExtraTextureDetails() const
 {
-	return ( fExtraTextureCount > 0 ) ? fExtraTextureInfo->fData : NULL;
+	return ( fExtraTextureCount > 0 ) ? (SamplerTypeDetails*)fExtraTextureInfo->fData : NULL;
 }
 
 const U8*
 ShaderResource::GetExtraTextureNames() const
 {
-	return ( fExtraTextureCount > 0 ) ? fExtraTextureInfo->fData + fExtraTextureCount : NULL;
+	int detailsSize = fExtraTextureCount * sizeof(SamplerTypeDetails);
+
+	return ( fExtraTextureCount > 0 ) ? fExtraTextureInfo->fData + detailsSize : NULL;
 }	
 
 void

@@ -868,9 +868,9 @@ IsBuiltInSampler( GLchar* buf )
 struct SamplerItem {
 	GLchar* buf;
 	GLint extraLoc;
+	SamplerTypeDetails details;
 	U8 locIndex;
 	U8 count;
-	U8 detail;
 	
 	static int Compare( const void* p1, const void* p2 )
 	{
@@ -881,21 +881,21 @@ struct SamplerItem {
 };
 
 static bool
-ValidateLaterVersion( const ShaderResource* shaderResource, const U8 builtinInfo[2], GLint numUnits, SamplerItem items[] )
+ValidateLaterVersion( const ShaderResource* shaderResource, const SamplerTypeDetails builtinInfo[2], GLint numUnits, SamplerItem items[] )
 {
 	if ( (U8)shaderResource->GetExtraTextureCount() != numUnits )
 	{
 		Rtt_LogException( "ERROR: shader versions disagree about extra texture counts" );
 		return false;
 	}
-	else if ( shaderResource->GetFillInfo(0) != builtinInfo[0] || shaderResource->GetFillInfo(1) != builtinInfo[1] )
+	else if ( !shaderResource->GetFillInfo(0).Matches( builtinInfo[0] ) || !shaderResource->GetFillInfo(1).Matches( builtinInfo[1] ) )
 	{
 		Rtt_LogException( "ERROR: shader versions disagree in fill sampler details" );
 		return false;
 	}
 	else
 	{
-		const U8* extraDetails = shaderResource->GetExtraTextureDetails();
+		const SamplerTypeDetails* extraDetails = shaderResource->GetExtraTextureDetails();
 		const U8* extraTextureNames = shaderResource->GetExtraTextureNames();
 		
 		for ( int i = 0; i < numUnits; i++ )
@@ -905,7 +905,7 @@ ValidateLaterVersion( const ShaderResource* shaderResource, const U8 builtinInfo
 			ExtraTextureInfo::EncodeName( name, items[i].buf );
 
 			int pos = ExtraTextureInfo::FindNameInList( name, extraTextureNames, numUnits );
-			if ( pos >= 0 && items[i].detail == extraDetails[pos] ) // if found, check that details also agree
+			if ( pos >= 0 && items[i].details.Matches( extraDetails[pos] ) ) // if found, check that details also agree
 			{
 				items[i].locIndex = (U8)pos;
 			}
@@ -1061,7 +1061,7 @@ GLProgram::Update( Program::Version version, VersionData& data )
 		maxUnits = kNumItems;
 	}
 
-	U8 builtinInfo[3] = {}; // 0-1 = fill(0|1); 2 = mask (junk)
+	SamplerTypeDetails builtinInfo[3] = {}; // 0-1 = fill(0|1); 2 = mask (junk)
 
 	GLint activeUniformCount;
 	glGetProgramiv( data.fProgram, GL_ACTIVE_UNIFORMS, &activeUniformCount );
@@ -1084,7 +1084,7 @@ GLProgram::Update( Program::Version version, VersionData& data )
 		{
 			int index = ( 'F' == buf[2] ) ? buf[length - 1] - '0' : 2;
 			
-			memcpy( &builtinInfo[index], &kDetails[details_index], sizeof(U8) );
+			builtinInfo[index] = kDetails[details_index];
 		
 			continue;
 		}
@@ -1111,8 +1111,7 @@ GLProgram::Update( Program::Version version, VersionData& data )
 		items[numUnits].buf = buf;
 		items[numUnits].extraLoc = loc;
 		items[numUnits].count = (U8)length;
-		
-		memcpy( &items[numUnits].detail, &kDetails[details_index], sizeof(U8) );
+		items[numUnits].details = kDetails[details_index];
 		
 		total += ExtraTextureInfo::BinsForLength( length );
 		buf += ExtraTextureInfo::kMaxNameLength;
@@ -1127,13 +1126,15 @@ GLProgram::Update( Program::Version version, VersionData& data )
 		{
 			qsort( items, numUnits, sizeof(SamplerItem), SamplerItem::Compare ); // n.b. also done by Paint
 		
-			extraTextureInfo = (U8*)Rtt_MALLOC( NULL, numUnits * 2 + total ); // details array + (count, name) array
+			extraTextureInfo = (U8*)Rtt_MALLOC( NULL, numUnits * ( 1 + sizeof(SamplerTypeDetails) ) + total ); // details array + (count, name) array
 
-			U8* names = extraTextureInfo + numUnits;
+			SamplerTypeDetails* details = (SamplerTypeDetails*)extraTextureInfo;
+			U8* names = extraTextureInfo + numUnits * sizeof(SamplerTypeDetails);
 			for ( U32 i = 0; i < numUnits; i++ )
 			{
 				items[i].extraLoc = i;
-				extraTextureInfo[i] = items[i].detail;
+
+				*details++ = items[i].details;
 
 				U8 packedCount = ExtraTextureInfo::BinsForLength( items[i].count );
 				

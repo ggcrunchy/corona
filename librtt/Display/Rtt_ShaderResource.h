@@ -36,14 +36,14 @@ class FormatExtensionList;
 // ----------------------------------------------------------------------------
 
 struct SamplerTypeDetails {
+	bool IsDefault() const { return ( 0 == family ) && ( 0 == target ) && !isImage && !isArray; }
+	bool Matches(const SamplerTypeDetails& rhs) { return 0 == memcmp( this, &rhs, sizeof(*this) ); }
+
 	U8 family : 2;
 	U8 target : 3;
 	U8 isImage : 1;
 	U8 isArray : 1;
 };
-
-// TODO: if this breaks, must instead use index and unpack details, but then need to know where LUT is, etc.
-Rtt_STATIC_ASSERT( sizeof(SamplerTypeDetails) == 1 );
 
 // ----------------------------------------------------------------------------
 
@@ -219,11 +219,11 @@ class ShaderResource
 		static bool GetAddedUsesTime() { return sAddedUsesTime; }
 
 	public:
-		void SetTextureInfo( const U8* info, U8 count, U8 fillInfo[2] );
+		void SetTextureInfo( const U8* info, U8 count, SamplerTypeDetails fillInfo[2] );
 
         S8 GetExtraTextureCount() const { return fExtraTextureCount; }
-        U8 GetFillInfo(int index) const { return fFillTextureInfo[index]; }
-        const U8* GetExtraTextureDetails() const;
+        SamplerTypeDetails GetFillInfo(int index) const { return fFillTextureInfo[index]; }
+        const SamplerTypeDetails* GetExtraTextureDetails() const;
         const U8* GetExtraTextureNames() const;
         
     private:
@@ -245,7 +245,7 @@ class ShaderResource
         const ExtraTextureInfo *fExtraTextureInfo;
         U32 fDetailsCount;
         TimeTransform *fTimeTransform;
-        U8 fFillTextureInfo[2];
+        SamplerTypeDetails fFillTextureInfo[2];
         S8 fExtraTextureCount;
         bool fUsesUniforms;
         bool fUsesTime;

@@ -3482,9 +3482,20 @@ LuaLibDisplay::LuaNewGradientPaint( lua_State *L, int paramsIndex )
 }
 
 struct ArrayData {
-	SharedPtr<TextureResource> tr;
 	const char* name;
 	U8 count;
+	
+	static int Compare( const void* p1, const void* p2 )
+	{
+		const ArrayData* d1 = (const ArrayData*)p1, *d2 = (const ArrayData*)p2;
+
+		return strcmp( d1->name, d2->name );
+	}
+};
+
+struct ArrayDataEx {
+	SharedPtr<TextureResource> tr;
+	ArrayData item;
 };
 
 static bool
@@ -3571,15 +3582,15 @@ GatherExtraPaint( lua_State *L, Array<ArrayData> &arr )
 }
 
 static int
-BuildExtraPaint( lua_State *L, ArrayData &ad )
+BuildExtraPaint( lua_State *L, ArrayDataEx &ad )
 {
-	lua_getfield( L, -1, ad.name );
+	lua_getfield( L, -1, ad.item.name );
 
 	LuaLibDisplay::LuaNewPaint( L, -1, &ad.tr ); // get resource only (no Paint)
 				
 	if ( !ad.tr.IsNull() )
 	{
-		return ExtraTextureInfo::BinsForLength( ad.count );
+		return ExtraTextureInfo::BinsForLength( ad.item.count );
 	}
 	else
 	{
@@ -3588,25 +3599,25 @@ BuildExtraPaint( lua_State *L, ArrayData &ad )
 }
 
 static void
-CommitExtraPaints( CompositePaint *paint, Array<ArrayData> &arr, U32 numExtra, U32 total )
+CommitExtraPaints( CompositePaint *paint, Array<ArrayDataEx> &arr, U32 numExtra, U32 total )
 {
 	paint->PrepareExtraTextures( numExtra, total );
 	
 	U8* nameList = paint->GetNameList();
 	SharedPtr<TextureResource>* textureResourceList = (SharedPtr<TextureResource>*)paint->GetTextureResourceList();
-	for ( int i = 0; i < (int)numExtra; i++ )
+	for ( int i = 0, iMax = arr.Length(); i < iMax; i++ )
 	{
-		if ( 0 == arr[i].count )
+		if ( 0 == arr[i].item.count )
 		{
 			continue;
 		}
 		
-		U32 count = ExtraTextureInfo::BinsForLength( arr[i].count );
+		U32 count = ExtraTextureInfo::BinsForLength( arr[i].item.count );
 		
 		*nameList++ = (U8)count;
 		*textureResourceList++ = arr[i].tr;
 		
-		int n = ExtraTextureInfo::EncodeName( nameList, arr[i].name );
+		int n = ExtraTextureInfo::EncodeName( nameList, arr[i].item.name );
 		
 		Rtt_ASSERT( n == ExtraTextureInfo::Advance( count ) );
 		
@@ -3640,18 +3651,26 @@ LuaLibDisplay::LuaNewCompositePaint( lua_State *L, int paramsIndex )
     if ( paint0 && paint1 )
     {	
 		U32 total = 0, numExtra = 0;
-		Array<ArrayData> arr( LuaContext::GetAllocator( L ) );
+		Array<ArrayDataEx> arr( LuaContext::GetAllocator( L ) );
 
 		lua_getfield( L, paramsIndex, "extraPaints" );
 		if ( lua_istable( L, -1 ) )
 		{
+			Array<ArrayData> prepArr( LuaContext::GetAllocator( L ) );
+			
 			for ( lua_pushnil( L ); lua_next( L, -1 ); lua_pop( L, 1 ) )
 			{
-				GatherExtraPaint( L, arr );
+				GatherExtraPaint( L, prepArr );
 			}
+
+			qsort( arr.WriteAccess(), arr.Length(), sizeof(ArrayData), ArrayData::Compare ); // also done by BACKEND_Program
+
+			arr.Reserve( (U32)prepArr.Length() );
 
 			for ( S32 i = 0, iMax = arr.Length(); i < iMax; i++, lua_pop( L, 1 ) )
 			{
+				arr[i].item = prepArr[i];
+				
 				int count = BuildExtraPaint( L, arr[i] );
 				if ( count > 0 )
 				{
@@ -3661,9 +3680,9 @@ LuaLibDisplay::LuaNewCompositePaint( lua_State *L, int paramsIndex )
 				}
 				else
 				{
-					Rtt_LogException( "WARNING: failed to load %s from `extraPaints`", arr[i].name );
+					Rtt_LogException( "WARNING: failed to load %s from `extraPaints`", arr[i].item.name );
 					
-					arr[i].count = 0; // skip in the commit step
+					arr[i].item.count = 0; // skip in the commit step
 				}
 			}
 		}
