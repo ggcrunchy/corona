@@ -124,8 +124,10 @@ class Shader
 
     public:
         bool IsCompatible( const Geometry* geometry ) const;
-		bool IsPaintConsistent() const;
+		bool IsPaintConsistent( const Paint* paint ) const;
 		bool CanCheckConsistency() const;
+    
+		static bool AreTexturesConsistent( const ShaderResource& resource, const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames );
     
     public:
 		typedef enum : U8
@@ -138,6 +140,21 @@ class Shader
 		
 		void SetSyncState( SyncState newValue ) { fSyncState = newValue; }
 		SyncState GetSyncState() const { return fSyncState; }
+    
+/*
+  https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel, pared back for 6 bits:
+  U16 n = i - ( ( i >> 1 ) & 0x55 )
+  
+  n = ( ( n >> 2 ) & 0x33 ) + ( n & 0x33 );
+  n = ( ( n >> 4 ) + n ) & 0x0F;
+
+ctz:	
+	x ← x ^ (x − 1)
+    return popcount(x) − 1
+
+	// idea here is how units are doled out
+	// and iterating over them as bit flags...
+*/
     
     protected:
         SharedPtr< ShaderResource > fResource;

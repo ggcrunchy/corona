@@ -137,6 +137,25 @@ PaintAdapter::ValueForKey(
     return result;
 }
 
+static Shader::SyncState
+CheckShaderState( const Shader* shader, const Paint* paint )
+{
+	if ( paint->IsType( Paint::kColor ) || paint->IsType( Paint::kGradient ) || paint->IsType( Paint::kCamera ) )
+	{
+		return Shader::kSynced;
+	}
+	else if ( shader->CanCheckConsistency() )
+	{
+		return shader->IsPaintConsistent( paint ) ? Shader::kSynced : Shader::kBroken;
+	}
+// TODO:
+	// no real support, but 
+	// this must also handle "first frame", since the sampler info will still be pending
+	// effect adapter should still "work", but renderer should just see default shader
+	// check that this doesn't mess up texture binding
+	return Shader::kUnsynced;
+}
+
 bool
 PaintAdapter::SetValueForKey(
     LuaUserdataProxy& sender,
@@ -217,42 +236,21 @@ PaintAdapter::SetValueForKey(
                         }
                     }
 
-                    if (shader && !shader->IsCompatible( geometry ))
+                    if ( shader && shader->IsCompatible( geometry ) )
                     {
-                        result = false;
-                    }
-                    
-                    else if (shader)
-                    {
-						if ( paint->IsType( Paint::kColor ) || paint->IsType( Paint::kGradient ) || paint->IsType( Paint::kCamera ) )
+						Shader::SyncState syncState = CheckShaderState( shader, paint );
+						if ( Shader::kBroken != syncState )
 						{
-							shader->SetSyncState( Shader::kSynced );
+							paint->SetShader( shader );
+
+							result = true;
 						}
-						else if ( shader->CanCheckConsistency() )
+						else
 						{
-							if ( shader->IsPaintConsistent() )
-							{
-								shader->SetSyncState( Shader::kSynced );
-							}
-							else
-							{
-								Rtt_LogException( "WARNING: effect `%s` is incompatible with the paint's textures", lua_tostring( L, valueIndex ) );
-								
-								shader->SetSyncState( Shader::kBroken );
-							}
-// TODO:
-	// no real support, but 
-	// this must also handle "first frame", since the sampler info will still be pending
-	// effect adapter should still "work", but renderer should just see default shader
-	// check that this doesn't mess up texture binding
+							Rtt_LogException( "ERROR: paint's textures and `%s`'s samplers are inconsistent", lua_tostring( L, valueIndex ) );
 						}
 						
-						result = Shader::kBroken != shader->GetSyncState();
-                    }
-                    
-                    if ( result )
-                    {
-                        paint->SetShader( shader );
+						shader->SetSyncState( syncState );
                     }
                 }
                 break;

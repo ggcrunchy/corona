@@ -950,14 +950,36 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
         INCREMENT( fStatistics.fProgramBindCount );
         fCurrentProgramMaskCount = MaskCount();
 
-		if ( !fWireframeEnabled && !data->fProgram->IsCurrent( version ) )
+		if ( !fWireframeEnabled && Program::kSynced != data->fProgram->GetSyncingState() )
 		{
-			if ( !data->fProgram->AnyPending() )
+			if ( Program::kNoneSynced == data->fProgram->GetSyncingState() )
 			{
+				data->fProgram->SetPending( version, false ); // ???
+		
 				fProgramsWithUpdateBindings.Append( data->fProgram );
 			}
-			
-			data->fProgram->SetPending( version );
+			else
+			{
+				// can use other?
+			}
+// TODO: we can now simplify this a bit
+	// it was enough that ANY version (for either mod) was bound
+	// but should be fine to say that all versions must be consistent
+	// therefore, if missing, we can take the "first choice" as canonical
+		// use to establish shader consistency (TODO: how do we bubble this back up?)
+		// shader would pass along a paint's blob somehow, maybe with a writeable flag byte (smuggle into TextureList?)
+		// ^^^ last point heavyweight if only using fill(0|1)
+		// could smuggle in via command? (incoming state in low pointer bits...)
+		// if not for wireframe (and isVisible, perhaps), we could do this bookkeeping in Lua-land, on aasignment
+			// if not synced:
+				// try to sync (first frame after shader ready)
+					// ok? (success or broken)
+				// must test fill(0|1) and all textures' details
+				// can issue conditional bind (or unconditional, if broken) on the spot
+					// and conditional restore after Draw()?
+					// will bind if synced
+					// might Bind() first and let other events happen
+		//	data->fProgram->SetPending( version );
 		}
         
         if (shaderData)
@@ -1103,7 +1125,7 @@ Renderer::Swap()
 	// Commit pending first-frame program version syncs.
 	for ( S32 i = 0, iMax = fProgramsWithUpdateBindings.Length(); i < iMax; i++ )
 	{
-		fProgramsWithUpdateBindings[i]->SyncPending();
+		fProgramsWithUpdateBindings[i]->SetSynced(); // TODO: Swap()...
 	}
 
     // Add pending commands

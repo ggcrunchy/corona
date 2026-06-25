@@ -450,52 +450,37 @@ DetailsAgree( const Texture *tex, const SamplerTypeDetails& details )
 }
 
 bool
-Shader::IsPaintConsistent() const
+Shader::AreTexturesConsistent( const ShaderResource& resource, const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames )
 {
-	CompositePaint* compositePaint = NULL;
-	Texture** texturesList = NULL;
-	const Texture *fill0 = NULL, *fill1 = NULL;
-	if ( fOwner->IsType( Paint::kMultitexture ) )
-	{
-		compositePaint = (CompositePaint*)fOwner;
-		texturesList = compositePaint->GetTexturesList();
-		fill0 = compositePaint->GetTexture0();
-		fill1 = compositePaint->GetTexture1();
-	}
-	else
-	{
-		fill0 = fOwner->GetTexture();
-	}
-
-	if ( fill0 && !DetailsAgree( fill0, fResource->GetFillInfo( 0 ) ) )
+	if ( fill0 && !DetailsAgree( fill0, resource.GetFillInfo( 0 ) ) )
 	{
 		Rtt_LogException( "`CoronaSampler0` inconsistent with image in paint1" );
 		return false;
 	}
 	
-	if ( fill1 && !DetailsAgree( fill1, fResource->GetFillInfo( 1 ) ) )
+	if ( fill1 && !DetailsAgree( fill1, resource.GetFillInfo( 1 ) ) )
 	{
 		Rtt_LogException( "`CoronaSampler1` inconsistent with image in paint2" );
 		return false;
 	}
 
-	S32 iMax = fResource->GetExtraTextureCount();
-	const SamplerTypeDetails* shaderDetails = fResource->GetExtraTextureDetails();
-	const U8* shaderNames = fResource->GetExtraTextureNames();
-	const U8* paintNames = compositePaint ? compositePaint->GetNameList() : NULL;
+	S32 iMax = resource.GetExtraTextureCount();
+	const SamplerTypeDetails* shaderDetails = resource.GetExtraTextureDetails();
+	const U8* shaderNames = resource.GetExtraTextureNames();
+	//const U8* paintNames = compositePaint ? compositePaint->GetNameList() : NULL;
 
-	Rtt_ASSERT( iMax <= 0 || ( NULL != texturesList ) );
-	Rtt_ASSERT( ( NULL != texturesList ) == ( NULL != paintNames ) );
+	Rtt_ASSERT( iMax <= 0 || ( NULL != extraTextures ) );
+	Rtt_ASSERT( ( NULL != extraTextures ) == ( NULL != paintNames ) );
 			
 	for ( S32 i = 0; i < iMax; i++ )
 	{
 		U8 count = *shaderNames++;
-		int index = ExtraTextureInfo::FindNameInList( shaderNames, paintNames, compositePaint->GetExtraCount() );
+		int index = ExtraTextureInfo::FindNameInList( shaderNames, paintNames, extraCount );
 		if ( index < 0 )
 		{
 			return ReportError( shaderNames, count, "WARNING: unable to match sampler `%s` with a corresponding texture from the paint" );
 		}
-		else if ( !DetailsAgree( texturesList[i + 2], shaderDetails[i] ) )
+		else if ( !DetailsAgree( extraTextures[i], shaderDetails[i] ) )
 		{
 			return ReportError( shaderNames, count, "WARNING: sampler `%s` inconsistent with image provided in `extraPaints`" );
 		}
@@ -504,6 +489,25 @@ Shader::IsPaintConsistent() const
 	}
 	
 	return true;
+}
+
+bool
+Shader::IsPaintConsistent( const Paint* paint ) const // n.b. shader has no owner yet
+{
+	Rtt_ASSERT( paint );
+	
+	if ( paint->IsType( Paint::kMultitexture ) )
+	{
+		const CompositePaint* compositePaint = (const CompositePaint*)paint;
+		const Texture *fill0 = compositePaint->GetTexture0(), *fill1 = compositePaint->GetTexture1();
+		U32 extraCount = compositePaint->GetExtraCount();
+		Texture** extraTextures = extraCount > 0 ? compositePaint->GetTexturesList() + 2 : NULL;
+		return AreTexturesConsistent( *fResource, fill0, fill1, extraTextures, extraCount, compositePaint->GetNameList() );
+	}
+	else
+	{
+		return AreTexturesConsistent( *fResource, paint->GetTexture(), NULL, NULL, 0, NULL );
+	}
 }
 
 bool
