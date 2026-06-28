@@ -12,6 +12,8 @@
 #include "Core/Rtt_Assert.h"
 #include "Rtt_RenderTypes.h"
 
+#include "Display/Rtt_CompositePaint.h"
+
 // ----------------------------------------------------------------------------
 
 namespace Rtt
@@ -348,6 +350,13 @@ TextureList::IsArray() const
 {
 	uintptr_t asUint = (uintptr_t)fFill1;
 	return ( 0 != ( asUint & 0x1 ) );
+}
+
+const U8*
+TextureList::GetNamesList() const
+{
+	// TODO: count - 2? (need actual policy for possibly-missing fill0, fill1...)
+	return IsArray() ? CompositePaint::GetNameListGivenTextureList( GetArray(), GetCount() - 2 ) : NULL;
 }
 
 U32

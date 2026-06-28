@@ -222,6 +222,8 @@ public:
 	void PointToArray( Texture** texArray, U32 count );
 	bool IsArray() const;
 	
+	const U8* GetNamesList() const;
+	
 	// these two assume we're using an array:
 	U32 GetCount() const;
 	Texture** GetArray() const;

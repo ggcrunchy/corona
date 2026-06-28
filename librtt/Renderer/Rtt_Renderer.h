@@ -39,6 +39,7 @@ class Uniform;
 class RenderingStream;
 class BufferBitmap;
 class ShaderData;
+class ShaderResource;
 struct CustomGraphicsInfo;
 struct TimeTransform;
 
@@ -428,7 +429,7 @@ class Renderer
         bool fCanAddGeometryWriters;
 
 // SAS TODO:
-		LightPtrArray<Program> fProgramsWithUpdateBindings;
+		LightPtrArray<ShaderResource> fShaderResourcesWithPendingBinds;
 		LightPtrArray<Texture> fExtraTextures;
 		U16 fMaxExtraTexturesThisFrame;
 

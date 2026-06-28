@@ -85,7 +85,8 @@ Program::Program( Rtt_Allocator* allocator )
 	fCompilerVerbose( false ),
 	fSyncingState( kNoneSynced),
 	fFirstVersion( 0 ),
-	fIsFirstMod25D( false )
+	fIsFirstMod25D( false ),
+	fIsMod25D( false )
 {
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
 	fCompiledShaders = NULL;
@@ -168,11 +169,11 @@ Program::SetHeaderSource( const char* source )
 }
 
 void
-Program::SetPending( Version v, bool isMod2D )
+Program::SetPending( Version v )
 {
 	fSyncingState = kSyncPending;
 	fFirstVersion = v;
-	fIsFirstMod25D = isMod2D;
+	fIsFirstMod25D = fIsMod25D;
 }
 
 // ----------------------------------------------------------------------------

@@ -28,23 +28,64 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 int
-ExtraTextureInfo::FindNameInList( const U8* name, const U8* listOfNames, int n )
+ExtraTextureInfo::FindNameInList( const U8* name, const U8* listOfNames, int n, int* offset )
 {
-	U8 count = *name++;
+	int countFromName = *name++;
+	const U8* readPos = listOfNames;
 	for ( int i = 0; i < n; ++i )
 	{
-		U8 nameCount = *listOfNames++;
-		if ( ( count == nameCount ) && 0 == memcmp( name, listOfNames, count ) )
+		int countFromList = BinsForLength( *readPos );
+		bool isMatch = ( countFromName == countFromList ) && 0 == memcmp( name, readPos + 1, countFromList );
+		
+		readPos += countFromList + 1;
+
+		if ( isMatch )
 		{
+			if ( NULL != offset )
+			{
+				*offset = (int)( readPos - listOfNames );
+			}
+			
 			return i;
-		}
-		else
-		{
-			listOfNames += nameCount;
 		}
 	}
 	
 	return -1;
+}
+
+bool
+ExtraTextureInfo::ListsMatch( const U8* listOfNames1, const U8* listOfNames2, int n )
+{
+	int offset = 0;
+
+	for ( int i = 0; i < n; ++i )
+	{
+		U8 count1 = listOfNames1[offset];
+		if ( count1 == listOfNames2[offset] )
+		{
+			offset += BinsForLength( count1 ) + 1;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	
+	return 0 == memcmp( listOfNames1, listOfNames2, offset );
+}
+
+U32
+ExtraTextureInfo::NamesSize( const U8* listOfNames, int n )
+{
+	const U8* readPos = listOfNames;
+	for ( int i = 0; i < n; ++i )
+	{
+		int countFromList = *readPos;
+		
+		readPos += BinsForLength( countFromList ) + 1;
+	}
+	
+	return (U32)( readPos - listOfNames );
 }
 
 // Encoding bit layout, for bytes 0-3:
@@ -119,13 +160,15 @@ ExtraTextureInfo::DecodeName( char* name, const U8* buf, int n )
 			( ( b2 & 0xF ) << 2 ) | ( b3 >> 6 ),
 			b3 & 0x3F 
 		};
-		
+				
 		#define PRED( COND, RESULT ) ( ( COND ) ? ( RESULT ) : 0 )
 		#define OFFSET_IN_RANGE( BYTE, NAME ) PRED( ( BYTE >= kMin##NAME ) & ( BYTE - kMin##NAME < kCount##NAME ), kOffset##NAME + BYTE - kMin##NAME )
 	
 		for ( int k = 0; k < 4; ++k )
 		{
 			U8 b = work[k];
+			
+			// could do with LUT instead; at any rate, currently only used for debugging
 			int c = PRED( kOffsetUnderscore == b, '_' ) |
 					OFFSET_IN_RANGE( b, Upper ) | OFFSET_IN_RANGE( b, Lower ) | OFFSET_IN_RANGE( b, Digit );
 
@@ -344,6 +387,10 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
     fShellTransform( NULL ),
 	fTimeTransform( NULL ),
 	fExtraTextureCount( -1 ),
+    fFirstVersion( 0 ),
+	fIsFirstMod25D( false ),
+	fAnyVersionBound( false ),
+	fSyncPending( false ),
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {
@@ -364,6 +411,10 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
     fShellTransform( NULL ),
 	fTimeTransform( NULL ),
 	fExtraTextureCount( -1 ),
+    fFirstVersion( 0 ),
+	fIsFirstMod25D( false ),
+	fAnyVersionBound( false ),
+    fSyncPending( false ),
 	fUsesUniforms( false ),
 	fUsesTime( false )
 {
@@ -477,6 +528,118 @@ ShaderResource::GetExtraTextureNames() const
 
 	return ( fExtraTextureCount > 0 ) ? fExtraTextureInfo->fData + detailsSize : NULL;
 }	
+
+static bool
+ReportError( const U8* name, int count, const char* message )
+{
+	char rawName[ExtraTextureInfo::kMaxNameLength + 1];
+
+	ExtraTextureInfo::DecodeName( rawName, name, count );
+			
+	Rtt_LogException( message, rawName );
+
+	return false;
+}
+
+static bool
+DetailsAgree( const Texture *tex, const SamplerTypeDetails& details )
+{
+	Texture::Format format = tex->GetFormat();
+	if ( format.IsNonCore() )
+	{
+		U32 backingValue = format.GetBackingValue();
+		bool targetsAgree = FormatDetails::GetTarget( backingValue ) == details.target;
+		bool familiesAgree = FormatDetails::GetFamily( backingValue ) == details.family;
+		
+		return targetsAgree && familiesAgree && ( FormatDetails::HasArrayFlag( backingValue ) == details.isArray );
+	}
+	else
+	{
+		return details.IsDefault();
+	}
+}
+
+bool
+ShaderResource::AreTexturesConsistent( const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames ) const
+{
+	if ( fill0 && !DetailsAgree( fill0, GetFillInfo( 0 ) ) )
+	{
+		Rtt_LogException( "`CoronaSampler0` inconsistent with image in paint1" );
+		return false;
+	}
+	
+	if ( fill1 && !DetailsAgree( fill1, GetFillInfo( 1 ) ) )
+	{
+		Rtt_LogException( "`CoronaSampler1` inconsistent with image in paint2" );
+		return false;
+	}
+
+	S32 iMax = GetExtraTextureCount();
+	const SamplerTypeDetails* shaderDetails = GetExtraTextureDetails();
+	const U8* shaderNames = GetExtraTextureNames();
+
+	Rtt_ASSERT( iMax <= 0 || ( NULL != extraTextures ) );
+	Rtt_ASSERT( ( NULL != extraTextures ) == ( NULL != paintNames ) );
+
+	if ( iMax > (int)extraCount )
+	{
+		Rtt_LogException( "WARNING: shader has %i samplers to bind, but only %u textures provided in `extraPaint`", iMax, extraCount );
+		return false;
+	}
+
+	int basePaintIndex = 0, offset = 0; // both name lists are sorted, so avoid searching entire list each iteration
+	for ( S32 i = 0; i < iMax; i++ )
+	{
+		int count = *shaderNames++;
+		int index = ExtraTextureInfo::FindNameInList( shaderNames, &paintNames[offset], extraCount - basePaintIndex, &offset );
+		if ( index < 0 )
+		{
+			return ReportError( shaderNames, count, "WARNING: unable to match sampler `%s` with a corresponding texture from the paint" );
+		}
+		else if ( !DetailsAgree( extraTextures[i], shaderDetails[i] ) )
+		{
+			return ReportError( shaderNames, count, "WARNING: sampler `%s` inconsistent with image provided in `extraPaints`" );
+		}
+
+		basePaintIndex += index;
+		shaderNames += ExtraTextureInfo::Advance( count );
+	}
+	
+	return true;
+}
+
+void
+ShaderResource::PrepareFirstBind( const Program* program, int version )
+{
+	Rtt_ASSERT( !fAnyVersionBound );
+	Rtt_ASSERT( !fSyncPending );
+	Rtt_ASSERT( version < Program::Version::kWireframe );
+	Rtt_ASSERT( program == fPrograms[kDefault] || program == fPrograms[k25D] );
+
+	fSyncPending = true;
+	fFirstVersion = version;
+	fIsFirstMod25D = program == fPrograms[k25D];
+}
+
+void
+ShaderResource::SyncBinding()
+{
+	fAnyVersionBound = true;
+	fSyncPending = false;
+}
+
+const Program*
+ShaderResource::GetFirstBoundProgram() const
+{
+	if ( fAnyVersionBound )
+	{
+		return GetProgramMod( fIsFirstMod25D ? k25D : kDefault );
+	}
+	else
+	{
+		return NULL;
+	}
+}
 
 void
 ShaderResource::SetEffectCallbacks( CoronaEffectCallbacks * callbacks )

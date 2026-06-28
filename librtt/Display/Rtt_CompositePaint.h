@@ -50,6 +50,9 @@ class CompositePaint : public Paint
 		U32 GetExtraCount() const { return fExtraCount; }
 		void* GetTextureResourceList() const; // void* = SharedPtr<TextureResource>*
 		Texture** GetTexturesList() const;
+		
+		static const U8* GetNameListGivenTextureList( Texture** list, U32 extraCount );
+		static const U32 GetNamesSizeGivenTextureList( Texture** list, U32 extraCount );
 //		virtual const MLuaUserdataAdapter& GetAdapter() const;
 
 	private:

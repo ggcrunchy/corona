@@ -188,6 +188,27 @@ CompositePaint::GetNameList() const
 	return fExtraInfo ? fExtraInfo->fData + TextureInfoSize( fExtraCount, true ) : NULL;
 }
 
+const U8*
+CompositePaint::GetNameListGivenTextureList( Texture** list, U32 extraCount )
+{
+	return (const U8*)( list ) + TextureInfoSize( extraCount, true );
+}
+
+const U32
+CompositePaint::GetNamesSizeGivenTextureList( Texture** list, U32 extraCount )
+{
+	const U8* names = (const U8*)( list ) + TextureInfoSize( extraCount, true );
+	const U8* cur = names;
+	for ( U32 i = 0; i < extraCount; i++ )
+	{
+		U32 nameCount = *cur;
+		
+		cur += nameCount + 1;
+	}
+		
+	return (U32)( cur - names );
+}
+
 // ----------------------------------------------------------------------------
 
 } // namespace Rtt

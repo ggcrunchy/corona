@@ -241,16 +241,21 @@ PaintAdapter::SetValueForKey(
 						Shader::SyncState syncState = CheckShaderState( shader, paint );
 						if ( Shader::kBroken != syncState )
 						{
-							paint->SetShader( shader );
+						//	paint->SetShader( shader ); // n.b. we probably want to set the shader anyhow...
 
-							result = true;
+							result = true; // check against existing...
 						}
 						else
 						{
-							Rtt_LogException( "ERROR: paint's textures and `%s`'s samplers are inconsistent", lua_tostring( L, valueIndex ) );
+							Rtt_LogException( "ERROR: some paint textures and `%s` samplers are inconsistent", lua_tostring( L, valueIndex ) );
 						}
 						
 						shader->SetSyncState( syncState );
+                    }
+                    
+                    if ( shader )
+                    {
+						paint->SetShader( shader );
                     }
                 }
                 break;

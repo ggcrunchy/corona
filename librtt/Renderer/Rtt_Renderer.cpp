@@ -175,7 +175,7 @@ Renderer::Renderer( Rtt_Allocator* allocator )
     fGeometryWriters( allocator ),
     fCurrentGeometryWriterList( NULL ),
     fCanAddGeometryWriters( false ),
-    fProgramsWithUpdateBindings( allocator ),
+    fShaderResourcesWithPendingBinds( allocator ),
     fExtraTextures( allocator ),
     fMaxExtraTexturesThisFrame( 0 ),
     fMaskCountIndex( 0 ),
@@ -286,7 +286,7 @@ Renderer::BeginFrame( Real totalTime, Real deltaTime, const TimeTransform *defTi
 
     fTimeDependencyCount = 0;
 
-	fProgramsWithUpdateBindings.Clear();
+	fShaderResourcesWithPendingBinds.Clear();
 	fExtraTextures.Clear();
 	
 	fMaxExtraTexturesThisFrame = 0;
@@ -950,17 +950,58 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
         INCREMENT( fStatistics.fProgramBindCount );
         fCurrentProgramMaskCount = MaskCount();
 
-		if ( !fWireframeEnabled && Program::kSynced != data->fProgram->GetSyncingState() )
+		if ( !fWireframeEnabled && Program::kSynced != data->fProgram->GetSyncingState() ) // since we're already here and have sr, can just look at list?
 		{
+			// TODO: already broken? (this is Paint granularity, not Program...)
+				// keep one writable byte before names? (actually only need two bits...)
+				// in full generality we need this even with fill texture(s), although maybe trivial if we can just decide almost immediately
+
+			const U8* paintNames = extraTextureCount > 0 ? data->fTextures.GetNamesList() : NULL;
+			const Program* refProgram = shaderResource->GetFirstBoundProgram();
+			if ( NULL != refProgram )
+			{
+				if ( shaderResource->AreTexturesConsistent( fillTexture0, fillTexture1, fExtraTextures.WriteAccess(), extraTextureCount, paintNames ) )
+				{
+					//
+				//	data->fProgram->SetSynced();
+				}
+				else
+				{
+					// broken! (can we also set this on the other path? assuming program is at hand... maybe bad to treat as writable?)
+					// set renderer state -> broken (clear preemptively when binding program)
+					// if set, do SetBroken() before Draw(), restore afterward
+				}
+    
+				// decide if synced...
+					// yes? good to go!
+					// no? set broken = true, still doing normal BindProgram(); issue commands around Draw() to temporarily bind default shader
+			}
+			else if ( !shaderResource->IsSyncPending() )
+			{
+				ShaderResource* sr = const_cast<ShaderResource*>( shaderResource );
+				sr->PrepareFirstBind( data->fProgram, version );
+
+				fShaderResourcesWithPendingBinds.Append( sr );
+					// set broken = maybe... copy TextureResource*, n, details, names into command, else like "broken" case
+					
+				/*
+				SetValidateBind(
+					fillTexture0
+					fillTexture0
+					fExtraTextures.WriteAccess()
+					extraTextureCount
+					paintNames
+				);
+				*/
+			}
+
 			if ( Program::kNoneSynced == data->fProgram->GetSyncingState() )
 			{
-				data->fProgram->SetPending( version, false ); // ???
-		
-				fProgramsWithUpdateBindings.Append( data->fProgram );
-			}
-			else
-			{
-				// can use other?
+// TODO: this really belongs in the ShaderResource, since ANY version + mod should
+// be able to serve as gfound truth... then "resources" with pending binds
+// actually Program does indicate it's pending, but ShaderResource has the "any
+// bound?" state... if that's true we can CheckConsistency() now and then assign
+// the sync state
 			}
 // TODO: we can now simplify this a bit
 	// it was enough that ANY version (for either mod) was bound
@@ -1123,9 +1164,9 @@ Renderer::Swap()
     fInstancingGeometryPool->Swap();
 
 	// Commit pending first-frame program version syncs.
-	for ( S32 i = 0, iMax = fProgramsWithUpdateBindings.Length(); i < iMax; i++ )
+	for ( S32 i = 0, iMax = fShaderResourcesWithPendingBinds.Length(); i < iMax; i++ )
 	{
-		fProgramsWithUpdateBindings[i]->SetSynced(); // TODO: Swap()...
+		fShaderResourcesWithPendingBinds[i]->SyncBinding(); // TODO: Swap()...
 	}
 
     // Add pending commands

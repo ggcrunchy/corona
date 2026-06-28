@@ -126,10 +126,10 @@ class Shader
         bool IsCompatible( const Geometry* geometry ) const;
 		bool IsPaintConsistent( const Paint* paint ) const;
 		bool CanCheckConsistency() const;
-    
-		static bool AreTexturesConsistent( const ShaderResource& resource, const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames );
-    
+
     public:
+		// TODO: must make some mutable stuff for Renderer::Insert(), with this as the basics
+    
 		typedef enum : U8
 		{
 			kUnsynced, // unable to resolve textures at creation; must try on the fly

@@ -419,78 +419,6 @@ Shader::IsCompatible( const Geometry* geometry ) const
     return FormatExtensionList::Compatible( shaderList, geometry->GetExtensionList() );
 }
 
-static bool
-ReportError( const U8* name, U8 count, const char* message )
-{
-	char rawName[ExtraTextureInfo::kMaxNameLength + 1];
-
-	ExtraTextureInfo::DecodeName( rawName, name, count );
-			
-	Rtt_LogException( message, rawName );
-
-	return false;
-}
-
-static bool
-DetailsAgree( const Texture *tex, const SamplerTypeDetails& details )
-{
-	Texture::Format format = tex->GetFormat();
-	if ( format.IsNonCore() )
-	{
-		U32 backingValue = format.GetBackingValue();
-		bool targetsAgree = FormatDetails::GetTarget( backingValue ) == details.target;
-		bool familiesAgree = FormatDetails::GetFamily( backingValue ) == details.family;
-		
-		return targetsAgree && familiesAgree && ( FormatDetails::HasArrayFlag( backingValue ) == details.isArray );
-	}
-	else
-	{
-		return details.IsDefault();
-	}
-}
-
-bool
-Shader::AreTexturesConsistent( const ShaderResource& resource, const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames )
-{
-	if ( fill0 && !DetailsAgree( fill0, resource.GetFillInfo( 0 ) ) )
-	{
-		Rtt_LogException( "`CoronaSampler0` inconsistent with image in paint1" );
-		return false;
-	}
-	
-	if ( fill1 && !DetailsAgree( fill1, resource.GetFillInfo( 1 ) ) )
-	{
-		Rtt_LogException( "`CoronaSampler1` inconsistent with image in paint2" );
-		return false;
-	}
-
-	S32 iMax = resource.GetExtraTextureCount();
-	const SamplerTypeDetails* shaderDetails = resource.GetExtraTextureDetails();
-	const U8* shaderNames = resource.GetExtraTextureNames();
-	//const U8* paintNames = compositePaint ? compositePaint->GetNameList() : NULL;
-
-	Rtt_ASSERT( iMax <= 0 || ( NULL != extraTextures ) );
-	Rtt_ASSERT( ( NULL != extraTextures ) == ( NULL != paintNames ) );
-			
-	for ( S32 i = 0; i < iMax; i++ )
-	{
-		U8 count = *shaderNames++;
-		int index = ExtraTextureInfo::FindNameInList( shaderNames, paintNames, extraCount );
-		if ( index < 0 )
-		{
-			return ReportError( shaderNames, count, "WARNING: unable to match sampler `%s` with a corresponding texture from the paint" );
-		}
-		else if ( !DetailsAgree( extraTextures[i], shaderDetails[i] ) )
-		{
-			return ReportError( shaderNames, count, "WARNING: sampler `%s` inconsistent with image provided in `extraPaints`" );
-		}
-
-		shaderNames += ExtraTextureInfo::Advance( count );
-	}
-	
-	return true;
-}
-
 bool
 Shader::IsPaintConsistent( const Paint* paint ) const // n.b. shader has no owner yet
 {
@@ -502,11 +430,11 @@ Shader::IsPaintConsistent( const Paint* paint ) const // n.b. shader has no owne
 		const Texture *fill0 = compositePaint->GetTexture0(), *fill1 = compositePaint->GetTexture1();
 		U32 extraCount = compositePaint->GetExtraCount();
 		Texture** extraTextures = extraCount > 0 ? compositePaint->GetTexturesList() + 2 : NULL;
-		return AreTexturesConsistent( *fResource, fill0, fill1, extraTextures, extraCount, compositePaint->GetNameList() );
+		return fResource->AreTexturesConsistent( fill0, fill1, extraTextures, extraCount, compositePaint->GetNameList() );
 	}
 	else
 	{
-		return AreTexturesConsistent( *fResource, paint->GetTexture(), NULL, NULL, 0, NULL );
+		return fResource->AreTexturesConsistent( paint->GetTexture(), NULL, NULL, 0, NULL );
 	}
 }
 

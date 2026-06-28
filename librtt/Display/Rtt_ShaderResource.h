@@ -31,13 +31,14 @@ namespace Rtt
 
 class Program;
 class ShaderData;
+class Texture;
 class FormatExtensionList;
 
 // ----------------------------------------------------------------------------
 
 struct SamplerTypeDetails {
 	bool IsDefault() const { return ( 0 == family ) && ( 0 == target ) && !isImage && !isArray; }
-	bool Matches(const SamplerTypeDetails& rhs) { return 0 == memcmp( this, &rhs, sizeof(*this) ); }
+	bool Matches( const SamplerTypeDetails& rhs) const { return 0 == memcmp( this, &rhs, sizeof(*this) ); }
 
 	U8 family : 2;
 	U8 target : 3;
@@ -50,22 +51,28 @@ struct SamplerTypeDetails {
 struct ExtraTextureInfo
 {
 	// The info is a big blob of bytes, used by shaders and paints in
-	// slightly different ways to hold some associated data. In each
-	// case, part of the payload is an optional list of names.
+	// slightly different ways. Both cases include a list of names.
 
-	// Names themselves are stored as a byte (a 6-bit length, with two
-	// bits reserved for flags), followed by the packed representation.
+	// Counts are 6-bit values, per the details that follow, and can
+	// be stored in a byte. One of the leftover bits is reserved as
+	// a behavior flag, e.g. "uses compression", to be interpreted
+	// in the same way by both shaders and paints; the high bit is
+	// intended for "local" use.
+
+	// At the moment, counts are interspersed between names. While
+	// slightly wasteful in the general case, owing to padding, it
+	// does make for a simpler decoding process.
 
 	enum {
 		// Names are basically "identifiers" as in C89 or GLSL, i.e.
 		// some combination of underscores, ASCII letters, and non-
-		// leading digits with a terminating NUL byte, that fit neatly
-		// into 6-bits (a Base64-style encoding). Every three bytes
-		// can thus hold four such elements, and we can eke out longer
-		// names by storing the count in terms of triples instead.
-		// (For purposes of the length, the terminating NUL is not
-		// included; however, names with non-multiple-of-3 lengths
-		// are padded with trailing NULs.)
+		// leading digits with a terminating NUL byte, which lends
+		// itself perfectly to a Base64-style, 6-bits-per-element
+		// encoding. Every three bytes can thus hold four of these
+		// elements, and we can eke out longer names by storing the
+		// count in terms of triples instead. (For purposes of this
+		// length, the terminating NUL is not included. Also, NULs
+		// will be added to pad any shortfall in the final triple.)
 		kMaxPackedNameCount = 64,
 		kMaxPackedNameLength = kMaxPackedNameCount * 3,
 	
@@ -97,13 +104,15 @@ struct ExtraTextureInfo
 	static U32 BinsForLength( U32 length ) { return ( length + 3 ) / 4; }
 	static U32 Advance( U32 binCount ) { return binCount * 3; }
 	
-	static int FindNameInList( const U8* name, const U8* listOfNames, int n );
+	static int FindNameInList( const U8* name, const U8* listOfNames, int n, int* offset = NULL );
+	static bool ListsMatch( const U8* listOfNames1, const U8* listOfNames2, int n );
+	static U32 NamesSize( const U8* listOfNames, int n );
 	static int EncodeName( U8* buf, const char* name, int kmask = kMaxPackedNameLength - 1 );
 	static int EncodeNameNoAlloc( const char* name );
 	static void DecodeName( char* name, const U8* buf, int n );
 
-	// In the above, `name` must have a terminating NUL (when encoding) or an
-	// extra character for the same (when decoding).
+	// N.B. `name` must have a terminating NUL (when encoding) or an
+	// extra slot to receive the same (when decoding).
 
 	U8 *fData;
 };
@@ -225,6 +234,18 @@ class ShaderResource
         SamplerTypeDetails GetFillInfo(int index) const { return fFillTextureInfo[index]; }
         const SamplerTypeDetails* GetExtraTextureDetails() const;
         const U8* GetExtraTextureNames() const;
+
+	public:
+		bool AreTexturesConsistent( const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames ) const;
+
+	public:
+		const Program* GetFirstBoundProgram() const;
+
+		bool IsSyncPending() const { return fSyncPending; }
+		bool IsFirstBoundMod25D() const { return fIsFirstMod25D; }
+		int GetFirstBoundVersion() const { return fFirstVersion; }
+		void PrepareFirstBind( const Program* program, int version );
+		void SyncBinding();
         
     private:
         void Init(Program *defaultProgram);
@@ -247,6 +268,10 @@ class ShaderResource
         TimeTransform *fTimeTransform;
         SamplerTypeDetails fFillTextureInfo[2];
         S8 fExtraTextureCount;
+        U8 fFirstVersion : 2;
+        U8 fIsFirstMod25D : 1;
+        U8 fAnyVersionBound : 1;
+        U8 fSyncPending : 1;
         bool fUsesUniforms;
         bool fUsesTime;
         
