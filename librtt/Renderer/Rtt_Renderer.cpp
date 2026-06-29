@@ -192,7 +192,8 @@ Renderer::Renderer( Rtt_Allocator* allocator )
     fRenderDataCount( 0 ),
 	fVertexOffset( 0 ),
 	fCurrentGeometry( NULL ),
-    fTimeDependencyCount( 0 )
+    fTimeDependencyCount( 0 ),
+    fGuardDraw()
 {
     // Always have at least 1 mask count.
     fMaskCount.Append( 0 );
@@ -289,6 +290,7 @@ Renderer::BeginFrame( Real totalTime, Real deltaTime, const TimeTransform *defTi
 	fShaderResourcesWithPendingBinds.Clear();
 	fExtraTextures.Clear();
 	
+	fGuardDraw.fIsValid = false;
 	fMaxExtraTexturesThisFrame = 0;
     
     DEBUG_PRINT( "--Begin Frame: Renderer--\n" );
@@ -580,7 +582,7 @@ DoExtraTexturesDiffer( const LightPtrArray<Texture>& extraTextures, const Textur
 }
 
 void
-Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
+Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderDataState* renderDataState )
 {
     // For debug visualization, the number of insertions may be limited
     if( fInsertionCount++ > fInsertionLimit )
@@ -950,31 +952,32 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
         INCREMENT( fStatistics.fProgramBindCount );
         fCurrentProgramMaskCount = MaskCount();
 
-		if ( !fWireframeEnabled && Program::kSynced != data->fProgram->GetSyncingState() ) // since we're already here and have sr, can just look at list?
-		{
-			// TODO: already broken? (this is Paint granularity, not Program...)
-				// keep one writable byte before names? (actually only need two bits...)
-				// in full generality we need this even with fill texture(s), although maybe trivial if we can just decide almost immediately
+		bool usesTextures = ( NULL != fillTexture0 ) || ( NULL != fillTexture1 ) || ( extraTextureCount > 0 );
+		
+		Rtt_ASSERT( NULL != renderDataState || !usesTextures ); // allow for color shader, e.g. for physics rendering
 
+		bool isUnsynced = usesTextures && RenderDataState::kSyncConsistent != renderDataState->GetSyncState() ;
+
+		if ( !fWireframeEnabled && isUnsynced ) // since we're already here and have sr, can just look at list?
+		{
 			const U8* paintNames = extraTextureCount > 0 ? data->fTextures.GetNamesList() : NULL;
 			const Program* refProgram = shaderResource->GetFirstBoundProgram();
 			if ( NULL != refProgram )
 			{
 				if ( shaderResource->AreTexturesConsistent( fillTexture0, fillTexture1, fExtraTextures.WriteAccess(), extraTextureCount, paintNames ) )
 				{
-					//
-				//	data->fProgram->SetSynced();
+					renderDataState->SetSyncState( RenderDataState::kSyncConsistent );
 				}
 				else
 				{
-					// broken! (can we also set this on the other path? assuming program is at hand... maybe bad to treat as writable?)
-					// set renderer state -> broken (clear preemptively when binding program)
-					// if set, do SetBroken() before Draw(), restore afterward
+					fGuardDraw.fList.Clear(); // syncing only meaningful when we have textures, so empty list interpreted as broken
+				
+					fGuardDraw.fIsValid = true;
+					fGuardDraw.fIsMod25 = data->fProgram == shaderResource->GetProgramMod( ShaderResource::k25D );
+				
+					renderDataState->SetSyncState( RenderDataState::kSyncInconsistent );
 				}
-    
-				// decide if synced...
-					// yes? good to go!
-					// no? set broken = true, still doing normal BindProgram(); issue commands around Draw() to temporarily bind default shader
+				// ^^^ in theory we can now retire SOME "extra info"
 			}
 			else if ( !shaderResource->IsSyncPending() )
 			{
@@ -982,45 +985,15 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData )
 				sr->PrepareFirstBind( data->fProgram, version );
 
 				fShaderResourcesWithPendingBinds.Append( sr );
-					// set broken = maybe... copy TextureResource*, n, details, names into command, else like "broken" case
-					
-				/*
-				SetValidateBind(
-					fillTexture0
-					fillTexture0
-					fExtraTextures.WriteAccess()
-					extraTextureCount
-					paintNames
-				);
-				*/
-			}
 
-			if ( Program::kNoneSynced == data->fProgram->GetSyncingState() )
-			{
-// TODO: this really belongs in the ShaderResource, since ANY version + mod should
-// be able to serve as gfound truth... then "resources" with pending binds
-// actually Program does indicate it's pending, but ShaderResource has the "any
-// bound?" state... if that's true we can CheckConsistency() now and then assign
-// the sync state
+				//	fGuardDraw.fList.PointToArray(Texture **texArray, U32 count)
+					// should be full list... but that can oversupply us... need to whittle down choices if > shader
+					// we could use extraTextures but need to verify the memory stays stable up to Draw()...
+				
+				fGuardDraw.fIsValid = true;
+				fGuardDraw.fNames = paintNames;
+				fGuardDraw.fIsMod25 = data->fProgram == shaderResource->GetProgramMod( ShaderResource::k25D );
 			}
-// TODO: we can now simplify this a bit
-	// it was enough that ANY version (for either mod) was bound
-	// but should be fine to say that all versions must be consistent
-	// therefore, if missing, we can take the "first choice" as canonical
-		// use to establish shader consistency (TODO: how do we bubble this back up?)
-		// shader would pass along a paint's blob somehow, maybe with a writeable flag byte (smuggle into TextureList?)
-		// ^^^ last point heavyweight if only using fill(0|1)
-		// could smuggle in via command? (incoming state in low pointer bits...)
-		// if not for wireframe (and isVisible, perhaps), we could do this bookkeeping in Lua-land, on aasignment
-			// if not synced:
-				// try to sync (first frame after shader ready)
-					// ok? (success or broken)
-				// must test fill(0|1) and all textures' details
-				// can issue conditional bind (or unconditional, if broken) on the spot
-					// and conditional restore after Draw()?
-					// will bind if synced
-					// might Bind() first and let other events happen
-		//	data->fProgram->SetPending( version );
 		}
         
         if (shaderData)
@@ -1724,6 +1697,12 @@ Renderer::CheckAndInsertDrawCommand()
 {
     if( fRenderDataCount != 0 )
     {
+		if( fGuardDraw.fIsValid )
+		{
+			ShaderResource::ProgramMod mod = fGuardDraw.fIsMod25 ? ShaderResource::k25D : ShaderResource::kDefault;
+			fBackCommandBuffer->CheckTextureConsistency( fDefaultPrograms[mod], &fGuardDraw.fList, fGuardDraw.fNames );
+		}
+	
         if( fPreviousPrimitiveType == Geometry::kIndexedTriangles )
         {
             fBackCommandBuffer->DrawIndexed( fIndexOffset, fIndexCount, fPreviousPrimitiveType );
@@ -1733,6 +1712,13 @@ Renderer::CheckAndInsertDrawCommand()
             fBackCommandBuffer->Draw( fVertexOffset, fVertexCount - fDegenerateVertexCount, fPreviousPrimitiveType );
         }
         INCREMENT( fStatistics.fDrawCallCount );
+
+		if( fGuardDraw.fIsValid )
+		{
+			fBackCommandBuffer->RestoreConsistency();
+			
+			fGuardDraw.fIsValid = false;
+		}
 
         if( fStatisticsEnabled )
         {

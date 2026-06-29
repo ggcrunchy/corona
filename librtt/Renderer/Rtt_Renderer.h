@@ -41,6 +41,7 @@ class BufferBitmap;
 class ShaderData;
 class ShaderResource;
 struct CustomGraphicsInfo;
+struct RenderDataState;
 struct TimeTransform;
 
 // ----------------------------------------------------------------------------
@@ -152,7 +153,7 @@ class Renderer
 
 		// Generate the minimum set of commands needed to ensure that the given
 		// RenderData is properly drawn on the next call to Render().
-		void Insert( const RenderData* data, const ShaderData * shaderData = NULL );
+		void Insert( const RenderData* data, const ShaderData * shaderData = NULL, RenderDataState * renderDataState = NULL );
 
         // Render all data added since the last call to swap(). It is both safe
         // and expected that Render() is called while another thread is adding
@@ -428,18 +429,26 @@ class Renderer
         const GeometryWriter* fCurrentGeometryWriterList; // to detect change in writer; assumed to be stable object, i.e. either NULL (default) or some static array
         bool fCanAddGeometryWriters;
 
-// SAS TODO:
 		LightPtrArray<ShaderResource> fShaderResourcesWithPendingBinds;
 		LightPtrArray<Texture> fExtraTextures;
 		U16 fMaxExtraTexturesThisFrame;
-
+		
+		struct GuardInfo {
+			GuardInfo() : fNames( NULL ), fIsMod25( false ), fIsValid( false ) {}
+			
+			TextureList fList;
+			const U8* fNames;
+			bool fIsMod25;
+			bool fIsValid;
+		};
+		
+		GuardInfo fGuardDraw;
 		// GetLightPtrArray() (then can reserve)
 			// something to set dirty
 // get() with index < len: null
 		// how do we populate these without blowing up RenderData?
 			// something particular to, say, composite shaders?
 			// should behave like a normal texture when shader has fewer textures...
-// /SAS TODO
 };
 
 // ----------------------------------------------------------------------------

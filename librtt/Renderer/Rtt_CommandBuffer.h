@@ -104,6 +104,10 @@ class CommandBuffer
         virtual void Clear( Real r, Real g, Real b, Real a ) = 0;
         virtual void Draw( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
         virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
+        
+        virtual void CheckTextureConsistency( Program* defaultProgram, const TextureList* list, const U8* extraNames ) {}
+        virtual void RestoreConsistency() {}
+        
         virtual S32 GetCachedParam( CommandBuffer::QueryableParams param ) = 0;
 
         virtual void AddCommand( const CoronaCommand * command ) = 0;

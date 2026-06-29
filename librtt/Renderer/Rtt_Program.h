@@ -92,13 +92,6 @@ class Program : public CPUResource
 		bool IsCompilerVerbose() const { return fCompilerVerbose; }
 		void SetCompilerVerbose( bool newValue ) { fCompilerVerbose = newValue; }
 
-	public:
-		enum SyncingState : U8 { kNoneSynced, kSyncPending, kSynced }; 
-		
-		SyncingState GetSyncingState() const { return fSyncingState; }
-		void SetPending( Version v );
-		void SetSynced() { fSyncingState = kSynced; }
-
 	private:
 		char *fVertexShaderSource;
 		char *fFragmentShaderSource;
@@ -111,10 +104,6 @@ class Program : public CPUResource
 
 		ShaderResource *fResource;
 		
-		SyncingState fSyncingState : 2; // one of the above three states
-		U8 fFirstVersion : 2; // if not "none synced", the first non-wireframe version bound
-		U8 fIsFirstMod25D : 1; // similarly, whether that version is a 2.5D mod, rather than default
-		U8 fIsMod25D : 1;
 		bool fCompilerVerbose;
 };
 

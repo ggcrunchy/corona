@@ -82,11 +82,7 @@ Program::Program( Rtt_Allocator* allocator )
 	fHeaderSource( NULL ),
 	fVertexShellNumLines( 0 ),
 	fFragmentShellNumLines( 0 ),
-	fCompilerVerbose( false ),
-	fSyncingState( kNoneSynced),
-	fFirstVersion( 0 ),
-	fIsFirstMod25D( false ),
-	fIsMod25D( false )
+	fCompilerVerbose( false )
 {
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
 	fCompiledShaders = NULL;
@@ -166,14 +162,6 @@ void
 Program::SetHeaderSource( const char* source )
 {
 	SetSource( &fHeaderSource, source );
-}
-
-void
-Program::SetPending( Version v )
-{
-	fSyncingState = kSyncPending;
-	fFirstVersion = v;
-	fIsFirstMod25D = fIsMod25D;
 }
 
 // ----------------------------------------------------------------------------

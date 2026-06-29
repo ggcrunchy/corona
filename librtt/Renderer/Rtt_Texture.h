@@ -219,8 +219,10 @@ public:
 	Texture* GetFill0() const;
 	Texture* GetFill1() const;
 
+	void Clear() { *this = TextureList(); }
 	void PointToArray( Texture** texArray, U32 count );
 	bool IsArray() const;
+	bool IsEmpty() const { return ( NULL == fFill0 ) && ( NULL == fFill1 ); }
 	
 	const U8* GetNamesList() const;
 	

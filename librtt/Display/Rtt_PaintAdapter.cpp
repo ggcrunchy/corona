@@ -137,23 +137,19 @@ PaintAdapter::ValueForKey(
     return result;
 }
 
-static Shader::SyncState
+static RenderDataState::SyncState
 CheckShaderState( const Shader* shader, const Paint* paint )
 {
 	if ( paint->IsType( Paint::kColor ) || paint->IsType( Paint::kGradient ) || paint->IsType( Paint::kCamera ) )
 	{
-		return Shader::kSynced;
+		return RenderDataState::kSyncConsistent;
 	}
 	else if ( shader->CanCheckConsistency() )
 	{
-		return shader->IsPaintConsistent( paint ) ? Shader::kSynced : Shader::kBroken;
+		return shader->IsPaintConsistent( paint ) ? RenderDataState::kSyncConsistent : RenderDataState::kSyncInconsistent;
 	}
-// TODO:
-	// no real support, but 
-	// this must also handle "first frame", since the sampler info will still be pending
-	// effect adapter should still "work", but renderer should just see default shader
-	// check that this doesn't mess up texture binding
-	return Shader::kUnsynced;
+
+	return RenderDataState::kUnsynced;
 }
 
 bool
@@ -238,8 +234,8 @@ PaintAdapter::SetValueForKey(
 
                     if ( shader && shader->IsCompatible( geometry ) )
                     {
-						Shader::SyncState syncState = CheckShaderState( shader, paint );
-						if ( Shader::kBroken != syncState )
+						RenderDataState::SyncState syncState = CheckShaderState( shader, paint );
+						if ( RenderDataState::kSyncInconsistent != syncState )
 						{
 						//	paint->SetShader( shader ); // n.b. we probably want to set the shader anyhow...
 
@@ -250,7 +246,9 @@ PaintAdapter::SetValueForKey(
 							Rtt_LogException( "ERROR: some paint textures and `%s` samplers are inconsistent", lua_tostring( L, valueIndex ) );
 						}
 						
-						shader->SetSyncState( syncState );
+						RenderDataState rds = { shader->GetRenderDataState() };
+						
+						rds.SetSyncState( syncState );
                     }
                     
                     if ( shader )

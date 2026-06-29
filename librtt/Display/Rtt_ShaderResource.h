@@ -111,10 +111,31 @@ struct ExtraTextureInfo
 	static int EncodeNameNoAlloc( const char* name );
 	static void DecodeName( char* name, const U8* buf, int n );
 
-	// N.B. `name` must have a terminating NUL (when encoding) or an
+	// N.B. name`must have a terminating NUL (when encoding) or an
 	// extra slot to receive the same (when decoding).
 
 	U8 *fData;
+};
+
+// ----------------------------------------------------------------------------
+
+// This is mutable state related to RenderData that might possibly
+// be resolved via Renderer::Insert(), as an inout argument.
+struct RenderDataState {
+	enum SyncState {
+		kUnsynced, // not yet able to check for consistency
+		kSyncConsistent, // sync attempt made and successful
+		kSyncInconsistent, // sync attempt failed
+	};
+	
+	enum {
+		kSyncMask = 0x3
+	};
+	
+	void SetSyncState( SyncState state ) { *fState = ( state & kSyncMask ); }
+	SyncState GetSyncState() const { return (SyncState)( *fState & kSyncMask ); }
+	
+	int *fState;
 };
 
 // ----------------------------------------------------------------------------

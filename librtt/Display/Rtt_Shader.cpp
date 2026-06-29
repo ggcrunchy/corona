@@ -54,7 +54,7 @@ Shader::Shader( Rtt_Allocator *allocator, const SharedPtr< ShaderResource >& res
 	fOutputReady( false ),
 	fDirty(false),
     fIsDrawing( false ),
-    fSyncState( kUnsynced )
+    fRenderDataState( 0 )
 {
     Rtt_ASSERT( resource.NotNull() );
     if ( data )
@@ -77,7 +77,7 @@ Shader::Shader()
 	fOutputReady( false ),
 	fDirty(false),
     fIsDrawing( false ),
-    fSyncState( kUnsynced )
+    fRenderDataState( 0 )
 {
 
 }
@@ -229,7 +229,9 @@ Shader::RenderToTexture( Renderer& renderer, Geometry& cache ) const
 				renderer.Clear( 0.0f, 0.0f, 0.0f, 0.0f );
 				renderer.BeginDrawing();
 				
-				renderer.Insert( fRenderData, GetData() );
+				RenderDataState rds = { &fRenderDataState };
+				
+				renderer.Insert( fRenderData, GetData(), &rds );
 			}
 			renderer.PopMaskCount();
 		}
@@ -289,7 +291,10 @@ Shader::Draw( Renderer& renderer, const RenderData& objectData, const GeometryWr
     {
         // No-op
         renderer.TallyTimeDependency( fResource->UsesTime() );
-        renderer.Insert( & objectData, GetData() );
+
+		RenderDataState rds = { &fRenderDataState };
+				
+        renderer.Insert( & objectData, GetData(), &rds );
     }
 
     DoAnyAfterDraw( state, renderer, objectData );
@@ -441,7 +446,9 @@ Shader::IsPaintConsistent( const Paint* paint ) const // n.b. shader has no owne
 bool
 Shader::CanCheckConsistency() const
 {
-	return kUnsynced == GetSyncState() && fResource->GetExtraTextureCount() < 0;
+	RenderDataState rds = { GetRenderDataState() };
+	
+	return ( RenderDataState::kUnsynced == rds.GetSyncState() ) && fResource->GetExtraTextureCount() < 0;
 }
 
 // ----------------------------------------------------------------------------

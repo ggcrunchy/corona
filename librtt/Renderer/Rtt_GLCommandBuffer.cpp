@@ -82,6 +82,8 @@ namespace /*anonymous*/
         kCommandClear,
         kCommandDraw,
         kCommandDrawIndexed,
+        kCommandCheckConsistency,
+        kCommandRestoreConsistency,
         kNumCommands
     };
 
@@ -795,6 +797,47 @@ GLCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
     Write<GLsizei>(count);
 }
 
+void
+GLCommandBuffer::CheckTextureConsistency( Program* defaultProgram, const TextureList* list, const U8* extraNames )
+{
+return;
+//	WRITE_COMMAND( kCommandCheckConsistency );
+	Write<GPUResource*>( defaultProgram->GetGPUResource() );
+	if ( list->IsEmpty() )
+	{
+		Write<S16>( -1 );
+	}
+	else
+	{
+		Write<S16>( list->GetCount() );
+
+		SamplerTypeDetails* details = (SamplerTypeDetails*)Reserve( list->GetCount() * sizeof(SamplerTypeDetails) );
+		if ( !list->IsArray() )
+		{
+		//	list->GetFill0();
+		//	list->GetFill1();
+		}
+		else
+		{
+			for ( int i = 0; i < list->GetCount(); i++ )
+			{
+				// just copy these...
+			}
+			
+			U32 size = ExtraTextureInfo::NamesSize( extraNames, list->GetCount() ); // - 2?
+			U8* names = Reserve( size );
+			memcpy( names, extraNames, size );
+				// ^^^ could possibly just stash the pointer, but this seems fine
+		}
+	}
+}
+
+void
+GLCommandBuffer::RestoreConsistency()
+{
+//	WRITE_COMMAND( kRestoreConsistency );
+}
+
 S32
 GLCommandBuffer::GetCachedParam( CommandBuffer::QueryableParams param )
 {
@@ -1385,6 +1428,16 @@ GLCommandBuffer::Execute( bool measureGPU )
                     instanceCount = 0;
                 }
                 CHECK_ERROR_AND_BREAK;
+            }
+            case kCommandCheckConsistency:
+            {
+				// TODO!
+				CHECK_ERROR_AND_BREAK;
+            }
+            case kCommandRestoreConsistency:
+            {
+				// TODO!
+				CHECK_ERROR_AND_BREAK;
             }
             default:
             {

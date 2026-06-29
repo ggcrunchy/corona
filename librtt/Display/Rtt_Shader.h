@@ -39,6 +39,7 @@ class FrameBufferObject;
 class Display;
 class Paint;
 struct RenderData;
+struct RenderDataState;
 struct GeometryWriter;
 class Renderer;
 class ShaderData;
@@ -126,21 +127,9 @@ class Shader
         bool IsCompatible( const Geometry* geometry ) const;
 		bool IsPaintConsistent( const Paint* paint ) const;
 		bool CanCheckConsistency() const;
-
+    
     public:
-		// TODO: must make some mutable stuff for Renderer::Insert(), with this as the basics
-    
-		typedef enum : U8
-		{
-			kUnsynced, // unable to resolve textures at creation; must try on the fly
-			kSynced, // successfully synced
-			kBroken // made unsuccessfuly attempt to sync; shader exists but effectively unusable
-		}
-		SyncState;
-		
-		void SetSyncState( SyncState newValue ) { fSyncState = newValue; }
-		SyncState GetSyncState() const { return fSyncState; }
-    
+		int* GetRenderDataState() const { return &fRenderDataState; }
 /*
   https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel, pared back for 6 bits:
   U16 n = i - ( ( i >> 1 ) & 0x55 )
@@ -165,7 +154,7 @@ ctz:
         FrameBufferObject *fFBO;
         Texture *fTexture;
         const Shader *fRoot; // Weak reference
-        SyncState fSyncState;
+        mutable int fRenderDataState; // state that may be modified by Renderer::Insert()
         
         
         // Cache for a shader's output
