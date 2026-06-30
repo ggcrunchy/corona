@@ -437,18 +437,13 @@ class Renderer
 			GuardInfo() : fNames( NULL ), fIsMod25( false ), fIsValid( false ) {}
 			
 			TextureList fList;
+			Program* fPrevious;
 			const U8* fNames;
 			bool fIsMod25;
 			bool fIsValid;
 		};
 		
 		GuardInfo fGuardDraw;
-		// GetLightPtrArray() (then can reserve)
-			// something to set dirty
-// get() with index < len: null
-		// how do we populate these without blowing up RenderData?
-			// something particular to, say, composite shaders?
-			// should behave like a normal texture when shader has fewer textures...
 };
 
 // ----------------------------------------------------------------------------

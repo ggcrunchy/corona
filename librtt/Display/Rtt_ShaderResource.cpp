@@ -386,13 +386,14 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
     fExtraTextureInfo( NULL ),
     fShellTransform( NULL ),
 	fTimeTransform( NULL ),
-	fExtraTextureCount( -1 ),
+	fExtraTextureCount( 0 ),
     fFirstVersion( 0 ),
 	fIsFirstMod25D( false ),
 	fAnyVersionBound( false ),
 	fSyncPending( false ),
 	fUsesUniforms( false ),
-	fUsesTime( false )
+	fUsesTime( false ),
+	fTextureInfoIsSet( false )
 {
 	Init(program);
 }
@@ -410,13 +411,14 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
     fExtraTextureInfo( NULL ),
     fShellTransform( NULL ),
 	fTimeTransform( NULL ),
-	fExtraTextureCount( -1 ),
+	fExtraTextureCount( 0 ),
     fFirstVersion( 0 ),
 	fIsFirstMod25D( false ),
 	fAnyVersionBound( false ),
     fSyncPending( false ),
 	fUsesUniforms( false ),
-	fUsesTime( false )
+	fUsesTime( false ),
+	fTextureInfoIsSet( false )
 {
 	Init(program);
 }
@@ -504,15 +506,15 @@ ShaderResource::SetTextureInfo( const U8* info, U8 count, SamplerTypeDetails fil
 {
 	Rtt_DELETE( fExtraTextureInfo );
 	
-	Rtt_ASSERT( count >= 0 );
 	Rtt_ASSERT( ( NULL == info ) == ( 0 == count ) );
-	Rtt_ASSERT( count == (U8)(S8)count );
 	
 	fExtraTextureInfo = (const ExtraTextureInfo*)info;
-	fExtraTextureCount = (S8)count;
+	fExtraTextureCount = count;
 
 	fFillTextureInfo[0] = fillInfo[0];
 	fFillTextureInfo[1] = fillInfo[1];
+
+	fTextureInfoIsSet = true;
 }
 
 const SamplerTypeDetails*
@@ -541,17 +543,15 @@ ReportError( const U8* name, int count, const char* message )
 	return false;
 }
 
-static bool
-DetailsAgree( const Texture *tex, const SamplerTypeDetails& details )
+bool
+ShaderResource::DetailsAgree( U32 formatBackingValue, const SamplerTypeDetails& details )
 {
-	Texture::Format format = tex->GetFormat();
-	if ( format.IsNonCore() )
+	if ( FormatDetails::IsCore( formatBackingValue ) )
 	{
-		U32 backingValue = format.GetBackingValue();
-		bool targetsAgree = FormatDetails::GetTarget( backingValue ) == details.target;
-		bool familiesAgree = FormatDetails::GetFamily( backingValue ) == details.family;
+		bool targetsAgree = FormatDetails::GetTarget( formatBackingValue ) == details.target;
+		bool familiesAgree = FormatDetails::GetFamily( formatBackingValue ) == details.family;
 		
-		return targetsAgree && familiesAgree && ( FormatDetails::HasArrayFlag( backingValue ) == details.isArray );
+		return targetsAgree && familiesAgree && ( FormatDetails::HasArrayFlag( formatBackingValue ) == details.isArray );
 	}
 	else
 	{
@@ -559,36 +559,44 @@ DetailsAgree( const Texture *tex, const SamplerTypeDetails& details )
 	}
 }
 
+static bool
+DetailsAgreeWithFormat( const Texture *tex, const SamplerTypeDetails& details )
+{
+	return ShaderResource::DetailsAgree( tex->GetFormat().GetBackingValue(), details );
+}
+
 bool
 ShaderResource::AreTexturesConsistent( const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames ) const
 {
-	if ( fill0 && !DetailsAgree( fill0, GetFillInfo( 0 ) ) )
+	Rtt_ASSERT( HasTextureInfo() );
+
+	if ( fill0 && !DetailsAgreeWithFormat( fill0, GetFillInfo( 0 ) ) )
 	{
 		Rtt_LogException( "`CoronaSampler0` inconsistent with image in paint1" );
 		return false;
 	}
 	
-	if ( fill1 && !DetailsAgree( fill1, GetFillInfo( 1 ) ) )
+	if ( fill1 && !DetailsAgreeWithFormat( fill1, GetFillInfo( 1 ) ) )
 	{
 		Rtt_LogException( "`CoronaSampler1` inconsistent with image in paint2" );
 		return false;
 	}
 
-	S32 iMax = GetExtraTextureCount();
+	U32 iMax = GetExtraTextureCount();
 	const SamplerTypeDetails* shaderDetails = GetExtraTextureDetails();
 	const U8* shaderNames = GetExtraTextureNames();
 
-	Rtt_ASSERT( iMax <= 0 || ( NULL != extraTextures ) );
+	Rtt_ASSERT( iMax == 0 || ( NULL != extraTextures ) );
 	Rtt_ASSERT( ( NULL != extraTextures ) == ( NULL != paintNames ) );
 
-	if ( iMax > (int)extraCount )
+	if ( iMax > extraCount )
 	{
 		Rtt_LogException( "WARNING: shader has %i samplers to bind, but only %u textures provided in `extraPaint`", iMax, extraCount );
 		return false;
 	}
 
 	int basePaintIndex = 0, offset = 0; // both name lists are sorted, so avoid searching entire list each iteration
-	for ( S32 i = 0; i < iMax; i++ )
+	for ( U32 i = 0; i < iMax; i++ )
 	{
 		int count = *shaderNames++;
 		int index = ExtraTextureInfo::FindNameInList( shaderNames, &paintNames[offset], extraCount - basePaintIndex, &offset );
@@ -596,7 +604,7 @@ ShaderResource::AreTexturesConsistent( const Texture* fill0, const Texture* fill
 		{
 			return ReportError( shaderNames, count, "WARNING: unable to match sampler `%s` with a corresponding texture from the paint" );
 		}
-		else if ( !DetailsAgree( extraTextures[i], shaderDetails[i] ) )
+		else if ( !DetailsAgreeWithFormat( extraTextures[i], shaderDetails[i] ) )
 		{
 			return ReportError( shaderNames, count, "WARNING: sampler `%s` inconsistent with image provided in `extraPaints`" );
 		}

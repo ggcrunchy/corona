@@ -801,7 +801,7 @@ void
 GLCommandBuffer::CheckTextureConsistency( Program* defaultProgram, const TextureList* list, const U8* extraNames )
 {
 return;
-//	WRITE_COMMAND( kCommandCheckConsistency );
+	WRITE_COMMAND( kCommandCheckConsistency );
 	Write<GPUResource*>( defaultProgram->GetGPUResource() );
 	if ( list->IsEmpty() )
 	{
@@ -811,31 +811,36 @@ return;
 	{
 		Write<S16>( list->GetCount() );
 
-		SamplerTypeDetails* details = (SamplerTypeDetails*)Reserve( list->GetCount() * sizeof(SamplerTypeDetails) );
-		if ( !list->IsArray() )
+		Texture* fill0 = list->GetFill0();
+		Texture* fill1 = list->GetFill1();
+
+		Write<U32>( fill0 ? fill0->GetFormat().GetBackingValue() : 0 );
+		Write<U32>( fill1 ? fill1->GetFormat().GetBackingValue() : 0 );
+// ^^^ TODO: really want a way to shore up this gap...
+	// we could actually use the low bit more...
+	// not a list? normal; else mark low bits of 0, 1
+	// MUST have 0 to have 1, then...
+		if ( list->IsArray() )
 		{
-		//	list->GetFill0();
-		//	list->GetFill1();
-		}
-		else
-		{
-			for ( int i = 0; i < list->GetCount(); i++ )
+			for ( int i = 2, iMax = list->GetCount(); i < iMax; i++ )
 			{
-				// just copy these...
+				Write<U32>( list->GetArray()[i + 2]->GetFormat().GetBackingValue() );
 			}
 			
-			U32 size = ExtraTextureInfo::NamesSize( extraNames, list->GetCount() ); // - 2?
+			U32 size = ExtraTextureInfo::NamesSize( extraNames, list->GetCount() - 2 );
 			U8* names = Reserve( size );
+
 			memcpy( names, extraNames, size );
-				// ^^^ could possibly just stash the pointer, but this seems fine
 		}
 	}
 }
 
 void
-GLCommandBuffer::RestoreConsistency()
+GLCommandBuffer::RestoreConsistency( Program* previous )
 {
-//	WRITE_COMMAND( kRestoreConsistency );
+return;
+	WRITE_COMMAND( kCommandRestoreConsistency );
+	Write<GPUResource*>( previous->GetGPUResource() );
 }
 
 S32
@@ -998,6 +1003,7 @@ GLCommandBuffer::Execute( bool measureGPU )
     U32 currentAttributeCount = 0, instanceCount = 0;
     bool clearingDepth = false, clearingStencil = false;
     TimeTransform* timeTransform = NULL;
+    bool areTexturesInconsistent = false;
 
     for( U32 i = 0; i < fNumCommands; ++i )
     {
@@ -1431,12 +1437,32 @@ GLCommandBuffer::Execute( bool measureGPU )
             }
             case kCommandCheckConsistency:
             {
-				// TODO!
+                GLProgram* defProgram = Read<GLProgram*>();
+                S16 count = Read<S16>();
+
+				if ( count < 0 ) // strictly broken
+				{
+					areTexturesInconsistent = true;
+				}
+				else // otherwise run check
+				{
+					// else check consistency(program, textures, names) -> maybe "fail"
+				}
+
+                if ( areTexturesInconsistent )
+                {
+					defProgram->Bind( fCurrentDrawVersion );					
+				}
 				CHECK_ERROR_AND_BREAK;
             }
             case kCommandRestoreConsistency:
             {
-				// TODO!
+                GLProgram* previous = Read<GLProgram*>();
+                if ( areTexturesInconsistent )
+                {
+					previous->Bind( fCurrentDrawVersion );
+					areTexturesInconsistent = false;
+                }
 				CHECK_ERROR_AND_BREAK;
             }
             default:

@@ -556,17 +556,17 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 }
 
 // The following LUTs were largely script-generated (see PR, also with verification), and comprise the
-// inlined image / sampler type constants from OpenGL 4.6 + ES 3.2, plus some metadata and lookup info.
+// inlined image / sampler type constants from OpenGL 4.6 + ES 3.2, along with some metadata.
 
-// Some investigation revealed that among the 73 such (16-bit) values, any given low byte occurs at most
-// twice. Additionally, these byte representations always appear in clusters, and the gap may be narrow
-// enough to simply merge them, cf. the 0s in the third range in ClassifySampler().
+// Some investigation revealed that among these 73 16-bit constants, any given low byte occurs at most
+// twice. Additionally, any such byte is always part of a sequence, e.g. ...CA, CB...; also, some of the
+// gaps between series are narrow enough to merge, cf. the 0s in the third range in ClassifySampler().
 
 // The constants are kept in one list for efficient searching, and are pointed to via the aforementioned
 // low byte. Since this might address TWO constants, a tuple of values (in fact four of them--so actually
 // more than one low byte is serviced--in all cases nicely aligned) is actually looked up. Since each of
 // the constants in question is unique, all members of the tuple are tried at once and only the proper
-// lane is chosen. (If the value is not even an image / sampler it will fail gracefully too.)
+// lane is chosen. (Values that are neither image nor sampler types are gracefully detected.)
 
 // The lane can also be used to look up the corresponding metadata.
 
@@ -883,7 +883,7 @@ struct SamplerItem {
 static bool
 ValidateLaterVersion( const ShaderResource* shaderResource, const SamplerTypeDetails builtinInfo[2], GLint numUnits, SamplerItem items[] )
 {
-	if ( (U8)shaderResource->GetExtraTextureCount() != numUnits )
+	if ( shaderResource->GetExtraTextureCount() != numUnits )
 	{
 		Rtt_LogException( "ERROR: shader versions disagree about extra texture counts" );
 		return false;
@@ -918,6 +918,103 @@ ValidateLaterVersion( const ShaderResource* shaderResource, const SamplerTypeDet
 	}
 
 	return true;
+}
+
+static U32
+GatherSamplers( GLuint program, GLchar stash[], SamplerItem items[], const int numItems, SamplerTypeDetails builtinInfo[], U32& total )
+{
+	GLint activeUniformCount = 0, maxUnits;
+	glGetProgramiv( program, GL_ACTIVE_UNIFORMS, &activeUniformCount );
+	glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits );
+
+	U32 numUnits = 0;
+	GLchar * buf = stash;
+    for ( GLint i = 0; i < activeUniformCount; i++ )
+    {
+		GLint size;
+		GLenum type;
+		GLsizei length;
+		glGetActiveUniform( program, i, ExtraTextureInfo::kMaxNameLength + 1, &length, &size, &type, buf );
+
+		int details_index = ClassifySampler( type );
+		if ( 0 == details_index ) // not a sampler?
+		{
+			continue;
+		}
+	
+		if ( kFillSamplerNameLength == length && IsBuiltInSampler( buf ) ) // built-in?
+		{
+			int index = ( 'F' == buf[2] ) ? buf[length - 1] - '0' : 2;
+			
+			builtinInfo[index] = kDetails[details_index];
+		
+			continue;
+		}
+		else if ( ExtraTextureInfo::kMaxNameLength + 1 == length )
+		{
+			Rtt_LogException( "WARNING: sampler name `%s` is too long; skipping", buf );
+			continue;
+		}
+		else if ( numItems == numUnits || maxUnits == numUnits )
+		{
+			Rtt_LogException( "WARNING: sampler `%s` potentially valid, but %u units already allocated; ignoring", buf, numItems );
+			continue;
+		}
+		else if ( 0 == strncmp( buf, "gl_", 3 ) || 0 == strncmp( buf, "__", 2 ) )
+		{
+			Rtt_LogException( "WARNING: samplers with `%s` prefix are reserved", 'g' == *buf ? "gl_" : "__" );
+			continue;
+		}
+	
+		GLint loc = glGetUniformLocation( program, buf );
+	
+		Rtt_ASSERT( -1 != loc );
+
+		items[numUnits].buf = buf;
+		items[numUnits].extraLoc = loc;
+		items[numUnits].count = (U8)length;
+		items[numUnits].details = kDetails[details_index];
+		
+		total += ExtraTextureInfo::BinsForLength( length );
+		buf += ExtraTextureInfo::kMaxNameLength;
+		
+		numUnits++;
+	}
+
+	return numUnits;
+}
+
+static void
+AttachExtraTextureInfo( ShaderResource* shaderResource, SamplerItem items[], U32 numUnits, SamplerTypeDetails builtinInfo[], U32 total )
+{
+	U8* extraTextureInfo = NULL;
+	if ( numUnits > 0 )
+	{
+		qsort( items, numUnits, sizeof(SamplerItem), SamplerItem::Compare ); // n.b. also done by Paint
+	
+		extraTextureInfo = (U8*)Rtt_MALLOC( NULL, numUnits * ( 1 + sizeof(SamplerTypeDetails) ) + total ); // details + (count, name) arrays
+
+		SamplerTypeDetails* details = (SamplerTypeDetails*)extraTextureInfo;
+		U8* names = extraTextureInfo + numUnits * sizeof(SamplerTypeDetails);
+		for ( U32 i = 0; i < numUnits; i++ )
+		{
+			items[i].extraLoc = i;
+
+			*details++ = items[i].details;
+
+			U8 packedCount = ExtraTextureInfo::BinsForLength( items[i].count );
+			
+			*names++ = packedCount;
+			
+			int n = ExtraTextureInfo::EncodeName( names, items[i].buf );
+			
+			Rtt_ASSERT( n >= 0 && n == ExtraTextureInfo::Advance( packedCount ) );
+			
+			names += n;
+		}
+	}
+	
+	shaderResource->SetTextureInfo( extraTextureInfo, (U8)numUnits, builtinInfo );
 }
 
 void
@@ -1026,17 +1123,12 @@ GLProgram::Update( Program::Version version, VersionData& data )
     GL_CHECK_ERROR();
    
     glUseProgram( data.fProgram );
-    GLint fillLoc0 = glGetUniformLocation( data.fProgram, "u_FillSampler0" );
-    glUniform1i( fillLoc0, Texture::kFill0 );
-    GLint fillLoc1 = glGetUniformLocation( data.fProgram, "u_FillSampler1" );
-    glUniform1i( fillLoc1, Texture::kFill1 );
+    glUniform1i( glGetUniformLocation( data.fProgram, "u_FillSampler0" ), Texture::kFill0 );
+    glUniform1i( glGetUniformLocation( data.fProgram, "u_FillSampler1" ), Texture::kFill1 );
     glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler0" ), Texture::kMask0 );
     glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler1" ), Texture::kMask1 );
     glUniform1i( glGetUniformLocation( data.fProgram, "u_MaskSampler2" ), Texture::kMask2 );
-
-	ShaderResource* shaderResource = program->GetShaderResource();
-	bool hasTextureInfo = -1 != shaderResource->GetExtraTextureCount();
-		
+	
 	GLint maxLength;
 	glGetProgramiv( data.fProgram, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLength );
 
@@ -1044,148 +1136,32 @@ GLProgram::Update( Program::Version version, VersionData& data )
 	{
 		Rtt_LogException( "WARNING: at least one uniform greater than %i character in length (%i)", ExtraTextureInfo::kMaxNameLength, maxLength );
 	}
+
     Rtt_STATIC_ASSERT( sizeof( kDetails ) / sizeof( kDetails[0] ) < 256 );
     
     SamplerItem items[ 32 - Texture::kNumUnits ];
     
     const U32 kNumItems = sizeof( items ) / sizeof( *items );
 
-    U32 total = 0;
-    GLchar stash[kNumItems * ExtraTextureInfo::kMaxNameLength + 2]; // n.b. 2 bytes for NUL + one guard character
-    
-	GLint maxUnits, numUnits = 0;
-	glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits );
-    
-    if ( maxUnits > kNumItems )
-    {
-		maxUnits = kNumItems;
-	}
-
 	SamplerTypeDetails builtinInfo[3] = {}; // 0-1 = fill(0|1); 2 = mask (junk)
-
-	GLint activeUniformCount;
-	glGetProgramiv( data.fProgram, GL_ACTIVE_UNIFORMS, &activeUniformCount );
-
-	GLchar * buf = stash;
-    for ( GLint i = 0; i < activeUniformCount; i++ )
-    {
-		GLint size;
-		GLenum type;
-		GLsizei length;
-		glGetActiveUniform( data.fProgram, i, ExtraTextureInfo::kMaxNameLength + 1, &length, &size, &type, buf );
-
-		int details_index = ClassifySampler( type );
-		if ( 0 == details_index ) // not a sampler?
-		{
-			continue;
-		}
+    GLchar stash[kNumItems * ExtraTextureInfo::kMaxNameLength + 2]; // n.b. 2 bytes for NUL + one guard character
 	
-		if ( kFillSamplerNameLength == length && IsBuiltInSampler( buf ) ) // built-in?
-		{
-			int index = ( 'F' == buf[2] ) ? buf[length - 1] - '0' : 2;
-			
-			builtinInfo[index] = kDetails[details_index];
-		
-			continue;
-		}
-		else if ( ExtraTextureInfo::kMaxNameLength + 1 == length )
-		{
-			Rtt_LogException( "WARNING: sampler name `%s` is too long; skipping", buf );
-			continue;
-		}
-		else if ( kNumItems == numUnits )
-		{
-			Rtt_LogException( "WARNING: sampler `%s` potentially valid, but %u units already allocated; ignoring", buf, kNumItems );
-			continue;
-		}
-		else if ( 0 == strncmp( buf, "gl_", 3 ) || 0 == strncmp( buf, "__", 2 ) )
-		{
-			Rtt_LogException( "WARNING: samplers with `%s` prefix are reserved", 'g' == *buf ? "gl_" : "__" );
-			continue;
-		}
-	
-		GLint loc = glGetUniformLocation( data.fProgram, buf );
-	
-		Rtt_ASSERT( -1 != loc );
+	U32 total = 0, numUnits = GatherSamplers( data.fProgram, stash, items, kNumItems, builtinInfo, total );
 
-		items[numUnits].buf = buf;
-		items[numUnits].extraLoc = loc;
-		items[numUnits].count = (U8)length;
-		items[numUnits].details = kDetails[details_index];
-		
-		total += ExtraTextureInfo::BinsForLength( length );
-		buf += ExtraTextureInfo::kMaxNameLength;
-		
-		numUnits++;
-	}
-	
-	if ( !hasTextureInfo )
+	ShaderResource* shaderResource = program->GetShaderResource();
+	if ( !shaderResource->HasTextureInfo() )
 	{
-		U8* extraTextureInfo = NULL;
-		if ( numUnits > 0 )
-		{
-			qsort( items, numUnits, sizeof(SamplerItem), SamplerItem::Compare ); // n.b. also done by Paint
-		
-			extraTextureInfo = (U8*)Rtt_MALLOC( NULL, numUnits * ( 1 + sizeof(SamplerTypeDetails) ) + total ); // details + (count, name) arrays
-
-			SamplerTypeDetails* details = (SamplerTypeDetails*)extraTextureInfo;
-			U8* names = extraTextureInfo + numUnits * sizeof(SamplerTypeDetails);
-			for ( U32 i = 0; i < numUnits; i++ )
-			{
-				items[i].extraLoc = i;
-
-				*details++ = items[i].details;
-
-				U8 packedCount = ExtraTextureInfo::BinsForLength( items[i].count );
-				
-				*names++ = packedCount;
-				
-				int n = ExtraTextureInfo::EncodeName( names, items[i].buf );
-				
-				Rtt_ASSERT( n >= 0 && n == ExtraTextureInfo::Advance( packedCount ) );
-				
-				names += n;
-			}
-		}
-		
-		shaderResource->SetTextureInfo( extraTextureInfo, (U8)numUnits, builtinInfo );
+		AttachExtraTextureInfo( shaderResource, items, numUnits, builtinInfo, total );
 	}
-	else if ( !ValidateLaterVersion( shaderResource, builtinInfo, numUnits, items ) )
+	else
 	{
-		// ???
+		Rtt_VERIFY( ValidateLaterVersion( shaderResource, builtinInfo, numUnits, items ) );
 	}
 	
 	for (int i = 0; i < numUnits; i++)
 	{
 		glUniform1i( items[i].extraLoc, Texture::kNumUnits + items[i].locIndex );
 	}
-	
-// SAS TODO: find extra samplers (and check 0, 1) and cache info
-	// TODO:
-		// prefers-local = largest < 6
-		// if !prefers-local or already non-local
-			// add version to internal list
-			// absorb list (probably duplicate per version)
-			// ensure non-local
-    
-    // TODO:
-    // decaying to non-local implies a sampler was #ifdef'd out in
-    // some mask counts but not others; this is very unlikely to
-    // happen by accident, though... most likely should error
-    // ACTUALLY, what could be done is sweeping an existing list
-    // and ensuring all valid names still show up... any "new"
-    // ones would then be ignored (THIS could also be applied to
-    // other uniforms, actually)
-    
-    // so then amend the above
-		// if old
-			// take current list as normative, check for consistency
-		// else
-			// if largest < 6
-				// add local list
-			// else
-				// keep inside
-    
     
     glUseProgram( 0 );
     GL_CHECK_ERROR();

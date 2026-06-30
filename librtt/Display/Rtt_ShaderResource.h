@@ -129,11 +129,32 @@ struct RenderDataState {
 	};
 	
 	enum {
-		kSyncMask = 0x3
+		kSyncBits = 2,
+		kOccupancyBits = 30,
+
+		kSyncShift = 0,
+		kOccupancyShift = kSyncBits,
+
+		kSyncMask = ( 1 << kSyncBits ) - 1,
+		kOccupancyMask = ( 1 << kOccupancyBits ) - 1,
+
+		kSyncWipeMask = ~( kSyncMask << kSyncShift ),
+		kOccupancyWipeMask = ~( kOccupancyMask << kOccupancyShift )
 	};
+
+	Rtt_STATIC_ASSERT( kOccupancyBits + kSyncBits <= sizeof(int) * 8 );
+
+	#define GET_BITS( NAME, TYPE ) (TYPE)( ( ( *fState ) >> k##NAME##Shift ) & k##NAME##Mask )
+	#define SET_BITS( NAME, ARG ) *fState = ( *fState & ~( k##NAME##Mask << k##NAME##Shift ) ) | ( ( ARG & k##NAME##Mask ) << k##NAME##Shift )
 	
-	void SetSyncState( SyncState state ) { *fState = ( state & kSyncMask ); }
-	SyncState GetSyncState() const { return (SyncState)( *fState & kSyncMask ); }
+	void SetSyncState( SyncState state ) { SET_BITS( Sync, state ); }
+	SyncState GetSyncState() const { return GET_BITS( Sync, SyncState ); }
+
+	void SetOccupancy( U32 occ ) { SET_BITS( Occupancy, occ ); }
+	U32 GetOccupancy() const { return GET_BITS( Occupancy, U32 ); }
+	
+	#undef GET_BITS
+	#undef SET_BITS
 	
 	int *fState;
 };
@@ -251,7 +272,10 @@ class ShaderResource
 	public:
 		void SetTextureInfo( const U8* info, U8 count, SamplerTypeDetails fillInfo[2] );
 
-        S8 GetExtraTextureCount() const { return fExtraTextureCount; }
+		static bool DetailsAgree( U32 formatBackingValue, const SamplerTypeDetails& details );
+
+		bool HasTextureInfo() const { return fTextureInfoIsSet; }
+        U32 GetExtraTextureCount() const { return fExtraTextureCount; }
         SamplerTypeDetails GetFillInfo(int index) const { return fFillTextureInfo[index]; }
         const SamplerTypeDetails* GetExtraTextureDetails() const;
         const U8* GetExtraTextureNames() const;
@@ -288,13 +312,14 @@ class ShaderResource
         U32 fDetailsCount;
         TimeTransform *fTimeTransform;
         SamplerTypeDetails fFillTextureInfo[2];
-        S8 fExtraTextureCount;
+        U8 fExtraTextureCount;
         U8 fFirstVersion : 2;
         U8 fIsFirstMod25D : 1;
         U8 fAnyVersionBound : 1;
         U8 fSyncPending : 1;
         bool fUsesUniforms;
         bool fUsesTime;
+        bool fTextureInfoIsSet;
         
         static bool sAddedUsesTime; // has ANY ShaderResource added the "uses time" flag?
 

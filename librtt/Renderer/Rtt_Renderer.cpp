@@ -712,7 +712,10 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
                 || formatsDirty
 				|| fCaptureGroups.Length() > 0 
                 || dirtyIndices.Length() > 0 );
-
+// TODO: do non-syncs necessarily mean dirty?
+	// penalizes warmup...
+		// maybe we can special-case shaders without a shell transform (or with "V2", that don't touch fills)
+	// would want to commit any "good" work...
         // Only triangle strips are batched. All other primitive types
         // force the previous batch to draw and a new one to be started.
         Geometry::PrimitiveType primitiveType = geometry->GetPrimitiveType();
@@ -912,25 +915,6 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
         INCREMENT( fStatistics.fUniformBindCount );
     }
 
-	for ( U32 i = 0; i < extraTextureCount; i++ )
-	{
-		Texture* extra = data->fTextures.GetArray()[i + 2]; // n.b. skip fill0 and fill1
-		if ( extra == fExtraTextures[i] )
-		{
-			continue;
-		}
-		
-		if( !extra->fGPUResource )
-		{
-			QueueCreate( extra );
-		}
-
-        fBackCommandBuffer->BindTexture( extra, Texture::kNumUnits + i );
-        fExtraTextures[i] = extra;
-        
-        // n.b. does not bind uniform
-	}
-
     // Program
     if( data->fMaskTexture )
     {
@@ -952,12 +936,11 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
         INCREMENT( fStatistics.fProgramBindCount );
         fCurrentProgramMaskCount = MaskCount();
 
-		bool usesTextures = ( NULL != fillTexture0 ) || ( NULL != fillTexture1 ) || ( extraTextureCount > 0 );
+		bool mightUseTextures = ( NULL != fillTexture0 ) || ( NULL != fillTexture1 ) || ( extraTextureCount > 0 );
 		
-		Rtt_ASSERT( NULL != renderDataState || !usesTextures ); // allow for color shader, e.g. for physics rendering
+		Rtt_ASSERT( NULL != renderDataState || !mightUseTextures ); // allow for color shader, e.g. for physics rendering
 
-		bool isUnsynced = usesTextures && RenderDataState::kSyncConsistent != renderDataState->GetSyncState() ;
-
+		bool isUnsynced = mightUseTextures && RenderDataState::kUnsynced == renderDataState->GetSyncState();
 		if ( !fWireframeEnabled && isUnsynced ) // since we're already here and have sr, can just look at list?
 		{
 			const U8* paintNames = extraTextureCount > 0 ? data->fTextures.GetNamesList() : NULL;
@@ -970,14 +953,8 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 				}
 				else
 				{
-					fGuardDraw.fList.Clear(); // syncing only meaningful when we have textures, so empty list interpreted as broken
-				
-					fGuardDraw.fIsValid = true;
-					fGuardDraw.fIsMod25 = data->fProgram == shaderResource->GetProgramMod( ShaderResource::k25D );
-				
 					renderDataState->SetSyncState( RenderDataState::kSyncInconsistent );
 				}
-				// ^^^ in theory we can now retire SOME "extra info"
 			}
 			else if ( !shaderResource->IsSyncPending() )
 			{
@@ -986,11 +963,9 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 
 				fShaderResourcesWithPendingBinds.Append( sr );
 
-				//	fGuardDraw.fList.PointToArray(Texture **texArray, U32 count)
-					// should be full list... but that can oversupply us... need to whittle down choices if > shader
-					// we could use extraTextures but need to verify the memory stays stable up to Draw()...
-				
 				fGuardDraw.fIsValid = true;
+				fGuardDraw.fList = data->fTextures;
+				fGuardDraw.fPrevious = data->fProgram;
 				fGuardDraw.fNames = paintNames;
 				fGuardDraw.fIsMod25 = data->fProgram == shaderResource->GetProgramMod( ShaderResource::k25D );
 			}
@@ -1017,6 +992,50 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
             }
         }
     }
+
+	// follows program, to pick up new syncs:
+	if ( NULL != renderDataState && !fWireframeEnabled )
+	{
+		if ( RenderDataState::kSyncInconsistent != renderDataState->GetSyncState() )
+		{
+			bool isSynced = RenderDataState::kSyncConsistent == renderDataState->GetSyncState();
+			if ( !isSynced )
+			{
+				// The extra texture set might oversupply the shader, so not all
+				// textures wind up in a new unit. When unsynced, the final layout
+				// is unknown, so our best bet is to wipe the cache.
+				fExtraTextures.Clear();
+			}
+			
+			U32 usageMask = isSynced ? 0xFF : 0x0; // TODO! (could be in renderDataState but limits to 30...
+			for ( U32 i = 0, unit = 0, bitMask = 0x1; i < extraTextureCount; i++, bitMask <<= 1 )
+			{
+				Texture* extra = data->fTextures.GetArray()[i + 2]; // n.b. skip fill0 and fill1
+
+				bool usesTextureAndNew = ( usageMask & bitMask ) && ( extra != fExtraTextures[unit] );
+				if ( usesTextureAndNew )
+				{
+					fBackCommandBuffer->BindTexture( extra, Texture::kNumUnits + unit );
+					fExtraTextures[unit++] = extra;
+					
+					// n.b. does not bind uniform
+				}
+
+				if ( ( usesTextureAndNew || !isSynced ) && !extra->fGPUResource ) // always try when unsynced, since no way to know if needed
+				{
+					QueueCreate( extra );
+				}
+			}
+		}
+		else
+		{
+			fGuardDraw.fList.Clear(); // empty list interpreted as broken, since nothing to sink
+				
+			fGuardDraw.fIsValid = true;
+			fGuardDraw.fPrevious = data->fProgram;
+			fGuardDraw.fIsMod25 = data->fProgram == shaderResource->GetProgramMod( ShaderResource::k25D );
+		}
+	}
 
 	// Mask texture
 	if( maskTextureDirty && data->fMaskTexture )
@@ -1715,7 +1734,7 @@ Renderer::CheckAndInsertDrawCommand()
 
 		if( fGuardDraw.fIsValid )
 		{
-			fBackCommandBuffer->RestoreConsistency();
+			fBackCommandBuffer->RestoreConsistency( fGuardDraw.fPrevious );
 			
 			fGuardDraw.fIsValid = false;
 		}

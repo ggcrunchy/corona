@@ -1341,6 +1341,12 @@ FormatDetails::HasArrayFlag( U32 v )
 	return 0 != ( v & IsArrayMask );
 }
 
+bool
+FormatDetails::IsCore( U32 v )
+{
+	return 0 == GetFormatIndex( v );
+}
+
 struct Bits {
 	U32 Get( const MaskInfo& mask ) const { return GetBits( fValue, mask ); }
 	U32 GetCount( const MaskInfo& mask ) const { return Get( mask ) + 1; }

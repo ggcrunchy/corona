@@ -448,7 +448,7 @@ Shader::CanCheckConsistency() const
 {
 	RenderDataState rds = { GetRenderDataState() };
 	
-	return ( RenderDataState::kUnsynced == rds.GetSyncState() ) && fResource->GetExtraTextureCount() < 0;
+	return ( RenderDataState::kUnsynced == rds.GetSyncState() ) && fResource->HasTextureInfo();
 }
 
 // ----------------------------------------------------------------------------

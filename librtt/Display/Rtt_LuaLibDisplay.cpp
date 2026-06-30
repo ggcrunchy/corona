@@ -3563,18 +3563,23 @@ GatherExtraPaint( lua_State *L, Array<ArrayData> &arr )
 		
 		if ( !isFilenameString )
 		{
-			Rtt_LogException( "WARNING: 'image'-type paint, but `filename` is not a string (%s)", luaL_typename( L, -2 ) );
+			Rtt_LogException( "WARNING: key %s: 'image'-type paint, but `filename` is not a string (%s)", ad.name, luaL_typename( L, -2 ) );
 			return;
 		}
 		else if ( isSheetUserdata )
 		{
-			Rtt_LogException( "WARNING: sheet-based 'image' type not supported in `extraPaints`" );
+			Rtt_LogException( "WARNING: key %s: sheet-based 'image'-type paint not supported in `extraPaints`", ad.name );
 			return;
 		}
 	}
 	else if ( 0 != strcmp( typeString, "camera" ) )
 	{
-		Rtt_LogException( "WARNING: unknown, unsupported, or empty paint type in `extraPaints`: %s", typeString );
+		Rtt_LogException( "WARNING: key %s: unknown, unsupported, or empty paint type in `extraPaints`: %s", ad.name, typeString );
+		return;
+	}
+	else if ( RenderDataState::kOccupancyBits == arr.Length() )
+	{
+		Rtt_LogException( "WARNING: key %s: %i paints from `extraPaints` already added", ad.name, RenderDataState::kOccupancyBits );
 		return;
 	}
 	

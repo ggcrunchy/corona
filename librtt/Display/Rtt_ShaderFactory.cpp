@@ -185,7 +185,7 @@ ShaderFactory::Initialize()
                 result = true;
 
                 Rtt_Allocator *allocator = fOwner.GetRuntime().Allocator();
-                fDefaultShell = Rtt_NEW( allocator, Program( allocator ) );
+                fDefaultShell = Rtt_NEW( allocantor, Program( allocator ) );
                 fDefaultShell->SetVertexShaderSource( shellVert );
                 fDefaultShell->SetFragmentShaderSource( shellFrag );
 
@@ -252,6 +252,58 @@ ShaderFactory::NewShaderResource(
 }
 
 #else
+
+static bool
+MightHaveImagesOrNonDefaultSamplers( const char* source )
+{
+	Rtt_ASSERT( source );
+
+	while ( true )
+	{
+		const char* pos = strstr( source, "uniform" );
+		if ( NULL == pos )
+		{
+			return false;
+		}
+		else
+		{
+			const size_t kUniformLength = sizeof("uniform") - 1;
+			bool foundUniformKeyword = isspace( pos[-1] ) && isspace( pos[kUniformLength] );
+			
+			source = pos + kUniformLength;
+			
+			if ( foundUniformKeyword ) // might have found word, but not isolated
+			{
+				while ( isspace( *source ) )
+				{
+					source++;
+				}
+				
+				if ( ( 'i' == *source ) || ( 'u' == *source ) ) // prefix if integer sampler
+				{
+					source++;
+				}
+				
+				// If one of these is satisfied, we MIGHT have an image or sampler. More
+				// importantly, if this is actual code, we either do or there's an error
+				// that will trip anyway.
+				// The proviso about "actual code" is the only sticking point: it would
+				// take a bit more work to detect that the usage is not in a comment or
+				// preprocessed out. But barring pathological shader authorship habits,
+				// this should keep most effects on the fast "already default" path.
+				if ( 0 == strcmp( source, "sampler" ) || 0 == strcmp( source, "image" ) )
+				{
+					return true; // we could delve deeper (valid type, valid identifier declaration, not in comment)
+								// but more importantly, if we never find even the above, we definitely do not have
+								// extra textures and can do a fast path
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
 Program *
 ShaderFactory::NewProgram(
         const char *shellVert,
@@ -383,6 +435,8 @@ ShaderFactory::NewShaderResource(
         ShaderResource::kDefault );
 
     SharedPtr< ShaderResource > result( Rtt_NEW( fAllocator, ShaderResource( program, category, name ) ) );
+
+    // result.
     
     Program *program25D = NewProgram( fDefaultShell->GetVertexShaderSource(), fDefaultShell->GetFragmentShaderSource(), kernelVert, kernelFrag, ShaderResource::k25D );
     result->SetProgramMod( ShaderResource::k25D, program25D );
@@ -763,6 +817,17 @@ ShaderFactory::InitializeBindings( lua_State *L, int shaderIndex, const SharedPt
     BindShellTransform( L, shaderIndex, resource );
     BindVertexExtension( L, shaderIndex, resource );
 	BindTimeTransform( L, shaderIndex, resource );
+
+	const char* fragSource = resource->GetProgramMod( ShaderResource::kDefault )->GetFragmentShaderSource();
+	bool isDefaultFragSource = fDefaultKernel->GetFragmentShaderSource() == fragSource;
+	bool hasNoExtraTextures = isDefaultFragSource || !MightHaveImagesOrNonDefaultSamplers( fragSource );
+	
+	if ( NULL == resource->GetShellTransform() && hasNoExtraTextures )
+	{
+		SamplerTypeDetails fillDefaults[2] = {};
+
+		resource->SetTextureInfo( NULL, 0, fillDefaults );
+	}
 
     bool has_vertex_data = BindVertexDataMap( L, shaderIndex, resource );
     if( has_vertex_data )

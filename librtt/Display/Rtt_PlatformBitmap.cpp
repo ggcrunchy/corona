@@ -39,7 +39,7 @@ PlatformBitmap::Format::GetValue() const
 bool
 PlatformBitmap::Format::IsNonCore() const
 {
-	return 0 != FormatDetails::GetFormatIndex( fValue );
+	return !FormatDetails::IsCore( fValue );
 }
 
 // ----------------------------------------------------------------------------

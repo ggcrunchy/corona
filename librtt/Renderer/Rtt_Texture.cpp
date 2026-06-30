@@ -44,7 +44,7 @@ Texture::Format::GetValue() const
 bool
 Texture::Format::IsNonCore() const
 {
-	return ( 0 != FormatDetails::GetFormatIndex( fValue ) );
+	return !FormatDetails::IsCore( fValue );
 }
 
 #define PACK_ASTC( WIDTH, HEIGHT ) ( ( WIDTH << 4 ) | ( HEIGHT ) )
