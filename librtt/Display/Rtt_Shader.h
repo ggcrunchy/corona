@@ -39,13 +39,56 @@ class FrameBufferObject;
 class Display;
 class Paint;
 struct RenderData;
-struct RenderDataState;
 struct GeometryWriter;
 class Renderer;
 class ShaderData;
 class ShaderResource;
 class Texture;
 class Geometry;
+
+// ----------------------------------------------------------------------------
+
+// This is mutable state related to RenderData that might possibly
+// be resolved via Renderer::Insert(), as an inout argument.
+struct RenderDataState {
+	RenderDataState() : fState( 0 ) {}
+
+	enum SyncState {
+		kUnsynced, // not yet able to check for consistency
+		kSyncConsistent, // sync attempt made and successful
+		kSyncInconsistent, // sync attempt failed
+	};
+	
+	enum {
+		kSyncBits = 2,
+		kOccupancyBits = 30,
+
+		kSyncShift = 0,
+		kOccupancyShift = kSyncBits,
+
+		kSyncMask = ( 1 << kSyncBits ) - 1,
+		kOccupancyMask = ( 1 << kOccupancyBits ) - 1,
+
+		kSyncWipeMask = ~( kSyncMask << kSyncShift ),
+		kOccupancyWipeMask = ~( kOccupancyMask << kOccupancyShift )
+	};
+
+	Rtt_STATIC_ASSERT( kOccupancyBits + kSyncBits <= sizeof(int) * 8 );
+
+	#define GET_BITS( NAME, TYPE ) (TYPE)( ( fState >> k##NAME##Shift ) & k##NAME##Mask )
+	#define SET_BITS( NAME, ARG ) fState = ( fState & ~( k##NAME##Mask << k##NAME##Shift ) ) | ( ( ARG & k##NAME##Mask ) << k##NAME##Shift )
+	
+	void SetSyncState( SyncState state ) { SET_BITS( Sync, state ); }
+	SyncState GetSyncState() const { return GET_BITS( Sync, SyncState ); }
+
+	void SetOccupancy( U32 occ ) { SET_BITS( Occupancy, occ ); }
+	U32 GetOccupancy() const { return GET_BITS( Occupancy, U32 ); }
+	
+	#undef GET_BITS
+	#undef SET_BITS
+	
+	int fState;
+};
 
 // ----------------------------------------------------------------------------
 
@@ -129,21 +172,7 @@ class Shader
 		bool CanCheckConsistency() const;
     
     public:
-		int* GetRenderDataState() const { return &fRenderDataState; }
-/*
-  https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel, pared back for 6 bits:
-  U16 n = i - ( ( i >> 1 ) & 0x55 )
-  
-  n = ( ( n >> 2 ) & 0x33 ) + ( n & 0x33 );
-  n = ( ( n >> 4 ) + n ) & 0x0F;
-
-ctz:	
-	x ← x ^ (x − 1)
-    return popcount(x) − 1
-
-	// idea here is how units are doled out
-	// and iterating over them as bit flags...
-*/
+		RenderDataState& GetRenderDataState() const { return fRenderDataState; }
     
     protected:
         SharedPtr< ShaderResource > fResource;
@@ -154,7 +183,7 @@ ctz:
         FrameBufferObject *fFBO;
         Texture *fTexture;
         const Shader *fRoot; // Weak reference
-        mutable int fRenderDataState; // state that may be modified by Renderer::Insert()
+        mutable RenderDataState fRenderDataState; // state that may be modified by Renderer::Insert()
         
         
         // Cache for a shader's output

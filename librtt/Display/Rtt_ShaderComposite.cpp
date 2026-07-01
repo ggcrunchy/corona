@@ -319,10 +319,7 @@ ShaderComposite::Draw( Renderer& renderer, const RenderData& objectData, const G
         RenderToTexture( renderer, cache );
         
         renderer.TallyTimeDependency( fResource->UsesTime() );
-        
-		RenderDataState rds = { &fRenderDataState };
-				
-        renderer.Insert( & objectData, GetData(), &rds );
+        renderer.Insert( & objectData, GetData(), &fRenderDataState );
     }
 
     DoAnyAfterDraw( state, renderer, objectData );

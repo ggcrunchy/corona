@@ -68,7 +68,7 @@ class GLCommandBuffer : public CommandBuffer
         virtual void Clear( Real r, Real g, Real b, Real a );
         virtual void Draw( U32 offset, U32 count, Geometry::PrimitiveType type );
         virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type );
-		virtual void CheckTextureConsistency( Program* defaultProgram, const TextureList* list, const U8* extraNames );
+		virtual void CheckTextureConsistency( ShaderResource* shaderResource, Program* defaultProgram, const TextureList* list, const U8* extraNames );
         virtual void RestoreConsistency( Program* previous );
         virtual S32 GetCachedParam( CommandBuffer::QueryableParams param );
 

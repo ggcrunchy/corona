@@ -246,9 +246,7 @@ PaintAdapter::SetValueForKey(
 							Rtt_LogException( "ERROR: some paint textures and `%s` samplers are inconsistent", lua_tostring( L, valueIndex ) );
 						}
 						
-						RenderDataState rds = { shader->GetRenderDataState() };
-						
-						rds.SetSyncState( syncState );
+						shader->GetRenderDataState().SetSyncState( syncState );
                     }
                     
                     if ( shader )

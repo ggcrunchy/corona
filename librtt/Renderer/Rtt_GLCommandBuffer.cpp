@@ -20,6 +20,7 @@
 #include "Renderer/Rtt_Program.h"
 #include "Renderer/Rtt_Texture.h"
 #include "Renderer/Rtt_Uniform.h"
+#include "Display/Rtt_Shader.h"
 #include "Display/Rtt_ShaderData.h"
 #include "Display/Rtt_ShaderResource.h"
 #include "Display/Rtt_ObjectHandle.h"
@@ -798,10 +799,10 @@ GLCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
 }
 
 void
-GLCommandBuffer::CheckTextureConsistency( Program* defaultProgram, const TextureList* list, const U8* extraNames )
+GLCommandBuffer::CheckTextureConsistency( ShaderResource* shaderResource, Program* defaultProgram, const TextureList* list, const U8* extraNames )
 {
-return;
 	WRITE_COMMAND( kCommandCheckConsistency );
+	Write<ShaderResource*>( shaderResource );
 	Write<GPUResource*>( defaultProgram->GetGPUResource() );
 	if ( list->IsEmpty() )
 	{
@@ -809,22 +810,24 @@ return;
 	}
 	else
 	{
-		Write<S16>( list->GetCount() );
+		Write<S16>( list->IsArray() ? list->GetCount() : 2 );
 
 		Texture* fill0 = list->GetFill0();
 		Texture* fill1 = list->GetFill1();
 
 		Write<U32>( fill0 ? fill0->GetFormat().GetBackingValue() : 0 );
 		Write<U32>( fill1 ? fill1->GetFormat().GetBackingValue() : 0 );
-// ^^^ TODO: really want a way to shore up this gap...
-	// we could actually use the low bit more...
-	// not a list? normal; else mark low bits of 0, 1
-	// MUST have 0 to have 1, then...
-		if ( list->IsArray() )
+
+		if ( list->IsArray() && list->GetCount() > 2 )
 		{
 			for ( int i = 2, iMax = list->GetCount(); i < iMax; i++ )
 			{
-				Write<U32>( list->GetArray()[i + 2]->GetFormat().GetBackingValue() );
+				Write<U32>( list->GetArray()[i]->GetFormat().GetBackingValue() );
+			}
+			
+			for ( int i = 2, iMax = list->GetCount(); i < iMax; i++ )
+			{
+				Write<GPUResource*>( list->GetArray()[i]->GetGPUResource() );
 			}
 			
 			U32 size = ExtraTextureInfo::NamesSize( extraNames, list->GetCount() - 2 );
@@ -838,7 +841,6 @@ return;
 void
 GLCommandBuffer::RestoreConsistency( Program* previous )
 {
-return;
 	WRITE_COMMAND( kCommandRestoreConsistency );
 	Write<GPUResource*>( previous->GetGPUResource() );
 }
@@ -1437,8 +1439,12 @@ GLCommandBuffer::Execute( bool measureGPU )
             }
             case kCommandCheckConsistency:
             {
+				ShaderResource* shaderResource = Read<ShaderResource*>();
                 GLProgram* defProgram = Read<GLProgram*>();
                 S16 count = Read<S16>();
+
+				GLTexture** gpuTextures = NULL;
+				RenderDataState rds;
 
 				if ( count < 0 ) // strictly broken
 				{
@@ -1446,12 +1452,49 @@ GLCommandBuffer::Execute( bool measureGPU )
 				}
 				else // otherwise run check
 				{
-					// else check consistency(program, textures, names) -> maybe "fail"
+					U32 backingValues[RenderDataState::kOccupancyBits], *extraBackingValues = NULL, extraCount = 0;
+					for ( S16 i = 0; i < count; i++ )
+					{
+						backingValues[i] = Read<U32>();
+					}
+					
+					GLTexture** gpuTextures = NULL;
+					U8* extraNames = NULL;
+					if ( count > 2 )
+					{
+						extraCount = count - 2;
+						extraBackingValues = backingValues + 2;
+						
+						gpuTextures = (GLTexture**)fOffset;
+						
+						fOffset += count * sizeof(GLTexture*);
+						
+						extraNames = fOffset;
+						
+						U32 size = ExtraTextureInfo::NamesSize( extraNames, extraCount );
+						
+						fOffset += size;
+					}
+					
+					areTexturesInconsistent = shaderResource->AreFormatsConsistent( backingValues, extraBackingValues, extraCount, extraNames, &rds );
 				}
 
                 if ( areTexturesInconsistent )
                 {
 					defProgram->Bind( fCurrentDrawVersion );					
+				}
+				else if ( NULL != gpuTextures )
+				{
+					Rtt_ASSERT( count - 2 <= RenderDataState::kOccupancyBits );
+				
+					U32 occupancy = rds.GetOccupancy();
+					for ( int i = 0, iMax = count - 2; i < iMax; i++ )
+					{
+						if ( occupancy & ( 1U << i ) )
+						{
+							gpuTextures[i]->Bind( Texture::kNumUnits + i );
+						}
+					}
 				}
 				CHECK_ERROR_AND_BREAK;
             }

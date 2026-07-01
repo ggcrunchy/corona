@@ -11,6 +11,7 @@
 
 #include "Display/Rtt_ShaderResource.h"
 
+#include "Display/Rtt_Shader.h"
 #include "Display/Rtt_ShaderData.h"
 #include "Renderer/Rtt_Program.h"
 
@@ -560,23 +561,23 @@ ShaderResource::DetailsAgree( U32 formatBackingValue, const SamplerTypeDetails& 
 }
 
 static bool
-DetailsAgreeWithFormat( const Texture *tex, const SamplerTypeDetails& details )
+DetailsAgreeWithFormat( U32 backingValue, const SamplerTypeDetails& details )
 {
-	return ShaderResource::DetailsAgree( tex->GetFormat().GetBackingValue(), details );
+	return ShaderResource::DetailsAgree( backingValue, details );
 }
 
 bool
-ShaderResource::AreTexturesConsistent( const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames ) const
+ShaderResource::AreFormatsConsistent( U32 fillBackingValues[], U32 extraTextureBackingValues[], U32 extraCount, const U8* paintNames, RenderDataState* renderDataState ) const
 {
 	Rtt_ASSERT( HasTextureInfo() );
 
-	if ( fill0 && !DetailsAgreeWithFormat( fill0, GetFillInfo( 0 ) ) )
+	if ( !DetailsAgreeWithFormat( fillBackingValues[0], GetFillInfo( 0 ) ) )
 	{
 		Rtt_LogException( "`CoronaSampler0` inconsistent with image in paint1" );
 		return false;
 	}
 	
-	if ( fill1 && !DetailsAgreeWithFormat( fill1, GetFillInfo( 1 ) ) )
+	if ( !DetailsAgreeWithFormat( fillBackingValues[1], GetFillInfo( 1 ) ) )
 	{
 		Rtt_LogException( "`CoronaSampler1` inconsistent with image in paint2" );
 		return false;
@@ -586,8 +587,8 @@ ShaderResource::AreTexturesConsistent( const Texture* fill0, const Texture* fill
 	const SamplerTypeDetails* shaderDetails = GetExtraTextureDetails();
 	const U8* shaderNames = GetExtraTextureNames();
 
-	Rtt_ASSERT( iMax == 0 || ( NULL != extraTextures ) );
-	Rtt_ASSERT( ( NULL != extraTextures ) == ( NULL != paintNames ) );
+	Rtt_ASSERT( iMax == 0 || ( NULL != extraTextureBackingValues ) );
+	Rtt_ASSERT( ( NULL != extraTextureBackingValues ) == ( NULL != paintNames ) );
 
 	if ( iMax > extraCount )
 	{
@@ -595,6 +596,7 @@ ShaderResource::AreTexturesConsistent( const Texture* fill0, const Texture* fill
 		return false;
 	}
 
+	U32 occupancyMask = 0;
 	int basePaintIndex = 0, offset = 0; // both name lists are sorted, so avoid searching entire list each iteration
 	for ( U32 i = 0; i < iMax; i++ )
 	{
@@ -604,16 +606,42 @@ ShaderResource::AreTexturesConsistent( const Texture* fill0, const Texture* fill
 		{
 			return ReportError( shaderNames, count, "WARNING: unable to match sampler `%s` with a corresponding texture from the paint" );
 		}
-		else if ( !DetailsAgreeWithFormat( extraTextures[i], shaderDetails[i] ) )
+		else if ( !DetailsAgreeWithFormat( extraTextureBackingValues[i], shaderDetails[i] ) )
 		{
 			return ReportError( shaderNames, count, "WARNING: sampler `%s` inconsistent with image provided in `extraPaints`" );
 		}
 
+		occupancyMask |= 1U << i;
 		basePaintIndex += index;
 		shaderNames += ExtraTextureInfo::Advance( count );
 	}
 	
+	if ( NULL != renderDataState )
+	{
+		renderDataState->SetOccupancy( occupancyMask );
+	}
+	
 	return true;
+}
+
+bool
+ShaderResource::AreTexturesConsistent( const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames, RenderDataState* renderDataState ) const
+{
+	Rtt_ASSERT( HasTextureInfo() );
+
+	U32 fillBackingValues[2] = {
+		fill0 ? fill0->GetFormat().GetBackingValue() : 0,
+		fill1 ? fill1->GetFormat().GetBackingValue() : 0
+	};
+	
+	U32 extraTextureBackingValues[ RenderDataState::kOccupancyBits ] = {};
+	
+	for ( U32 i = 0; i < extraCount; i++ )
+	{
+		extraTextureBackingValues[i] = extraTextures[i]->GetFormat().GetBackingValue();
+	}
+	
+	return AreFormatsConsistent( fillBackingValues, extraCount > 0 ? extraTextureBackingValues : NULL, extraCount, paintNames, renderDataState );
 }
 
 void

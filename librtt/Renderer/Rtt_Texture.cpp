@@ -352,6 +352,9 @@ TextureList::IsArray() const
 	return ( 0 != ( asUint & 0x1 ) );
 }
 
+// ^^^ TODO? we could add this same low bit trick to mark fill textures
+// and dispense with much of the weirdness
+
 const U8*
 TextureList::GetNamesList() const
 {

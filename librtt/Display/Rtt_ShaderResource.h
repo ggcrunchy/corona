@@ -33,6 +33,7 @@ class Program;
 class ShaderData;
 class Texture;
 class FormatExtensionList;
+struct RenderDataState;
 
 // ----------------------------------------------------------------------------
 
@@ -115,48 +116,6 @@ struct ExtraTextureInfo
 	// extra slot to receive the same (when decoding).
 
 	U8 *fData;
-};
-
-// ----------------------------------------------------------------------------
-
-// This is mutable state related to RenderData that might possibly
-// be resolved via Renderer::Insert(), as an inout argument.
-struct RenderDataState {
-	enum SyncState {
-		kUnsynced, // not yet able to check for consistency
-		kSyncConsistent, // sync attempt made and successful
-		kSyncInconsistent, // sync attempt failed
-	};
-	
-	enum {
-		kSyncBits = 2,
-		kOccupancyBits = 30,
-
-		kSyncShift = 0,
-		kOccupancyShift = kSyncBits,
-
-		kSyncMask = ( 1 << kSyncBits ) - 1,
-		kOccupancyMask = ( 1 << kOccupancyBits ) - 1,
-
-		kSyncWipeMask = ~( kSyncMask << kSyncShift ),
-		kOccupancyWipeMask = ~( kOccupancyMask << kOccupancyShift )
-	};
-
-	Rtt_STATIC_ASSERT( kOccupancyBits + kSyncBits <= sizeof(int) * 8 );
-
-	#define GET_BITS( NAME, TYPE ) (TYPE)( ( ( *fState ) >> k##NAME##Shift ) & k##NAME##Mask )
-	#define SET_BITS( NAME, ARG ) *fState = ( *fState & ~( k##NAME##Mask << k##NAME##Shift ) ) | ( ( ARG & k##NAME##Mask ) << k##NAME##Shift )
-	
-	void SetSyncState( SyncState state ) { SET_BITS( Sync, state ); }
-	SyncState GetSyncState() const { return GET_BITS( Sync, SyncState ); }
-
-	void SetOccupancy( U32 occ ) { SET_BITS( Occupancy, occ ); }
-	U32 GetOccupancy() const { return GET_BITS( Occupancy, U32 ); }
-	
-	#undef GET_BITS
-	#undef SET_BITS
-	
-	int *fState;
 };
 
 // ----------------------------------------------------------------------------
@@ -281,7 +240,8 @@ class ShaderResource
         const U8* GetExtraTextureNames() const;
 
 	public:
-		bool AreTexturesConsistent( const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames ) const;
+		bool AreFormatsConsistent( U32 fillBackingValues[], U32 extraTextureBackingValues[], U32 extraCount, const U8* paintNames, RenderDataState* renderDataState = NULL ) const;
+		bool AreTexturesConsistent( const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames, RenderDataState* renderDataState = NULL ) const;
 
 	public:
 		const Program* GetFirstBoundProgram() const;

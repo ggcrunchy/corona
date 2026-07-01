@@ -53,8 +53,7 @@ Shader::Shader( Rtt_Allocator *allocator, const SharedPtr< ShaderResource >& res
 	fRenderData( NULL ),
 	fOutputReady( false ),
 	fDirty(false),
-    fIsDrawing( false ),
-    fRenderDataState( 0 )
+    fIsDrawing( false )
 {
     Rtt_ASSERT( resource.NotNull() );
     if ( data )
@@ -76,8 +75,7 @@ Shader::Shader()
 	fRenderData( NULL ),
 	fOutputReady( false ),
 	fDirty(false),
-    fIsDrawing( false ),
-    fRenderDataState( 0 )
+    fIsDrawing( false )
 {
 
 }
@@ -228,10 +226,7 @@ Shader::RenderToTexture( Renderer& renderer, Geometry& cache ) const
 				renderer.SetViewport( 0, 0, w, h );
 				renderer.Clear( 0.0f, 0.0f, 0.0f, 0.0f );
 				renderer.BeginDrawing();
-				
-				RenderDataState rds = { &fRenderDataState };
-				
-				renderer.Insert( fRenderData, GetData(), &rds );
+				renderer.Insert( fRenderData, GetData(), &fRenderDataState );
 			}
 			renderer.PopMaskCount();
 		}
@@ -290,11 +285,8 @@ Shader::Draw( Renderer& renderer, const RenderData& objectData, const GeometryWr
     if (DoAnyBeforeDrawAndThenOriginal( state, renderer, objectData ))
     {
         // No-op
-        renderer.TallyTimeDependency( fResource->UsesTime() );
-
-		RenderDataState rds = { &fRenderDataState };
-				
-        renderer.Insert( & objectData, GetData(), &rds );
+        renderer.TallyTimeDependency( fResource->UsesTime() );	
+        renderer.Insert( & objectData, GetData(), &fRenderDataState );
     }
 
     DoAnyAfterDraw( state, renderer, objectData );
@@ -435,7 +427,7 @@ Shader::IsPaintConsistent( const Paint* paint ) const // n.b. shader has no owne
 		const Texture *fill0 = compositePaint->GetTexture0(), *fill1 = compositePaint->GetTexture1();
 		U32 extraCount = compositePaint->GetExtraCount();
 		Texture** extraTextures = extraCount > 0 ? compositePaint->GetTexturesList() + 2 : NULL;
-		return fResource->AreTexturesConsistent( fill0, fill1, extraTextures, extraCount, compositePaint->GetNameList() );
+		return fResource->AreTexturesConsistent( fill0, fill1, extraTextures, extraCount, compositePaint->GetNameList(), &fRenderDataState );
 	}
 	else
 	{
@@ -446,9 +438,7 @@ Shader::IsPaintConsistent( const Paint* paint ) const // n.b. shader has no owne
 bool
 Shader::CanCheckConsistency() const
 {
-	RenderDataState rds = { GetRenderDataState() };
-	
-	return ( RenderDataState::kUnsynced == rds.GetSyncState() ) && fResource->HasTextureInfo();
+	return ( RenderDataState::kUnsynced == fRenderDataState.GetSyncState() ) && fResource->HasTextureInfo();
 }
 
 // ----------------------------------------------------------------------------

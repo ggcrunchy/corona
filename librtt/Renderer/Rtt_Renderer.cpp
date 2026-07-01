@@ -28,6 +28,7 @@
 #include "Core/Rtt_Types.h"
 #include "Renderer/Rtt_MCPUResourceObserver.h"
 #include "Display/Rtt_ObjectHandle.h"
+#include "Display/Rtt_Shader.h"
 #include "Display/Rtt_ShaderData.h"
 #include "Display/Rtt_ShaderResource.h"
 
@@ -626,6 +627,43 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 		}
 	}
 
+	bool syncingDirty = false;
+	if ( !fWireframeEnabled && ( NULL != renderDataState ) )
+	{
+		bool isUnsynced = RenderDataState::kUnsynced == renderDataState->GetSyncState();
+		if ( isUnsynced ) // since we're already here and have sr, can just look at list?
+		{
+			ShaderResource* shaderResource = data->fProgram->GetShaderResource();
+			const U8* paintNames = extraTextureCount > 0 ? data->fTextures.GetNamesList() : NULL;
+			const Program* refProgram = shaderResource->GetFirstBoundProgram();
+			if ( NULL != refProgram )
+			{
+				if ( shaderResource->AreTexturesConsistent( fillTexture0, fillTexture1, fExtraTextures.WriteAccess(), extraTextureCount, paintNames, renderDataState ) )
+				{
+					renderDataState->SetSyncState( RenderDataState::kSyncConsistent );
+				}
+				else
+				{
+					renderDataState->SetSyncState( RenderDataState::kSyncInconsistent );
+				}
+			}
+			else if ( !shaderResource->IsSyncPending() )
+			{
+				shaderResource->PrepareFirstBind( data->fProgram, static_cast<Program::Version>( MaskCount() ) );
+
+				fShaderResourcesWithPendingBinds.Append( shaderResource );
+
+				fGuardDraw.fIsValid = true;
+				fGuardDraw.fList = data->fTextures;
+				fGuardDraw.fPrevious = data->fProgram;
+				fGuardDraw.fNames = paintNames;
+				fGuardDraw.fIsMod25 = data->fProgram == shaderResource->GetProgramMod( ShaderResource::k25D );
+			}
+		}
+		
+		syncingDirty = RenderDataState::kSyncConsistent != renderDataState->GetSyncState();
+	}
+
     ArrayS32 dirtyIndices( fAllocator );
     U32 largestDirtySize = EnumerateDirtyBlocks( dirtyIndices );
 
@@ -705,6 +743,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
                 || maskTextureDirty
                 || maskUniformDirty
                 || programDirty
+                || syncingDirty
                 || userUniformDirty0
                 || userUniformDirty1
                 || userUniformDirty2
@@ -712,10 +751,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
                 || formatsDirty
 				|| fCaptureGroups.Length() > 0 
                 || dirtyIndices.Length() > 0 );
-// TODO: do non-syncs necessarily mean dirty?
-	// penalizes warmup...
-		// maybe we can special-case shaders without a shell transform (or with "V2", that don't touch fills)
-	// would want to commit any "good" work...
+
         // Only triangle strips are batched. All other primitive types
         // force the previous batch to draw and a new one to be started.
         Geometry::PrimitiveType primitiveType = geometry->GetPrimitiveType();
@@ -936,41 +972,6 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
         INCREMENT( fStatistics.fProgramBindCount );
         fCurrentProgramMaskCount = MaskCount();
 
-		bool mightUseTextures = ( NULL != fillTexture0 ) || ( NULL != fillTexture1 ) || ( extraTextureCount > 0 );
-		
-		Rtt_ASSERT( NULL != renderDataState || !mightUseTextures ); // allow for color shader, e.g. for physics rendering
-
-		bool isUnsynced = mightUseTextures && RenderDataState::kUnsynced == renderDataState->GetSyncState();
-		if ( !fWireframeEnabled && isUnsynced ) // since we're already here and have sr, can just look at list?
-		{
-			const U8* paintNames = extraTextureCount > 0 ? data->fTextures.GetNamesList() : NULL;
-			const Program* refProgram = shaderResource->GetFirstBoundProgram();
-			if ( NULL != refProgram )
-			{
-				if ( shaderResource->AreTexturesConsistent( fillTexture0, fillTexture1, fExtraTextures.WriteAccess(), extraTextureCount, paintNames ) )
-				{
-					renderDataState->SetSyncState( RenderDataState::kSyncConsistent );
-				}
-				else
-				{
-					renderDataState->SetSyncState( RenderDataState::kSyncInconsistent );
-				}
-			}
-			else if ( !shaderResource->IsSyncPending() )
-			{
-				ShaderResource* sr = const_cast<ShaderResource*>( shaderResource );
-				sr->PrepareFirstBind( data->fProgram, version );
-
-				fShaderResourcesWithPendingBinds.Append( sr );
-
-				fGuardDraw.fIsValid = true;
-				fGuardDraw.fList = data->fTextures;
-				fGuardDraw.fPrevious = data->fProgram;
-				fGuardDraw.fNames = paintNames;
-				fGuardDraw.fIsMod25 = data->fProgram == shaderResource->GetProgramMod( ShaderResource::k25D );
-			}
-		}
-        
         if (shaderData)
         {
             const CoronaEffectCallbacks * effectCallbacks = shaderResource->GetEffectCallbacks();
@@ -1007,12 +1008,14 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 				fExtraTextures.Clear();
 			}
 			
-			U32 usageMask = isSynced ? 0xFF : 0x0; // TODO! (could be in renderDataState but limits to 30...
-			for ( U32 i = 0, unit = 0, bitMask = 0x1; i < extraTextureCount; i++, bitMask <<= 1 )
+			Rtt_ASSERT( extraTextureCount <= RenderDataState::kOccupancyBits );
+			
+			U32 usageMask = isSynced ? renderDataState->GetOccupancy() : 0x0;
+			for ( U32 i = 0, unit = 0; i < extraTextureCount; i++ )
 			{
 				Texture* extra = data->fTextures.GetArray()[i + 2]; // n.b. skip fill0 and fill1
 
-				bool usesTextureAndNew = ( usageMask & bitMask ) && ( extra != fExtraTextures[unit] );
+				bool usesTextureAndNew = ( usageMask & ( 1U << i ) ) && ( extra != fExtraTextures[unit] );
 				if ( usesTextureAndNew )
 				{
 					fBackCommandBuffer->BindTexture( extra, Texture::kNumUnits + unit );
@@ -1719,7 +1722,7 @@ Renderer::CheckAndInsertDrawCommand()
 		if( fGuardDraw.fIsValid )
 		{
 			ShaderResource::ProgramMod mod = fGuardDraw.fIsMod25 ? ShaderResource::k25D : ShaderResource::kDefault;
-			fBackCommandBuffer->CheckTextureConsistency( fDefaultPrograms[mod], &fGuardDraw.fList, fGuardDraw.fNames );
+			fBackCommandBuffer->CheckTextureConsistency( fGuardDraw.fPrevious->GetShaderResource(), fDefaultPrograms[mod], &fGuardDraw.fList, fGuardDraw.fNames );
 		}
 	
         if( fPreviousPrimitiveType == Geometry::kIndexedTriangles )
