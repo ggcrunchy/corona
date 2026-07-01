@@ -1470,7 +1470,7 @@ GLCommandBuffer::Execute( bool measureGPU )
 						fOffset += size;
 					}
 					
-					areTexturesInconsistent = shaderResource->AreFormatsConsistent( backingValues, extraBackingValues, extraCount, extraNames, &rds );
+					areTexturesInconsistent = !shaderResource->AreFormatsConsistent( backingValues, extraBackingValues, extraCount, extraNames, &rds );
 				}
 
                 if ( areTexturesInconsistent )

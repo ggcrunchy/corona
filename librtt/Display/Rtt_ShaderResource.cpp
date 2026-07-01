@@ -547,7 +547,7 @@ ReportError( const U8* name, int count, const char* message )
 bool
 ShaderResource::DetailsAgree( U32 formatBackingValue, const SamplerTypeDetails& details )
 {
-	if ( FormatDetails::IsCore( formatBackingValue ) )
+	if ( !FormatDetails::IsCore( formatBackingValue ) )
 	{
 		bool targetsAgree = FormatDetails::GetTarget( formatBackingValue ) == details.target;
 		bool familiesAgree = FormatDetails::GetFamily( formatBackingValue ) == details.family;

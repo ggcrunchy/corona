@@ -114,6 +114,14 @@ ShaderFactory::~ShaderFactory()
     Rtt_DELETE( fDefaultShader );
 }
 
+static void
+SetDefaultTextureInfo( ShaderResource& resource )
+{
+	SamplerTypeDetails fillDefaults[2] = {};
+
+	resource.SetTextureInfo( NULL, 0, fillDefaults );
+}
+
 bool
 ShaderFactory::Initialize()
 {
@@ -146,6 +154,8 @@ ShaderFactory::Initialize()
                     resource->SetProgramMod(ShaderResource::k25D, program25D);
                     fDefaultShader = Rtt_NEW(fAllocator, Shader(fAllocator, resource, NULL));
                     result = true;
+                    
+                    SetDefaultTextureInfo( *resource );
                 }
             }
         }
@@ -192,6 +202,8 @@ ShaderFactory::Initialize()
                 fDefaultKernel = Rtt_NEW( allocator, Program( allocator ) );
                 fDefaultKernel->SetVertexShaderSource( kernelVert );
                 fDefaultKernel->SetFragmentShaderSource( kernelFrag );
+                
+                SetDefaultTextureInfo( *resource );
             }
         }
     }
@@ -322,6 +334,11 @@ ShaderFactory::NewProgram(
     Rtt_Allocator *allocator = fOwner.GetRuntime().Allocator();
 
     Program *program = Rtt_NEW( allocator, Program( allocator ) );
+ 
+	if ( ShaderResource::kDefault == mod && MightHaveImagesOrNonDefaultSamplers( kernelFrag ) )
+	{
+		program->SetMightHaveNoneDefaultDetails( true );
+	}
     
     bool isCompilerVerbose = fOwner.GetDefaults().IsShaderCompilerVerbose();
     program->SetCompilerVerbose( isCompilerVerbose );
@@ -818,15 +835,10 @@ ShaderFactory::InitializeBindings( lua_State *L, int shaderIndex, const SharedPt
     BindVertexExtension( L, shaderIndex, resource );
 	BindTimeTransform( L, shaderIndex, resource );
 
-	const char* fragSource = resource->GetProgramMod( ShaderResource::kDefault )->GetFragmentShaderSource();
-	bool isDefaultFragSource = fDefaultKernel->GetFragmentShaderSource() == fragSource;
-	bool hasNoExtraTextures = isDefaultFragSource || !MightHaveImagesOrNonDefaultSamplers( fragSource );
-	
-	if ( NULL == resource->GetShellTransform() && hasNoExtraTextures )
+	Program* program = resource->GetProgramMod( ShaderResource::kDefault );
+	if ( NULL == resource->GetShellTransform() && !program->GetMightHaveNonDefaultDetails() )
 	{
-		SamplerTypeDetails fillDefaults[2] = {};
-
-		resource->SetTextureInfo( NULL, 0, fillDefaults );
+		SetDefaultTextureInfo( *resource );
 	}
 
     bool has_vertex_data = BindVertexDataMap( L, shaderIndex, resource );

@@ -636,7 +636,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 			ShaderResource* shaderResource = data->fProgram->GetShaderResource();
 			const U8* paintNames = extraTextureCount > 0 ? data->fTextures.GetNamesList() : NULL;
 			const Program* refProgram = shaderResource->GetFirstBoundProgram();
-			if ( NULL != refProgram )
+			if ( NULL != refProgram || shaderResource->HasTextureInfo() )
 			{
 				if ( shaderResource->AreTexturesConsistent( fillTexture0, fillTexture1, fExtraTextures.WriteAccess(), extraTextureCount, paintNames, renderDataState ) )
 				{
