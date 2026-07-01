@@ -825,15 +825,15 @@ GLCommandBuffer::CheckTextureConsistency( ShaderResource* shaderResource, Progra
 				Write<U32>( list->GetArray()[i]->GetFormat().GetBackingValue() );
 			}
 			
-			for ( int i = 2, iMax = list->GetCount(); i < iMax; i++ )
-			{
-				Write<GPUResource*>( list->GetArray()[i]->GetGPUResource() );
-			}
-			
 			U32 size = ExtraTextureInfo::NamesSize( extraNames, list->GetCount() - 2 );
 			U8* names = Reserve( size );
 
 			memcpy( names, extraNames, size );
+			
+			for ( int i = 2, iMax = list->GetCount(); i < iMax; i++ )
+			{
+				Write<GPUResource*>( list->GetArray()[i]->GetGPUResource() );
+			}
 		}
 	}
 }
@@ -1443,7 +1443,7 @@ GLCommandBuffer::Execute( bool measureGPU )
                 GLProgram* defProgram = Read<GLProgram*>();
                 S16 count = Read<S16>();
 
-				GLTexture** gpuTextures = NULL;
+				U32 extraCount = 0;
 				RenderDataState rds;
 
 				if ( count < 0 ) // strictly broken
@@ -1452,23 +1452,17 @@ GLCommandBuffer::Execute( bool measureGPU )
 				}
 				else // otherwise run check
 				{
-					U32 backingValues[RenderDataState::kOccupancyBits], *extraBackingValues = NULL, extraCount = 0;
+					U32 backingValues[RenderDataState::kOccupancyBits], *extraBackingValues = NULL;
 					for ( S16 i = 0; i < count; i++ )
 					{
 						backingValues[i] = Read<U32>();
 					}
 					
-					GLTexture** gpuTextures = NULL;
 					U8* extraNames = NULL;
 					if ( count > 2 )
 					{
 						extraCount = count - 2;
 						extraBackingValues = backingValues + 2;
-						
-						gpuTextures = (GLTexture**)fOffset;
-						
-						fOffset += count * sizeof(GLTexture*);
-						
 						extraNames = fOffset;
 						
 						U32 size = ExtraTextureInfo::NamesSize( extraNames, extraCount );
@@ -1481,18 +1475,22 @@ GLCommandBuffer::Execute( bool measureGPU )
 
                 if ( areTexturesInconsistent )
                 {
-					defProgram->Bind( fCurrentDrawVersion );					
+					defProgram->Bind( fCurrentDrawVersion );
+					
+					fOffset += extraCount * sizeof(GLTexture*); // unused, so skip
 				}
-				else if ( NULL != gpuTextures )
+				else
 				{
-					Rtt_ASSERT( count - 2 <= RenderDataState::kOccupancyBits );
+					Rtt_ASSERT( extraCount <= RenderDataState::kOccupancyBits );
 				
 					U32 occupancy = rds.GetOccupancy();
-					for ( int i = 0, iMax = count - 2; i < iMax; i++ )
+					for ( U32 i = 0; i < extraCount; i++ )
 					{
+						GLTexture* tex = Read<GLTexture*>();
+						
 						if ( occupancy & ( 1U << i ) )
 						{
-							gpuTextures[i]->Bind( Texture::kNumUnits + i );
+							tex->Bind( Texture::kNumUnits + i );
 						}
 					}
 				}
