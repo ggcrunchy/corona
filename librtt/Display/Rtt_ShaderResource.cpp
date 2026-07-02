@@ -186,7 +186,7 @@ NamesReader::FindCurrentNameInList( NamesReader& headOfList, int n ) const
 	{
 		headOfList.PullNext();
 		
-		bool isMatch = ( dup.fCount == headOfList.fCount ) && 0 == memcmp( fStream, headOfList.fStream, dup.fCount );
+		bool isMatch = ( dup.fCount == headOfList.fCount ) && 0 == memcmp( Current(), headOfList.Current(), dup.fCount );
 		if ( isMatch )
 		{
 			return i;
@@ -249,6 +249,8 @@ void
 LengthAccumulator::AddLength( int length )
 {
 	fTotalBins += LengthToBins( length );
+	
+	fCount++;
 }
 
 // ----------------------------------------------------------------------------
@@ -256,7 +258,7 @@ LengthAccumulator::AddLength( int length )
 NamesEncoder::NamesEncoder( U8* stream, const LengthAccumulator& acc )
 :	fStream( stream ),
 	fPos( 0 ),
-	fCount( acc.GetTotalBytes() )
+	fRef( acc )
 {
 }
 
@@ -284,7 +286,7 @@ NamesEncoder::Encode( const char* name, int length )
 void
 NamesEncoder::CheckTotalCount()
 {
-	Rtt_ASSERT( -1 == fCount || ( fPos == fCount + 1 ) );
+	Rtt_ASSERT( fPos == fRef.GetTotalBytes() + fRef.GetCount() );
 }
 	
 // ----------------------------------------------------------------------------
@@ -718,8 +720,8 @@ ShaderResource::AreFormatsConsistent( U32 fillBackingValues[], U32 extraTextureB
 			return ReportError( shaderNamesIter, "WARNING: sampler `%s` inconsistent with image provided in `extraPaints`" );
 		}
 
-		occupancyMask |= 1U << i;
 		basePaintIndex += index;
+		occupancyMask |= 1U << basePaintIndex;
 	}
 	
 	if ( NULL != renderDataState )

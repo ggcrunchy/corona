@@ -1484,13 +1484,15 @@ GLCommandBuffer::Execute( bool measureGPU )
 					Rtt_ASSERT( extraCount <= RenderDataState::kOccupancyBits );
 				
 					U32 occupancy = rds.GetOccupancy();
-					for ( U32 i = 0; i < extraCount; i++ )
+					for ( U32 i = 0, unit = 0; i < extraCount; i++ )
 					{
 						GLTexture* tex = Read<GLTexture*>();
 						
 						if ( occupancy & ( 1U << i ) )
 						{
-							tex->Bind( Texture::kNumUnits + i );
+							tex->Bind( Texture::kNumUnits + unit );
+							
+							unit++;
 						}
 					}
 				}

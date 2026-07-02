@@ -143,13 +143,15 @@ private:
 
 class LengthAccumulator {
 public:
-	LengthAccumulator() : fTotalBins( 0 ) {}
+	LengthAccumulator() : fTotalBins( 0 ), fCount( 0 ) {}
 
 	int GetTotalBytes() const;
+	int GetCount() const { return fCount; }
 	void AddLength( int length );
 
 private:
 	int fTotalBins;
+	int fCount;
 };
 
 class NamesEncoder {
@@ -160,9 +162,9 @@ public:
 	void CheckTotalCount();
 
 private:
+	LengthAccumulator fRef;
 	U8* fStream;
 	int fPos;
-	int fCount;
 };
 
 // ----------------------------------------------------------------------------
