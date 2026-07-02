@@ -124,13 +124,13 @@ TextureInfoSize( U32 extraCount, bool includeResources )
 }
 
 void
-CompositePaint::PrepareExtraTextures( U32 count, U32 nameBinCount )
+CompositePaint::PrepareExtraTextures( U32 count, const LengthAccumulator& names )
 {
 	ClearExtraInfo();
 
 	if ( count > 0 )
 	{
-		fExtraInfo = (ExtraTextureInfo*)Rtt_MALLOC( NULL, TextureInfoSize( count, true ) + count + nameBinCount );
+		fExtraInfo = (ExtraTextureInfo*)Rtt_MALLOC( NULL, TextureInfoSize( count, true ) + count + names.GetTotalBytes() );
 		fExtraCount = count;
 		
 		Texture** texturesList = GetTexturesList();

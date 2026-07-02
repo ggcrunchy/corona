@@ -3483,7 +3483,7 @@ LuaLibDisplay::LuaNewGradientPaint( lua_State *L, int paramsIndex )
 
 struct ArrayData {
 	const char* name;
-	U8 count;
+	U8 length;
 	
 	static int Compare( const void* p1, const void* p2 )
 	{
@@ -3528,7 +3528,7 @@ GatherExtraPaint( lua_State *L, Array<ArrayData> &arr )
 		
 	ArrayData ad;
 	ad.name = lua_tostring( L, -2 );
-	ad.count = (U8)len;
+	ad.length = (U8)len;
 	
 	if ( 0 == len )
 	{
@@ -3540,7 +3540,7 @@ GatherExtraPaint( lua_State *L, Array<ArrayData> &arr )
 		Rtt_LogException( "WARNING: key (%s) exceeds maximum sampler identifier length %i", ad.name, ExtraTextureInfo::kMaxNameLength );
 		return;
 	}
-	else if ( ReservedByBackend( ad.name ) || ExtraTextureInfo::EncodeNameNoAlloc( ad.name ) < 0 ) // n.b. will issue own warnings
+	else if ( ReservedByBackend( ad.name ) || ExtraTextureInfo::CheckEncodability( ad.name ) < 0 ) // n.b. will issue own warnings
 	{
 		return;
 	}
@@ -3586,48 +3586,36 @@ GatherExtraPaint( lua_State *L, Array<ArrayData> &arr )
 	arr.Append( ad );
 }
 
-static int
+static bool
 BuildExtraPaint( lua_State *L, ArrayDataEx &ad )
 {
 	lua_getfield( L, -1, ad.item.name );
 
 	LuaLibDisplay::LuaNewPaint( L, -1, &ad.tr ); // get resource only (no Paint)
 				
-	if ( !ad.tr.IsNull() )
-	{
-		return ExtraTextureInfo::BinsForLength( ad.item.count );
-	}
-	else
-	{
-		return 0;
-	}
+	return !ad.tr.IsNull();
 }
 
 static void
-CommitExtraPaints( CompositePaint *paint, Array<ArrayDataEx> &arr, U32 numExtra, U32 total )
+CommitExtraPaints( CompositePaint *paint, Array<ArrayDataEx> &arr, U32 numExtra, const LengthAccumulator& nameLengths )
 {
-	paint->PrepareExtraTextures( numExtra, total );
+	paint->PrepareExtraTextures( numExtra, nameLengths );
 	
 	U8* nameList = paint->GetNameList();
+	NamesEncoder names( nameList, nameLengths );
 	SharedPtr<TextureResource>* textureResourceList = (SharedPtr<TextureResource>*)paint->GetTextureResourceList();
 	for ( int i = 0, iMax = arr.Length(); i < iMax; i++ )
 	{
-		if ( 0 == arr[i].item.count )
+		if ( 0 == arr[i].item.length )
 		{
 			continue;
 		}
-		
-		U32 count = ExtraTextureInfo::BinsForLength( arr[i].item.count );
-		
-		*nameList++ = (U8)count;
+
 		*textureResourceList++ = arr[i].tr;
-		
-		int n = ExtraTextureInfo::EncodeName( nameList, arr[i].item.name );
-		
-		Rtt_ASSERT( n == ExtraTextureInfo::Advance( count ) );
-		
-		nameList += n;
+
+		names.Encode( arr[i].item.name, arr[i].item.length );
 	}
+	names.CheckTotalCount();
 	
 	paint->CommitExtraTextures();
 }
@@ -3655,7 +3643,8 @@ LuaLibDisplay::LuaNewCompositePaint( lua_State *L, int paramsIndex )
 
     if ( paint0 && paint1 )
     {	
-		U32 total = 0, numExtra = 0;
+		U32 numExtra = 0;
+		LengthAccumulator nameLengths;
 		Array<ArrayDataEx> arr( LuaContext::GetAllocator( L ) );
 
 		lua_getfield( L, paramsIndex, "extraPaints" );
@@ -3663,31 +3652,31 @@ LuaLibDisplay::LuaNewCompositePaint( lua_State *L, int paramsIndex )
 		{
 			Array<ArrayData> prepArr( LuaContext::GetAllocator( L ) );
 			
-			for ( lua_pushnil( L ); lua_next( L, -1 ); lua_pop( L, 1 ) )
+			for ( lua_pushnil( L ); lua_next( L, -2 ); lua_pop( L, 1 ) )
 			{
 				GatherExtraPaint( L, prepArr );
 			}
 
-			qsort( arr.WriteAccess(), arr.Length(), sizeof(ArrayData), ArrayData::Compare ); // also done by ShaderResource
+			qsort( prepArr.WriteAccess(), prepArr.Length(), sizeof(ArrayData), ArrayData::Compare ); // also done by ShaderResource
 
-			arr.Reserve( (U32)prepArr.Length() );
+			arr.PadToSize( (U32)prepArr.Length(), ArrayDataEx() );
 
-			for ( S32 i = 0, iMax = arr.Length(); i < iMax; i++, lua_pop( L, 1 ) )
+			for ( S32 i = 0, iMax = prepArr.Length(); i < iMax; i++, lua_pop( L, 1 ) )
 			{
 				arr[i].item = prepArr[i];
 				
-				int count = BuildExtraPaint( L, arr[i] );
-				if ( count > 0 )
+				bool didBuild = BuildExtraPaint( L, arr[i] );
+				if ( didBuild )
 				{
 					numExtra++;
 					
-					total += count;
+					nameLengths.AddLength( arr[i].item.length );
 				}
 				else
 				{
 					Rtt_LogException( "WARNING: failed to load %s from `extraPaints`", arr[i].item.name );
 					
-					arr[i].item.count = 0; // skip in the commit step
+					arr[i].item.length = 0; // skip in the commit step
 				}
 			}
 		}
@@ -3696,7 +3685,7 @@ LuaLibDisplay::LuaNewCompositePaint( lua_State *L, int paramsIndex )
         
         if ( result && numExtra > 0 )
         {
-			CommitExtraPaints( result, arr, numExtra, total );
+			CommitExtraPaints( result, arr, numExtra, nameLengths );
 		}
     }
 

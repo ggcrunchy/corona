@@ -869,8 +869,8 @@ struct SamplerItem {
 	GLchar* buf;
 	GLint extraLoc;
 	SamplerTypeDetails details;
-	U8 locIndex;
-	U8 count;
+	U8 extraLocUnit;
+	U8 length;
 	
 	static int Compare( const void* p1, const void* p2 )
 	{
@@ -907,7 +907,7 @@ ValidateLaterVersion( const ShaderResource* shaderResource, const SamplerTypeDet
 			int pos = ExtraTextureInfo::FindNameInList( name, extraTextureNames, numUnits );
 			if ( pos >= 0 && items[i].details.Matches( extraDetails[pos] ) ) // if found, check that details also agree
 			{
-				items[i].locIndex = (U8)pos;
+				items[i].extraLocUnit = (U8)pos;
 			}
 			else
 			{
@@ -921,7 +921,7 @@ ValidateLaterVersion( const ShaderResource* shaderResource, const SamplerTypeDet
 }
 
 static U32
-GatherSamplers( GLuint program, GLchar stash[], SamplerItem items[], const int numItems, SamplerTypeDetails builtinInfo[], U32& total )
+GatherSamplers( GLuint program, GLchar stash[], SamplerItem items[], const int numItems, SamplerTypeDetails builtinInfo[], LengthAccumulator& nameLengths )
 {
 	GLint activeUniformCount = 0, maxUnits;
 	glGetProgramiv( program, GL_ACTIVE_UNIFORMS, &activeUniformCount );
@@ -972,10 +972,11 @@ GatherSamplers( GLuint program, GLchar stash[], SamplerItem items[], const int n
 
 		items[numUnits].buf = buf;
 		items[numUnits].extraLoc = loc;
-		items[numUnits].count = (U8)length;
+		items[numUnits].length = (U8)length;
 		items[numUnits].details = kDetails[details_index];
 		
-		total += ExtraTextureInfo::BinsForLength( length );
+		nameLengths.AddLength( length );
+		
 		buf += ExtraTextureInfo::kMaxNameLength;
 		
 		numUnits++;
@@ -985,33 +986,28 @@ GatherSamplers( GLuint program, GLchar stash[], SamplerItem items[], const int n
 }
 
 static void
-AttachExtraTextureInfo( ShaderResource* shaderResource, SamplerItem items[], U32 numUnits, SamplerTypeDetails builtinInfo[], U32 total )
+AttachExtraTextureInfo( ShaderResource* shaderResource, SamplerItem items[], U32 numUnits, SamplerTypeDetails builtinInfo[], const LengthAccumulator& nameLengths )
 {
 	U8* extraTextureInfo = NULL;
 	if ( numUnits > 0 )
 	{
 		qsort( items, numUnits, sizeof(SamplerItem), SamplerItem::Compare ); // n.b. also done by Paint
 	
-		extraTextureInfo = (U8*)Rtt_MALLOC( NULL, numUnits * ( 1 + sizeof(SamplerTypeDetails) ) + total ); // details + (count, name) arrays
+		extraTextureInfo = (U8*)Rtt_MALLOC( NULL, numUnits * ( 1 + sizeof(SamplerTypeDetails) ) + nameLengths.GetTotalBytes() ); // details + (count, name) arrays
 
 		SamplerTypeDetails* details = (SamplerTypeDetails*)extraTextureInfo;
 		U8* names = extraTextureInfo + numUnits * sizeof(SamplerTypeDetails);
+		NamesEncoder encoder( names, nameLengths );
 		for ( U32 i = 0; i < numUnits; i++ )
 		{
-			items[i].extraLoc = i;
+			items[i].extraLocUnit = i;
 
 			*details++ = items[i].details;
 
-			U8 packedCount = ExtraTextureInfo::BinsForLength( items[i].count );
+			encoder.Encode( items[i].buf, items[i].length );
 			
-			*names++ = packedCount;
-			
-			int n = ExtraTextureInfo::EncodeName( names, items[i].buf );
-			
-			Rtt_ASSERT( n >= 0 && n == ExtraTextureInfo::Advance( packedCount ) );
-			
-			names += n;
 		}
+		encoder.CheckTotalCount();
 	}
 	
 	shaderResource->SetTextureInfo( extraTextureInfo, (U8)numUnits, builtinInfo );
@@ -1146,12 +1142,13 @@ GLProgram::Update( Program::Version version, VersionData& data )
 	SamplerTypeDetails builtinInfo[3] = {}; // 0-1 = fill(0|1); 2 = mask (junk)
     GLchar stash[kNumItems * ExtraTextureInfo::kMaxNameLength + 2]; // n.b. 2 bytes for NUL + one guard character
 	
-	U32 total = 0, numUnits = GatherSamplers( data.fProgram, stash, items, kNumItems, builtinInfo, total );
+	LengthAccumulator nameLengths;
+	U32 numUnits = GatherSamplers( data.fProgram, stash, items, kNumItems, builtinInfo, nameLengths );
 
 	ShaderResource* shaderResource = program->GetShaderResource();
 	if ( !shaderResource->HasTextureInfo() )
 	{
-		AttachExtraTextureInfo( shaderResource, items, numUnits, builtinInfo, total );
+		AttachExtraTextureInfo( shaderResource, items, numUnits, builtinInfo, nameLengths );
 	}
 	else
 	{
@@ -1160,7 +1157,7 @@ GLProgram::Update( Program::Version version, VersionData& data )
 	
 	for (int i = 0; i < numUnits; i++)
 	{
-		glUniform1i( items[i].extraLoc, Texture::kNumUnits + items[i].locIndex );
+		glUniform1i( items[i].extraLoc, Texture::kNumUnits + items[i].extraLocUnit );
 	}
     
     glUseProgram( 0 );

@@ -29,68 +29,22 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 int
-ExtraTextureInfo::FindNameInList( const U8* name, const U8* listOfNames, int n, int* offset )
+ExtraTextureInfo::FindNameInList( const U8* name, const U8* listOfNames, int n )
 {
-	int countFromName = *name++;
-	const U8* readPos = listOfNames;
-	for ( int i = 0; i < n; ++i )
-	{
-		int countFromList = BinsForLength( *readPos );
-		bool isMatch = ( countFromName == countFromList ) && 0 == memcmp( name, readPos + 1, countFromList );
-		
-		readPos += countFromList + 1;
-
-		if ( isMatch )
-		{
-			if ( NULL != offset )
-			{
-				*offset = (int)( readPos - listOfNames );
-			}
-			
-			return i;
-		}
-	}
+	NamesReader reader( name ), listReader( listOfNames );
 	
-	return -1;
-}
-
-bool
-ExtraTextureInfo::ListsMatch( const U8* listOfNames1, const U8* listOfNames2, int n )
-{
-	int offset = 0;
-
-	for ( int i = 0; i < n; ++i )
-	{
-		U8 count1 = listOfNames1[offset];
-		if ( count1 == listOfNames2[offset] )
-		{
-			offset += BinsForLength( count1 ) + 1;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	
-	return 0 == memcmp( listOfNames1, listOfNames2, offset );
+	return reader.FindCurrentNameInList( listReader, n );
 }
 
 U32
 ExtraTextureInfo::NamesSize( const U8* listOfNames, int n )
 {
-	const U8* readPos = listOfNames;
-	for ( int i = 0; i < n; ++i )
-	{
-		int countFromList = *readPos;
-		
-		readPos += BinsForLength( countFromList ) + 1;
-	}
+	NamesReader reader( listOfNames );
 	
-	return (U32)( readPos - listOfNames );
+	return reader.SizeOfList( n );
 }
 
 // Encoding bit layout, for bytes 0-3:
-//
 // 0 0 0 0 0 0 1 1 | 1 1 1 1 2 2 2 2 | 2 2 3 3 3 3 3 3
 
 int
@@ -142,7 +96,7 @@ ExtraTextureInfo::EncodeName( U8* buf, const char* name, int kmask )
 }
 
 int
-ExtraTextureInfo::EncodeNameNoAlloc( const char* name )
+ExtraTextureInfo::CheckEncodability( const char* name )
 {
 	U8 junk[3];
 
@@ -152,7 +106,7 @@ ExtraTextureInfo::EncodeNameNoAlloc( const char* name )
 void
 ExtraTextureInfo::DecodeName( char* name, const U8* buf, int n )
 {
-	for ( int i = 0, j = 0; i > n; i++, j += 3 )
+	for ( int i = 0, j = 0; i < n; i++, j += 3 )
 	{
 		U32 b1 = buf[j], b2 = buf[j + 1], b3 = buf[j + 2];
 		U32 work[] = {
@@ -161,28 +115,178 @@ ExtraTextureInfo::DecodeName( char* name, const U8* buf, int n )
 			( ( b2 & 0xF ) << 2 ) | ( b3 >> 6 ),
 			b3 & 0x3F 
 		};
-				
-		#define PRED( COND, RESULT ) ( ( COND ) ? ( RESULT ) : 0 )
-		#define OFFSET_IN_RANGE( BYTE, NAME ) PRED( ( BYTE >= kMin##NAME ) & ( BYTE - kMin##NAME < kCount##NAME ), kOffset##NAME + BYTE - kMin##NAME )
-	
+			
 		for ( int k = 0; k < 4; ++k )
 		{
 			U8 b = work[k];
+
+			static const char kSymbols[] = {
+				"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+				"abcdefghijklmnopqrstuvwxyz"
+				"0123456789_"
+			};
 			
-			// could do with LUT instead; at any rate, currently only used for debugging
-			int c = PRED( kOffsetUnderscore == b, '_' ) |
-					OFFSET_IN_RANGE( b, Upper ) | OFFSET_IN_RANGE( b, Lower ) | OFFSET_IN_RANGE( b, Digit );
-
-			*name++ = c;
+			*name++ = kSymbols[b];
 		}
-
-		#undef PRED
-		#undef OFFSET_IN_RANGE
 	}
 		
 	*name = 0;
 }
 
+// ----------------------------------------------------------------------------
+
+static int LengthToBins( int length )
+{
+	return ( length + 3 ) / 4;
+}
+
+static int BinsToBytes( int binCount )
+{
+	return binCount * 3;
+}	
+
+// ----------------------------------------------------------------------------
+
+NamesReader::NamesReader( const U8* stream )
+:	fCount( 0 ),
+	fPulls( 0 ),
+	fTally( 0 ),
+	fStream( stream )
+{
+}
+			
+void
+NamesReader::PullNext()
+{
+	Rtt_ASSERT( fStream );
+
+	fTally += fCount;
+
+	fCount = BinsToBytes( *Current() );
+
+	fPulls++;
+}
+
+const U8*
+NamesReader::Current() const
+{
+	return fStream + ( fTally + fPulls );
+}
+
+int
+NamesReader::FindCurrentNameInList( NamesReader& headOfList, int n ) const
+{
+	Rtt_ASSERT( fStream );
+
+	NamesReader dup = Clone(); // only for count
+
+	dup.PullNext();
+
+	for ( int i = 0; i < n; ++i )
+	{
+		headOfList.PullNext();
+		
+		bool isMatch = ( dup.fCount == headOfList.fCount ) && 0 == memcmp( fStream, headOfList.fStream, dup.fCount );
+		if ( isMatch )
+		{
+			return i;
+		}
+	}
+	
+	return -1;
+}
+
+bool
+NamesReader::MatchesList( const NamesReader& headOfOtherList, int n ) const
+{
+	Rtt_ASSERT( fStream );
+
+	NamesReader list1 = Clone(), list2 = headOfOtherList.Clone();
+
+	for ( int i = 0; i < n; ++i )
+	{
+		list1.PullNext();
+		list2.PullNext();
+	}
+	
+	int total1 = list1.GetTotalBytes();
+	
+	return ( total1 == list2.GetTotalBytes() ) && 0 == memcmp( fStream, headOfOtherList.fStream, total1 );
+}
+
+U32
+NamesReader::SizeOfList( int n ) const
+{
+	Rtt_ASSERT( fStream );
+
+	NamesReader dup = Clone();
+	
+	for ( int i = 0; i < n; ++i )
+	{
+		dup.PullNext();
+	}
+	
+	return dup.GetTotalBytes();
+}
+
+void
+NamesReader::Decode( char* name ) const
+{
+	Rtt_ASSERT( fStream );
+
+	ExtraTextureInfo::DecodeName( name, Current(), fCount );
+}
+	
+// ----------------------------------------------------------------------------
+
+int
+LengthAccumulator::GetTotalBytes() const
+{
+	return BinsToBytes( fTotalBins );
+}
+
+void
+LengthAccumulator::AddLength( int length )
+{
+	fTotalBins += LengthToBins( length );
+}
+
+// ----------------------------------------------------------------------------
+
+NamesEncoder::NamesEncoder( U8* stream, const LengthAccumulator& acc )
+:	fStream( stream ),
+	fPos( 0 ),
+	fCount( acc.GetTotalBytes() )
+{
+}
+
+bool
+NamesEncoder::Encode( const char* name, int length )
+{
+	int encoded = ExtraTextureInfo::EncodeName( fStream + fPos + 1, name );
+	if ( encoded > 0 )
+	{
+		U32 binCount = LengthToBins( length );
+		
+		Rtt_ASSERT( BinsToBytes( binCount ) == encoded );
+		
+		fStream[fPos] = binCount;
+		fPos += encoded + 1;
+	
+		return true;
+	}
+	else
+	{
+		return false;
+	}	
+}
+
+void
+NamesEncoder::CheckTotalCount()
+{
+	Rtt_ASSERT( -1 == fCount || ( fPos == fCount + 1 ) );
+}
+	
 // ----------------------------------------------------------------------------
 
 Real
@@ -533,11 +637,11 @@ ShaderResource::GetExtraTextureNames() const
 }	
 
 static bool
-ReportError( const U8* name, int count, const char* message )
+ReportError( const NamesReader& reader, const char* message )
 {
 	char rawName[ExtraTextureInfo::kMaxNameLength + 1];
 
-	ExtraTextureInfo::DecodeName( rawName, name, count );
+	reader.Decode( rawName );
 			
 	Rtt_LogException( message, rawName );
 
@@ -597,23 +701,25 @@ ShaderResource::AreFormatsConsistent( U32 fillBackingValues[], U32 extraTextureB
 	}
 
 	U32 occupancyMask = 0;
-	int basePaintIndex = 0, offset = 0; // both name lists are sorted, so avoid searching entire list each iteration
+	int basePaintIndex = 0; // both name lists are sorted, so avoid searching entire list each iteration
+	
+	NamesReader shaderNamesIter( shaderNames ), paintNamesIter( paintNames );
 	for ( U32 i = 0; i < iMax; i++ )
 	{
-		int count = *shaderNames++;
-		int index = ExtraTextureInfo::FindNameInList( shaderNames, &paintNames[offset], extraCount - basePaintIndex, &offset );
+		shaderNamesIter.PullNext();
+	
+		int index = shaderNamesIter.FindCurrentNameInList( paintNamesIter, extraCount - basePaintIndex );
 		if ( index < 0 )
 		{
-			return ReportError( shaderNames, count, "WARNING: unable to match sampler `%s` with a corresponding texture from the paint" );
+			return ReportError( shaderNamesIter, "WARNING: unable to match sampler `%s` with a corresponding texture from the paint" );
 		}
 		else if ( !DetailsAgreeWithFormat( extraTextureBackingValues[i], shaderDetails[i] ) )
 		{
-			return ReportError( shaderNames, count, "WARNING: sampler `%s` inconsistent with image provided in `extraPaints`" );
+			return ReportError( shaderNamesIter, "WARNING: sampler `%s` inconsistent with image provided in `extraPaints`" );
 		}
 
 		occupancyMask |= 1U << i;
 		basePaintIndex += index;
-		shaderNames += ExtraTextureInfo::Advance( count );
 	}
 	
 	if ( NULL != renderDataState )

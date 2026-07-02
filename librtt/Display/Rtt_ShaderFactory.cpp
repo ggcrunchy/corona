@@ -303,7 +303,9 @@ MightHaveImagesOrNonDefaultSamplers( const char* source )
 				// take a bit more work to detect that the usage is not in a comment or
 				// preprocessed out. But barring pathological shader authorship habits,
 				// this should keep most effects on the fast "already default" path.
-				if ( 0 == strcmp( source, "sampler" ) || 0 == strcmp( source, "image" ) )
+				const size_t kSamplerLength = sizeof("sampler") - 1;
+				const size_t kImageLength = sizeof("image") - 1;
+				if ( 0 == strncmp( source, "sampler", kSamplerLength ) || 0 == strncmp( source, "image", kImageLength ) )
 				{
 					return true; // we could delve deeper (valid type, valid identifier declaration, not in comment)
 								// but more importantly, if we never find even the above, we definitely do not have

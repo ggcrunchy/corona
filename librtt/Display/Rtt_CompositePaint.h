@@ -17,6 +17,7 @@
 namespace Rtt
 {
 
+class LengthAccumulator;
 struct ExtraTextureInfo;
 
 // ----------------------------------------------------------------------------
@@ -43,7 +44,7 @@ class CompositePaint : public Paint
 		virtual const Paint* AsPaint( Type t ) const;
 		virtual void ApplyPaintUVTransformations( ArrayVertex2& vertices ) const override;
 
-		void PrepareExtraTextures( U32 count, U32 nameBinCount );
+		void PrepareExtraTextures( U32 count, const LengthAccumulator& names );
 		void CommitExtraTextures(); // merge extra textures after populating list
 		void ClearExtraInfo();
 		U8* GetNameList() const;

@@ -102,20 +102,67 @@ struct ExtraTextureInfo
 
 	Rtt_STATIC_ASSERT( ( kOffsetNUL + 1 == 64 ) && ( kMaxPackedNameLength % 3 == 0 ) && ( kMaxNameLength % 4 == 0 ) );
 
-	static U32 BinsForLength( U32 length ) { return ( length + 3 ) / 4; }
-	static U32 Advance( U32 binCount ) { return binCount * 3; }
-	
-	static int FindNameInList( const U8* name, const U8* listOfNames, int n, int* offset = NULL );
-	static bool ListsMatch( const U8* listOfNames1, const U8* listOfNames2, int n );
+	static int FindNameInList( const U8* name, const U8* listOfNames, int n );
 	static U32 NamesSize( const U8* listOfNames, int n );
 	static int EncodeName( U8* buf, const char* name, int kmask = kMaxPackedNameLength - 1 );
-	static int EncodeNameNoAlloc( const char* name );
+	static int CheckEncodability( const char* name );
 	static void DecodeName( char* name, const U8* buf, int n );
 
 	// N.B. name`must have a terminating NUL (when encoding) or an
 	// extra slot to receive the same (when decoding).
 
-	U8 *fData;
+	U8 fData[1];
+};
+
+class NamesReader {
+public:
+	NamesReader( const U8* stream );
+
+	NamesReader Clone() const { return NamesReader( fStream ); }
+		
+	void PullNext();
+	const U8* Current() const;
+		
+public:
+	int FindCurrentNameInList( NamesReader& headOfList, int n ) const;
+	bool MatchesList( const NamesReader& headOfOtherList, int n ) const;
+	U32 SizeOfList( int n ) const;
+	
+public:
+	void Decode( char* name ) const;
+	int GetPullCount() const { return fPulls; } // times PullNext() has been called / number of "count" bytes
+	int GetTotalBytes() const { return GetNameBytes() + fPulls; } // all counts
+	int GetNameBytes() const { return fTally + fCount; } // current count plus previous results
+
+private:
+	const U8* fStream;
+	int fCount;
+	int fPulls;
+	int fTally;
+};
+
+class LengthAccumulator {
+public:
+	LengthAccumulator() : fTotalBins( 0 ) {}
+
+	int GetTotalBytes() const;
+	void AddLength( int length );
+
+private:
+	int fTotalBins;
+};
+
+class NamesEncoder {
+public:
+	NamesEncoder( U8* stream, const LengthAccumulator& acc );
+
+	bool Encode( const char* name, int length );
+	void CheckTotalCount();
+
+private:
+	U8* fStream;
+	int fPos;
+	int fCount;
 };
 
 // ----------------------------------------------------------------------------
