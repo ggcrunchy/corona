@@ -47,19 +47,27 @@ CompositePaint::~CompositePaint()
 }
 
 void
+CompositePaint::PopulateTextureList( TextureList& list ) const
+{
+	if ( 0 == fExtraCount )
+	{
+		list.SetFill0( fPaint0->GetTexture() );
+		list.SetFill1( fPaint1->GetTexture() );
+	}
+	else
+	{
+		// TODO: relax + 2
+	
+		list.PointToArray( GetTexturesList(), fExtraCount + 2 );
+	}
+}
+
+void
 CompositePaint::UpdatePaint( RenderData& data )
 {
 	Super::UpdatePaint( data );
 
-	if ( 0 == fExtraCount )
-	{
-		data.fTextures.SetFill0( fPaint0->GetTexture() );
-		data.fTextures.SetFill1( fPaint1->GetTexture() );
-	}
-	else
-	{
-		data.fTextures.PointToArray( GetTexturesList(), fExtraCount + 2 );
-	}
+	PopulateTextureList( data.fTextures );
 }
 
 Texture *
@@ -69,18 +77,6 @@ CompositePaint::GetTexture() const
 
 	// Just in case...
 	return fPaint0->GetTexture();
-}
-
-const Texture*
-CompositePaint::GetTexture0() const
-{
-	return fPaint0->GetTexture();
-}
-
-const Texture*
-CompositePaint::GetTexture1() const
-{
-	return fPaint1->GetTexture();
 }
 
 const Paint*
@@ -118,7 +114,7 @@ CompositePaint::GetAdapter() const
 static U32
 TextureInfoSize( U32 extraCount, bool includeResources )
 {
-	U32 total = ( extraCount + 2 ) * sizeof(Texture*);
+	U32 total = ( extraCount + 2 ) * sizeof(Texture*); // TODO: relax + 2
 	
 	return total + ( includeResources ? extraCount * sizeof(PtrTR) : 0 );
 }
@@ -135,8 +131,10 @@ CompositePaint::PrepareExtraTextures( U32 count, const LengthAccumulator& names 
 		
 		Texture** texturesList = GetTexturesList();
 
-		texturesList[0] = fPaint0 ? fPaint0->GetTexture() : NULL;
-		texturesList[1] = fPaint1 ? fPaint1->GetTexture() : NULL;		
+		Rtt_ASSERT( fPaint0 && fPaint1 ); // TODO: possibly can be relaxed... maybe to fPaint0 || !fPaint1
+// for the last TODO, we could "mark as fill" these per the TextureList comments
+		texturesList[0] = fPaint0->GetTexture();
+		texturesList[1] = fPaint1->GetTexture();		
 	}
 	else
 	{
@@ -150,7 +148,7 @@ CompositePaint::CommitExtraTextures()
 {
 	Texture** texturesList = GetTexturesList();
 	PtrTR* list = (PtrTR*)GetTextureResourceList();
-	for ( U32 i = 0; i < fExtraCount; i++ )
+	for ( U32 i = 0; i < fExtraCount; i++ ) // TODO: relax + 2
 	{
 		texturesList[i + 2] = &list[i]->GetTexture();
 	}

@@ -424,10 +424,13 @@ Shader::IsPaintConsistent( const Paint* paint ) const // n.b. shader has no owne
 	if ( paint->IsType( Paint::kMultitexture ) )
 	{
 		const CompositePaint* compositePaint = (const CompositePaint*)paint;
-		const Texture *fill0 = compositePaint->GetTexture0(), *fill1 = compositePaint->GetTexture1();
+
+		TextureList list;
+		compositePaint->PopulateTextureList( list );
+
 		U32 extraCount = compositePaint->GetExtraCount();
-		Texture** extraTextures = extraCount > 0 ? compositePaint->GetTexturesList() + 2 : NULL;
-		return fResource->AreTexturesConsistent( fill0, fill1, extraTextures, extraCount, compositePaint->GetNameList(), &fRenderDataState );
+		Texture** extraTextures = extraCount > 0 ? list.GetArray() + 2 : NULL; // TODO: relax + 2
+		return fResource->AreTexturesConsistent( list.GetFill0(), list.GetFill1(), extraTextures, extraCount, compositePaint->GetNameList(), &fRenderDataState );
 	}
 	else
 	{

@@ -224,6 +224,12 @@ public:
 	bool IsArray() const;
 	bool IsEmpty() const { return ( NULL == fFill0 ) && ( NULL == fFill1 ); }
 	
+// TODO: static method to "mark as fill" (assumes only 1 or 2 textures in first spots)
+// then can support a GetPostFillCount() and GetPostFill() without knowing upfront that we have an array, and relax + 2 rule
+// in theory we can only have fill1 and not fill0 in the array, though seems odd :D
+	// since we really should have at least 4-byte alignment, another bit should be fine
+	// probably should double-check that WASM doesn't freak out over this pointer tagging :)
+	
 	const U8* GetNamesList() const;
 	
 	// these two assume we're using an array:

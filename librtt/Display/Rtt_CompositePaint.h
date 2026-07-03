@@ -33,12 +33,10 @@ class CompositePaint : public Paint
 		virtual ~CompositePaint();
 
 	public:
+		void PopulateTextureList( TextureList& list ) const;
+	
 		virtual void UpdatePaint( RenderData& data );
 		virtual Texture *GetTexture() const;
-
-	public:
-		const Texture* GetTexture0() const;
-		const Texture* GetTexture1() const;
 
 	public:
 		virtual const Paint* AsPaint( Type t ) const;

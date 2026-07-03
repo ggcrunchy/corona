@@ -1533,7 +1533,7 @@ GLCommandBuffer::Execute( bool measureGPU )
 					U8* extraNames = NULL;
 					if ( count > 2 )
 					{
-						extraCount = count - 2;
+						extraCount = count - 2; // TODO: relax + 2
 						extraBackingValues = backingValues + 2;
 						extraNames = fOffset;
 						

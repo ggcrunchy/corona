@@ -573,7 +573,7 @@ DoExtraTexturesDiffer( const LightPtrArray<Texture>& extraTextures, const Textur
 {
 	for ( int i = 0; i < count; i++ )
 	{
-		if ( extraTextures[i] != list.GetArray()[i + 2] )
+		if ( extraTextures[i] != list.GetArray()[i + 2] ) // TODO: relax + 2
 		{
 			return true;
 		}
@@ -1012,7 +1012,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 			
 			U32 usageMask = isSynced ? renderDataState->GetOccupancy() : 0x0;
 			for ( U32 i = 0, unit = 0; i < extraTextureCount; i++ )
-			{
+			{// TODO: relax + 2
 				Texture* extra = data->fTextures.GetArray()[i + 2]; // n.b. skip fill0 and fill1
 
 				bool usesTextureAndNew = ( usageMask & ( 1U << i ) ) && ( extra != fExtraTextures[unit] );
