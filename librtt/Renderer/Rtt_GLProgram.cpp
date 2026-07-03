@@ -881,7 +881,7 @@ struct SamplerItem {
 };
 
 static bool
-ValidateLaterVersion( const ShaderResource* shaderResource, const SamplerTypeDetails builtinInfo[2], GLint numUnits, SamplerItem items[] )
+ValidateLaterVersion( const ShaderResource* shaderResource, const SamplerTypeDetails builtinInfo[2], int numUnits, SamplerItem items[] )
 {
 	if ( shaderResource->GetExtraTextureCount() != numUnits )
 	{
@@ -920,14 +920,13 @@ ValidateLaterVersion( const ShaderResource* shaderResource, const SamplerTypeDet
 	return true;
 }
 
-static U32
+static void
 GatherSamplers( GLuint program, GLchar stash[], SamplerItem items[], const int numItems, SamplerTypeDetails builtinInfo[], LengthAccumulator& nameLengths )
 {
 	GLint activeUniformCount = 0, maxUnits;
 	glGetProgramiv( program, GL_ACTIVE_UNIFORMS, &activeUniformCount );
 	glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits );
 
-	U32 numUnits = 0;
 	GLchar * buf = stash;
     for ( GLint i = 0; i < activeUniformCount; i++ )
     {
@@ -955,7 +954,7 @@ GatherSamplers( GLuint program, GLchar stash[], SamplerItem items[], const int n
 			Rtt_LogException( "WARNING: sampler name `%s` is too long; skipping", buf );
 			continue;
 		}
-		else if ( numItems == numUnits || maxUnits == numUnits )
+		else if ( numItems == nameLengths.GetCount() || maxUnits == nameLengths.GetCount() )
 		{
 			Rtt_LogException( "WARNING: sampler `%s` potentially valid, but %u units already allocated; ignoring", buf, numItems );
 			continue;
@@ -970,6 +969,8 @@ GatherSamplers( GLuint program, GLchar stash[], SamplerItem items[], const int n
 	
 		Rtt_ASSERT( -1 != loc );
 
+		int numUnits = nameLengths.GetCount();
+
 		items[numUnits].buf = buf;
 		items[numUnits].extraLoc = loc;
 		items[numUnits].length = (U8)length;
@@ -978,17 +979,14 @@ GatherSamplers( GLuint program, GLchar stash[], SamplerItem items[], const int n
 		nameLengths.AddLength( length );
 		
 		buf += ExtraTextureInfo::kMaxNameLength;
-		
-		numUnits++;
 	}
-
-	return numUnits;
 }
 
 static void
-AttachExtraTextureInfo( ShaderResource* shaderResource, SamplerItem items[], U32 numUnits, SamplerTypeDetails builtinInfo[], const LengthAccumulator& nameLengths )
+AttachExtraTextureInfo( ShaderResource* shaderResource, SamplerItem items[], SamplerTypeDetails builtinInfo[], const LengthAccumulator& nameLengths )
 {
 	U8* extraTextureInfo = NULL;
+	int numUnits = nameLengths.GetCount();
 	if ( numUnits > 0 )
 	{
 		qsort( items, numUnits, sizeof(SamplerItem), SamplerItem::Compare ); // n.b. also done by Paint
@@ -1143,19 +1141,19 @@ GLProgram::Update( Program::Version version, VersionData& data )
     GLchar stash[kNumItems * ExtraTextureInfo::kMaxNameLength + 2]; // n.b. 2 bytes for NUL + one guard character
 	
 	LengthAccumulator nameLengths;
-	U32 numUnits = GatherSamplers( data.fProgram, stash, items, kNumItems, builtinInfo, nameLengths );
+	GatherSamplers( data.fProgram, stash, items, kNumItems, builtinInfo, nameLengths );
 
 	ShaderResource* shaderResource = program->GetShaderResource();
 	if ( !shaderResource->HasTextureInfo() )
 	{
-		AttachExtraTextureInfo( shaderResource, items, numUnits, builtinInfo, nameLengths );
+		AttachExtraTextureInfo( shaderResource, items, builtinInfo, nameLengths );
 	}
 	else
 	{
-		Rtt_VERIFY( ValidateLaterVersion( shaderResource, builtinInfo, numUnits, items ) );
+		Rtt_VERIFY( ValidateLaterVersion( shaderResource, builtinInfo, nameLengths.GetCount(), items ) );
 	}
 	
-	for (int i = 0; i < numUnits; i++)
+	for (int i = 0, iMax = nameLengths.GetCount(); i < iMax; i++)
 	{
 		glUniform1i( items[i].extraLoc, Texture::kNumUnits + items[i].extraLocUnit );
 	}
