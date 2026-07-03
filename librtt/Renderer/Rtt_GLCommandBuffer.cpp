@@ -85,6 +85,7 @@ namespace /*anonymous*/
         kCommandDrawIndexed,
         kCommandCheckConsistency,
         kCommandRestoreConsistency,
+        kCommandJump,
         kNumCommands
     };
 
@@ -763,8 +764,8 @@ GLCommandBuffer::Clear(Real r, Real g, Real b, Real a)
 void
 GLCommandBuffer::Draw( U32 offset, U32 count, Geometry::PrimitiveType type )
 {
-    Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-    ApplyUniforms( fProgram->GetGPUResource() );
+//    Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
+//    ApplyUniforms( fProgram->GetGPUResource() );
     
     WRITE_COMMAND( kCommandDraw );
     switch( type )
@@ -786,8 +787,8 @@ GLCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
     // The first argument, offset, is currently unused. If support for non-
     // VBO based indexed rendering is added later, an offset may be needed.
 
-    Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
-    ApplyUniforms( fProgram->GetGPUResource() );
+//    Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
+//    ApplyUniforms( fProgram->GetGPUResource() );
     
     WRITE_COMMAND( kCommandDrawIndexed );
     switch( type )
@@ -798,12 +799,54 @@ GLCommandBuffer::DrawIndexed( U32, U32 count, Geometry::PrimitiveType type )
     Write<GLsizei>(count);
 }
 
+GLCommandBuffer::Label
+GLCommandBuffer::EmitLabel()
+{
+	Label label;
+
+	label.byteCount = fBytesUsed;
+	label.commandCount = fNumCommands;
+	label.hasSkipInfo = false;
+	
+	return label;
+}
+
+GLCommandBuffer::Label
+GLCommandBuffer::EmitLabelWithSkipInfo()
+{
+	Reserve( sizeof(SkipInfo) ); // skip count, to pos2
+
+	Label label = EmitLabel();
+	
+	label.hasSkipInfo = true;
+	
+	return label;
+}
+    
+void
+GLCommandBuffer::BridgeLabels( const Label& from, const Label& to )
+{
+	Rtt_ASSERT( from.hasSkipInfo );
+
+	SkipInfo skip;
+	skip.byteCount = to.byteCount - from.byteCount;
+	skip.commandCount = to.commandCount - from.commandCount;
+
+	memcpy( &fBuffer[from.byteCount - sizeof(SkipInfo)], &skip, sizeof(SkipInfo) );
+}
+		
+void
+GLCommandBuffer::ApplySkipInfo( const SkipInfo& info )
+{
+	fOffset += info.byteCount;
+	fNumCommands -= info.commandCount;
+}
+
 void
 GLCommandBuffer::CheckTextureConsistency( ShaderResource* shaderResource, Program* defaultProgram, const TextureList* list, const U8* extraNames )
 {
 	WRITE_COMMAND( kCommandCheckConsistency );
 	Write<ShaderResource*>( shaderResource );
-	Write<GPUResource*>( defaultProgram->GetGPUResource() );
 	if ( list->IsEmpty() )
 	{
 		Write<S16>( -1 );
@@ -836,13 +879,43 @@ GLCommandBuffer::CheckTextureConsistency( ShaderResource* shaderResource, Progra
 			}
 		}
 	}
+		
+	Label start = EmitLabelWithSkipInfo();
+
+	// "consistent" textures path:
+
+	{
+		LoadUniforms();
+
+		WRITE_COMMAND( kCommandJump );
+	}
+
+	Label split = EmitLabelWithSkipInfo();
+	
+	BridgeLabels( start, split ); // skip
+
+	// "inconsistent" textures path:
+
+	{
+		BindProgram( defaultProgram, fCurrentPrepVersion );
+		LoadUniforms();
+	}
+	
+	BridgeLabels( split, EmitLabel() ); // skip
 }
 
 void
 GLCommandBuffer::RestoreConsistency( Program* previous )
 {
 	WRITE_COMMAND( kCommandRestoreConsistency );
-	Write<GPUResource*>( previous->GetGPUResource() );
+
+	Label start = EmitLabelWithSkipInfo();
+	
+	{
+		BindProgram( previous, fCurrentPrepVersion );
+	}
+
+	BridgeLabels( start, EmitLabel() ); // skip
 }
 
 S32
@@ -1023,7 +1096,7 @@ GLCommandBuffer::Execute( bool measureGPU )
 				fbo->Bind( asDrawBuffer );
 				DEBUG_PRINT( "Bind FrameBufferObject (as draw buffer = %s): OpenGL name: %i, OpenGL Texture name, if any: %d",
 								asDrawBuffer ? "true" : "false",
-								fbo->GetName(),
+								fbo->GetName(),fskip
                                 fbo->GetTextureName() );
                 CHECK_ERROR_AND_BREAK;
             }
@@ -1440,7 +1513,6 @@ GLCommandBuffer::Execute( bool measureGPU )
             case kCommandCheckConsistency:
             {
 				ShaderResource* shaderResource = Read<ShaderResource*>();
-                GLProgram* defProgram = Read<GLProgram*>();
                 S16 count = Read<S16>();
 
 				U32 extraCount = 0;
@@ -1475,8 +1547,6 @@ GLCommandBuffer::Execute( bool measureGPU )
 
                 if ( areTexturesInconsistent )
                 {
-					defProgram->Bind( fCurrentDrawVersion );
-					
 					fOffset += extraCount * sizeof(GLTexture*); // unused, so skip
 				}
 				else
@@ -1496,16 +1566,29 @@ GLCommandBuffer::Execute( bool measureGPU )
 						}
 					}
 				}
+				
+				SkipInfo skip = Read<SkipInfo>();
+				if ( areTexturesInconsistent )
+				{
+					ApplySkipInfo( skip );
+				}
+				
 				CHECK_ERROR_AND_BREAK;
             }
             case kCommandRestoreConsistency:
             {
-                GLProgram* previous = Read<GLProgram*>();
-                if ( areTexturesInconsistent )
-                {
-					previous->Bind( fCurrentDrawVersion );
-					areTexturesInconsistent = false;
-                }
+				SkipInfo skip = Read<SkipInfo>();
+				if ( !areTexturesInconsistent )
+				{
+					ApplySkipInfo( skip );
+				}
+				areTexturesInconsistent = false;
+				CHECK_ERROR_AND_BREAK;
+            }
+            case kCommandJump:
+            {
+				SkipInfo skip = Read<SkipInfo>();
+				ApplySkipInfo( skip );
 				CHECK_ERROR_AND_BREAK;
             }
             default:
@@ -1590,6 +1673,12 @@ GLCommandBuffer::Write( T value )
 
     memcpy( /*fBuffer + fBytesUsed*/writePos, &value, size );
     //fBytesUsed += size;
+}
+
+void GLCommandBuffer::LoadUniforms()
+{
+    Rtt_ASSERT( fProgram && fProgram->GetGPUResource() );
+    ApplyUniforms( fProgram->GetGPUResource() );
 }
 
 void GLCommandBuffer::ApplyUniforms( GPUResource* resource )

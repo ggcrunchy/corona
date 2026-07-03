@@ -693,14 +693,22 @@ ShaderResource::AreFormatsConsistent( U32 fillBackingValues[], U32 extraTextureB
 	const SamplerTypeDetails* shaderDetails = GetExtraTextureDetails();
 	const U8* shaderNames = GetExtraTextureNames();
 
-	Rtt_ASSERT( iMax == 0 || ( NULL != extraTextureBackingValues ) );
 	Rtt_ASSERT( ( NULL != extraTextureBackingValues ) == ( NULL != paintNames ) );
 
 	if ( iMax > extraCount )
 	{
-		Rtt_LogException( "WARNING: shader has %i samplers to bind, but only %u textures provided in `extraPaint`", iMax, extraCount );
+		char buf[128] = "no";
+		
+		if ( extraCount )
+		{
+			sprintf( buf, "only %u", extraCount );
+		}
+
+		Rtt_LogException( "WARNING: shader has %i samplers to bind, but %s textures provided in `extraPaints`", iMax, buf );
 		return false;
 	}
+
+	Rtt_ASSERT( iMax == 0 || ( NULL != extraTextureBackingValues ) );
 
 	U32 occupancyMask = 0;
 	int basePaintIndex = 0; // both name lists are sorted, so avoid searching entire list each iteration

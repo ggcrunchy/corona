@@ -104,6 +104,7 @@ class CommandBuffer
         virtual void Clear( Real r, Real g, Real b, Real a ) = 0;
         virtual void Draw( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
         virtual void DrawIndexed( U32 offset, U32 count, Geometry::PrimitiveType type ) = 0;
+        virtual void LoadUniforms() {} /* TODO? grumble, grumble */
         
         virtual void CheckTextureConsistency( ShaderResource* shaderResource, Program* defaultProgram, const TextureList* list, const U8* extraNames ) {}
         virtual void RestoreConsistency( Program* previous ) {}

@@ -1724,7 +1724,11 @@ Renderer::CheckAndInsertDrawCommand()
 			ShaderResource::ProgramMod mod = fGuardDraw.fIsMod25 ? ShaderResource::k25D : ShaderResource::kDefault;
 			fBackCommandBuffer->CheckTextureConsistency( fGuardDraw.fPrevious->GetShaderResource(), fDefaultPrograms[mod], &fGuardDraw.fList, fGuardDraw.fNames );
 		}
-	
+		else
+		{
+			fBackCommandBuffer->LoadUniforms();
+		}
+
         if( fPreviousPrimitiveType == Geometry::kIndexedTriangles )
         {
             fBackCommandBuffer->DrawIndexed( fIndexOffset, fIndexCount, fPreviousPrimitiveType );

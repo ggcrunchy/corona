@@ -82,6 +82,24 @@ class GLCommandBuffer : public CommandBuffer
         // Execute all buffered commands. A valid OpenGL context must be active.
         virtual Real Execute( bool measureGPU );
     
+    public:
+		struct SkipInfo {
+			U16 byteCount;
+			U16 commandCount;
+		};
+    
+		struct Label {
+			int byteCount;
+			int commandCount;
+			bool hasSkipInfo;
+		};
+		
+		Label EmitLabel();
+		Label EmitLabelWithSkipInfo();
+    
+		void BridgeLabels( const Label& from, const Label& to );
+		void ApplySkipInfo( const SkipInfo& info );
+    
     private:
         virtual void InitializeFBO();
         virtual void InitializeCachedParams();
@@ -104,6 +122,7 @@ class GLCommandBuffer : public CommandBuffer
 			U32 timestamp;
 		};
 		
+		virtual void LoadUniforms(); // TODO: just a silly wrapper
 		void ApplyUniforms( GPUResource* resource );
 		void ApplyUniform( GPUResource* resource, U32 index );
 		void WriteUniform( Uniform* uniform );
