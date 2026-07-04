@@ -230,10 +230,10 @@ ProcessExtensions( TextureFactory& factory, const CoronaExternalTextureCallbacks
 	{
 		switch ( ext->type )
 		{
-		case kTextureTarget:
+		case kExternalTextureExtension_TextureTarget:
 			ProcessTarget( (CoronaExternalTextureExtension_TextureTarget*)ext, bitmap );
 			break;
-		case kCustomFormat:
+		case kExternalTextureExtension_CustomFormat:
 			ProcessFormat( factory, (CoronaExternalTextureExtension_CustomFormat*)ext, bitmap );
 			break;
 		default:

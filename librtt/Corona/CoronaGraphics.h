@@ -160,11 +160,11 @@ typedef struct CoronaExternalTextureCallbacks
 typedef enum {
 	/**
 	*/
-	kTextureTarget,
+	kExternalTextureExtension_TextureTarget,
 	
 	/**
 	*/
-	kCustomFormat, // must be registered, but thus can change what component count, etc. are
+	kExternalTextureExtension_CustomFormat, // must be registered, but thus can change what component count, etc. are
 } CoronaExternalTextureExtensionType;
 
 // TODO: future possibilities... kAllowSubimage, e.g. some "window" method, picked up by invalidate(); kNoPremultiply

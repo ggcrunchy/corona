@@ -883,8 +883,7 @@ GLCommandBuffer::CheckTextureConsistency( ShaderResource* shaderResource, Progra
 		
 	Label start = EmitLabelWithSkipInfo();
 
-	// "consistent" textures path:
-
+	/* IF ( textures consistent) */
 	{
 		LoadUniforms();
 
@@ -895,8 +894,7 @@ GLCommandBuffer::CheckTextureConsistency( ShaderResource* shaderResource, Progra
 	
 	BridgeLabels( start, split ); // skip
 
-	// "inconsistent" textures path:
-
+	/* ELSE */
 	{
 		BindProgram( defaultProgram, fCurrentPrepVersion );
 		LoadUniforms();
@@ -912,11 +910,14 @@ GLCommandBuffer::RestoreConsistency( Program* previous )
 
 	Label start = EmitLabelWithSkipInfo();
 	
+	/* IF ( textures not consistent ) */
 	{
 		BindProgram( previous, fCurrentPrepVersion );
 	}
 
 	BridgeLabels( start, EmitLabel() ); // skip
+	
+	/* end if */
 }
 
 S32
@@ -1202,9 +1203,6 @@ GLCommandBuffer::Execute( bool measureGPU )
                 U16 attributeCount = Read<U16>();
                 
                 Array< FormatExtensionList::Attribute > attributeArr( fAllocator );
-
-                std::vector< FormatExtensionList::Attribute > attributes;
-                std::vector< FormatExtensionList::Group > groups;
                 
                 for (U32 i = 0; i < attributeCount; ++i)
                 {
