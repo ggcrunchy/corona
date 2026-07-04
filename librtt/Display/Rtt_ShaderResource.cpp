@@ -490,6 +490,7 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
     fDetailNames( NULL ),
     fDetailValues( NULL ),
     fDetailsCount( 0U ),
+    fExtensionPrelude( NULL ),
     fExtraTextureInfo( NULL ),
     fShellTransform( NULL ),
 	fTimeTransform( NULL ),
@@ -515,6 +516,7 @@ ShaderResource::ShaderResource( Program *program, ShaderTypes::Category category
     fDetailNames( NULL ),
     fDetailValues( NULL ),
     fDetailsCount( 0U ),
+    fExtensionPrelude( NULL ),
     fExtraTextureInfo( NULL ),
     fShellTransform( NULL ),
 	fTimeTransform( NULL ),
@@ -567,6 +569,7 @@ ShaderResource::~ShaderResource()
 
     SetEffectCallbacks( NULL );
     SetShellTransform( NULL );
+	SetExtensionPrelude( NULL );
 }
 
 void
@@ -701,7 +704,7 @@ ShaderResource::AreFormatsConsistent( U32 fillBackingValues[], U32 extraTextureB
 		
 		if ( extraCount )
 		{
-			sprintf( buf, "only %u", extraCount );
+			snprintf( buf, sizeof(buf), "only %u", extraCount );
 		}
 
 		Rtt_LogException( "WARNING: shader has %i samplers to bind, but %s textures provided in `extraPaints`", iMax, buf );
@@ -793,6 +796,17 @@ ShaderResource::GetFirstBoundProgram() const
 	{
 		return NULL;
 	}
+}
+
+void
+ShaderResource::SetExtensionPrelude( const char* prelude )
+{
+	if ( NULL != fExtensionPrelude )
+	{
+		Rtt_FREE( fExtensionPrelude );
+	}
+	
+	fExtensionPrelude = ( NULL != prelude ) ? strdup( prelude ) : NULL;
 }
 
 void

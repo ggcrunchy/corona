@@ -301,6 +301,10 @@ class ShaderResource
 		void PrepareFirstBind( const Program* program, int version );
 		void SyncBinding();
         
+	public:
+		void SetExtensionPrelude( const char* prelude );
+		const char* GetExtensionPrelude() const { return fExtensionPrelude; }
+        
     private:
         void Init(Program *defaultProgram);
 
@@ -317,6 +321,7 @@ class ShaderResource
         SharedPtr<FormatExtensionList> fExtensionList;
         std::vector< std::string > fDetailNames;
         std::vector< std::string > fDetailValues;
+        char* fExtensionPrelude;
         const ExtraTextureInfo *fExtraTextureInfo;
         U32 fDetailsCount;
         TimeTransform *fTimeTransform;

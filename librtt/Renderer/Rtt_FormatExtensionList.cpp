@@ -501,7 +501,7 @@ FormatExtensionList::Build( Rtt_Allocator* allocator, const CoronaVertexExtensio
                
                 char buf[3] = {}; // two digits, cf. kWindowSizeLimit
                 
-                sprintf( buf, "%i", j + 1 );
+                snprintf( buf, sizeof(buf), "%i", j + 1 );
                 
                 str->Append( buf );
                 

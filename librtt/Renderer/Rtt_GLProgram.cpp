@@ -323,13 +323,15 @@ IsDoubleType( CoronaVertexExtensionAttributeType )
     return false; // NYI
 }
 
+#define ARRAY_AND_N( NAME ) NAME, sizeof(NAME)
+
 static void
 AppendMacroName( const char* name, std::string& extensionAttributes )
 {
     char buf[BUFSIZ];
     const char * rest = name + 1;
     
-    sprintf( buf, "#define Corona%c%s a_%s\n", toupper( *name ), *rest ? rest : "", name );
+    snprintf( ARRAY_AND_N( buf ), "#define Corona%c%s a_%s\n", toupper( *name ), *rest ? rest : "", name );
 
     extensionAttributes += buf;
 }
@@ -365,7 +367,7 @@ GatherAttributeExtensions( const FormatExtensionList* extensionList, std::string
             vec = "ivec";
         }
             
-        sprintf( buf, "attribute %s%s a_%s;\n", *count ? vec : prim, count, extensionList->FindNameByAttribute( i ) );
+        snprintf( ARRAY_AND_N( buf ), "attribute %s%s a_%s;\n", *count ? vec : prim, count, extensionList->FindNameByAttribute( i ) );
         
         extensionAttributes += buf;
     }
@@ -399,10 +401,18 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 
     const char *program_header_source = program->GetHeaderSource();
     const char *header = ( program_header_source ? program_header_source : "" );
+    
+	ShaderResource * shaderResource = program->GetShaderResource();
+    const char *languageExtensions = shaderResource->GetExtensionPrelude();
+
+	char header_with_resolved_exts[BUFSIZ];
+	snprintf( ARRAY_AND_N( header_with_resolved_exts ), header, languageExtensions ? languageExtensions : "" );
+	// ^^^ would be better if just supplying these as sources below, but header is built the way
+	// it is, and extensions need to crowd in there too...
 
     const char* shader_source[5];
     memset( shader_source, 0, sizeof( shader_source ) );
-    shader_source[0] = header;
+    shader_source[0] = header_with_resolved_exts;
     shader_source[1] = highp_support;
     shader_source[2] = maskBuffer;
     shader_source[3] = texCoordZBuffer;
@@ -414,7 +424,6 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
         data.fHeaderNumLines = CountLines( shader_source, numSegments );
     }
     
-    ShaderResource * shaderResource = program->GetShaderResource();
     const CoronaShellTransform * shellTransform = shaderResource->GetShellTransform();
     CoronaShellTransformParams params = {};
     const char * hints[] = { "header", "highpSupport", "mask", "texCoordZ", NULL };
@@ -499,7 +508,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
                             version[offset] = shader_source[0][offset];
                         }
                         
-                        sprintf( buf,
+                        snprintf( ARRAY_AND_N( buf ),
                                 "%s\n\n#extension GL_%s_draw_instanced : enable%s",
                                 version, idSuffix, shader_source[0] + offset );
                         
@@ -508,7 +517,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
                         extendedSources[0] = versionStr.c_str();
                     }
                     
-					sprintf( buf,
+					snprintf( ARRAY_AND_N( buf ),
 							"\n#define CoronaInstanceID int(gl_InstanceID%s)\n"
 							"\n#define CoronaInstanceFloat float(gl_InstanceID%s)\n\n",
 							idSuffix, idSuffix );
@@ -1039,7 +1048,7 @@ GLProgram::Update( Program::Version version, VersionData& data )
             S32 index;
             char buf[BUFSIZ];
             
-            sprintf( buf, "a_%s", extensionList->FindNameByAttribute( i, &index ) );
+            snprintf( ARRAY_AND_N( buf ), "a_%s", extensionList->FindNameByAttribute( i, &index ) );
             
             glBindAttribLocation( data.fProgram, first + index, buf );
         }
@@ -1350,6 +1359,8 @@ GLProgram::GetExtraUniformsInfo( Program::Version version, GLExtraUniforms& extr
 {
     extraUniforms = GLExtraUniforms( version, fData, &fUniformsCache );
 }
+
+#undef ARRAY_AND_N
 
 // ----------------------------------------------------------------------------
 

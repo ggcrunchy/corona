@@ -821,6 +821,137 @@ ShaderFactory::BindVertexExtension( lua_State *L, int index, const SharedPtr< Sh
     lua_pop( L, 1 ); // ...
 }
 
+static const char*
+CheckExtensionName( lua_State *L, int* colonPos )
+{
+	if ( !lua_isstring( L, -1 ) )
+	{
+		CoronaLuaWarning( L, "Expected string name in `languageExtensions`, got '%s'", luaL_typename( L, -1 ) );
+		return NULL;
+	}
+
+	const char* ext = lua_tostring( L, -1 );
+	const char* colonAndRest = strchr( ext, ':' );
+
+	if ( NULL == colonAndRest )
+	{
+		return ext;
+	}
+	else if ( NULL != strchr( colonAndRest + 1, ':' ) )
+	{
+		CoronaLuaWarning( L, "Multiple colons in name found in `languageExtensions`" );
+		return NULL;
+	}
+	else
+	{
+		const char* behavior = colonAndRest + 1;
+		const char* choices[] = { "require", "enable", "warn", "disable" };
+		for ( const char* what : choices )
+		{
+			if ( 0 == strcmp( what, behavior ) )
+			{
+				*colonPos = (int)( colonAndRest - ext );
+			
+				return ext;
+			}
+		}
+
+		CoronaLuaWarning( L, "Unknown behavior found in `languageExtensions` name: '%s'", behavior );
+		return NULL;
+	}
+}
+
+void
+ShaderFactory::BindLanguageExtensions( lua_State *L, int index, const SharedPtr< ShaderResource >& resource )
+{
+    Rtt_LUA_STACK_GUARD(L);
+
+    lua_getfield( L, index, "languageExtensions" ); // ..., extensions?
+
+    if (lua_istable( L, -1 ))
+    {
+		bool ok = true;
+		std::vector<std::string> require, enable, warn, disable;
+		
+		for ( size_t i = 1, len = lua_objlen( L, -1 ); i <= len && ok; i++ )
+		{
+			lua_rawgeti( L, -1, (int)i );
+			
+			int colonPos = -1;
+			const char* ext = CheckExtensionName( L, &colonPos );
+			
+			lua_pop( L, 1 );
+			
+			const char* rest = NULL;
+			std::string s = "#extension ";
+			if ( colonPos > 0 )
+			{
+				Rtt_ASSERT ( NULL != ext );
+					
+				s.append( ext, colonPos );
+				
+				rest = ext + colonPos + 1;
+			}
+			else if ( NULL != ext )
+			{
+				s.append( ext );
+				
+				rest = "require";
+			}
+			
+			if ( NULL != rest )
+			{			
+				s += " : ";
+				s += rest;
+				s += '\n';
+				
+				switch ( *rest )
+				{
+				case 'r':
+					require.push_back( s );
+					break;
+				case 'e':
+					enable.push_back( s );
+					break;
+				case 'w':
+					warn.push_back( s );
+					break;
+				case 'd':
+					disable.push_back( s );
+					break;
+				default:
+					Rtt_ASSERT_NOT_REACHED();
+				}
+			}
+			else
+			{
+				ok = false;
+			}
+		}
+		 
+		if ( ok )
+		{
+			std::string full;
+			std::vector<std::string> *stringVecs[] = { &require, &enable, &warn, &disable };
+			for ( auto *list : stringVecs )
+			{
+				for ( const std::string& s : *list )
+				{
+					full += s;
+				}
+			}
+			
+			resource->SetExtensionPrelude( full.c_str() );
+		}
+		else
+		{
+			lua_pop( L, 1 );
+		}
+    }
+
+    lua_pop( L, 1 ); // ...
+}
+
 // shaderIndex is the index into the Lua table that defines the shader
 void
 ShaderFactory::InitializeBindings( lua_State *L, int shaderIndex, const SharedPtr< ShaderResource >& resource )
@@ -836,6 +967,7 @@ ShaderFactory::InitializeBindings( lua_State *L, int shaderIndex, const SharedPt
     BindShellTransform( L, shaderIndex, resource );
     BindVertexExtension( L, shaderIndex, resource );
 	BindTimeTransform( L, shaderIndex, resource );
+	BindLanguageExtensions( L, shaderIndex, resource );
 
 	Program* program = resource->GetProgramMod( ShaderResource::kDefault );
 	if ( NULL == resource->GetShellTransform() && !program->GetMightHaveNonDefaultDetails() )
@@ -1859,7 +1991,7 @@ SetExternalInfo( lua_State * L, const char * name, const char * type )
 	
 	char key[BUFSIZ];
 	
-	sprintf( key, "coronashaderexternalinfo:%s:%s", type, name );
+	snprintf( key, sizeof(key), "coronashaderexternalinfo:%s:%s", type, name );
 	
 	lua_insert( L, -2 ); // ..., ei, object
 	lua_setfield( L, -2, key ); // ..., ei = { ..., key = object }
