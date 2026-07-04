@@ -570,6 +570,11 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 
 // The lane can also be used to look up the corresponding metadata.
 
+// TODO: after some searching, discovered https://raw.githubusercontent.com/KhronosGroup/glslang/refs/heads/main/glslang/MachineIndependent/gl_types.h
+// ^^^ looks like GL_FLOAT16_(SAMPLER|IMAGE)_* missing; can probably repair this by hand, at need
+// it's one big swath in 0x91* (CE-EA)... looks safe: any low bytes in that range only have one use
+// adds 29 values -> 102
+
 struct SamplerTypeConstantQuad {
 	U16 fValues[4];
 };
@@ -797,6 +802,7 @@ ClassifySampler( GLenum type )
 
 		/* 0xC0-0xD8 */
 		7, 13, 12, 12, 8, 12, 0, 0, 0, 10, 9, 9, 11, 8, 13, 7, 14, 6, 14, 18, 15, 15, 15, 16, 18
+// TODO (see above, re. 16-bit): expand this range out to 0xEA; might need to play the cuckoo with some of these :D
 	};
 	
 	const int Base1 = 1;
@@ -1003,7 +1009,6 @@ AttachExtraTextureInfo( ShaderResource* shaderResource, SamplerItem items[], Sam
 			*details++ = items[i].details;
 
 			encoder.Encode( items[i].buf, items[i].length );
-			
 		}
 		encoder.CheckTotalCount();
 	}

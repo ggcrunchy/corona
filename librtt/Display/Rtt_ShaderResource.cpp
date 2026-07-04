@@ -234,7 +234,7 @@ NamesReader::Decode( char* name ) const
 {
 	Rtt_ASSERT( fStream );
 
-	ExtraTextureInfo::DecodeName( name, Current(), fCount );
+	ExtraTextureInfo::DecodeName( name, Current(), LengthToBins( fCount ) );
 }
 	
 // ----------------------------------------------------------------------------
@@ -719,16 +719,18 @@ ShaderResource::AreFormatsConsistent( U32 fillBackingValues[], U32 extraTextureB
 		shaderNamesIter.PullNext();
 	
 		int index = shaderNamesIter.FindCurrentNameInList( paintNamesIter, extraCount - basePaintIndex );
+		
+		basePaintIndex += index;
+				
 		if ( index < 0 )
 		{
 			return ReportError( shaderNamesIter, "WARNING: unable to match sampler `%s` with a corresponding texture from the paint" );
 		}
-		else if ( !DetailsAgreeWithFormat( extraTextureBackingValues[i], shaderDetails[i] ) )
+		else if ( !DetailsAgreeWithFormat( extraTextureBackingValues[basePaintIndex], shaderDetails[i] ) )
 		{
 			return ReportError( shaderNamesIter, "WARNING: sampler `%s` inconsistent with image provided in `extraPaints`" );
 		}
 
-		basePaintIndex += index;
 		occupancyMask |= 1U << basePaintIndex;
 	}
 	

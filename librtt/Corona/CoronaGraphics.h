@@ -212,11 +212,11 @@ typedef enum {
 typedef enum {
 	/**
 	*/
-	kTextureShape_1D,
+	kTextureShape_2D,
 
 	/**
 	*/
-	kTextureShape_2D,
+	kTextureShape_1D,
 
 	/**
 	*/
