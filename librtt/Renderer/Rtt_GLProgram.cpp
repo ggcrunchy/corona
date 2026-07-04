@@ -515,6 +515,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
                         versionStr = buf;
                         
                         extendedSources[0] = versionStr.c_str();
+                        // ^^^ TODO: add this to header_with_resolved_exts, above
                     }
                     
 					snprintf( ARRAY_AND_N( buf ),

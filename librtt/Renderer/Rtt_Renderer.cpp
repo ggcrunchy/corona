@@ -638,7 +638,8 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 			const Program* refProgram = shaderResource->GetFirstBoundProgram();
 			if ( NULL != refProgram || shaderResource->HasTextureInfo() )
 			{
-				if ( shaderResource->AreTexturesConsistent( fillTexture0, fillTexture1, fExtraTextures.WriteAccess(), extraTextureCount, paintNames, renderDataState ) )
+				Texture** extraTextures = extraTextureCount > 0 ? data->fTextures.GetArray() + 2 : NULL; // TODO: relax + 2
+				if ( shaderResource->AreTexturesConsistent( fillTexture0, fillTexture1, extraTextures, extraTextureCount, paintNames, renderDataState ) )
 				{
 					renderDataState->SetSyncState( RenderDataState::kSyncConsistent );
 				}

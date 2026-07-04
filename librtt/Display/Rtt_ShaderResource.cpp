@@ -700,7 +700,7 @@ ShaderResource::AreFormatsConsistent( U32 fillBackingValues[], U32 extraTextureB
 
 	if ( iMax > extraCount )
 	{
-		char buf[128] = "no";
+		char buf[32] = "no";
 		
 		if ( extraCount )
 		{
