@@ -853,7 +853,7 @@ GLCommandBuffer::CheckTextureConsistency( ShaderResource* shaderResource, Progra
 	}
 	else
 	{
-		Write<S16>( list->IsArray() ? list->GetCount() : 2 );
+		Write<S16>( list->IsArray() ? list->GetCount() : 2 ); // TODO relax + 2
 
 		Texture* fill0 = list->GetFill0();
 		Texture* fill1 = list->GetFill1();
@@ -861,21 +861,22 @@ GLCommandBuffer::CheckTextureConsistency( ShaderResource* shaderResource, Progra
 		Write<U32>( fill0 ? fill0->GetFormat().GetBackingValue() : 0 );
 		Write<U32>( fill1 ? fill1->GetFormat().GetBackingValue() : 0 );
 
-		if ( list->IsArray() && list->GetCount() > 2 )
+		U32 extraTexturesCount = list->GetCountAfterFills();
+		if ( extraTexturesCount > 0 )
 		{
-			for ( int i = 2, iMax = list->GetCount(); i < iMax; i++ )
+			for ( U32 i = 0; i < extraTexturesCount; i++ )
 			{
-				Write<U32>( list->GetArray()[i]->GetFormat().GetBackingValue() );
+				Write<U32>( list->GetPositionAfterFills()[i]->GetFormat().GetBackingValue() );
 			}
 			
-			U32 size = ExtraTextureInfo::NamesSize( extraNames, list->GetCount() - 2 );
+			U32 size = ExtraTextureInfo::NamesSize( extraNames, extraTexturesCount );
 			U8* names = Reserve( size );
 
 			memcpy( names, extraNames, size );
 			
-			for ( int i = 2, iMax = list->GetCount(); i < iMax; i++ )
+			for ( U32 i = 0; i < extraTexturesCount; i++ )
 			{
-				Write<GPUResource*>( list->GetArray()[i]->GetGPUResource() );
+				Write<GPUResource*>( list->GetPositionAfterFills()[i]->GetGPUResource() );
 			}
 		}
 	}

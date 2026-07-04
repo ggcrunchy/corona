@@ -355,11 +355,22 @@ TextureList::IsArray() const
 // ^^^ TODO? we could add this same low bit trick to mark fill textures
 // and dispense with much of the weirdness
 
+Texture**
+TextureList::GetPositionAfterFills() const
+{
+	return IsArray() ? GetArray() + 2 : NULL; // TODO relax + 2 :D
+}
+	
+U32
+TextureList::GetCountAfterFills() const
+{
+	return IsArray() ? GetCount() - 2 : 0; // TODO relax + 2 :D
+}
+
 const U8*
 TextureList::GetNamesList() const
 {
-	// TODO: count - 2? (need actual policy for possibly-missing fill0, fill1...)
-	return IsArray() ? CompositePaint::GetNameListGivenTextureList( GetArray(), GetCount() - 2 ) : NULL;
+	return IsArray() ? CompositePaint::GetNameListGivenTextureList( GetArray(), GetCountAfterFills() ) : NULL;
 }
 
 U32

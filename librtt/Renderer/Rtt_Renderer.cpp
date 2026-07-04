@@ -569,11 +569,11 @@ Renderer::PopMaskCount()
 }
 
 static bool
-DoExtraTexturesDiffer( const LightPtrArray<Texture>& extraTextures, const TextureList& list, U32 count )
+DoExtraTexturesDiffer( const LightPtrArray<Texture>& extraTextures, const TextureList& list )
 {
-	for ( int i = 0; i < count; i++ )
+	for ( U32 i = 0, iMax = list.GetCountAfterFills(); i < iMax; i++ )
 	{
-		if ( extraTextures[i] != list.GetArray()[i + 2] ) // TODO: relax + 2
+		if ( extraTextures[i] != list.GetPositionAfterFills()[i] )
 		{
 			return true;
 		}
@@ -610,18 +610,15 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 	bool userUniformDirty2 = data->fUserUniform2 != fPrevious.fUserUniform2 && data->fUserUniform2;
 	bool userUniformDirty3 = data->fUserUniform3 != fPrevious.fUserUniform3 && data->fUserUniform3;
 	
-	U32 extraTextureCount = 0;
-	if ( data->fTextures.IsArray() )
+	U32 extraTextureCount = data->fTextures.GetCountAfterFills();
+	if ( extraTextureCount > 0 )
 	{
-		U32 count = data->fTextures.GetCount();
-		Rtt_ASSERT( count > 2 ); // fills will be in first two slots
-		extraTextureCount = count - 2;
 		if ( extraTextureCount > fMaxExtraTexturesThisFrame )
 		{
 			fExtraTextures.PadToSize( extraTextureCount, NULL );
 			fMaxExtraTexturesThisFrame = extraTextureCount;
 		}
-		else if ( !DoExtraTexturesDiffer( fExtraTextures, data->fTextures, extraTextureCount ) )
+		else if ( !DoExtraTexturesDiffer( fExtraTextures, data->fTextures ) )
 		{
 			extraTextureCount = 0;
 		}
@@ -631,15 +628,14 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 	if ( !fWireframeEnabled && ( NULL != renderDataState ) )
 	{
 		bool isUnsynced = RenderDataState::kUnsynced == renderDataState->GetSyncState();
-		if ( isUnsynced ) // since we're already here and have sr, can just look at list?
+		if ( isUnsynced )
 		{
 			ShaderResource* shaderResource = data->fProgram->GetShaderResource();
-			const U8* paintNames = extraTextureCount > 0 ? data->fTextures.GetNamesList() : NULL;
+			const U8* paintNames = data->fTextures.GetNamesList();
 			const Program* refProgram = shaderResource->GetFirstBoundProgram();
 			if ( NULL != refProgram || shaderResource->HasTextureInfo() )
 			{
-				Texture** extraTextures = extraTextureCount > 0 ? data->fTextures.GetArray() + 2 : NULL; // TODO: relax + 2
-				if ( shaderResource->AreTexturesConsistent( fillTexture0, fillTexture1, extraTextures, extraTextureCount, paintNames, renderDataState ) )
+				if ( shaderResource->AreTexturesConsistent( data->fTextures, paintNames, renderDataState ) )
 				{
 					renderDataState->SetSyncState( RenderDataState::kSyncConsistent );
 				}
@@ -1013,8 +1009,8 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 			
 			U32 usageMask = isSynced ? renderDataState->GetOccupancy() : 0x0;
 			for ( U32 i = 0, unit = 0; i < extraTextureCount; i++ )
-			{// TODO: relax + 2
-				Texture* extra = data->fTextures.GetArray()[i + 2]; // n.b. skip fill0 and fill1
+			{
+				Texture* extra = data->fTextures.GetPositionAfterFills()[i]; // n.b. skip fill0 and fill1
 
 				bool usesTextureAndNew = ( usageMask & ( 1U << i ) ) && ( extra != fExtraTextures[unit] );
 				if ( usesTextureAndNew )

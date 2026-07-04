@@ -746,20 +746,22 @@ ShaderResource::AreFormatsConsistent( U32 fillBackingValues[], U32 extraTextureB
 }
 
 bool
-ShaderResource::AreTexturesConsistent( const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, const U8* paintNames, RenderDataState* renderDataState ) const
+ShaderResource::AreTexturesConsistent( const TextureList& list, const U8* paintNames, RenderDataState* renderDataState ) const
 {
 	Rtt_ASSERT( HasTextureInfo() );
+
+	const Texture* fill0 = list.GetFill0();
+	const Texture* fill1 = list.GetFill1();
 
 	U32 fillBackingValues[2] = {
 		fill0 ? fill0->GetFormat().GetBackingValue() : 0,
 		fill1 ? fill1->GetFormat().GetBackingValue() : 0
-	};
+	}, extraTextureBackingValues[ RenderDataState::kOccupancyBits ] = {};
 	
-	U32 extraTextureBackingValues[ RenderDataState::kOccupancyBits ] = {};
-	
+	U32 extraCount = list.GetCountAfterFills();
 	for ( U32 i = 0; i < extraCount; i++ )
 	{
-		extraTextureBackingValues[i] = extraTextures[i]->GetFormat().GetBackingValue();
+		extraTextureBackingValues[i] = list.GetPositionAfterFills()[i]->GetFormat().GetBackingValue();
 	}
 	
 	return AreFormatsConsistent( fillBackingValues, extraCount > 0 ? extraTextureBackingValues : NULL, extraCount, paintNames, renderDataState );
