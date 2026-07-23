@@ -93,7 +93,7 @@ class Program : public CPUResource
 		void SetCompilerVerbose( bool newValue ) { fCompilerVerbose = newValue; }
 
 	public:
-		void SetMightHaveNoneDefaultDetails( bool newValue ) { fMightHaveNonDefaultDetails = newValue; }
+		void SetMightHaveNonDefaultDetails( bool newValue ) { fMightHaveNonDefaultDetails = newValue; }
 		bool GetMightHaveNonDefaultDetails() const { return fMightHaveNonDefaultDetails; }
 
 	private:

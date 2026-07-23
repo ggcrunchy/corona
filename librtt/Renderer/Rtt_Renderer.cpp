@@ -624,6 +624,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 		}
 	}
 
+	GuardInfo syncGuard;
 	bool syncingDirty = false;
 	if ( !fWireframeEnabled && ( NULL != renderDataState ) )
 	{
@@ -649,12 +650,12 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 				shaderResource->PrepareFirstBind( data->fProgram, static_cast<Program::Version>( MaskCount() ) );
 
 				fShaderResourcesWithPendingBinds.Append( shaderResource );
-
-				fGuardDraw.fIsValid = true;
-				fGuardDraw.fList = data->fTextures;
-				fGuardDraw.fPrevious = data->fProgram;
-				fGuardDraw.fNames = paintNames;
-				fGuardDraw.fIsMod25 = data->fProgram == shaderResource->GetProgramMod( ShaderResource::k25D );
+				
+				syncGuard.fIsValid = true;
+				syncGuard.fList = data->fTextures;
+				syncGuard.fPrevious = data->fProgram;
+				syncGuard.fNames = paintNames;
+				syncGuard.fIsMod25 = data->fProgram == shaderResource->GetProgramMod( ShaderResource::k25D );
 			}
 		}
 		
@@ -844,6 +845,11 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
     }
     fRenderDataCount++;
     
+    if (syncingDirty)
+    {
+		fGuardDraw = syncGuard;
+    }
+    
     // Blend mode
     if( data->fBlendMode != fPrevious.fBlendMode )
     {
@@ -1029,7 +1035,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 		}
 		else
 		{
-			fGuardDraw.fList.Clear(); // empty list interpreted as broken, since nothing to sink
+			fGuardDraw.fList.Clear(); // empty list interpreted as broken, since nothing to sync
 				
 			fGuardDraw.fIsValid = true;
 			fGuardDraw.fPrevious = data->fProgram;

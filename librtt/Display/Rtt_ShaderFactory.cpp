@@ -339,7 +339,7 @@ ShaderFactory::NewProgram(
  
 	if ( ShaderResource::kDefault == mod && MightHaveImagesOrNonDefaultSamplers( kernelFrag ) )
 	{
-		program->SetMightHaveNoneDefaultDetails( true );
+		program->SetMightHaveNonDefaultDetails( true );
 	}
     
     bool isCompilerVerbose = fOwner.GetDefaults().IsShaderCompilerVerbose();
