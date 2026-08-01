@@ -568,22 +568,27 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 // The following LUTs were largely script-generated (see PR, also with verification), and comprise the
 // inlined image / sampler type constants from OpenGL 4.6 + ES 3.2, along with some metadata.
 
-// Some investigation revealed that among these 73 16-bit constants, any given low byte occurs at most
-// twice. Additionally, any such byte is always part of a sequence, e.g. ...CA, CB...; also, some of the
-// gaps between series are narrow enough to merge, cf. the 0s in the third range in ClassifySampler().
+// The list used by Slang is taken as definite:
+// https://raw.githubusercontent.com/KhronosGroup/glslang/refs/heads/main/glslang/MachineIndependent/gl_types.h
 
-// The constants are kept in one list for efficient searching, and are pointed to via the aforementioned
-// low byte. Since this might address TWO constants, a tuple of values (in fact four of them--so actually
-// more than one low byte is serviced--in all cases nicely aligned) is actually looked up. Since each of
-// the constants in question is unique, all members of the tuple are tried at once and only the proper
-// lane is chosen. (Values that are neither image nor sampler types are gracefully detected.)
+// Some investigation showed that among these 102 16-bit constants, any given low byte occurs at most
+// twice. Additionally, such bytes are always part of a sequence, e.g. ...CA, CB...; some gaps between
+// series are narrow enough to simply merge, cf. the 0s in the third range in ClassifySampler().
 
-// The lane can also be used to look up the corresponding metadata.
+// Said ranges refer to an intermediate table of indices, with a range + low byte containing some slot
+// index, referencing a position within a separate list.
 
-// TODO: after some searching, discovered https://raw.githubusercontent.com/KhronosGroup/glslang/refs/heads/main/glslang/MachineIndependent/gl_types.h
-// ^^^ looks like GL_FLOAT16_(SAMPLER|IMAGE)_* missing; can probably repair this by hand, at need
-// it's one big swath in 0x91* (CE-EA)... looks safe: any low bytes in that range only have one use
-// adds 29 values -> 102
+// The GL constants are kept in one list for efficient searching. The constants are actually grouped in
+// sets of four, and any pair with a common low byte always occur in the same quad. Since each constant
+// is unique, this lets us try all four entries and still select the proper lane.
+
+// Quad 0 has a sentinel, as do trailing entries in the final quad. This guards against bogus image /
+// sampler types being provided (the tests ran an exhaustive trial from 0-0xFFFF): a simple unplanned
+// use case is being able to distinguish from "basic" uniforms or counters, as in the uniforms sweep
+// below. Trailing entries use the first valid constant in this list (i.e. quad 1's first element) as
+// their sentinel value; the quad 0 sentinel does the opposite, using the last valid constant.
+
+// A second list keeps the corresponding metadata. Indexing is similar, sans sentinels and lanes.
 
 struct SamplerTypeConstantQuad {
 	U16 fValues[4];
@@ -591,105 +596,140 @@ struct SamplerTypeConstantQuad {
 
 static const SamplerTypeConstantQuad kConstantQuads[] = {
 	{
-	  0x906A, /* SENTINEL */
-	  0x906A, /* SENTINEL */
-	  0x906A, /* SENTINEL */
-	  0x906A  /* SENTINEL */
+		0x9108, /* SENTINEL */
+		0x9108, /* SENTINEL */
+		0x9108, /* SENTINEL */
+		0x9108  /* SENTINEL */
 	}, {
-	  0x900D, /* SAMPLER_CUBE_MAP_ARRAY_SHADOW */
-	  0x910D, /* UNSIGNED_INT_SAMPLER_MULTISAMPLE_ARRAY */
-	  0x8B64, /* SAMPLER_RECT_SHADOW */
-	  0x9064  /* UNSIGNED_INT_IMAGE_3D */
+		0x91D7, /* FLOAT16_SAMPLER_2D_MULTISAMPLE */
+		0x8DD7, /* UNSIGNED_INT_SAMPLER_2D_ARRAY */
+		0x91D5, /* FLOAT16_SAMPLER_CUBE_MAP_ARRAY */
+		0x8DD5  /* UNSIGNED_INT_SAMPLER_RECT */
 	}, {
-	  0x9063, /* UNSIGNED_INT_IMAGE_2D */
-	  0x8B63, /* SAMPLER_RECT */
-	  0x8B62, /* SAMPLER_2D_SHADOW */
-	  0x9062  /* UNSIGNED_INT_IMAGE_1D */
+		0x91D3, /* FLOAT16_SAMPLER_1D_ARRAY */
+		0x8DD3, /* UNSIGNED_INT_SAMPLER_3D */
+		0x8DD1, /* UNSIGNED_INT_SAMPLER_1D */
+		0x91D1  /* FLOAT16_SAMPLER_CUBE */
 	}, {
-	  0x9061, /* INT_IMAGE_MULTISAMPLE_ARRAY */
-	  0x8B61, /* SAMPLER_1D_SHADOW */
-	  0x8B5D, /* SAMPLER_1D */
-	  0x905D  /* INT_IMAGE_1D_ARRAY */
+		0x91CF, /* FLOAT16_SAMPLER_2D */
+		0x8DCF, /* INT_SAMPLER_2D_ARRAY */
+		0x8B64, /* SAMPLER_RECT_SHADOW */
+		0x9064  /* UNSIGNED_INT_IMAGE_3D */
 	}, {
-	  0x9060, /* INT_IMAGE_MULTISAMPLE */
-	  0x8B60, /* SAMPLER_CUBE */
-	  0x905F, /* INT_IMAGE_CUBE_MAP_ARRAY */
-	  0x8B5F  /* SAMPLER_3D */
+		0x8B60, /* SAMPLER_CUBE */
+		0x9060, /* INT_IMAGE_MULTISAMPLE */
+		0x8B5F, /* SAMPLER_3D */
+		0x905F  /* INT_IMAGE_CUBE_MAP_ARRAY */
 	}, {
-	  0x905E, /* INT_IMAGE_2D_ARRAY */
-	  0x8B5E, /* SAMPLER_2D */
-	  0x910C, /* INT_SAMPLER_MULTISAMPLE_ARRAY */
-	  0x900C  /* SAMPLER_CUBE_MAP_ARRAY */
+		0x8B5E, /* SAMPLER_2D */
+		0x905E, /* INT_IMAGE_2D_ARRAY */
+		0x905D, /* INT_IMAGE_1D_ARRAY */
+		0x8B5D  /* SAMPLER_1D */
 	}, {
-	  0x910A, /* UNSIGNED_INT_SAMPLER_MULTISAMPLE */
-	  0x905A, /* INT_IMAGE_RECTANGLE */
-	  0x8DD1, /* UNSIGNED_INT_SAMPLER_1D */
-	  0x9055  /* IMAGE_MULTISAMPLE */
+		0x9061, /* INT_IMAGE_MULTISAMPLE_ARRAY */
+		0x8B61, /* SAMPLER_1D_SHADOW */
+		0x8B62, /* SAMPLER_2D_SHADOW */
+		0x9062  /* UNSIGNED_INT_IMAGE_1D */
 	}, {
-	  0x9069, /* UNSIGNED_INT_IMAGE_2D_ARRAY */
-	  0x9059, /* INT_IMAGE_3D */
-	  0x8DCF, /* INT_SAMPLER_2D_ARRAY */
-	  0x8DC0  /* SAMPLER_1D_ARRAY	 */
+		0x9063, /* UNSIGNED_INT_IMAGE_2D */
+		0x8B63, /* SAMPLER_RECT */
+		0x8DD8, /* UNSIGNED_INT_SAMPLER_BUFFER  */
+		0x91D8  /* FLOAT16_SAMPLER_2D_MULTISAMPLE_ARRAY */
 	}, {
-	  0x9068, /* UNSIGNED_INT_IMAGE_1D_ARRAY */
-	  0x9058, /* INT_IMAGE_2D */
-	  0x8DCD, /* INT_SAMPLER_RECT */
-	  0x8DC4  /* SAMPLER_2D_ARRAY_SHADOW */
+		0x8DD6, /* UNSIGNED_INT_SAMPLER_1D_ARRAY */
+		0x91D6, /* FLOAT16_SAMPLER_BUFFER */
+		0x91D4, /* FLOAT16_SAMPLER_2D_ARRAY */
+		0x8DD4  /* UNSIGNED_INT_SAMPLER_CUBE */
 	}, {
-	  0x9067, /* UNSIGNED_INT_IMAGE_BUFFER */
-	  0x9057, /* INT_IMAGE_1D  */
-	  0x8DCB, /* INT_SAMPLER_3D */
-	  0x8DCA  /* INT_SAMPLER_2D */
+		0x8DD2, /* UNSIGNED_INT_SAMPLER_2D */
+		0x91D2, /* FLOAT16_SAMPLER_2D_REC */
+		0x91D0, /* FLOAT16_SAMPLER_3D */
+		0x8DD0  /* INT_SAMPLER_BUFFER */
 	}, {
-	  0x9066, /* UNSIGNED_INT_IMAGE_CUBE */
-	  0x9056, /* IMAGE_MULTISAMPLE_ARRAY */
-	  0x8DC9, /* INT_SAMPLER_1D */
-	  0x900F  /* UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY */
+		0x8DCE, /* INT_SAMPLER_1D_ARRAY */
+		0x91CE, /* FLOAT16_SAMPLER_1D */
+		0x910D, /* UNSIGNED_INT_SAMPLER_MULTISAMPLE_ARRAY */
+		0x900D  /* SAMPLER_CUBE_MAP_ARRAY_SHADOW */
 	}, {
-	  0x910B, /* SAMPLER_MULTISAMPLE_ARRAY */
-	  0x9109, /* INT_SAMPLER_MULTISAMPLE */
-	  0x8DCC, /* INT_SAMPLER_CUBE */
-	  0x9054  /* IMAGE_CUBE_MAP_ARRAY */
+		0x900C, /* SAMPLER_CUBE_MAP_ARRAY */
+		0x910C, /* INT_SAMPLER_MULTISAMPLE_ARRAY */
+		0x9069, /* UNSIGNED_INT_IMAGE_2D_ARRAY */
+		0x9068  /* UNSIGNED_INT_IMAGE_1D_ARRAY */
 	}, {
-	  0x8DC5, /* SAMPLER_CUBE_SHADOW */
-	  0x8DC2, /* SAMPLER_BUFFER */
-	  0x9053, /* IMAGE_2D_ARRAY */
-	  0x8DC3  /* SAMPLER_1D_ARRAY_SHADOW */
+		0x9067, /* UNSIGNED_INT_IMAGE_BUFFER */
+		0x9066, /* UNSIGNED_INT_IMAGE_CUBE */
+		0x91E9, /* FLOAT16_IMAGE_2D_MULTISAMPLE */
+		0x91E7  /* FLOAT16_IMAGE_CUBE_MAP_ARRAY */
 	}, {
-	  0x8DCE, /* INT_SAMPLER_1D_ARRAY */
-	  0x9052, /* IMAGE_1D_ARRAY */
-	  0x8DC1, /* SAMPLER_2D_ARRAY */
-	  0x9065  /* UNSIGNED_INT_IMAGE_RECTANGLE */
+		0x91E5, /* FLOAT16_IMAGE_1D_ARRAY */
+		0x91E3, /* FLOAT16_IMAGE_2D_RECT */
+		0x91E1, /* FLOAT16_IMAGE_2D */
+		0x91DF  /* FLOAT16_SAMPLER_CUBE_MAP_ARRAY_SHADOW */
 	}, {
-	  0x9051, /* IMAGE_BUFFER */
-	  0x8DD0, /* INT_SAMPLER_BUFFER */
-	  0x9050, /* IMAGE_CUBE */
-	  0x8DD2  /* UNSIGNED_INT_SAMPLER_2D */
+		0x91DD, /* FLOAT16_SAMPLER_2D_ARRAY_SHADOW */
+		0x91DB, /* FLOAT16_SAMPLER_2D_RECT_SHADOW */
+		0x91D9, /* FLOAT16_SAMPLER_1D_SHADOW */
+		0x8DCD  /* INT_SAMPLER_RECT */
 	}, {
-	  0x8DD4, /* UNSIGNED_INT_SAMPLER_CUBE */
-	  0x904F, /* IMAGE_RECTANGLE */
-	  0x8DD5, /* UNSIGNED_INT_SAMPLER_RECT */
-	  0x8DD6  /* UNSIGNED_INT_SAMPLER_1D_ARRAY */
+		0x8DCB, /* INT_SAMPLER_3D */
+		0x8DC9, /* INT_SAMPLER_1D */
+		0x8DC5, /* SAMPLER_CUBE_SHADOW */
+		0x8DC3  /* SAMPLER_1D_ARRAY_SHADOW */
 	}, {
-	  0x904E, /* IMAGE_3D */
-	  0x8DD7, /* UNSIGNED_INT_SAMPLER_2D_ARRAY */
-	  0x900E, /* INT_SAMPLER_CUBE_MAP_ARRAY */
-	  0x904D  /* IMAGE_2D */
+		0x8DC1, /* SAMPLER_2D_ARRAY */
+		0x905C, /* INT_IMAGE_BUFFER */
+		0x905B, /* INT_IMAGE_CUBE */
+		0x905A  /* INT_IMAGE_RECTANGLE */
 	}, {
-	  0x9108, /* SAMPLER_MULTISAMPLE */
-	  0x906C, /* UNSIGNED_INT_IMAGE_MULTISAMPLE_ARRAY */
-	  0x905C, /* INT_IMAGE_BUFFER */
-	  0x904C  /* IMAGE_1D */
+		0x9059, /* INT_IMAGE_3D */
+		0x9058, /* INT_IMAGE_2D */
+		0x9057, /* INT_IMAGE_1D  */
+		0x9056  /* IMAGE_MULTISAMPLE_ARRAY */
 	}, {
-	  0x8DD8, /* UNSIGNED_INT_SAMPLER_BUFFER  */
-	  0x906B, /* UNSIGNED_INT_IMAGE_MULTISAMPLE */
-	  0x905B, /* INT_IMAGE_CUBE */
-	  0x8DD3  /* UNSIGNED_INT_SAMPLER_3D */
+		0x9055, /* IMAGE_MULTISAMPLE */
+		0x9054, /* IMAGE_CUBE_MAP_ARRAY */
+		0x9053, /* IMAGE_2D_ARRAY */
+		0x9052  /* IMAGE_1D_ARRAY */
 	}, {
-	  0x906A, /* UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY */
-	  0x900D, /* SENTINEL */
-	  0x900D, /* SENTINEL */
-	  0x900D  /* SENTINEL */
+		0x9051, /* IMAGE_BUFFER */
+		0x9050, /* IMAGE_CUBE */
+		0x904F, /* IMAGE_RECTANGLE */
+		0x904E  /* IMAGE_3D */
+	}, {
+		0x904D, /* IMAGE_2D */
+		0x904C, /* IMAGE_1D */
+		0x906A, /* UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY */
+		0x91DC  /* FLOAT16_SAMPLER_1D_ARRAY_SHADOW */
+	}, {
+		0x906B, /* UNSIGNED_INT_IMAGE_MULTISAMPLE */
+		0x906C, /* UNSIGNED_INT_IMAGE_MULTISAMPLE_ARRAY */
+		0x9065, /* UNSIGNED_INT_IMAGE_RECTANGLE */
+		0x8DCC  /* INT_SAMPLER_CUBE */
+	}, {
+		0x900F, /* UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY */
+		0x91EA, /* FLOAT16_IMAGE_2D_MULTISAMPLE_ARRAY */
+		0x91E8, /* FLOAT16_IMAGE_BUFFER */
+		0x91E6  /* FLOAT16_IMAGE_2D_ARRAY */
+	}, {
+		0x91E4, /* FLOAT16_IMAGE_CUBE */
+		0x91E2, /* FLOAT16_IMAGE_3D */
+		0x91E0, /* FLOAT16_IMAGE_1D */
+		0x91DE  /* FLOAT16_SAMPLER_CUBE_SHADOW */
+	}, {
+		0x900E, /* INT_SAMPLER_CUBE_MAP_ARRAY */
+		0x91DA, /* FLOAT16_SAMPLER_2D_SHADOW */
+		0x8DCA, /* INT_SAMPLER_2D */
+		0x8DC4  /* SAMPLER_2D_ARRAY_SHADOW */
+	}, {
+		0x8DC2, /* SAMPLER_BUFFER */
+		0x8DC0, /* SAMPLER_1D_ARRAY	 */
+		0x910B, /* SAMPLER_MULTISAMPLE_ARRAY */
+		0x910A  /* UNSIGNED_INT_SAMPLER_MULTISAMPLE */
+	}, {
+		0x9109, /* INT_SAMPLER_MULTISAMPLE */
+		0x9108, /* SAMPLER_MULTISAMPLE */
+		0x91D7, /* SENTINEL */
+		0x91D7  /* SENTINEL */
 	}
 };
 
@@ -709,79 +749,108 @@ Rtt_STATIC_ASSERT( Texture::kNumTargets <= ( 1 << 3 ) );
 
 static const SamplerTypeDetails kDetails[] = {
 	{ /* SENTINEL */ },
-	SHADOW_SAMPLER_ARRAY( Cube ), /* SAMPLER_CUBE_MAP_ARRAY_SHADOW */
-	INTEGER_SAMPLER_ARRAY( Unsigned, Multisample ), /* UNSIGNED_INT_SAMPLER_MULTISAMPLE_ARRAY */
+	SAMPLER( Multisample ), /* FLOAT16_SAMPLER_2D_MULTISAMPLE */
+	INTEGER_SAMPLER_ARRAY( Unsigned, 2D ), /* UNSIGNED_INT_SAMPLER_2D_ARRAY */
+	SAMPLER_ARRAY( Cube ), /* FLOAT16_SAMPLER_CUBE_MAP_ARRAY */
+	INTEGER_SAMPLER( Unsigned, Rectangle ), /* UNSIGNED_INT_SAMPLER_RECT */
+	SAMPLER_ARRAY( 1D ), /* FLOAT16_SAMPLER_1D_ARRAY */
+	INTEGER_SAMPLER( Unsigned, 3D ), /* UNSIGNED_INT_SAMPLER_3D */
+	INTEGER_SAMPLER( Unsigned, 1D ), /* UNSIGNED_INT_SAMPLER_1D */
+	SAMPLER( Cube ), /* FLOAT16_SAMPLER_CUBE */
+	SAMPLER( 2D ), /* FLOAT16_SAMPLER_2D */
+	INTEGER_SAMPLER_ARRAY( Signed, 2D ), /* INT_SAMPLER_2D_ARRAY */
 	SHADOW_SAMPLER( Rectangle ), /* SAMPLER_RECT_SHADOW */
 	INTEGER_IMAGE( Unsigned, 3D ), /* UNSIGNED_INT_IMAGE_3D */
-	INTEGER_IMAGE( Unsigned, 2D ), /* UNSIGNED_INT_IMAGE_2D */
-	SAMPLER( Rectangle ), /* SAMPLER_RECT */
-	SHADOW_SAMPLER( 2D ), /* SAMPLER_2D_SHADOW */
-	INTEGER_IMAGE( Unsigned, 1D ), /* UNSIGNED_INT_IMAGE_1D */
+	SAMPLER( Cube ), /* SAMPLER_CUBE */
+	INTEGER_IMAGE( Signed, Multisample ), /* INT_IMAGE_MULTISAMPLE */
+	SAMPLER( 3D ), /* SAMPLER_3D */
+	INTEGER_IMAGE_ARRAY( Signed, Cube ), /* INT_IMAGE_CUBE_MAP_ARRAY */
+	SAMPLER( 2D ), /* SAMPLER_2D */
+	INTEGER_IMAGE_ARRAY( Signed, 2D ), /* INT_IMAGE_2D_ARRAY */
+	INTEGER_IMAGE_ARRAY( Signed, 1D ), /* INT_IMAGE_1D_ARRAY */
+	SAMPLER( 1D ), /* SAMPLER_1D */
 	INTEGER_IMAGE_ARRAY( Signed, Multisample ), /* INT_IMAGE_MULTISAMPLE_ARRAY */
 	SHADOW_SAMPLER( 1D ), /* SAMPLER_1D_SHADOW */
-	SAMPLER( 1D ), /* SAMPLER_1D */
-	INTEGER_IMAGE_ARRAY( Signed, 1D ), /* INT_IMAGE_1D_ARRAY */
-	INTEGER_IMAGE( Signed, Multisample ), /* INT_IMAGE_MULTISAMPLE */
-	SAMPLER( Cube ), /* SAMPLER_CUBE */
-	INTEGER_IMAGE_ARRAY( Signed, Cube ), /* INT_IMAGE_CUBE_MAP_ARRAY */
-	SAMPLER( 3D ), /* SAMPLER_3D */
-	INTEGER_IMAGE_ARRAY( Signed, 2D ), /* INT_IMAGE_2D_ARRAY */
-	SAMPLER( 2D ), /* SAMPLER_2D */
-	INTEGER_SAMPLER_ARRAY( Signed, Multisample ), /* INT_SAMPLER_MULTISAMPLE_ARRAY */
-	SAMPLER_ARRAY( Cube ), /* SAMPLER_CUBE_MAP_ARRAY */
-	INTEGER_SAMPLER( Unsigned, Multisample ), /* UNSIGNED_INT_SAMPLER_MULTISAMPLE */
-	INTEGER_IMAGE( Signed, Rectangle ), /* INT_IMAGE_RECTANGLE */
-	INTEGER_SAMPLER( Unsigned, 1D ), /* UNSIGNED_INT_SAMPLER_1D */
-	IMAGE( Multisample ), /* IMAGE_MULTISAMPLE */
-	INTEGER_IMAGE_ARRAY( Unsigned, 2D ), /* UNSIGNED_INT_IMAGE_2D_ARRAY */
-	INTEGER_IMAGE( Signed, 3D ), /* INT_IMAGE_3D */
-	INTEGER_SAMPLER_ARRAY( Signed, 2D ), /* INT_SAMPLER_2D_ARRAY */
-	SAMPLER_ARRAY( 1D ), /* SAMPLER_1D_ARRAY	 */
-	INTEGER_IMAGE_ARRAY( Unsigned, 1D ), /* UNSIGNED_INT_IMAGE_1D_ARRAY */
-	INTEGER_IMAGE( Signed, 2D ), /* INT_IMAGE_2D */
-	INTEGER_SAMPLER( Signed, Rectangle ), /* INT_SAMPLER_RECT */
-	SHADOW_SAMPLER_ARRAY( 2D ), /* SAMPLER_2D_ARRAY_SHADOW */
-	INTEGER_IMAGE( Unsigned, Buffer ), /* UNSIGNED_INT_IMAGE_BUFFER */
-	INTEGER_IMAGE( Signed, 1D ), /* INT_IMAGE_1D  */
-	INTEGER_SAMPLER( Signed, 3D ), /* INT_SAMPLER_3D */
-	INTEGER_SAMPLER( Signed, 2D ), /* INT_SAMPLER_2D */
-	INTEGER_IMAGE( Unsigned, Cube ), /* UNSIGNED_INT_IMAGE_CUBE */
-	IMAGE_ARRAY( Multisample ), /* IMAGE_MULTISAMPLE_ARRAY */
-	INTEGER_SAMPLER( Signed, 1D ), /* INT_SAMPLER_1D */
-	INTEGER_SAMPLER_ARRAY( Unsigned, Cube ), /* UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY */
-	SAMPLER_ARRAY( Multisample ), /* SAMPLER_MULTISAMPLE_ARRAY */
-	INTEGER_SAMPLER( Signed, Multisample ), /* INT_SAMPLER_MULTISAMPLE */
-	INTEGER_SAMPLER( Signed, Cube ), /* INT_SAMPLER_CUBE */
-	IMAGE_ARRAY( Cube ), /* IMAGE_CUBE_MAP_ARRAY */
-	SHADOW_SAMPLER( Cube ), /* SAMPLER_CUBE_SHADOW */
-	SAMPLER( Buffer ), /* SAMPLER_BUFFER */
-	IMAGE_ARRAY( 2D ), /* IMAGE_2D_ARRAY */
-	SHADOW_SAMPLER_ARRAY( 1D ), /* SAMPLER_1D_ARRAY_SHADOW */
-	INTEGER_SAMPLER_ARRAY( Signed, 1D ), /* INT_SAMPLER_1D_ARRAY */
-	IMAGE_ARRAY( 1D ), /* IMAGE_1D_ARRAY */
-	SAMPLER_ARRAY( 2D ), /* SAMPLER_2D_ARRAY */
-	INTEGER_IMAGE( Unsigned, Rectangle ), /* UNSIGNED_INT_IMAGE_RECTANGLE */
-	IMAGE( Buffer ), /* IMAGE_BUFFER */
-	INTEGER_SAMPLER( Signed, Buffer ), /* INT_SAMPLER_BUFFER */
-	IMAGE( Cube ), /* IMAGE_CUBE */
-	INTEGER_SAMPLER( Unsigned, 2D ), /* UNSIGNED_INT_SAMPLER_2D */
-	INTEGER_SAMPLER( Unsigned, Cube ), /* UNSIGNED_INT_SAMPLER_CUBE */
-	IMAGE( Rectangle ), /* IMAGE_RECTANGLE */
-	INTEGER_SAMPLER( Unsigned, Rectangle ), /* UNSIGNED_INT_SAMPLER_RECT */
-	INTEGER_SAMPLER_ARRAY( Unsigned, 1D ), /* UNSIGNED_INT_SAMPLER_1D_ARRAY */
-	IMAGE( 3D ), /* IMAGE_3D */
-	INTEGER_SAMPLER_ARRAY( Unsigned, 2D ), /* UNSIGNED_INT_SAMPLER_2D_ARRAY */
-	INTEGER_SAMPLER_ARRAY( Signed, Cube ), /* INT_SAMPLER_CUBE_MAP_ARRAY */
-	IMAGE( 2D ), /* IMAGE_2D */
-	SAMPLER( Multisample ), /* SAMPLER_MULTISAMPLE */
-	INTEGER_IMAGE_ARRAY( Unsigned, Multisample ), /* UNSIGNED_INT_IMAGE_MULTISAMPLE_ARRAY */
-	INTEGER_IMAGE( Signed, Buffer ), /* INT_IMAGE_BUFFER */
-	IMAGE( 1D ), /* IMAGE_1D */
+	SHADOW_SAMPLER( 2D ), /* SAMPLER_2D_SHADOW */
+	INTEGER_IMAGE( Unsigned, 1D ), /* UNSIGNED_INT_IMAGE_1D */
+	INTEGER_IMAGE( Unsigned, 2D ), /* UNSIGNED_INT_IMAGE_2D */
+	SAMPLER( Rectangle ), /* SAMPLER_RECT */
 	INTEGER_SAMPLER( Unsigned, Buffer ), /* UNSIGNED_INT_SAMPLER_BUFFER  */
-	INTEGER_IMAGE( Unsigned, Multisample ), /* UNSIGNED_INT_IMAGE_MULTISAMPLE */
+	SAMPLER_ARRAY( Multisample ), /* FLOAT16_SAMPLER_2D_MULTISAMPLE_ARRAY */
+	INTEGER_SAMPLER_ARRAY( Unsigned, 1D ), /* UNSIGNED_INT_SAMPLER_1D_ARRAY */
+	SAMPLER( Buffer ), /* FLOAT16_SAMPLER_BUFFER */
+	SAMPLER_ARRAY( 2D ), /* FLOAT16_SAMPLER_2D_ARRAY */
+	INTEGER_SAMPLER( Unsigned, Cube ), /* UNSIGNED_INT_SAMPLER_CUBE */
+	INTEGER_SAMPLER( Unsigned, 2D ), /* UNSIGNED_INT_SAMPLER_2D */
+	SAMPLER( 2D ), /* FLOAT16_SAMPLER_2D_REC */
+	SAMPLER( 3D ), /* FLOAT16_SAMPLER_3D */
+	INTEGER_SAMPLER( Signed, Buffer ), /* INT_SAMPLER_BUFFER */
+	INTEGER_SAMPLER_ARRAY( Signed, 1D ), /* INT_SAMPLER_1D_ARRAY */
+	SAMPLER( 1D ), /* FLOAT16_SAMPLER_1D */
+	INTEGER_SAMPLER_ARRAY( Unsigned, Multisample ), /* UNSIGNED_INT_SAMPLER_MULTISAMPLE_ARRAY */
+	SHADOW_SAMPLER_ARRAY( Cube ), /* SAMPLER_CUBE_MAP_ARRAY_SHADOW */
+	SAMPLER_ARRAY( Cube ), /* SAMPLER_CUBE_MAP_ARRAY */
+	INTEGER_SAMPLER_ARRAY( Signed, Multisample ), /* INT_SAMPLER_MULTISAMPLE_ARRAY */
+	INTEGER_IMAGE_ARRAY( Unsigned, 2D ), /* UNSIGNED_INT_IMAGE_2D_ARRAY */
+	INTEGER_IMAGE_ARRAY( Unsigned, 1D ), /* UNSIGNED_INT_IMAGE_1D_ARRAY */
+	INTEGER_IMAGE( Unsigned, Buffer ), /* UNSIGNED_INT_IMAGE_BUFFER */
+	INTEGER_IMAGE( Unsigned, Cube ), /* UNSIGNED_INT_IMAGE_CUBE */
+	IMAGE( Multisample ), /* FLOAT16_IMAGE_2D_MULTISAMPLE */
+	IMAGE_ARRAY( Cube ), /* FLOAT16_IMAGE_CUBE_MAP_ARRAY */
+	IMAGE_ARRAY( 1D ), /* FLOAT16_IMAGE_1D_ARRAY */
+	IMAGE( Rectangle ), /* FLOAT16_IMAGE_2D_RECT */
+	IMAGE( 2D ), /* FLOAT16_IMAGE_2D */
+	SHADOW_SAMPLER_ARRAY( Cube ), /* FLOAT16_SAMPLER_CUBE_MAP_ARRAY_SHADOW */
+	SHADOW_SAMPLER_ARRAY( 2D ), /* FLOAT16_SAMPLER_2D_ARRAY_SHADOW */
+	SHADOW_SAMPLER( Rectangle ), /* FLOAT16_SAMPLER_2D_RECT_SHADOW */
+	SHADOW_SAMPLER( 1D ), /* FLOAT16_SAMPLER_1D_SHADOW */
+	INTEGER_SAMPLER( Signed, Rectangle ), /* INT_SAMPLER_RECT */
+	INTEGER_SAMPLER( Signed, 3D ), /* INT_SAMPLER_3D */
+	INTEGER_SAMPLER( Signed, 1D ), /* INT_SAMPLER_1D */
+	SHADOW_SAMPLER( Cube ), /* SAMPLER_CUBE_SHADOW */
+	SHADOW_SAMPLER_ARRAY( 1D ), /* SAMPLER_1D_ARRAY_SHADOW */
+	SAMPLER_ARRAY( 2D ), /* SAMPLER_2D_ARRAY */
+	INTEGER_IMAGE( Signed, Buffer ), /* INT_IMAGE_BUFFER */
 	INTEGER_IMAGE( Signed, Cube ), /* INT_IMAGE_CUBE */
-	INTEGER_SAMPLER( Unsigned, 3D ), /* UNSIGNED_INT_SAMPLER_3D */
+	INTEGER_IMAGE( Signed, Rectangle ), /* INT_IMAGE_RECTANGLE */
+	INTEGER_IMAGE( Signed, 3D ), /* INT_IMAGE_3D */
+	INTEGER_IMAGE( Signed, 2D ), /* INT_IMAGE_2D */
+	INTEGER_IMAGE( Signed, 1D ), /* INT_IMAGE_1D  */
+	IMAGE_ARRAY( Multisample ), /* IMAGE_MULTISAMPLE_ARRAY */
+	IMAGE( Multisample ), /* IMAGE_MULTISAMPLE */
+	IMAGE_ARRAY( Cube ), /* IMAGE_CUBE_MAP_ARRAY */
+	IMAGE_ARRAY( 2D ), /* IMAGE_2D_ARRAY */
+	IMAGE_ARRAY( 1D ), /* IMAGE_1D_ARRAY */
+	IMAGE( Buffer ), /* IMAGE_BUFFER */
+	IMAGE( Cube ), /* IMAGE_CUBE */
+	IMAGE( Rectangle ), /* IMAGE_RECTANGLE */
+	IMAGE( 3D ), /* IMAGE_3D */
+	IMAGE( 2D ), /* IMAGE_2D */
+	IMAGE( 1D ), /* IMAGE_1D */
 	INTEGER_IMAGE_ARRAY( Unsigned, Cube ), /* UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY */
+	SHADOW_SAMPLER_ARRAY( 1D ), /* FLOAT16_SAMPLER_1D_ARRAY_SHADOW */
+	INTEGER_IMAGE( Unsigned, Multisample ), /* UNSIGNED_INT_IMAGE_MULTISAMPLE */
+	INTEGER_IMAGE_ARRAY( Unsigned, Multisample ), /* UNSIGNED_INT_IMAGE_MULTISAMPLE_ARRAY */
+	INTEGER_IMAGE( Unsigned, Rectangle ), /* UNSIGNED_INT_IMAGE_RECTANGLE */
+	INTEGER_SAMPLER( Signed, Cube ), /* INT_SAMPLER_CUBE */
+	INTEGER_SAMPLER_ARRAY( Unsigned, Cube ), /* UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY */
+	IMAGE_ARRAY( Multisample ), /* FLOAT16_IMAGE_2D_MULTISAMPLE_ARRAY */
+	IMAGE( Buffer ), /* FLOAT16_IMAGE_BUFFER */
+	IMAGE_ARRAY( 2D ), /* FLOAT16_IMAGE_2D_ARRAY */
+	IMAGE( Cube ), /* FLOAT16_IMAGE_CUBE */
+	IMAGE( 3D ), /* FLOAT16_IMAGE_3D */
+	IMAGE( 1D ), /* FLOAT16_IMAGE_1D */
+	SHADOW_SAMPLER( Cube ), /* FLOAT16_SAMPLER_CUBE_SHADOW */
+	INTEGER_SAMPLER_ARRAY( Signed, Cube ), /* INT_SAMPLER_CUBE_MAP_ARRAY */
+	SHADOW_SAMPLER( 2D ), /* FLOAT16_SAMPLER_2D_SHADOW */
+	INTEGER_SAMPLER( Signed, 2D ), /* INT_SAMPLER_2D */
+	SHADOW_SAMPLER_ARRAY( 2D ), /* SAMPLER_2D_ARRAY_SHADOW */
+	SAMPLER( Buffer ), /* SAMPLER_BUFFER */
+	SAMPLER_ARRAY( 1D ), /* SAMPLER_1D_ARRAY	 */
+	SAMPLER_ARRAY( Multisample ), /* SAMPLER_MULTISAMPLE_ARRAY */
+	INTEGER_SAMPLER( Unsigned, Multisample ), /* UNSIGNED_INT_SAMPLER_MULTISAMPLE */
+	INTEGER_SAMPLER( Signed, Multisample ), /* INT_SAMPLER_MULTISAMPLE */
+	SAMPLER( Multisample ) /* SAMPLER_MULTISAMPLE */
 };
 
 #undef INTEGER_IMAGE
@@ -805,14 +874,13 @@ ClassifySampler( GLenum type )
 		0,
 		
 		/* 0x8-0xF */
-		17, 11, 6, 11, 5, 1, 16, 10,
+		26, 26, 25, 25, 11, 10, 24, 22,
 
 		/* 0x4C-0x6C */
-		17, 16, 16, 15, 14, 14, 13, 12, 11, 6, 10, 9, 8, 7, 6, 18, 17, 3, 5, 4, 4, 3, 2, 2, 1, 13, 10, 9, 8, 7, 19, 18, 17,
+		20, 20, 19, 19, 19, 19, 18, 18, 18, 18, 17, 17, 17, 17, 16, 16, 16, 5, 5, 4, 4, 6, 6, 7, 3, 21, 12, 12, 11, 11, 20, 21, 21,
 
 		/* 0xC0-0xD8 */
-		7, 13, 12, 12, 8, 12, 0, 0, 0, 10, 9, 9, 11, 8, 13, 7, 14, 6, 14, 18, 15, 15, 15, 16, 18
-// TODO (see above, re. 16-bit): expand this range out to 0xEA; might need to play the cuckoo with some of these :D
+		25, 16, 25, 15, 24, 15, 0, 0, 0, 15, 24, 15, 21, 14, 10, 3, 9, 2, 9, 2, 8, 1, 8, 1, 7, 14, 24, 14, 20, 14, 23, 13, 23, 13, 23, 13, 23, 13, 22, 12, 22, 12, 22
 	};
 	
 	const int Base1 = 1;
@@ -823,7 +891,7 @@ ClassifySampler( GLenum type )
 	
 	int offset_index = GET_OFFSET_IN_RANGE( 0x8, 0xF, Base1, low )
 					| GET_OFFSET_IN_RANGE( 0x4C, 0x6C, Base2, low )
-					| GET_OFFSET_IN_RANGE( 0xC0, 0xD8, Base3, low );
+					| GET_OFFSET_IN_RANGE( 0xC0, 0xEA, Base3, low );
 
 	int offset = kQuadOffsets[offset_index];
 	SamplerTypeConstantQuad quad = kConstantQuads[offset];
@@ -847,46 +915,45 @@ Rtt_STATIC_ASSERT( kFillSamplerNameLength == kMaskSamplerNameLength );
 static bool
 IsBuiltInSampler( GLchar* buf )
 {
-	#define NONE
-	#define NUL '\0'
-	#define KEEP "\xff"
-	#define WIPE "\0"
+	const union {
+		char _[8];
+		U64 u64;
+		
+		bool operator == (U64 other) const { return u64 == other; }
+	}
 
-	// n.b. kMask has some artificial padding to get the KEEP / WIPE to align with characters
-	const size_t kLengthFitToQuads = ( kFillSamplerNameLength + 3 ) & ~3;
-	const GLchar kMask[kLengthFitToQuads] = NONE KEEP KEEP WIPE WIPE WIPE WIPE KEEP KEEP KEEP KEEP KEEP KEEP KEEP WIPE;
-	const GLchar kPattern[kLengthFitToQuads] = { 'u', '_', NUL, NUL, NUL, NUL, 'S', 'a', 'm', 'p', 'l', 'e', 'r', NUL };
+	// first half:
+	kFill = { 'u', '_', 'F', 'i', 'l', 'l', 'S', 'a' },
+	kMask = { 'u', '_', 'M', 'a', 's', 'k', 'S', 'a' },
+	
+	// second half:
+	kDigit0 = { 'm', 'p', 'l', 'e', 'r', '0' }, // n.b. adds a couple NULs
+	kDigit1 = { 'm', 'p', 'l', 'e', 'r', '1' },
+	kDigit2 = { 'm', 'p', 'l', 'e', 'r', '2' },
+	kWipeJunk = { "\xFF\xFF\xFF\xFF\xFF\xFF\xFF" }; // terminating NUL wipes spurious final byte (builtins have 14-character names + their own NUL)
 
-	#undef NONE
-	#undef NUL
-	#undef KEEP
-	#undef WIPE
+	U64 name1, name2;
+	
+	// Reinterpret buf as two U64s. It should be sufficiently aligned that a
+	// cast would also work, but compilers seem to smile on the idiom here.
+	memcpy(&name1, buf, sizeof(U64));
+	memcpy(&name2, buf + sizeof(U64), sizeof(U64));
 
-	Rtt_STATIC_ASSERT( kLengthFitToQuads <= ExtraTextureInfo::kMaxNameLength );	// sanity check for the "fit to quads"
-	Rtt_STATIC_ASSERT( kLengthFitToQuads == sizeof(U64) * 2 );
+	U64 digit = kWipeJunk.u64 & name2;
 
-	const U64* kBufAsU64s = (const U64*)buf;
-	const U64* kMaskAsU64s = (const U64*)kMask;
-	const U64* kPatternAsU64s = (const U64*)kPattern;
+	// n.b. 01 satisfies both 01 and 11, but only the latter matches 10, i.e. limiting '2' to mask samplers	
+	int prefix_mask = ( kFill == name1 ? 0b01 : 0 ) | ( kMask == name1 ? 0b11 : 0 );
+	int suffix_mask = ( kDigit0 == digit ? 0b01 : 0 ) | ( kDigit1 == digit ? 0b01 : 0 ) | ( kDigit2 == digit ? 0b10 : 0 );
 
-	int masked1 = ( kMaskAsU64s[0] & kBufAsU64s[0] ) == kPatternAsU64s[0];
-	int masked2 = ( kMaskAsU64s[1] & kBufAsU64s[1] ) == kPatternAsU64s[1];
-	int const_mask = ( masked1 & masked2 ) ? 0b11 : 0;	
-	int digit = buf[kFillSamplerNameLength - 1];
-
-	// n.b. 01 satisfies both 01 and 11, but only the latter matches 10, i.e. limiting '2' to mask samplers
-	int prefix_mask = ( 0 == memcmp( &buf[2], "Fill", 4 ) ? 0xb01 : 0 ) | ( 0 == memcmp( &buf[2], "Mask", 4 ) ? 0b11 : 0 );
-	int suffix_mask = ( '0' == digit ? 0b01 : 0 ) | ( '1' == digit ? 0b01 : 0 ) | ( '2' == digit ? 0b10 : 0 );
-
-	return !!( const_mask & prefix_mask & suffix_mask );
+	return !!( prefix_mask & suffix_mask );
 }
 
 struct SamplerItem {
 	GLchar* buf;
 	GLint extraLoc;
 	SamplerTypeDetails details;
-	U8 extraLocUnit;
-	U8 length;
+	U32 extraLocUnit;
+	U32 length;
 	
 	static int Compare( const void* p1, const void* p2 )
 	{

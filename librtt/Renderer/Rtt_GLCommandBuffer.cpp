@@ -880,6 +880,32 @@ GLCommandBuffer::CheckTextureConsistency( ShaderResource* shaderResource, Progra
 			}
 		}
 	}
+
+	// When we do consistency checks, they will obviously either pass
+	// or fail, and thus we have an if-else structure here, as well as
+	// in RestoreConsistency() should we need to clean up.
+	
+	// So far so good. We only progress forward in the stream, and
+	// put down "labels" to track stream details at certain points:
+	// where we happen to be in the byte stream, along with how many
+	// commands were issued thus far.
+	
+	// Some labels are emitted with a "skip info" placeholder. If we
+	// bridge such a label to another later one, it will be supplied
+	// with details of how to advance the command stream from label
+	// 1's position to label 2's.
+		
+	// The control flow is designed around ApplyUniforms() using the
+	// most recent BindProgram() result. Different commands are issued
+	// per uniform type (when present), and also depend on whether the
+	// program is new. The fallback must honor this scheme.
+		
+	// The whole command stream is written, though many are skipped.
+
+	// Currently, all memory written for a command must also be read
+	// back during execution, so that the stream ends up on a command
+	// boundary. A command could instead bundle its own offset: then
+	// we could jump directly via the command index.
 		
 	Label start = EmitLabelWithSkipInfo();
 
@@ -887,7 +913,7 @@ GLCommandBuffer::CheckTextureConsistency( ShaderResource* shaderResource, Progra
 	{
 		LoadUniforms();
 
-		WRITE_COMMAND( kCommandJump );
+		WRITE_COMMAND( kCommandJump ); // n.b. owns the subsequent skip info
 	}
 
 	Label split = EmitLabelWithSkipInfo();
@@ -907,6 +933,8 @@ void
 GLCommandBuffer::RestoreConsistency( Program* previous )
 {
 	WRITE_COMMAND( kCommandRestoreConsistency );
+
+	// see note in CheckConsistency()
 
 	Label start = EmitLabelWithSkipInfo();
 	

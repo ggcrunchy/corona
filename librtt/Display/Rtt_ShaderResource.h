@@ -291,7 +291,7 @@ class ShaderResource
 
 	public:
 		bool AreFormatsConsistent( U32 fillBackingValues[], U32 extraTextureBackingValues[], U32 extraCount, const U8* paintNames, RenderDataState* renderDataState = NULL ) const;
-		bool AreTexturesConsistent( /*const Texture* fill0, const Texture* fill1, Texture* extraTextures[], U32 extraCount, */ const TextureList& list, const U8* paintNames, RenderDataState* renderDataState = NULL ) const;
+		bool AreTexturesConsistent( const TextureList& list, const U8* paintNames, RenderDataState* renderDataState = NULL ) const;
 
 	public:
 		const Program* GetFirstBoundProgram() const;
