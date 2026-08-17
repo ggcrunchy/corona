@@ -67,6 +67,13 @@ class ShaderFactory
 				ShaderBinaryVersions &compiled25DShaders,
                 int localStubsIndex );
 #else
+		struct TweakDetails {
+			const char* fVert;
+			const char* fFrag;
+			int fHasZFlagPos; // n.b. stack slot, and gets stomped on for temporary storage
+			bool fSamplerTypes;
+		};
+
 		Program *NewProgram(
 				const char *shellVert,
 				const char *shellFrag,
@@ -79,7 +86,7 @@ class ShaderFactory
 				const char *kernelVert,
 				const char *kernelFrag,
                 int localStubsIndex,
-                bool tweaksOnStack, bool hasZ );
+                const TweakDetails* tweaks );
 #endif
         Shader *NewShaderPrototype( lua_State *L, int index, const SharedPtr< ShaderResource >& resource );
 

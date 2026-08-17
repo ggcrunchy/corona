@@ -481,7 +481,10 @@ local function Replace( options, uniforms )
     frag = frag:gsub( k, v )
   end
 
-  return "vec3" == replacements.VSHELL_APOS, vert, frag
+  local hasZ = "vec3" == replacements.VSHELL_APOS
+  local modifiedSampler = "sampler2D" ~= replacements.FSHELL_SAMPLER0_TYPE or "sampler2D" ~= replacements.FSHELL_SAMPLER1_TYPE
+
+  return hasZ, modifiedSampler, vert, frag
 end
 
 shell.replace = Replace
@@ -490,7 +493,7 @@ shell.replace = Replace
 --
 --
 
-local _, defVert, defFrag = Replace( nil )
+local _, _, defVert, defFrag = Replace( nil )
 
 assert( defVert == shell.vertex, "Default vertex shell and replacement form have diverged" )
 assert( defFrag == shell.fragment, "Default fragment shell and replacement form have diverged" )

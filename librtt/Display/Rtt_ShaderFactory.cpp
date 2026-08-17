@@ -428,7 +428,7 @@ ShaderFactory::NewShaderResource(
 	const char *kernelVert,
 	const char *kernelFrag,
     int localStubsIndex,
-    bool tweaksOnStack, bool hasZ )
+    const TweakDetails* tweaks )
 {
     // Cannot create default
     if ( ShaderTypes::kCategoryDefault == category )
@@ -437,10 +437,10 @@ ShaderFactory::NewShaderResource(
     }
 
 	const char *shellVert, *shellFrag;
-	if ( tweaksOnStack )
+	if ( NULL != tweaks )
 	{
-		shellVert = lua_tostring( fL, -2 );
-		shellFrag = lua_tostring( fL, -1 );
+		shellVert = tweaks->fVert;
+		shellFrag = tweaks->fFrag;
 	}
 	else
 	{
@@ -456,11 +456,11 @@ ShaderFactory::NewShaderResource(
         // Fallback to default
         kernelVert = fDefaultKernel->GetVertexShaderSource();
         
-        if ( hasZ )
+        if ( ( NULL != tweaks ) && ( 0 != tweaks->fHasZFlagPos ) )
         {
 			kernelVert = luaL_gsub( fL, kernelVert, "vec2", "vec3" );
 			
-			lua_replace( fL, -3 ); // replace the hasZ boolean; will get popped
+			lua_replace( fL, tweaks->fHasZFlagPos ); // replace the hasZ boolean; will get popped
         }
     }
 
@@ -476,6 +476,11 @@ ShaderFactory::NewShaderResource(
         kernelVert,
         kernelFrag,
         ShaderResource::kDefault );
+
+	if ( ( NULL != tweaks ) && !program->GetMightHaveNonDefaultDetails() && tweaks->fSamplerTypes )
+	{
+		program->SetMightHaveNonDefaultDetails( true );
+	}
 
     SharedPtr< ShaderResource > result( Rtt_NEW( fAllocator, ShaderResource( program, category, name ) ) );
 
@@ -1246,26 +1251,49 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
                             const char *kernelFrag = lua_tostring( L, -1 );
 							
 							lua_getfield( L, tableIndex, "shellTweaks" );
-							bool tweaksOnStack = false, hasZ = false;
+							TweakDetails tweaks = {}, *tweaksPtr = NULL;
 							if ( lua_istable( L, -1 ) )
 							{
-								Rtt_ASSERT( LUA_NOREF != fReplaceFuncRef );
-								if ( LUA_REFNIL != fReplaceFuncRef )
+								lua_getfield( L, tableIndex, "shellTransform" );
+								bool hasTransform = lua_isstring( L, -1 );
+								lua_pop( L, 1 );
+								
+								if ( !hasTransform )
 								{
-									lua_getref( L, fReplaceFuncRef );
-									lua_insert( L, -2 );
-									lua_getfield( L, tableIndex, "uniformData" );
-									
-									tweaksOnStack = ( 0 == Corona::Lua::DoCall( L, 2, 3 ) );
-									hasZ = tweaksOnStack && lua_toboolean( L, -3 );
+									Rtt_ASSERT( LUA_NOREF != fReplaceFuncRef );
+									if ( LUA_REFNIL != fReplaceFuncRef )
+									{
+										lua_getref( L, fReplaceFuncRef );
+										lua_insert( L, -2 );
+										lua_getfield( L, tableIndex, "uniformData" );
+										
+										if ( 0 == Corona::Lua::DoCall( L, 2, 4 ) )
+										{
+											tweaks.fSamplerTypes = lua_toboolean( L, -3 );
+											tweaks.fVert = lua_tostring( L, -2 );
+											tweaks.fFrag = lua_tostring( L, -1 );
+										
+											if ( lua_toboolean( L, -4 ) ) // has z?
+											{
+												// temp slot in case 3D default vertex kernel needed
+												tweaks.fHasZFlagPos = CoronaLuaNormalize( L, -4 );
+											}
+											
+											tweaksPtr = &tweaks; // good to go!
+										}
+									}
+									else
+									{
+										CoronaLuaWarning( L, "Backend does not support tweaks" );
+									}
 								}
 								else
 								{
-									CoronaLuaWarning( L, "Backend does not support tweaks" );
+									CoronaLuaWarning( L, "Both `shellTweaks` and `shellTransfor` found" );
 								}
 							}
 
-							resource = NewShaderResource( category, name, kernelVert, kernelFrag, localStubsIndex, tweaksOnStack, hasZ );
+							resource = NewShaderResource( category, name, kernelVert, kernelFrag, localStubsIndex, tweaksPtr );
 							lua_settop( L, top ); // pop 2 strings and any tweaks
 #endif
 
