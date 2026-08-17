@@ -279,7 +279,7 @@ GPU_GetPixelFormat( PlatformBitmap::Format format )
 {
 #	ifdef Rtt_OPENGLES
 
-		switch ( format )
+		switch ( format.GetValue() )
 		{
 			case PlatformBitmap::kRGBA:
 				return GL_RGBA;
@@ -319,7 +319,7 @@ GPU_GetPixelType( PlatformBitmap::Format format )
 {
 #	ifdef Rtt_OPENGLES
 
-		switch( format )
+		switch( format.GetValue() )
 		{
 			case PlatformBitmap::kMask:
 				return GL_UNSIGNED_BYTE;

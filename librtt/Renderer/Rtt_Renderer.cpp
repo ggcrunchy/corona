@@ -1009,6 +1009,8 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 				// textures wind up in a new unit. When unsynced, the final layout
 				// is unknown, so our best bet is to wipe the cache.
 				fExtraTextures.Clear();
+				
+				fMaxExtraTexturesThisFrame = 0;
 			}
 			
 			Rtt_ASSERT( extraTextureCount <= RenderDataState::kOccupancyBits );
