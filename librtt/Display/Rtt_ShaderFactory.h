@@ -78,7 +78,8 @@ class ShaderFactory
 				const char *name,
 				const char *kernelVert,
 				const char *kernelFrag,
-                int localStubsIndex );
+                int localStubsIndex,
+                bool tweaksOnStack, bool hasZ );
 #endif
         Shader *NewShaderPrototype( lua_State *L, int index, const SharedPtr< ShaderResource >& resource );
 
@@ -166,6 +167,7 @@ class ShaderFactory
 		Program *fDefaultKernel;
 		ProgramHeader *fProgramHeader;
 		const char *fBackend;
+		int fReplaceFuncRef;
 };
 
 // ----------------------------------------------------------------------------

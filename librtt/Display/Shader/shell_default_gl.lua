@@ -174,4 +174,332 @@ void main()
 }
 ]]
 
+--
+--
+--
+
+-- The code above is the canonical GL shell. What follows closely adheres to it in form, but with a few
+-- choice bits meant to be "tweaked" with appropriate subsitutions. (To keep them synced, the replacement
+-- logic is run with all defaults and must reproduces the "true" shell exactly.)
+
+local assert = assert
+local pairs = pairs
+local type = type
+
+--
+--
+--
+
+local vform =
+[[
+attribute VSHELL_APOS a_Position;
+attribute vec3 a_TexCoord;
+attribute vec4 a_ColorScale;
+attribute vec4 a_UserData;
+
+uniform P_DEFAULT float u_TotalTime;
+uniform P_DEFAULT float u_DeltaTime;
+uniform P_UV vec4 u_TexelSize;
+uniform P_POSITION vec2 u_ContentScale;BSHELL_DECL_USERDATA
+
+uniform P_POSITION mat4 u_ViewProjectionMatrix;
+
+#define CoronaVertexUserData a_UserData
+#define CoronaTexCoord a_TexCoord.xy
+
+#define CoronaTotalTime u_TotalTime
+#define CoronaDeltaTime u_DeltaTime
+#define CoronaTexelSize u_TexelSize
+#define CoronaContentScale u_ContentScale
+
+#if MASK_COUNT > 0
+    uniform P_POSITION mat3 u_MaskMatrix0;
+#endif
+
+#if MASK_COUNT > 1
+    uniform P_POSITION mat3 u_MaskMatrix1;
+#endif
+
+#if MASK_COUNT > 2
+    uniform P_POSITION mat3 u_MaskMatrix2;
+#endif
+
+varying P_POSITION vec2 v_Position;BSHELL_DECL_VARYING
+varying P_UV vec2 v_TexCoord;
+#ifdef TEX_COORD_Z
+	varying P_UV float v_TexCoordZ;
+#endif
+
+varying P_COLOR vec4 v_ColorScale;
+varying P_DEFAULT vec4 v_UserData;
+
+#if MASK_COUNT > 0
+    varying P_UV vec2 v_MaskUV0;
+#endif
+
+#if MASK_COUNT > 1
+    varying P_UV vec2 v_MaskUV1;
+#endif
+
+#if MASK_COUNT > 2
+    varying P_UV vec2 v_MaskUV2;
+#endif
+
+#ifdef Rtt_WEBGL_ENV
+%s
+#else
+P_POSITION VSHELL_KRET VertexKernel( VSHELL_KARGDECL );
+#endif
+
+void main()
+{
+	// "varying" are only meant as OUTPUT variables. ie: Write-only variables
+	// meant to provide to a fragment shader, values computed in a vertex
+	// shader.
+	//
+	// Certain devices, like the "Samsung Galaxy Tab 2", DON'T allow you to
+	// use "varying" variable like any other local variables.
+
+	v_TexCoord = a_TexCoord.xy;
+#ifdef TEX_COORD_Z
+	v_TexCoordZ = a_TexCoord.z;
+#endif
+	v_ColorScale = a_ColorScale;
+	v_UserData = a_UserData;VSHELL_ASSIGN_VARYING
+
+	P_POSITION VSHELL_KRET position = VSHELL_KCALL;
+
+    #if MASK_COUNT > 0
+        v_MaskUV0 = ( u_MaskMatrix0 * vec3( VSHELL_MASK_POS ) ).xy;
+    #endif
+
+    #if MASK_COUNT > 1
+        v_MaskUV1 = ( u_MaskMatrix1 * vec3( VSHELL_MASK_POS ) ).xy;
+    #endif
+
+    #if MASK_COUNT > 2
+        v_MaskUV2 = ( u_MaskMatrix2 * vec3( VSHELL_MASK_POS ) ).xy;
+    #endif
+
+    gl_Position = VSHELL_LHS_MATRIX * vec4( VSHELL_RHS_VEC3, 1.0 );VSHELL_SET_POSITION_EX
+}
+]]
+
+--
+--
+--
+
+local fform =
+[[
+uniform FSHELL_SAMPLER0_TYPE u_FillSampler0;
+uniform FSHELL_SAMPLER1_TYPE u_FillSampler1;
+uniform P_DEFAULT float u_TotalTime;
+uniform P_DEFAULT float u_DeltaTime;
+uniform P_UV vec4 u_TexelSize;
+uniform P_POSITION vec2 u_ContentScale;BSHELL_DECL_USERDATA
+
+varying P_POSITION vec2 v_Position;BSHELL_DECL_VARYING
+varying P_UV vec2 v_TexCoord;
+#ifdef TEX_COORD_Z
+	varying P_UV float v_TexCoordZ;
+#endif
+
+varying P_COLOR vec4 v_ColorScale;
+varying P_DEFAULT vec4 v_UserData;
+
+#define CoronaColorScale( color ) (v_ColorScale*(color))
+#define CoronaVertexUserData v_UserData
+
+#define CoronaTotalTime u_TotalTime
+#define CoronaDeltaTime u_DeltaTime
+#define CoronaTexelSize u_TexelSize
+#define CoronaContentScale u_ContentScale
+#define CoronaSampler0 u_FillSampler0
+#define CoronaSampler1 u_FillSampler1
+
+#if MASK_COUNT > 0
+    uniform sampler2D u_MaskSampler0;
+    varying P_UV vec2 v_MaskUV0;
+#endif
+
+#if MASK_COUNT > 1
+    uniform sampler2D u_MaskSampler1;
+    varying P_UV vec2 v_MaskUV1;
+#endif
+
+#if MASK_COUNT > 2
+    uniform sampler2D u_MaskSampler2;
+    varying P_UV vec2 v_MaskUV2;
+#endif
+
+#ifdef Rtt_WEBGL_ENV
+%s
+#else
+P_COLOR vec4 FragmentKernel( P_UV vec2 texCoord );
+#endif
+
+void main()
+{
+#ifdef TEX_COORD_Z
+    P_COLOR vec4 result = FragmentKernel( v_TexCoord.xy / v_TexCoordZ );
+#else
+    P_COLOR vec4 result = FragmentKernel( v_TexCoord );
+#endif
+    
+    #if MASK_COUNT > 0
+        result *= texture2D( u_MaskSampler0, v_MaskUV0 ).r;
+    #endif
+
+    #if MASK_COUNT > 1
+        result *= texture2D( u_MaskSampler1, v_MaskUV1 ).r;
+    #endif
+
+    #if MASK_COUNT > 2
+        result *= texture2D( u_MaskSampler2, v_MaskUV2 ).r;
+    #endif
+
+    gl_FragColor = result;
+}
+]]
+
+--
+--
+--
+
+local Replacements = 
+{
+  VSHELL_APOS = "vec2",
+  VSHELL_KRET = "vec2",
+  VSHELL_MASK_POS = "position, 1.0",
+  VSHELL_KARGDECL = "P_POSITION vec2 position",
+  VSHELL_KCALL = "VertexKernel( a_Position )",
+  VSHELL_ASSIGN_VARYING = "",
+  VSHELL_LHS_MATRIX = "u_ViewProjectionMatrix",
+  VSHELL_RHS_VEC3 = "position, 0.0",
+  VSHELL_SET_POSITION_EX = "",
+  
+  FSHELL_SAMPLER0_TYPE = "sampler2D",
+  FSHELL_SAMPLER1_TYPE = "sampler2D",
+
+  BSHELL_DECL_VARYING = "",
+  BSHELL_DECL_USERDATA = ""
+}
+
+--
+--
+--
+
+local function NilOrString( options, key )
+  local v = options[key]
+
+  assert( v == nil or type( v ) == "string" )
+  
+  return v
+end
+
+local function ConfigureTweaks( options, replacements, uniforms )
+  local zAsVarying = NilOrString( options, "extraVaryingInPosZ" )
+  local lhm = NilOrString( options, "lhsMatrix" )
+  local rhz = NilOrString( options, "rhsZcoord" )
+  local sp_ex = NilOrString( options, "setPositionEx" )
+  local s0t = NilOrString( options, "sampler0Type" )
+  local s1t = NilOrString( options, "sampler1Type" )
+  
+  if options.posAttributeHasZ then
+    replacements.VSHELL_APOS = "vec3"
+  
+    local zAsExtraArg = options.extraKernelArgumentInPosZ
+  
+    if zAsExtraArg or zAsVarying then
+      if zAsExtraArg then
+        replacements.VSHELL_KARGDECL = "P_POSITION vec2 position, P_POSITION float extra"
+        replacements.VSHELL_KCALL = "VertexKernel( a_Position.xy, a_Position.z )"
+      else
+        replacements.VSHELL_KCALL = "VertexKernel( a_Position.xy )"
+      end
+      
+      if zAsVarying then
+        replacements.BSHELL_DECL_VARYING = "\nvarying P_POSITION float " .. zAsVarying .. ";"
+        replacements.VSHELL_ASSIGN_VARYING = "\n\t" .. zAsVarying .. " = a_Position.z;"
+      end
+
+      replacements.VSHELL_RHS_VEC3 = "position, " .. ( rhz or "0.0" )
+    else
+      replacements.VSHELL_KRET = "vec3"
+      replacements.VSHELL_KARGDECL = "P_POSITION vec3 position"
+      replacements.VSHELL_RHS_VEC3 = "position"
+      replacements.VSHELL_MASK_POS = "position.xy, 1.0"
+      
+      rhz = nil
+    end
+  elseif rhz then
+    replacements.VSHELL_RHS_VEC3 = "position, " .. rhz
+  end
+
+  if uniforms and options.declareUniforms then
+    local decl_uniforms = "\n";
+
+    for i = 1, #uniforms do
+      local ui = uniforms[i]
+
+      if type(ui.type) == "string" and type(ui.index) == "number" then
+        decl_uniforms = decl_uniforms .. "uniform " .. ui.type .. " u_UserData" .. ui.index .. ";\n"
+      end
+    end
+    
+    replacements.BSHELL_DECL_USERDATA = decl_uniforms
+  end
+
+  if sp_ex then
+    replacements.VSHELL_SET_POSITION_EX = "\n    gl_Position" .. sp_ex .. ";"
+  end
+
+  for k, v in pairs( {
+    VSHELL_LHS_MATRIX = lhm,
+    FSHELL_SAMPLER0_TYPE = s0t,
+    FSHELL_SAMPLER1_TYPE = s1t
+  } ) do
+    replacements[k] = v
+  end
+end
+
+local function Replace( options, uniforms )
+  assert( options == nil or type( options ) == "table" )
+  assert( uniforms == nil or type( uniforms ) == "table" )
+  
+  options = options or {}
+
+  local replacements = {}
+
+  for k, v in pairs( Replacements ) do
+    replacements[k] = v
+  end
+
+  ConfigureTweaks( options, replacements, uniforms )
+
+  local vert, frag = vform, fform
+
+  for k, v in pairs( replacements ) do
+    vert = vert:gsub( k, v )
+    frag = frag:gsub( k, v )
+  end
+  
+  return "vec3" == replacements.VSHELL_APOS, vert, frag
+end
+
+shell.replace = Replace
+
+--
+--
+--
+
+local _, defVert, defFrag = Replace( nil )
+
+assert( defVert == shell.vertex, "Default vertex shell and replacement form have diverged" )
+assert( defFrag == shell.fragment, "Default fragment shell and replacement form have diverged" )
+
+--
+--
+--
+
 return shell

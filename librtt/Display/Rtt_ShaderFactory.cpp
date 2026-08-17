@@ -94,7 +94,8 @@ ShaderFactory::ShaderFactory( Display& owner, const ProgramHeader& programHeader
 	fDefaultShell( NULL ),
 	fDefaultKernel( NULL ),
 	fProgramHeader( Rtt_NEW( fAllocator, ProgramHeader( programHeader ) ) ),
-	fBackend( backend )
+	fBackend( backend ),
+	fReplaceFuncRef( LUA_NOREF )
 {
     lua_State *L = fL;
 
@@ -131,7 +132,7 @@ ShaderFactory::Initialize()
 
     int top = lua_gettop( L );
 
-    lua_checkstack( L, 6 );
+    lua_checkstack( L, 7 );
 
 #if defined( Rtt_USE_PRECOMPILED_SHADERS )
     // Load precompiled shaders from the default kernel Lua script.
@@ -171,6 +172,9 @@ ShaderFactory::Initialize()
 
         lua_getfield( L, tableIndex, "fragment" );
         const char *shellFrag = lua_tostring( L, -1 );
+
+		lua_getfield( L, tableIndex, "replace" );
+		fReplaceFuncRef = lua_ref( L, 1 );
 
         if ( ShaderBuiltin::PushDefaultKernel( L ) )
         {
@@ -423,13 +427,26 @@ ShaderFactory::NewShaderResource(
 	const char *name,
 	const char *kernelVert,
 	const char *kernelFrag,
-    int localStubsIndex )
+    int localStubsIndex,
+    bool tweaksOnStack, bool hasZ )
 {
     // Cannot create default
     if ( ShaderTypes::kCategoryDefault == category )
     {
         return SharedPtr< ShaderResource >();
     }
+
+	const char *shellVert, *shellFrag;
+	if ( tweaksOnStack )
+	{
+		shellVert = lua_tostring( fL, -2 );
+		shellFrag = lua_tostring( fL, -1 );
+	}
+	else
+	{
+        shellVert = fDefaultShell->GetVertexShaderSource();
+        shellFrag = fDefaultShell->GetFragmentShaderSource();
+	}
 
 	// Caller should check for existence
 	Rtt_ASSERT( NULL == FindPrototype( category, name, localStubsIndex ) );
@@ -438,6 +455,13 @@ ShaderFactory::NewShaderResource(
     {
         // Fallback to default
         kernelVert = fDefaultKernel->GetVertexShaderSource();
+        
+        if ( hasZ )
+        {
+			kernelVert = luaL_gsub( fL, kernelVert, "vec2", "vec3" );
+			
+			lua_replace( fL, -3 ); // replace the hasZ boolean; will get popped
+        }
     }
 
     if ( ! kernelFrag )
@@ -447,8 +471,8 @@ ShaderFactory::NewShaderResource(
     }
 
     Program *program = NewProgram(
-        fDefaultShell->GetVertexShaderSource(),
-        fDefaultShell->GetFragmentShaderSource(),
+        shellVert,
+        shellFrag,
         kernelVert,
         kernelFrag,
         ShaderResource::kDefault );
@@ -457,7 +481,7 @@ ShaderFactory::NewShaderResource(
 
     // result.
     
-    Program *program25D = NewProgram( fDefaultShell->GetVertexShaderSource(), fDefaultShell->GetFragmentShaderSource(), kernelVert, kernelFrag, ShaderResource::k25D );
+    Program *program25D = NewProgram( shellVert, shellFrag, kernelVert, kernelFrag, ShaderResource::k25D );
     result->SetProgramMod( ShaderResource::k25D, program25D );
 
     return result;
@@ -1213,14 +1237,36 @@ ShaderFactory::NewShaderBuiltin( ShaderTypes::Category category, const char *nam
 							lua_pop( L, 1 );
 
 #else
+							int top = lua_gettop( L );
+
                             lua_getfield( L, tableIndex, "vertex" );
                             const char *kernelVert = lua_tostring( L, -1 );
 
                             lua_getfield( L, tableIndex, "fragment" );
                             const char *kernelFrag = lua_tostring( L, -1 );
+							
+							lua_getfield( L, tableIndex, "shellTweaks" );
+							bool tweaksOnStack = false, hasZ = false;
+							if ( lua_istable( L, -1 ) )
+							{
+								Rtt_ASSERT( LUA_NOREF != fReplaceFuncRef );
+								if ( LUA_REFNIL != fReplaceFuncRef )
+								{
+									lua_getref( L, fReplaceFuncRef );
+									lua_insert( L, -2 );
+									lua_getfield( L, tableIndex, "uniformData" );
+									
+									tweaksOnStack = ( 0 == Corona::Lua::DoCall( L, 2, 3 ) );
+									hasZ = tweaksOnStack && lua_toboolean( L, -3 );
+								}
+								else
+								{
+									CoronaLuaWarning( L, "Backend does not support tweaks" );
+								}
+							}
 
-							resource = NewShaderResource( category, name, kernelVert, kernelFrag, localStubsIndex );
-							lua_pop( L, 2 ); // pop 2 strings
+							resource = NewShaderResource( category, name, kernelVert, kernelFrag, localStubsIndex, tweaksOnStack, hasZ );
+							lua_settop( L, top ); // pop 2 strings and any tweaks
 #endif
 
                             if (resource.NotNull())
