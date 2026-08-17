@@ -182,10 +182,6 @@ void main()
 -- choice bits meant to be "tweaked" with appropriate subsitutions. (To keep them synced, the replacement
 -- logic is run with all defaults and must reproduces the "true" shell exactly.)
 
-local assert = assert
-local pairs = pairs
-local type = type
-
 --
 --
 --
@@ -281,7 +277,7 @@ void main()
         v_MaskUV2 = ( u_MaskMatrix2 * vec3( VSHELL_MASK_POS ) ).xy;
     #endif
 
-    gl_Position = VSHELL_LHS_MATRIX * vec4( VSHELL_RHS_VEC3, 1.0 );VSHELL_SET_POSITION_EX
+    gl_Position = VSHELL_LHS_MATRIX * vec4( VSHELL_RHS_VEC3, 1.0 );VSHELL_SET_POSITION_Z
 }
 ]]
 
@@ -376,7 +372,7 @@ local Replacements =
   VSHELL_ASSIGN_VARYING = "",
   VSHELL_LHS_MATRIX = "u_ViewProjectionMatrix",
   VSHELL_RHS_VEC3 = "position, 0.0",
-  VSHELL_SET_POSITION_EX = "",
+  VSHELL_SET_POSITION_Z = "",
   
   FSHELL_SAMPLER0_TYPE = "sampler2D",
   FSHELL_SAMPLER1_TYPE = "sampler2D",
@@ -389,6 +385,12 @@ local Replacements =
 --
 --
 
+local assert = assert
+local concat = table.concat
+local ipairs = ipairs
+local pairs = pairs
+local type = type
+
 local function NilOrString( options, key )
   local v = options[key]
 
@@ -398,60 +400,55 @@ local function NilOrString( options, key )
 end
 
 local function ConfigureTweaks( options, replacements, uniforms )
-  local zAsVarying = NilOrString( options, "extraVaryingInPosZ" )
+  local zAsVarying = NilOrString( options, "varyingFromPosZ" )
   local lhm = NilOrString( options, "lhsMatrix" )
   local rhz = NilOrString( options, "rhsZcoord" )
-  local sp_ex = NilOrString( options, "setPositionEx" )
+  local spz = NilOrString( options, "setPositionZ" )
   local s0t = NilOrString( options, "sampler0Type" )
   local s1t = NilOrString( options, "sampler1Type" )
-  
-  if options.posAttributeHasZ then
-    replacements.VSHELL_APOS = "vec3"
-  
-    local zAsExtraArg = options.extraKernelArgumentInPosZ
-  
-    if zAsExtraArg or zAsVarying then
-      if zAsExtraArg then
-        replacements.VSHELL_KARGDECL = "P_POSITION vec2 position, P_POSITION float extra"
-        replacements.VSHELL_KCALL = "VertexKernel( a_Position.xy, a_Position.z )"
-      else
-        replacements.VSHELL_KCALL = "VertexKernel( a_Position.xy )"
-      end
-      
-      if zAsVarying then
-        replacements.BSHELL_DECL_VARYING = "\nvarying P_POSITION float " .. zAsVarying .. ";"
-        replacements.VSHELL_ASSIGN_VARYING = "\n\t" .. zAsVarying .. " = a_Position.z;"
-      end
+  local zAsExtraArg = options.extraKernelArgumentFromPosZ
 
-      replacements.VSHELL_RHS_VEC3 = "position, " .. ( rhz or "0.0" )
+  if zAsExtraArg or zAsVarying then
+    if zAsExtraArg then
+      replacements.VSHELL_KARGDECL = "P_POSITION vec2 position, P_POSITION float extra"
+      replacements.VSHELL_KCALL = "VertexKernel( a_Position.xy, a_Position.z )"
     else
-      replacements.VSHELL_KRET = "vec3"
-      replacements.VSHELL_KARGDECL = "P_POSITION vec3 position"
-      replacements.VSHELL_RHS_VEC3 = "position"
-      replacements.VSHELL_MASK_POS = "position.xy, 1.0"
-      
-      rhz = nil
+      replacements.VSHELL_KCALL = "VertexKernel( a_Position.xy )"
     end
+    
+    if zAsVarying then
+      replacements.BSHELL_DECL_VARYING = "\nvarying P_POSITION float " .. zAsVarying .. ";"
+      replacements.VSHELL_ASSIGN_VARYING = "\n\t" .. zAsVarying .. " = a_Position.z;"
+    end
+
+    replacements.VSHELL_APOS = "vec3"
+    replacements.VSHELL_RHS_VEC3 = "position, " .. ( rhz or "0.0" )
+  elseif options.posAttributeHasZ then
+    replacements.VSHELL_APOS = "vec3"
+    replacements.VSHELL_KRET = "vec3"
+    replacements.VSHELL_KARGDECL = "P_POSITION vec3 position"
+    replacements.VSHELL_RHS_VEC3 = "position"
+    replacements.VSHELL_MASK_POS = "position.xy, 1.0"
+    
+    rhz = nil
   elseif rhz then
     replacements.VSHELL_RHS_VEC3 = "position, " .. rhz
   end
 
   if uniforms and options.declareUniforms then
-    local decl_uniforms = "\n";
+    local decl_uniforms = { "", "" }
 
-    for i = 1, #uniforms do
-      local ui = uniforms[i]
-
-      if type(ui.type) == "string" and type(ui.index) == "number" then
-        decl_uniforms = decl_uniforms .. "uniform " .. ui.type .. " u_UserData" .. ui.index .. ";\n"
+    for _, userData in ipairs( uniforms ) do
+      if type( userData.type ) == "string" and type( userData.index ) == "number" then
+        decl_uniforms[#decl_uniforms + 1] = "uniform " .. userData.type .. " u_UserData" .. userData.index .. ";"
       end
     end
-    
-    replacements.BSHELL_DECL_USERDATA = decl_uniforms
+
+    replacements.BSHELL_DECL_USERDATA = concat( decl_uniforms, "\n" )
   end
 
-  if sp_ex then
-    replacements.VSHELL_SET_POSITION_EX = "\n    gl_Position" .. sp_ex .. ";"
+  if spz then
+    replacements.VSHELL_SET_POSITION_Z = "\n    gl_Position.z = " .. spz .. ";"
   end
 
   for k, v in pairs( {
@@ -483,7 +480,7 @@ local function Replace( options, uniforms )
     vert = vert:gsub( k, v )
     frag = frag:gsub( k, v )
   end
-  
+
   return "vec3" == replacements.VSHELL_APOS, vert, frag
 end
 
