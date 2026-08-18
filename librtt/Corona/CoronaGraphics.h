@@ -802,6 +802,15 @@ typedef void (*CoronaGeometryComponentWriter)( void * dest, const void * context
 CORONA_API
 int CoronaGeometrySetComponentWriter ( const CoronaRenderer * renderer, const char * name, CoronaGeometryComponentWriter writer, const void * context, int update ) CORONA_PUBLIC_SUFFIX;
 
+// !!!!!!!!!!
+// Aside from the inability to unregister (which ought to be easy enough), none of these
+// vertex extension features seem to be lacking from the graphics.defineVertexExtension()
+// API. Even possible "native" needs like adding memory-based attribute assignment for
+// PathExtensions should be amenable to CoronaMemory's policies, as with meshes. The types
+// are also a bit brittle now and probably easier to address from Lua.
+// This swath of APIs seems basically deprecated, although the internals remain solid.
+// !!!!!!!!!!
+
 /**
  Primitive types that may be used by extended attributes; these extend the set used by Solar's vertices.
 */
@@ -919,6 +928,15 @@ int CoronaGeometryUnregisterVertexExtension( lua_State * L, const char * name ) 
 
 // ----------------------------------------------------------------------------
 
+// !!!!!!!!!!
+// "Details" are kind of weird to use--basically being environment variables.
+// With shell transforms pretty much defunct, only effect data types really have
+// access to them, and the idea of "shared" state is already used in some tests,
+// without need for this mechanism.
+// Thus these really don't bring anything worthwhile and seem worth deprecating;
+// outside this API they also have no use, so this would also mean full removal.
+// !!!!!!!!!!
+
 /**
  Read-only details that may be provided to `graphics.defineEffect()`. These are made available
  to shell transform and data type callbacks in particular, in order to allow user-defined tuning.
@@ -946,6 +964,18 @@ CORONA_API
 int CoronaShaderGetEffectDetail( const CoronaShader * shader, int index, CoronaEffectDetail * detail ) CORONA_PUBLIC_SUFFIX;
 
 // ----------------------------------------------------------------------------
+
+// !!!!!!!!!!
+// Shell transforms are a tremendous sort of internal complexity and are unfriendly to use
+// as well. This applies to the current Lua API, and that was a difficult implementation;
+// writing a "custom" one with these native bits would be just as onerous if meant to be
+// complete.
+// Over time it's also become clear that the use cases are rather clear and a better way to
+// go is a template of the shell that, by default, can reproduce the default. This feature
+// is now available as "shellTweaks" (and was a MUCH simpler process, and in pure Lua) in
+// our graphics.defineEffect params, and seems to be better in every way.
+// Shell transforms therefore seem very worth deprecating and removing internally.
+// !!!!!!!!!!
 
 /**
  Any structure that extends `CoronaShellTransformParams` will take this as its first member, to effect C-style inheritance.
