@@ -1279,6 +1279,34 @@ GLExtraUniforms::GLExtraUniforms( Program::Version version, const GLProgram::Ver
 {
 }
 
+static ptrdiff_t
+LengthWithDecayedArrayStart( const char* name )
+{
+	const char * lastBracket = strrchr( name, '[' );
+	
+	if ( ( NULL != lastBracket ) && ( 0 == strcmp( lastBracket, "[0]" ) ) )
+	{
+		return lastBracket - name;
+	}
+	else
+	{
+		return -1;
+	}
+}
+
+static int
+CompareUniformNames( const std::string& existing, const char* name, ptrdiff_t decayedLen )
+{
+	if ( decayedLen > 0 ) // name at least one character
+	{
+		return existing.compare( 0, (size_t)decayedLen, name ); 
+	}
+	else
+	{
+		return existing.compare( name );
+	}
+}
+
 GLint
 GLExtraUniforms::Find( const char * name, GLint & size, GLenum & type )
 {
@@ -1294,11 +1322,12 @@ GLExtraUniforms::Find( const char * name, GLint & size, GLenum & type )
     
     if (*fCache)
     {
+		ptrdiff_t decayedLen = LengthWithDecayedArrayStart( name );
+    
         for (size_t i = 0; i < (*fCache)->fInfo.size(); ++i)
         {
             const auto & pos = (*fCache)->fInfo[i];
-            
-            if (0 == strcmp( pos.fName.c_str(), name ))
+			if ( 0 == CompareUniformNames( pos.fName, name, decayedLen ) )
             {
                 entryIndex = (int)i;
                 
@@ -1330,7 +1359,7 @@ GLExtraUniforms::Find( const char * name, GLint & size, GLenum & type )
     if (-1 == entryIndex)
     {
         // Not a built-in?
-        if (name[0] && name[1] && 'u' == name[0] && '_' == name[1])
+        if ('u' == name[0] && '_' == name[1])
         {
             for (int i = 0; i < Uniform::kNumBuiltInVariables; ++i)
             {
@@ -1344,25 +1373,27 @@ GLExtraUniforms::Find( const char * name, GLint & size, GLenum & type )
         }
         
         // Gather details.
-        GLint count;
-        
+        GLint count, uniformIndex;
         glGetProgramiv( versionData.fProgram, GL_ACTIVE_UNIFORMS, &count );
         
         GLchar nameBuf[GLProgram::kUniformNameBufferSize];
         GLsizei length;
-        GLint uniformIndex;
         
-        for (uniformIndex = 0; uniformIndex < count; ++uniformIndex)
+        for ( uniformIndex = 0; uniformIndex < count; ++uniformIndex )
         {
-            ::glGetActiveUniform( versionData.fProgram, (GLuint)uniformIndex, GLProgram::kUniformNameBufferSize - 1, &length, &size, &type, nameBuf );
+            glGetActiveUniform( versionData.fProgram, (GLuint)uniformIndex, GLProgram::kUniformNameBufferSize - 1, &length, &size, &type, nameBuf );
 
-            const char * bracket = strchr( nameBuf, '[' );
-            
-            if (bracket)
+			if ( 0 != ClassifySampler( type ) || ( 0x92DB == type ) /* GL_UNSIGNED_INT_ATOMIC_COUNTER */ )
+			{
+				continue;
+			}
+
+            ptrdiff_t decayedLen = LengthWithDecayedArrayStart( nameBuf ); // canonicalize if array ending in "[0]"
+            if ( decayedLen > 0 )
             {
-                length = (GLsizei)(bracket - nameBuf);
+                length = (GLsizei)decayedLen;
             }
-            
+
             if (0 == strncmp( name, nameBuf, length ))
             {
                 break;
@@ -1386,6 +1417,73 @@ GLExtraUniforms::Find( const char * name, GLint & size, GLenum & type )
         case GL_FLOAT_MAT3:
         case GL_FLOAT_MAT4:
             break;
+#if 0
+	// For possible expansion:
+	// If these turn up, the shader presumably linked and the driver supports them...
+	// so need to look up the symbol and add commands
+
+	#define GL_DOUBLE                         0x140A
+	#define GL_DOUBLE_VEC2                    0x8FFC
+	#define GL_DOUBLE_VEC3                    0x8FFD
+	#define GL_DOUBLE_VEC4                    0x8FFE
+
+	#define GL_INT                            0x1404
+	#define GL_INT_VEC2                       0x8B53
+	#define GL_INT_VEC3                       0x8B54
+	#define GL_INT_VEC4                       0x8B55
+
+	#define GL_UNSIGNED_INT                   0x1405
+	#define GL_UNSIGNED_INT_VEC2              0x8DC6
+	#define GL_UNSIGNED_INT_VEC3              0x8DC7
+	#define GL_UNSIGNED_INT_VEC4              0x8DC8
+
+	#define GL_INT64_ARB                      0x140E
+	#define GL_INT64_VEC2_ARB                 0x8FE9
+	#define GL_INT64_VEC3_ARB                 0x8FEA
+	#define GL_INT64_VEC4_ARB                 0x8FEB
+
+	#define GL_UNSIGNED_INT64_ARB             0x140F
+	#define GL_UNSIGNED_INT64_VEC2_ARB        0x8FE5
+	#define GL_UNSIGNED_INT64_VEC3_ARB        0x8FE6
+	#define GL_UNSIGNED_INT64_VEC4_ARB        0x8FE7
+
+	#define GL_BOOL                           0x8B56
+	#define GL_BOOL_VEC2                      0x8B57
+	#define GL_BOOL_VEC3                      0x8B58
+	#define GL_BOOL_VEC4                      0x8B59
+
+	#define GL_FLOAT_MAT2x3                   0x8B65
+	#define GL_FLOAT_MAT2x4                   0x8B66
+	#define GL_FLOAT_MAT3x2                   0x8B67
+	#define GL_FLOAT_MAT3x4                   0x8B68
+	#define GL_FLOAT_MAT4x2                   0x8B69
+	#define GL_FLOAT_MAT4x3                   0x8B6A
+
+	#define GL_DOUBLE_MAT2                    0x8F46
+	#define GL_DOUBLE_MAT3                    0x8F47
+	#define GL_DOUBLE_MAT4                    0x8F48
+	#define GL_DOUBLE_MAT2x3                  0x8F49
+	#define GL_DOUBLE_MAT2x4                  0x8F4A
+	#define GL_DOUBLE_MAT3x2                  0x8F4B
+	#define GL_DOUBLE_MAT3x4                  0x8F4C
+	#define GL_DOUBLE_MAT4x2                  0x8F4D
+	#define GL_DOUBLE_MAT4x3                  0x8F4E
+
+	#define GL_FLOAT16_NV                     0x8FF8
+	#define GL_FLOAT16_VEC2_NV                0x8FF9
+	#define GL_FLOAT16_VEC3_NV                0x8FFA
+	#define GL_FLOAT16_VEC4_NV                0x8FFB
+
+	#define GL_FLOAT16_MAT2_AMD               0x91C5
+	#define GL_FLOAT16_MAT3_AMD               0x91C6
+	#define GL_FLOAT16_MAT4_AMD               0x91C7
+	#define GL_FLOAT16_MAT2x3_AMD             0x91C8
+	#define GL_FLOAT16_MAT2x4_AMD             0x91C9
+	#define GL_FLOAT16_MAT3x2_AMD             0x91CA
+	#define GL_FLOAT16_MAT3x4_AMD             0x91CB
+	#define GL_FLOAT16_MAT4x2_AMD             0x91CC
+	#define GL_FLOAT16_MAT4x3_AMD             0x91CD
+#endif
         default:
             Rtt_LogException( "Location of uniform `%s` found, but type unsupported", name );
                 

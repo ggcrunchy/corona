@@ -1043,6 +1043,7 @@ GLCommandBuffer::WriteNamedUniform( const char * uniformName, const void * data,
         case GL_FLOAT_MAT4:
             glUniformMatrix4fv( location, WriteCount( size, count, 16 ), GL_FALSE, floatData );
             break;
+		// TODO: other...
         default:
             Rtt_ASSERT_NOT_REACHED();
         }

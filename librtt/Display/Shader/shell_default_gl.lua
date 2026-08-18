@@ -196,13 +196,13 @@ attribute vec4 a_UserData;
 uniform P_DEFAULT float u_TotalTime;
 uniform P_DEFAULT float u_DeltaTime;
 uniform P_UV vec4 u_TexelSize;
-uniform P_POSITION vec2 u_ContentScale;BSHELL_DECL_USERDATA
+uniform P_POSITION vec2 u_ContentScale;VSHELL_DECL_USERDATA
 
 uniform P_POSITION mat4 u_ViewProjectionMatrix;
 
 #define CoronaVertexUserData a_UserData
 #define CoronaTexCoord a_TexCoord.xy
-
+VSHELL_DEFINE_APOS_VAR
 #define CoronaTotalTime u_TotalTime
 #define CoronaDeltaTime u_DeltaTime
 #define CoronaTexelSize u_TexelSize
@@ -220,7 +220,7 @@ uniform P_POSITION mat4 u_ViewProjectionMatrix;
     uniform P_POSITION mat3 u_MaskMatrix2;
 #endif
 
-varying P_POSITION vec2 v_Position;BSHELL_DECL_VARYING
+varying P_POSITION vec2 v_Position;
 varying P_UV vec2 v_TexCoord;
 #ifdef TEX_COORD_Z
 	varying P_UV float v_TexCoordZ;
@@ -261,7 +261,7 @@ void main()
 	v_TexCoordZ = a_TexCoord.z;
 #endif
 	v_ColorScale = a_ColorScale;
-	v_UserData = a_UserData;VSHELL_ASSIGN_VARYING
+	v_UserData = a_UserData;
 
 	P_POSITION VSHELL_KRET position = VSHELL_KCALL;
 
@@ -292,9 +292,9 @@ uniform FSHELL_SAMPLER1_TYPE u_FillSampler1;
 uniform P_DEFAULT float u_TotalTime;
 uniform P_DEFAULT float u_DeltaTime;
 uniform P_UV vec4 u_TexelSize;
-uniform P_POSITION vec2 u_ContentScale;BSHELL_DECL_USERDATA
+uniform P_POSITION vec2 u_ContentScale;FSHELL_DECL_USERDATA
 
-varying P_POSITION vec2 v_Position;BSHELL_DECL_VARYING
+varying P_POSITION vec2 v_Position;
 varying P_UV vec2 v_TexCoord;
 #ifdef TEX_COORD_Z
 	varying P_UV float v_TexCoordZ;
@@ -369,16 +369,15 @@ local Replacements =
   VSHELL_MASK_POS = "position, 1.0",
   VSHELL_KARGDECL = "P_POSITION vec2 position",
   VSHELL_KCALL = "VertexKernel( a_Position )",
-  VSHELL_ASSIGN_VARYING = "",
+  VSHELL_DEFINE_APOS_VAR = "",
   VSHELL_LHS_MATRIX = "u_ViewProjectionMatrix",
   VSHELL_RHS_VEC3 = "position, 0.0",
   VSHELL_SET_POSITION_Z = "",
+  VSHELL_DECL_USERDATA = "",
   
   FSHELL_SAMPLER0_TYPE = "sampler2D",
   FSHELL_SAMPLER1_TYPE = "sampler2D",
-
-  BSHELL_DECL_VARYING = "",
-  BSHELL_DECL_USERDATA = ""
+  FSHELL_DECL_USERDATA = ""
 }
 
 --
@@ -400,7 +399,7 @@ local function NilOrString( options, key )
 end
 
 local function ConfigureTweaks( options, replacements, uniforms )
-  local zAsVarying = NilOrString( options, "varyingFromPosZ" )
+  local zAsVar = NilOrString( options, "varFromPosZ" )
   local lhm = NilOrString( options, "lhsMatrix" )
   local rhz = NilOrString( options, "rhsZcoord" )
   local spz = NilOrString( options, "setPositionZ" )
@@ -408,7 +407,7 @@ local function ConfigureTweaks( options, replacements, uniforms )
   local s1t = NilOrString( options, "sampler1Type" )
   local zAsExtraArg = options.extraKernelArgumentFromPosZ
 
-  if zAsExtraArg or zAsVarying then
+  if zAsExtraArg or zAsVar then
     if zAsExtraArg then
       replacements.VSHELL_KARGDECL = "P_POSITION vec2 position, P_POSITION float extra"
       replacements.VSHELL_KCALL = "VertexKernel( a_Position.xy, a_Position.z )"
@@ -416,9 +415,8 @@ local function ConfigureTweaks( options, replacements, uniforms )
       replacements.VSHELL_KCALL = "VertexKernel( a_Position.xy )"
     end
     
-    if zAsVarying then
-      replacements.BSHELL_DECL_VARYING = "\nvarying P_POSITION float " .. zAsVarying .. ";"
-      replacements.VSHELL_ASSIGN_VARYING = "\n\t" .. zAsVarying .. " = a_Position.z;"
+    if zAsVar then
+      replacements.VSHELL_DEFINE_APOS_VAR = "#define " .. zAsVar .. " a_Position.z\n\n"
     end
 
     replacements.VSHELL_APOS = "vec3"
@@ -444,7 +442,16 @@ local function ConfigureTweaks( options, replacements, uniforms )
       end
     end
 
-    replacements.BSHELL_DECL_USERDATA = concat( decl_uniforms, "\n" )
+    decl_uniforms = concat( decl_uniforms, "\n" )
+
+    if decl_uniforms == "vertex" then
+      replacements.VSHELL_DECL_USERDATA = decl_uniforms
+    elseif decl_uniforms == "fragment" then
+      replacements.FSHELL_DECL_USERDATA = decl_uniforms
+    else
+      replacements.VSHELL_DECL_USERDATA = decl_uniforms
+      replacements.FSHELL_DECL_USERDATA = decl_uniforms
+    end
   end
 
   if spz then
