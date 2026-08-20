@@ -79,37 +79,16 @@ struct ExtraTextureInfo
 		kMaxPackedNameLength = kMaxPackedNameCount * 3,
 	
 		// Longest length of raw name that may be packed.
-		kMaxNameLength = kMaxPackedNameLength * 4,
-	
-		#define COUNT_AND_OFFSET( NAME, COUNT, OFFSET ) kCount##NAME = COUNT, kOffset##NAME = OFFSET
-		#define AFTER_PREV( PREV ) kOffset##PREV + kCount##PREV
-		#define NEXT_COUNT_AND_OFFSET( NAME, OFFSET ) COUNT_AND_OFFSET( NAME, kMax##NAME - kMin##NAME + 1, OFFSET )
-	
-		kMinUpper = 'A', kMaxUpper = 'Z',
-		kMinLower = 'a', kMaxLower = 'z',
-		kMinDigit = '0', kMaxDigit = '9',
-	
-		NEXT_COUNT_AND_OFFSET( Upper, 0 ),
-		NEXT_COUNT_AND_OFFSET( Lower, AFTER_PREV( Upper ) ),
-		NEXT_COUNT_AND_OFFSET( Digit, AFTER_PREV( Lower ) ),
-		kOffsetUnderscore = AFTER_PREV( Digit ),
-		kOffsetNUL = kOffsetUnderscore + 1
-	
-		#undef COUNT_AND_OFFSET
-		#undef AFTER_PREV
-		#undef NEXT_COUNT_AND_OFFSET
-		
+		kMaxNameLength = kMaxPackedNameCount * 4,
 	};
 
-	Rtt_STATIC_ASSERT( ( kOffsetNUL + 1 == 64 ) && ( kMaxPackedNameLength % 3 == 0 ) && ( kMaxNameLength % 4 == 0 ) );
+	Rtt_STATIC_ASSERT( ( kMaxPackedNameLength % 3 == 0 ) && ( kMaxNameLength % 4 == 0 ) );
 
 	static int FindNameInList( const U8* name, const U8* listOfNames, int n );
 	static U32 NamesSize( const U8* listOfNames, int n );
-	static int EncodeName( U8* buf, const char* name, int kmask = kMaxPackedNameLength - 1 );
-	static int CheckEncodability( const char* name );
-	static void DecodeName( char* name, const U8* buf, int n );
+	static int EncodeName( U8* buf, const char* name );
 
-	// N.B. name`must have a terminating NUL (when encoding) or an
+	// N.B. name must have a terminating NUL (when encoding) or an
 	// extra slot to receive the same (when decoding).
 
 	U8 fData[1];

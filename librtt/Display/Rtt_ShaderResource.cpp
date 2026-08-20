@@ -44,106 +44,11 @@ ExtraTextureInfo::NamesSize( const U8* listOfNames, int n )
 	return reader.SizeOfList( n );
 }
 
-// Encoding bit layout, for bytes 0-3:
-// 0 0 0 0 0 0 1 1 | 1 1 1 1 2 2 2 2 | 2 2 3 3 3 3 3 3
-
 int
-ExtraTextureInfo::EncodeName( U8* buf, const char* name, int kmask )
+ExtraTextureInfo::EncodeName( U8* buf, const char* name )
 {
-	if ( *name >= '0' && *name <= '9' )
-	{
-		Rtt_LogException( "ERROR: Identifiers cannot start with digits (%c)", *name );
-	
-		return -1;
-	}
-	
-	#define PLUS_1_PRED( COND, RESULT ) ( ( COND ) ? 1 + ( RESULT ) : 0 )
-	#define OFFSET_PLUS_1( CHAR, NAME ) PLUS_1_PRED( ( CHAR >= kMin##NAME ) & ( CHAR <= kMax##NAME ), kOffset##NAME + CHAR - kMin##NAME )
-
-	int k = 0, bad = 0;
-	
-	do {
-		uint8_t work[4] = { kOffsetNUL, kOffsetNUL, kOffsetNUL, kOffsetNUL };
-	
-		for (int j = 0; *name && j < 4; ++name, ++j)
-		{
-			int c = *name;
-			uint8_t code = PLUS_1_PRED( 0 == c, kOffsetNUL ) | PLUS_1_PRED( '_' == c, kOffsetUnderscore ) |
-							OFFSET_PLUS_1( c, Upper ) | OFFSET_PLUS_1( c, Lower ) | OFFSET_PLUS_1( c, Digit );
-
-			bad = ( 0 == code ) ? c : bad;
-			work[j] = code - 1;
-		}
-
-		buf[k++] = ( work[0] << 2 ) | ( work[1] >> 4 );
-		buf[k++] = ( work[1] << 4 ) | ( work[2] >> 2 );
-		buf[k++] = ( work[2] << 6 ) | ( work[3] >> 0 );
-
-		k &= kmask;
-	} while ( *name );
-
-	#undef PLUS_1_PRED
-	#undef OFFSET_PLUS_1
-
-	if ( bad )
-	{
-		Rtt_LogException( "ERROR: Non-identifier character(s) found, including %c", bad );
-		
-		return -1;
-	}
-
-	return k;
+	return String::EncodeIdentifier( buf, name, kMaxPackedNameCount );
 }
-
-int
-ExtraTextureInfo::CheckEncodability( const char* name )
-{
-	U8 junk[3];
-
-	return EncodeName( junk, name, 0 );
-}
-
-void
-ExtraTextureInfo::DecodeName( char* name, const U8* buf, int n )
-{
-	for ( int i = 0, j = 0; i < n; i++, j += 3 )
-	{
-		U32 b1 = buf[j], b2 = buf[j + 1], b3 = buf[j + 2];
-		U32 work[] = {
-			b1 >> 2,
-			( ( b1 & 0x3 ) << 4 ) | ( b2 >> 4 ),
-			( ( b2 & 0xF ) << 2 ) | ( b3 >> 6 ),
-			b3 & 0x3F 
-		};
-			
-		for ( int k = 0; k < 4; ++k )
-		{
-			U8 b = work[k];
-
-			static const char kSymbols[] = {
-				"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-				"abcdefghijklmnopqrstuvwxyz"
-				"0123456789_"
-			};
-			
-			*name++ = kSymbols[b];
-		}
-	}
-		
-	*name = 0;
-}
-
-// ----------------------------------------------------------------------------
-
-static int LengthToBins( int length )
-{
-	return ( length + 3 ) / 4;
-}
-
-static int BinsToBytes( int binCount )
-{
-	return binCount * 3;
-}	
 
 // ----------------------------------------------------------------------------
 
@@ -162,7 +67,7 @@ NamesReader::PullNext()
 
 	fTally += fCount;
 
-	fCount = BinsToBytes( *Current() );
+	fCount = String::IdentifierBinCountToBytes( *Current() );
 
 	fPulls++;
 }
@@ -234,7 +139,7 @@ NamesReader::Decode( char* name ) const
 {
 	Rtt_ASSERT( fStream );
 
-	ExtraTextureInfo::DecodeName( name, Current(), LengthToBins( fCount ) );
+	String::DecodeIdentifier( name, Current(), String::IdentifierLengthToBinCount( fCount ) );
 }
 	
 // ----------------------------------------------------------------------------
@@ -242,13 +147,13 @@ NamesReader::Decode( char* name ) const
 int
 LengthAccumulator::GetTotalBytes() const
 {
-	return BinsToBytes( fTotalBins );
+	return String::IdentifierBinCountToBytes( fTotalBins );
 }
 
 void
 LengthAccumulator::AddLength( int length )
 {
-	fTotalBins += LengthToBins( length );
+	fTotalBins += String::IdentifierLengthToBinCount( length );
 	
 	fCount++;
 }
@@ -268,9 +173,9 @@ NamesEncoder::Encode( const char* name, int length )
 	int encoded = ExtraTextureInfo::EncodeName( fStream + fPos + 1, name );
 	if ( encoded > 0 )
 	{
-		U32 binCount = LengthToBins( length );
+		U32 binCount = String::IdentifierLengthToBinCount( length );
 		
-		Rtt_ASSERT( BinsToBytes( binCount ) == encoded );
+		Rtt_ASSERT( String::IdentifierBinCountToBytes( binCount ) == encoded );
 		
 		fStream[fPos] = binCount;
 		fPos += encoded + 1;

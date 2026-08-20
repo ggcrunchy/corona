@@ -3540,7 +3540,7 @@ GatherExtraPaint( lua_State *L, Array<ArrayData> &arr )
 		Rtt_LogException( "WARNING: key (%s) exceeds maximum sampler identifier length %i", ad.name, ExtraTextureInfo::kMaxNameLength );
 		return;
 	}
-	else if ( ReservedByBackend( ad.name ) || ExtraTextureInfo::CheckEncodability( ad.name ) < 0 ) // n.b. will issue own warnings
+	else if ( ReservedByBackend( ad.name ) || !String::IsIdentifier( ad.name ) ) // n.b. will issue own warnings
 	{
 		return;
 	}
