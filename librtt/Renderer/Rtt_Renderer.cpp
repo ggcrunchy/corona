@@ -679,7 +679,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
     }
 
     const FormatExtensionList* extensionList = geometry->GetExtensionList();
-    const U32 vertexExtra = extensionList ? extensionList->ExtraVertexCount() : 0;
+    const U32 vertexExtra = extensionList ? extensionList->ExtraVertexRateSizeInVertices/*ExtraVertexCount*/() : 0;
     bool formatsDirty = !FormatExtensionList::Match( previousGeometryList, extensionList );
 
     if (!formatsDirty && data->fProgram != fPrevious.fProgram)
@@ -1360,7 +1360,7 @@ Renderer::GetStateBlockInfo( U16 id, U8 *& start, U32 & size, bool mightDirty )
         start = fWorkingState.WriteAccess() + info->fOffset;
         size = info->fSize;
 
-        fMaybeDirty = mightDirty && size > 0;
+        fMaybeDirty = mightDirty && size > 0; // TODO: probably a bug... can clear fMaybeDirty
         
         return true;
     }
@@ -1909,11 +1909,12 @@ Renderer::InsertInstancing( const Geometry::ExtensionBlock* block, const FormatE
 {
     U32 verticesRequired = 0;
 
-    for (auto iter = FormatExtensionList::InstancedGroups( programList ); !iter.IsDone(); iter.Advance())
+//    for (auto iter = FormatExtensionList::InstancedGroups( programList ); !iter.IsDone(); iter.Advance())
+	for ( auto&& iter : FormatExtensionList::InstancedGroups( programList ) )
     {
-        const FormatExtensionList::Group* group = iter.GetGroup();
+        const FormatExtensionList::Group* group = iter.group;//GetGroup();
         
-        verticesRequired += group->GetVertexCount( block->fCount, iter.GetAttribute() );
+        verticesRequired += group->InstanceStreamSizeInVertices/*GetVertexCount*/( block->fCount, iter.attribute );//GetAttribute() );
     }
 
     bool enoughSpace = fCurrentInstancingGeometry && verticesRequired <=
@@ -1927,20 +1928,22 @@ Renderer::InsertInstancing( const Geometry::ExtensionBlock* block, const FormatE
     
     fBackCommandBuffer->BindInstancing( block->fCount, verticesRequired > 0 ? fCurrentInstancingVertex : NULL );
     
-    for (auto iter = FormatExtensionList::InstancedGroups( programList ); !iter.IsDone(); iter.Advance())
+//    for (auto iter = FormatExtensionList::InstancedGroups( programList ); !iter.IsDone(); iter.Advance())
+	for ( auto&& iter : FormatExtensionList::InstancedGroups( programList ) )
     {
-        const FormatExtensionList::Group* programGroup = iter.GetGroup();
+        const FormatExtensionList::Group* programGroup = iter.group;//GetGroup();
         
         // Find the geometry group corresponding to this program group. Merge
         // the corresponding instance data.
         U32 geometryAttributeIndex;
-  
-        S32 geometryGroupIndex = geometryList->FindCorrespondingInstanceGroup( programGroup, iter.GetAttribute(), &geometryAttributeIndex );
+
+		const U8* nameData = programList->FindAttributeNameData( iter.attribute );
+        S32 geometryGroupIndex = geometryList->FindCorrespondingInstanceGroup( programGroup, iter.attribute/*GetAttribute()*/, nameData, &geometryAttributeIndex );
 
         Rtt_ASSERT( -1 != geometryGroupIndex );
         
         FormatExtensionList::Group geometryGroup = geometryList->GetGroups()[geometryGroupIndex];
-        U32 vertexCount = geometryGroup.GetVertexCount( block->fCount, geometryList->GetAttributes() + geometryAttributeIndex );
+        U32 vertexCount = geometryGroup.InstanceStreamSizeInVertices/*GetVertexCount*/( block->fCount, geometryList->GetAttributes() + geometryAttributeIndex );
 
         if (geometryList->HasVertexRateData())
         {

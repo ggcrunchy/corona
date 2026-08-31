@@ -361,6 +361,11 @@ GLCommandBuffer::GetVertexAttributes( VertexAttributeSupport & support ) const
         glGetIntegerv( GL_MAX_VERTEX_ATTRIBS, &sMaxVertexAttribs );
         
         sMaxVertexAttribs -= 4; // ignore built-ins
+        
+        if ( sMaxVertexAttribs > FormatExtensionList::kMaxAttribs )
+        {
+			sMaxVertexAttribs = FormatExtensionList::kMaxAttribs;
+		}
     }
     
     support.maxCount = (U32)sMaxVertexAttribs;
@@ -1231,27 +1236,29 @@ GLCommandBuffer::Execute( bool measureGPU )
                 // Reconstitute any attribute attached to the geometry.
                 U16 attributeCount = Read<U16>();
                 
-                Array< FormatExtensionList::Attribute > attributeArr( fAllocator );
+           //     Array< FormatExtensionList::Attribute > attributeArr( fAllocator );
+				FormatExtensionList::Attribute attributeArr[ FormatExtensionList::kMaxAttribs ];
                 
                 for (U32 i = 0; i < attributeCount; ++i)
                 {
-                    FormatExtensionList::Attribute attribute = Read<FormatExtensionList::Attribute>();
+                    /*FormatExtensionList::Attribute attribute*/attributeArr[i] = Read<FormatExtensionList::Attribute>();
                     
-                    attributeArr.Append( attribute );
+                //    attributeArr.Append( attribute );
                 }
                 
                 U16 groupCount = Read<U16>();
                 
-                Array< FormatExtensionList::Group > groupArr( fAllocator );
+            //    Array< FormatExtensionList::Group > groupArr( fAllocator );
+				FormatExtensionList::Group groupArr[ FormatExtensionList::kMaxAttribs ];
                 
                 for (U32 i = 0; i < groupCount; ++i)
                 {
-                    FormatExtensionList::Group group = Read<FormatExtensionList::Group>();
+                    /*FormatExtensionList::Group group*/groupArr[i] = Read<FormatExtensionList::Group>();
                     
-                    groupArr.Append( group );
+//                    groupArr.Append( group );
                 }
 
-                FormatExtensionList list = FormatExtensionList::FromArrays( groupArr, attributeArr );
+                FormatExtensionList list( groupArr, groupCount, attributeArr, attributeCount );// = FormatExtensionList::FromArrays( groupArr, attributeArr, groupCount, attributeCount );
 
                 // Bring the enabled arrays into agreement.
                 if (!geometry->StoredOnGPU())
@@ -1266,15 +1273,16 @@ GLCommandBuffer::Execute( bool measureGPU )
                 
                 bool hasDivisors = GLGeometry::SupportsDivisors();
                 
-                for (auto iter = FormatExtensionList::AllAttributes( &list ); !iter.IsDone(); iter.Advance())
+//                for (auto iter = FormatExtensionList::AllAttributes( &list ); !iter.IsDone(); iter.Advance())
+				for ( auto&& iter : FormatExtensionList::AllAttributes( &list ) )
                 {
-                    GLuint index = Geometry::FirstExtraAttribute() + iter.GetAttributeIndex();
+                    GLuint index = Geometry::FirstExtraAttribute() + iter.attributeIndex;//GetAttributeIndex();
                     
                     glEnableVertexAttribArray( index );
                     
                     if (hasDivisors)
                     {
-                        GLGeometry::VertexAttribDivisor( index, iter.GetGroup()->divisor );
+                        GLGeometry::VertexAttribDivisor( index, iter.group/*GetGroup()*/->divisor );
                     }
                 }
                 

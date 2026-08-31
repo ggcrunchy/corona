@@ -67,7 +67,7 @@ NamesReader::PullNext()
 
 	fTally += fCount;
 
-	fCount = String::IdentifierBinCountToBytes( *Current() );
+	fCount = ( *Current() ) * 3;
 
 	fPulls++;
 }
@@ -139,7 +139,7 @@ NamesReader::Decode( char* name ) const
 {
 	Rtt_ASSERT( fStream );
 
-	String::DecodeIdentifier( name, Current(), String::IdentifierLengthToBinCount( fCount ) );
+	String::DecodeIdentifier( name, Current(), String::IdentifierLengthToTriples( fCount ) );
 }
 	
 // ----------------------------------------------------------------------------
@@ -147,13 +147,13 @@ NamesReader::Decode( char* name ) const
 int
 LengthAccumulator::GetTotalBytes() const
 {
-	return String::IdentifierBinCountToBytes( fTotalBins );
+	return fTotalTriples * 3;
 }
 
 void
 LengthAccumulator::AddLength( int length )
 {
-	fTotalBins += String::IdentifierLengthToBinCount( length );
+	fTotalTriples += String::IdentifierLengthToTriples( length );
 	
 	fCount++;
 }
@@ -173,11 +173,11 @@ NamesEncoder::Encode( const char* name, int length )
 	int encoded = ExtraTextureInfo::EncodeName( fStream + fPos + 1, name );
 	if ( encoded > 0 )
 	{
-		U32 binCount = String::IdentifierLengthToBinCount( length );
+		U32 triples = String::IdentifierLengthToTriples( length );
 		
-		Rtt_ASSERT( String::IdentifierBinCountToBytes( binCount ) == encoded );
+		Rtt_ASSERT( triples * 3 == (U32)encoded );
 		
-		fStream[fPos] = binCount;
+		fStream[fPos] = triples;
 		fPos += encoded + 1;
 	
 		return true;

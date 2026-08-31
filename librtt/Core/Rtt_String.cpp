@@ -12,6 +12,7 @@
 #include "Core/Rtt_New.h"
 
 #include <string.h>
+#include <ctype.h>
 
 // ----------------------------------------------------------------------------
 
@@ -352,9 +353,9 @@ Rtt_STATIC_ASSERT( kOffsetNUL + 1 == 64 );
 int
 String::EncodeIdentifier( U8* buf, const char* ident, int maxTriples )
 {
-	if ( *ident >= '0' && *ident <= '9' )
+	if ( !isalpha( *ident ) && *ident != '_' )
 	{
-		Rtt_LogException( "ERROR: Identifiers cannot start with digits (%c)", *ident );
+		Rtt_LogException( "ERROR: Identifier must begin with a letter or underscore, got '%c'", *ident );
 	
 		return -1;
 	}
@@ -362,25 +363,25 @@ String::EncodeIdentifier( U8* buf, const char* ident, int maxTriples )
 	// TODO? empty string; maxTriples == 0
 	
 	#define PLUS_1_PRED( COND, RESULT ) ( ( COND ) ? 1 + ( RESULT ) : 0 )
-	#define OFFSET_PLUS_1( CHAR, NAME ) PLUS_1_PRED( ( CHAR >= kMin##NAME ) & ( CHAR <= kMax##NAME ), kOffset##NAME + CHAR - kMin##NAME )
+	#define OFFSET_PLUS_1( CHAR, NAME ) PLUS_1_PRED( ( (U32)( CHAR - kMin##NAME ) ) <= ( (U32)( kMax##NAME - kMin##NAME ) ), kOffset##NAME + CHAR - kMin##NAME )
 
 	int k = 0, bufSize = maxTriples * 3, bad = 0;
 	
 	do {
-		uint8_t work[4] = { kOffsetNUL, kOffsetNUL, kOffsetNUL, kOffsetNUL };
+		U8 work[4] = { kOffsetNUL, kOffsetNUL, kOffsetNUL, kOffsetNUL };
 	
 		for (int j = 0; *ident && j < 4; ++ident, ++j)
 		{
 			int c = *ident;
-			uint8_t code = PLUS_1_PRED( 0 == c, kOffsetNUL ) | PLUS_1_PRED( '_' == c, kOffsetUnderscore ) |
-							OFFSET_PLUS_1( c, Upper ) | OFFSET_PLUS_1( c, Lower ) | OFFSET_PLUS_1( c, Digit );
+			U8 code = PLUS_1_PRED( 0 == c, kOffsetNUL ) | PLUS_1_PRED( '_' == c, kOffsetUnderscore ) |
+						OFFSET_PLUS_1( c, Upper ) | OFFSET_PLUS_1( c, Lower ) | OFFSET_PLUS_1( c, Digit );
 
 			bad = ( 0 == code ) ? c : bad;
 			work[j] = code - 1;
 		}
 
 		// This check prevents overflow, but will lead to bogus results. This is mainly
-		// intended to check encodability, in which case the results are thrown away.
+		// intended to detect encodability, in which case the results are thrown away.
 		k = Min( k + 3, bufSize );
 
 		buf[k - 3] = ( work[0] << 2 ) | ( work[1] >> 4 );
@@ -406,7 +407,7 @@ String::IsIdentifier( const char* name )
 {
 	U8 junk[3];
 
-	return EncodeIdentifier( junk, name, sizeof(junk) ) > 0;
+	return EncodeIdentifier( junk, name, 1 ) > 0;
 }
 
 void
@@ -438,15 +439,9 @@ String::DecodeIdentifier( char* name, const U8* buf, int numTriples )
 }
 
 int
-String::IdentifierLengthToBinCount( int length )
+String::IdentifierLengthToTriples( int length )
 {
 	return ( length + 3 ) / 4;
-}
-
-int
-String::IdentifierBinCountToBytes( int binCount )
-{
-	return binCount * 3;
 }
 
 void

@@ -144,12 +144,11 @@ class String
 
 		// Identifier operations
 
-		static int EncodeIdentifier( U8* buf, const char* ident, int maxBins );
+		static int EncodeIdentifier( U8* buf, const char* ident, int maxTriples );
 		static bool IsIdentifier( const char* name );
-		static void DecodeIdentifier( char* name, const U8* buf, int numBins );
+		static void DecodeIdentifier( char* name, const U8* buf, int numTriples );
 
-		static int IdentifierLengthToBinCount( int length );
-		static int IdentifierBinCountToBytes( int binCount );
+		static int IdentifierLengthToTriples( int length );
 
 		// Path operations
 

@@ -124,7 +124,7 @@ namespace /*anonymous*/
 
         // It is valid to pass a NULL pointer, so allocation is done either way
         const FormatExtensionList* extensionList = geometry->GetExtensionList();
-        const size_t size = FormatExtensionList::GetVertexSize( extensionList );
+        const /*size_t*/U32 size = FormatExtensionList::FullVertexRateSizeInBytes/*GetVertexSize*/( extensionList );
         const U32 vertexCount = geometry->GetVerticesAllocated();
         glBufferData( GL_ARRAY_BUFFER, vertexCount * size, vertexData, GL_STATIC_DRAW );
         GL_CHECK_ERROR();
@@ -190,7 +190,7 @@ namespace /*anonymous*/
         // It is valid to pass a NULL pointer, so allocation is done either way
         const U32 vertexCount = geometry->GetVerticesAllocated();
         const FormatExtensionList* extensionList = geometry->GetExtensionList();
-        const size_t size = FormatExtensionList::GetVertexSize( extensionList );
+        const /*size_t*/U32 size = FormatExtensionList::FullVertexRateSizeInBytes/*GetVertexSize*/( extensionList );
         glBufferData( GL_ARRAY_BUFFER, vertexCount * size, vertexData, GL_STATIC_DRAW );
         GL_CHECK_ERROR();
         
@@ -226,9 +226,10 @@ void createInstanceVBO( Geometry* geometry, GLuint& instancesVBO )
     const FormatExtensionList* extensionList = geometry->GetExtensionList();
     U32 instanceCount = geometry->GetExtensionBlock()->fCount, vertexCount = 0;
     
-    for (auto iter = FormatExtensionList::InstancedGroups( extensionList ); !iter.IsDone(); iter.Advance())
+//    for (auto iter = FormatExtensionList::InstancedGroups( extensionList ); !iter.IsDone(); iter.Advance())
+	for ( auto&& iter : FormatExtensionList::InstancedGroups( extensionList ) )
     {
-        vertexCount += iter.GetGroup()->GetVertexCount( instanceCount, iter.GetAttribute() );
+        vertexCount += iter.group/*GetGroup()*/->InstanceStreamSizeInVertices/*GetVertexCount*/( instanceCount, iter.attribute/*GetAttribute()*/ );
     }
 
     glBufferData( GL_ARRAY_BUFFER, vertexCount * sizeof(Geometry::Vertex), NULL, GL_DYNAMIC_DRAW );
@@ -426,7 +427,7 @@ GLGeometry::VertexAttribDivisor( GLuint index, GLuint divisor)
 void
 GLGeometry::SpliceVertexRateData( const Geometry::Vertex* vertexData, Geometry::Vertex* extendedVertexData, const FormatExtensionList * list, size_t & size )
 {
-    U32 total = 1 + list->ExtraVertexCount();
+    U32 total = 1 + list->ExtraVertexRateSizeInVertices/*ExtraVertexCount*/();
     
     for (U32 i = 0, j = 0, iMax = fVertexCount * total; i < iMax; i += total, ++j)
     {
@@ -551,10 +552,11 @@ GLGeometry::Update( CPUResource* resource, const RenderContext* )
                 
                 U32 offset = 0;
                 
-                for (auto iter = FormatExtensionList::InstancedGroups( extensionList ); !iter.IsDone(); iter.Advance())
+//                for (auto iter = FormatExtensionList::InstancedGroups( extensionList ); !iter.IsDone(); iter.Advance())
+				for ( auto&& iter : FormatExtensionList::InstancedGroups( extensionList ) )
                 {
-                    size_t dataSize = iter.GetGroup()->GetDataSize( block->fCount, iter.GetAttribute() );
-                    U32 groupIndex = iter.GetGroupIndex();
+                    /*size_t*/U32 dataSize = iter.group/*GetGroup()*/->InstanceStreamSizeInBytes/*GetDataSize*/( block->fCount, iter.attribute/*GetAttribute()*/ );
+                    U32 groupIndex = iter.groupIndex;//GetGroupIndex();
                     
                     if (extensionList->HasVertexRateData())
                     {
@@ -635,10 +637,11 @@ GLGeometry::Update( CPUResource* resource, const RenderContext* )
                 
                 U32 offset = 0;
                 
-                for (auto iter = FormatExtensionList::InstancedGroups( extensionList ); !iter.IsDone(); iter.Advance())
+//                for (auto iter = FormatExtensionList::InstancedGroups( extensionList ); !iter.IsDone(); iter.Advance())
+				for ( auto&& iter : FormatExtensionList::InstancedGroups( extensionList ) )
                 {
-                    size_t dataSize = iter.GetGroup()->GetDataSize( block->fCount, iter.GetAttribute() );
-                    U32 groupIndex = iter.GetAttributeIndex();
+                    /*size_t*/U32 dataSize = iter.group/*GetGroup()*/->InstanceStreamSizeInBytes/*GetDataSize*/( block->fCount, iter.attribute/*GetAttribute()*/ );
+                    U32 groupIndex = iter.attributeIndex;//GetAttributeIndex();
                     
                     if (extensionList->HasVertexRateData())
                     {
@@ -798,10 +801,11 @@ GLGeometry::ResolveVertexFormat( const FormatExtensionList * list, U32 vertexSiz
 
     Rtt_ASSERT( list );
     
-    for ( auto iter = FormatExtensionList::AllGroups( list ); !iter.IsDone(); iter.Advance() )
+//    for ( auto iter = FormatExtensionList::AllGroups( list ); !iter.IsDone(); iter.Advance() )
+	for ( auto&& iter : FormatExtensionList::AllGroups( list ) )
     {
-        const FormatExtensionList::Group* group = iter.GetGroup();
-        const FormatExtensionList::Attribute* first = iter.GetAttribute();
+        const FormatExtensionList::Group* group = iter.group;//GetGroup();
+        const FormatExtensionList::Attribute* first = iter.attribute;//GetAttribute();
         GLbyte* start = NULL;
         U32 offsetExtra = 0;
         size_t stride;
@@ -818,7 +822,7 @@ GLGeometry::ResolveVertexFormat( const FormatExtensionList * list, U32 vertexSiz
                 stride = group->size;
             }
             
-            U32 vertexCount = group->GetVertexCount( instanceCount, first );
+            U32 vertexCount = group->InstanceStreamSizeInVertices/*GetVertexCount*/( instanceCount, first );
             
             if (storedOnGPU)
             {
@@ -837,7 +841,7 @@ GLGeometry::ResolveVertexFormat( const FormatExtensionList * list, U32 vertexSiz
         
         else
         {
-            stride = FormatExtensionList::GetVertexSize( list );
+            stride = FormatExtensionList::FullVertexRateSizeInBytes/*GetVertexSize*/( list );
             offsetExtra = sizeof(Geometry::Vertex);
             
             if (!storedOnGPU)
@@ -846,7 +850,7 @@ GLGeometry::ResolveVertexFormat( const FormatExtensionList * list, U32 vertexSiz
             }
         }
         
-        U32 firstIndex = iter.GetAttributeIndex();
+        U32 firstIndex = iter.attributeIndex;//GetAttributeIndex();
         
         for (U32 i = 0; i < group->count; ++i)
         {

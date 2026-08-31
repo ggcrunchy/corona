@@ -123,14 +123,14 @@ private:
 
 class LengthAccumulator {
 public:
-	LengthAccumulator() : fTotalBins( 0 ), fCount( 0 ) {}
+	LengthAccumulator() : fTotalTriples( 0 ), fCount( 0 ) {}
 
 	int GetTotalBytes() const;
 	int GetCount() const { return fCount; }
 	void AddLength( int length );
 
 private:
-	int fTotalBins;
+	int fTotalTriples;
 	int fCount;
 };
 
