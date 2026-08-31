@@ -146,7 +146,7 @@ class String
 
 		static int EncodeIdentifier( U8* buf, const char* ident, int maxTriples );
 		static bool IsIdentifier( const char* name );
-		static void DecodeIdentifier( char* name, const U8* buf, int numTriples );
+		static U32 DecodeIdentifier( char* name, const U8* buf, int numTriples );
 
 		static int IdentifierLengthToTriples( int length );
 

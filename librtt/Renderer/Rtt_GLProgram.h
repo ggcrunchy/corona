@@ -83,7 +83,7 @@ class GLProgram : public GPUResource
 
 		void Create( Program::Version version, VersionData& data );
 		void Update( Program::Version version, VersionData& data );
-		void UpdateShaderSource( Program* program, Program::Version version, VersionData& data, const char names[] );//, const U8 attributeIndices[] );
+		void UpdateShaderSource( Program* program, Program::Version version, VersionData& data, const char names[] );
 		void Reset( VersionData& data );
 
         enum { kUniformNameBufferSize = 64 };

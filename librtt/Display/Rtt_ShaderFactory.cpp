@@ -1855,52 +1855,6 @@ ShaderFactory::RegisterShellTransform( const char * name, const CoronaShellTrans
     }
 }
 
-static U32
-CheckExtensionDetails( const CoronaVertexExtension & extension, U32 n, const VertexAttributeSupport& support )//, FormatExtensionList::NamedAttributeInfo info[] )
-{
-	U32 index = 0/*, max = Min( support.maxCount, (U32)FormatExtensionList::kMaxAttribs )*/;
-	// ^^^ TODO: be a count instead
-	if (extension.instanceByID && NULL == support.suffix)
-	{
-		return 0;
-	}
-	else if ( 0 == n || n > support.maxCount ) // would loop more than max? (guard for info size)
-	{
-		return 0;
-	}
-
-//	U32 tempCount = 0;
-		
-	// TODO: compare against graphics.defineVertexExtension()... probably this is all duplicated
-	for (U32 i = 0; i < n; i++)
-	{
-		const CoronaVertexExtensionAttribute & attribute = extension.attributes[i];
-		
-		/*info[i].index = */index++;/*
-		info[i].length = 0;
-		info[i].name = attribute.name;*/
-		
-		//info[i].suffix = 0;
-		/*
-		if ( !String::IsIdentifier( attribute.name ) )
-		{
-			return 0;
-		}
-		else */if (0 == attribute.components || attribute.components > 4)
-		{
-			return 0;
-		}
-		else if (attribute.instancesToReplicate || attribute.windowSize)
-		{
-			if (!support.hasPerInstance)
-			{
-				return 0;
-			}
-			else if (attribute.instancesToReplicate > 1 && !support.hasDivisors)
-			{
-				return 0;
-			}
-		}
 #if 0
 		else if (attribute.windowSize)
 		{
@@ -1925,47 +1879,7 @@ CheckExtensionDetails( const CoronaVertexExtension & extension, U32 n, const Ver
 				index += attribute.windowSize - 1;
 			}
 		}
-	#endif
-	#if 0
-		info[i].length += strlen( attribute.name ); // TODO: in practice these are Lua-sourced and so should have free length
-
-		if (info[i].length /*+ ( attribute.windowSize >= 10 )*/ > 64) // name too long? (including two-digit window names)
-		{
-			return 0;//false;
-		}
-		#endif
-	}
-
-	if (index > support.maxCount/*max*/) // windowing still left index valid?
-	{
-		return 0;
-	}
-#if 0
-	for ( ; tempCount; --tempCount)
-	{
-		const FormatExtensionList::NamedAttributeInfo& temp = info[ FormatExtensionList::kMaxAttribs - tempCount ];
-		FormatExtensionList::NamedAttributeInfo& entry = info[temp.index];
-		
-		for (U32 i = 1; i < temp.length; i++, n++)
-		{
-			info[n].length = entry.length + ( i >= 10 ); // has second digit?
-			info[n].index = entry.index + i;
-			info[n].name = entry.name;
-		//	info[n].suffix = i + 1;
-		}
-	}
 #endif
-	// std::sort( info, info + n );
-#if 0
-	bool ok = true;
-	for (U32 i = 1; i < n; i++)
-	{
-		ok &= info[i - 1] < info[i];
-	}
-#endif
-	return n;
-	//ok ? n : 0; // all names distinct
-}
 
 bool
 ShaderFactory::RegisterVertexExtension( const char * name, const CoronaVertexExtension & extension )
@@ -2015,36 +1929,24 @@ ShaderFactory::RegisterVertexExtension( const char * name, const CoronaVertexExt
     
     else
     {
-        VertexAttributeSupport support;
-        
-        fOwner.GetVertexAttributes( support );
-
-//		FormatExtensionList::NamedAttributeInfo info[ FormatExtensionList::kMaxAttribs ];
-
-// TODO: a lot of this was ALREADY checked by graphics.defineVertexExtension()
-// Unless there's actually any use case still for the C API (doubtful), just
-// assume these details have already been verified and whittle this down.
-		U32 n = CheckExtensionDetails( extension, extension.count, support );//, info );
-        if ( n > 0 )
-        {
-            using SharedExtensionListPtr = SharedPtr<FormatExtensionList>;
-            
-            SharedExtensionListPtr * sharedList = (SharedExtensionListPtr*)lua_newuserdata( L, sizeof(SharedExtensionListPtr) ); // ..., vertexExtensions, nil, sharedList
-            FormatExtensionList* list = Rtt_NEW( fAllocator, FormatExtensionList );
-            
-            new (sharedList) SharedExtensionListPtr( list );
-            
-            list->Build( fAllocator, &extension );//, info );
-            
-            lua_pushlightuserdata( L, &sVertexExtensionCookie ); // ..., vertexExtensions, nil, sharedList, cookie
-            lua_rawget( L, -4 ); // ..., vertexExtensions, nil, sharedList, sharedListMT
-            lua_setmetatable( L, -2 ); // ..., vertexExtensions, nil, sharedList; sharedList.metatable = sharedListMT
-            lua_setfield( L, -3, name ); // ..., vertexExtensions = { ..., [name] = sharedList, nil }, nil
-        }
-        
+// TODO: Unless there's actually any use case still for the C API (doubtful),
+// should be safe to assume this comes from graphics.defineVertexExtension()
+		using SharedExtensionListPtr = SharedPtr<FormatExtensionList>;
+		
+		SharedExtensionListPtr * sharedList = (SharedExtensionListPtr*)lua_newuserdata( L, sizeof(SharedExtensionListPtr) ); // ..., vertexExtensions, nil, sharedList
+		FormatExtensionList* list = Rtt_NEW( fAllocator, FormatExtensionList );
+		
+		new (sharedList) SharedExtensionListPtr( list );
+		
+		list->Build( fAllocator, &extension );
+		
+		lua_pushlightuserdata( L, &sVertexExtensionCookie ); // ..., vertexExtensions, nil, sharedList, cookie
+		lua_rawget( L, -4 ); // ..., vertexExtensions, nil, sharedList, sharedListMT
+		lua_setmetatable( L, -2 ); // ..., vertexExtensions, nil, sharedList; sharedList.metatable = sharedListMT
+		lua_setfield( L, -3, name ); // ..., vertexExtensions = { ..., [name] = sharedList, nil }, nil
         lua_pop( L, 2 ); // ...
         
-        return ( n > 0 );
+        return true;
     }
 }
 

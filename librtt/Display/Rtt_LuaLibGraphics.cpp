@@ -723,16 +723,15 @@ GraphicsLibrary::defineVertexExtension( lua_State *L )
         return 1;
     }
  
-//    std::vector< CoronaVertexExtensionAttribute > attributes;
 	CoronaVertexExtensionAttribute attributeList[FormatExtensionList::kMaxAttribs] = {};
 	NameAndLength nameList[FormatExtensionList::kMaxAttribs];
 	U32 attribCount = 0, n = 0;
 
     ok = false;
 
-    for (U32 i = 0; i < support.maxCount; i++)//int index = 1; index <= support.maxCount; index++)
+    for (U32 i = 0; i < support.maxCount; i++)
     {
-        lua_rawgeti( L, 1, (int)(i + 1)/*index*/ ); // extension, entry?
+        lua_rawgeti( L, 1, (int)(i + 1) ); // extension, entry?
         
         if (lua_isnil( L, -1 ))
         {
@@ -743,7 +742,6 @@ GraphicsLibrary::defineVertexExtension( lua_State *L )
         
         else
         {
-//            CoronaVertexExtensionAttribute attribute = {};
 			CoronaVertexExtensionAttribute& attribute = attributeList[n];
             
             luaL_checktype( L, -1, LUA_TTABLE );
@@ -779,7 +777,6 @@ GraphicsLibrary::defineVertexExtension( lua_State *L )
 
             lua_getfield( L, -1, "type" ); // extension, entry, type
             
-       //     const char * type = luaL_checkstring( L, -1 );
             const char * typeNames[] = { "byte", "float", "int", NULL };
             
             attribute.type = (CoronaVertexExtensionAttributeType)luaL_checkoption( L, -1, NULL, typeNames );
@@ -842,7 +839,7 @@ GraphicsLibrary::defineVertexExtension( lua_State *L )
             
             if (attribCount > support.maxCount)
             {
-                Rtt_TRACE_SIM( ( "WARNING: iteration %i, attribute count is now %u (maximum %u)", /*index*/i + 1, attribCount, support.maxCount ) );
+                Rtt_TRACE_SIM( ( "WARNING: iteration %i, attribute count is now %u (maximum %u)", i + 1, attribCount, support.maxCount ) );
                 
                 break;
             }
@@ -883,15 +880,13 @@ GraphicsLibrary::defineVertexExtension( lua_State *L )
             
             attribute.instancesToReplicate = dummyGroup.divisor;
             
-         //   attributes.push_back( attribute );
-            
             lua_pop( L, 1 ); // params
         }
     }
     
     lua_pop( L, 1 ); // params
 
-    if ( ok && 0 == n )//attributes.empty())
+    if ( ok && 0 == n )
     {
         Rtt_TRACE_SIM( ( "WARNING: no attributes found in definition" ) );
         
@@ -917,8 +912,8 @@ GraphicsLibrary::defineVertexExtension( lua_State *L )
         CoronaVertexExtension extension;
         
         extension.size = sizeof( CoronaVertexExtension );
-        extension.attributes = attributeList;//s.data();
-        extension.count = n;//attributes.size();
+        extension.attributes = attributeList;
+        extension.count = n;
 		extension.instanceByID = instanceByID;
         
         ok = CoronaGeometryRegisterVertexExtension( L, name, &extension );

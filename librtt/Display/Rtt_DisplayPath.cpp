@@ -277,11 +277,10 @@ DisplayPath::ExtensionAdapter::SetValueForKey(
                         
                         U32 instanceGroupIndex = 0;
                         
-//                        for (auto iter = FormatExtensionList::InstancedGroups( extensionList ); !iter.IsDone(); iter.Advance())
 						for ( auto&& iter : FormatExtensionList::InstancedGroups( extensionList ) )
                         {
-                            const FormatExtensionList::Group* group = iter.group;//GetGroup();
-                            U32 vertexCount = group->InstanceStreamSizeInVertices/*GetVertexCount*/( block->fCount, iter.attribute/*GetAttribute()*/ );
+                            const FormatExtensionList::Group* group = iter.group;
+                            U32 vertexCount = group->InstanceStreamSizeInVertices( block->fCount, iter.attribute );
                             
                             block->fInstanceData[instanceGroupIndex]->PadToSize( vertexCount * sizeof(Geometry::Vertex), 0 );
                             // TODO? more fine-grained, e.g. instances flag?
@@ -387,7 +386,6 @@ DisplayPath::ExtensionAdapter::getAttributeDetails( lua_State *L )
     if (extensionList)
     {
         const char* name = luaL_checkstring( L, nextArg );
-     //   S32 nameIndex = extensionList->FindName( name );
 		int nameIndex = extensionList->FindAttributeWithName( name );
 
         if (-1 != nameIndex)
@@ -473,7 +471,6 @@ DisplayPath::ExtensionAdapter::setAttributeValue( lua_State *L )
             return 0;
         }
         
-    //    S32 nameIndex = extensionList->FindName( name );
 		int nameIndex = extensionList->FindAttributeWithName( name );
 
         if (-1 != nameIndex)
@@ -533,7 +530,7 @@ DisplayPath::ExtensionAdapter::setAttributeValue( lua_State *L )
                     offset += (index - 1) * group.size;
                 }
 
-                if ( offset + attribute.GetSize() > group./*GetDataSize*/InstanceStreamSizeInBytes( block->fCount, &attribute ) )
+                if ( offset + attribute.GetSize() > group.InstanceStreamSizeInBytes( block->fCount, &attribute ) )
                 {
                     CoronaLuaWarning( L, "Index is out of bounds" );
                     
@@ -551,7 +548,7 @@ DisplayPath::ExtensionAdapter::setAttributeValue( lua_State *L )
                 Rtt_ASSERT( extendedData );
                                 
                 U32 offset = attribute.offset;
-                /*size_t*/U32 vertexSize = FormatExtensionList::ExtraVertexRateSizeInBytes/*GetExtraVertexSize*/( extensionList );
+                U32 vertexSize = FormatExtensionList::ExtraVertexRateSizeInBytes( extensionList );
                 
                 if (geometry->GetStoredOnGPU())
                 {

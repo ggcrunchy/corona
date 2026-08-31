@@ -410,9 +410,10 @@ String::IsIdentifier( const char* name )
 	return EncodeIdentifier( junk, name, 1 ) > 0;
 }
 
-void
+U32
 String::DecodeIdentifier( char* name, const U8* buf, int numTriples )
 {
+	const char* start = name;
 	for ( int i = 0; i < numTriples; i++, buf += 3 )
 	{
 		U32 b1 = buf[0], b2 = buf[1], b3 = buf[2];
@@ -436,6 +437,8 @@ String::DecodeIdentifier( char* name, const U8* buf, int numTriples )
 	}
 		
 	*name = 0;
+
+	return (U32)( name - start );
 }
 
 int

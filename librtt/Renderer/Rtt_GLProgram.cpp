@@ -326,27 +326,61 @@ IsDoubleType( CoronaVertexExtensionAttributeType )
 
 #define ARRAY_AND_N( NAME ) NAME, sizeof(NAME)
 
-static void
-AppendMacroName( const char* name, std::string& extensionAttributes )
-{
-    char buf[BUFSIZ];
-    const char * rest = name + 1;
-    
-    snprintf( ARRAY_AND_N( buf ), "#define Corona%c%s a_%s\n", toupper( *name ), *rest ? rest : "", name );
+static const char kAttributePrefix[] = "a_";
+static const char kLongestTypeName[] = "double";
+static const char kDeclareAttributeString[] = "attribute %s%s %s;\n";
+static const char kDeclareAttributeArrayString[] = "attribute %s%s %s[%i];\n";
+static const char kMacroFormatString[] = "#define Corona%c%s a_%s\n";
+static const char kSuffixedMacroFormatString[] = "#define Corona%c%s%i a_%s[%i - 1]\n";
+static const char kIndexedMacroFormatString[] = "#define Corona%c%sAt( pos ) a_%s[(int)pos]\n";
 
-    extensionAttributes += buf;
+Rtt_STATIC_ASSERT( sizeof(kDeclareAttributeArrayString) > sizeof(kDeclareAttributeString) );
+Rtt_STATIC_ASSERT( sizeof(kSuffixedMacroFormatString) > sizeof(kMacroFormatString) );
+Rtt_STATIC_ASSERT( sizeof(kIndexedMacroFormatString) > sizeof(kMacroFormatString) );
+
+#define LEN( str_const, num_specifiers ) ( sizeof(str_const) - 1 /* NUL */ - ( num_specifiers * 2 ) )
+
+enum {
+	kAttributePrefixLen = LEN( kAttributePrefix, 0 ),
+	kLongestTypeNameLen = LEN( kLongestTypeName, 0 ),
+	kDeclareAttributeArrayStringLen = LEN( kDeclareAttributeArrayString, 4 )
+		+ kLongestTypeNameLen /* type */ + 1 /* suffix digit */ + 64 /* name */ + 2 /* two-digit array size */ ,
+	kSuffixedMacroFormatStringLen = LEN( kSuffixedMacroFormatString, 5 )
+		+ ( 0 + 64 ) /* name (includes capitalized first letter) */ + 2 /* two-digit suffix */ + 64 /* name */ + 2 /* two-digit index */,
+	kIndexedMacroFormatStringLen = LEN( kIndexedMacroFormatString, 3 )
+		+ ( 0 + 64 ) /* name (includes capitalized first letter) */ + 64 /* name */ ,
+	kProgramAttribStringSize = FormatExtensionList::kMaxAttribs * ( kDeclareAttributeArrayStringLen + kSuffixedMacroFormatStringLen ) +
+								( FormatExtensionList::kMaxAttribs / 2 ) * kIndexedMacroFormatStringLen +
+								2 /* newline and NUL */
+};
+
+#undef LEN
+
+static int
+AppendMacroName( const char* name, char extensionAttribStrs[], int wpos )
+{
+    // TODO: array
+    
+	int n = snprintf(
+		&extensionAttribStrs[wpos], kProgramAttribStringSize - wpos,
+		kMacroFormatString,
+		toupper( *name ), name + 1, name
+		);
+	
+	Rtt_ASSERT( n > 0 );
+	
+	return n;
 }
 
 static void
-GatherAttributeExtensions( const FormatExtensionList* extensionList, std::string& extensionAttributes, const char names[] )//, const U8 attributeIndices[] )
+GatherAttributeExtensions( const FormatExtensionList* extensionList, char *extensionAttribStrs, const char names[] )
 {
-//    extensionList->SortNames();
-    
+	int wpos = 0;
+	
     for (int i = 0; i < extensionList->GetAttributeCount(); ++i)
     {
-//		U8 index = attributeIndices[i];
-        const FormatExtensionList::Attribute& attribute = extensionList->GetAttributes()[i/*index*/];
-        char buf[64], count[2] = {};
+        const FormatExtensionList::Attribute& attribute = extensionList->GetAttributes()[i];
+        char count[2] = {};
         
         if (attribute.GetComponentCount() > 1)
         {
@@ -369,21 +403,29 @@ GatherAttributeExtensions( const FormatExtensionList* extensionList, std::string
             vec = "ivec";
         }
             
-        snprintf( ARRAY_AND_N( buf ), "attribute %s%s a_%s;\n", *count ? vec : prim, count, names + i * ( 64 + 1 )/*extensionList->FindNameByAttribute( i )*/ );
-        
-        extensionAttributes += buf;
+		// TODO: is array?
+            
+		int n = snprintf(
+			&extensionAttribStrs[wpos], kProgramAttribStringSize - wpos,
+			kDeclareAttributeString,
+			*count ? vec : prim, count, names + i * ( 64 + 1 + kAttributePrefixLen )
+			);
+            
+		Rtt_ASSERT( n > 0 );
+
+		wpos += n;
     }
     
-    extensionAttributes += "\n";
+	extensionAttribStrs[wpos++] = '\n';
     
     for (int i = 0; i < extensionList->GetAttributeCount(); ++i)
     {
-        AppendMacroName( /*extensionList->FindNameByAttribute( i )*/names + i * ( 64 + 1 ), extensionAttributes );
+        wpos += AppendMacroName( names + i * ( 64 + 1 + kAttributePrefixLen ) + kAttributePrefixLen, extensionAttribStrs, wpos );
     }
 }
 
 void
-GLProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data, const char names[] )//, const U8 attributeIndices[] )
+GLProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data, const char names[] )
 {
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
     char maskBuffer[] = "#define MASK_COUNT 0\n";
@@ -456,7 +498,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
     // Vertex shader.
     {
         const char * extendedSources[7] = {}, * extendedHints[8] = {};
-        std::string extensionAttributes, suffixStr, versionStr;
+        std::string suffixStr, versionStr;
         
         params.hints = hints;
         params.sources = shader_source;
@@ -477,12 +519,14 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
                 extendedHints[i] = hints[i];
             }
                         
-            GatherAttributeExtensions( extensionList, extensionAttributes, names );//, attributeIndices );
+			char extensionAttribStrs[kProgramAttribStringSize];
+                        
+            GatherAttributeExtensions( extensionList, extensionAttribStrs, names );
             
             const char * originalSource = shader_source[4], * originalHint = hints[4];
             U32 nsources = params.nsources + 1;
             
-            extendedSources[4] = extensionAttributes.c_str();
+            extendedSources[4] = extensionAttribStrs;
             extendedHints[4] = "extensionAttributes";
             
             // enable instances and / or provide IDs for the same
@@ -1035,35 +1079,22 @@ GLProgram::Update( Program::Version version, VersionData& data )
 
     const FormatExtensionList* extensionList = program->GetShaderResource()->GetExtensionList();
     
-    char names[FormatExtensionList::kMaxAttribs * ( 64 + 1 )];
-    U8 attributeIndices[FormatExtensionList::kMaxAttribs];
+    char names[FormatExtensionList::kMaxAttribs * ( 64 + 1 + kAttributePrefixLen )];
 
     if (extensionList)
     {
         GLuint first = Geometry::FirstExtraAttribute();
-/*
-        for (U32 i = 0; i < extensionList->GetAttributeCount(); ++i)
-        {
-            S32 index;
-            char buf[BUFSIZ];
-            
-            snprintf( ARRAY_AND_N( buf ), "a_%s", extensionList->FindNameByAttribute( i, &index ) );
-*/
-		int n = 0;
+
+		char *buf = names;
 		for ( auto&& iter : extensionList->NamedAttributes() )
 		{
-			char* str = names + n * ( 64 + 1 );
-			String::DecodeIdentifier( str, iter.nameData, iter.triplesCount );
+			memcpy( buf, kAttributePrefix, kAttributePrefixLen );
+
+			String::DecodeIdentifier( buf + kAttributePrefixLen, iter.nameData, iter.triplesCount );
 			
-			attributeIndices[n] = iter.attributeIndex;
-			
-			++n;
-			
-			char buf[64 + 3] = "a_";
-			
-			strcat( buf, str );
-		
-            glBindAttribLocation( data.fProgram, first + iter.attributeIndex/*index*/, buf );
+            glBindAttribLocation( data.fProgram, first + iter.attributeIndex, buf );
+            
+            buf += kAttributePrefixLen + ( 64 + 1 );
         }
 
         GL_CHECK_ERROR();
@@ -1073,7 +1104,7 @@ GLProgram::Update( Program::Version version, VersionData& data )
     UpdateShaderSource( program,
                         version,
                         data,
-                        names );//, attributeIndices );
+                        names );
 
 #ifdef Rtt_USE_PRECOMPILED_SHADERS
     ShaderBinary *shaderBinary = program->GetCompiledShaders()->Get(version);
