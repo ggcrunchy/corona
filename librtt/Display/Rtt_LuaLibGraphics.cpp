@@ -640,6 +640,7 @@ GraphicsLibrary::defineShellTransform( lua_State * L )
 struct NameAndLength {
 	const char *name;
 	size_t length;
+	int windowSize;
 
 	bool operator<( const NameAndLength& other ) const
 	{
@@ -751,6 +752,7 @@ GraphicsLibrary::defineVertexExtension( lua_State *L )
             
             nameList[n].name = attribute.name;
             nameList[n].length = lua_objlen( L, -1 );
+            nameList[n].windowSize = ( attribute.windowSize > 1 ) ? attribute.windowSize : 0;
             
             if ( 0 == nameList[n].length )
             {
@@ -898,11 +900,29 @@ GraphicsLibrary::defineVertexExtension( lua_State *L )
     
 		for ( U32 i = 1; i < n; i++ )
 		{
-			ok = nameList[i - 1] < nameList[i];
+			NameAndLength &n1 = nameList[i - 1], &n2 = nameList[i];
+			
+			ok = n1 < n2;
 			if ( !ok )
 			{
-				Rtt_TRACE_SIM( ( "WARNING: more than one attribute using name %s", nameList[i].name ) );
+				Rtt_TRACE_SIM( ( "WARNING: more than one attribute using name %s", n2.name ) );
 				break;
+			}
+			else if ( ( n1.length < n2.length ) && ( 0 == strncmp( n1.name, n2.name, n1.length ) ) && ( 0 != n1.windowSize ) )
+			{
+				bool allDigits = true;
+				int count = 0;
+				for ( int i = (int)n1.length; allDigits && n2.name[i]; i++ )
+				{
+					allDigits = isdigit( n2.name[i] );
+					count = count * 10 + n2.name[i] - '0';
+				}
+				
+				if ( allDigits && ( count >= 1 && count <= n1.windowSize ) )
+				{
+					Rtt_TRACE_SIM( ( "WARNING: window attribute %s of size %i conflicts with %s attribute", n1.name, n1.windowSize, n2.name ) );
+					break;
+				}
 			}
 		}
     }

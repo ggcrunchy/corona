@@ -240,28 +240,29 @@ FormatExtensionList::Compatible( const FormatExtensionList * shaderList, const F
     {
         return true;
     }
-    
     else if (NULL == geometryList) // ...whereas this is the opposite
     {
         Rtt_TRACE_SIM(( "WARNING: no geometry list, so shader list implicitly not a subset." ));
         
         return false;
     }
-    
+    else if ( shaderList == geometryList )
+    {
+		return true;
+    }
     else if ((shaderList->fGroupCount > geometryList->fGroupCount) || (shaderList->fAttributeCount > geometryList->fAttributeCount))
     {
         Rtt_TRACE_SIM(( "WARNING: shader list has more attributes or groups than geometry list." ));
         
         return false;
     }
-	
     else
     {
 		bool geometryIsInstanced = geometryList->fInstancedByID;
 		
 		for ( auto&& iter : FormatExtensionList::AllAttributes( shaderList ) )
         {
-            Attribute shaderAttribute = *iter.attribute;//*iter.GetAttribute();
+            Attribute shaderAttribute = *iter.attribute;
 			S32 geometryAttributeIndex = geometryList->FindMatchingAttribute( shaderList, iter.attribute );
             if (-1 == geometryAttributeIndex)
             {
@@ -378,73 +379,84 @@ FormatExtensionList::Build( Rtt_Allocator* allocator, const CoronaVertexExtensio
 
     std::sort( groupInfo, groupInfo + extension->count );
 
+	char windowNames[kMaxAttribs * ( 64 + 2 /* two-digit suffix */ + 1 /* NUL */ )], digits[3] = {};
 	NamedAttributeInfo info[kMaxAttribs];
     Attribute attributes[kMaxAttribs];
     Group groups[kMaxAttribs], *curGroup;
 
-	for ( U32 i = 0; i < extension->count; i++ )
+	for ( U32 i = 0, windowNamePos = 0, numAttribs; i < extension->count; i++ )
 	{
-		bool isWindow = false;
 		const CoronaVertexExtensionAttribute &attribData = extension->attributes[ groupInfo[i].index ];
 	
 		if ( ( 0 == i ) || ( groupInfo[i - 1] < groupInfo[i] ) )
 		{
 			curGroup = &groups[fGroupCount++];
+			curGroup->count = 0;
 			curGroup->size = 0;
 		
-			isWindow = groupInfo[i].isWindow;
-			if ( isWindow )
+			if ( groupInfo[i].isWindow )
 			{
-				curGroup->count = attribData.windowSize;
+				numAttribs = attribData.windowSize;
 				curGroup->divisor = Max( groupInfo[i].divisor, 1 );
 			}
 			else
 			{
-				curGroup->count = 0;
+				numAttribs = 1;
 				curGroup->divisor = groupInfo[i].divisor;
 			}
 		}
 		
-		Attribute &attrib = attributes[fAttributeCount++];
-		
-		attrib.type = attribData.type;
-        attrib.comp_minus_1 = attribData.components - 1;
-        attrib.normalized = attribData.normalized;
-        
-        if ( !isWindow )
-        {
+		for ( int index = 1; index <= numAttribs; index++ )
+		{
+			U32 attribIndex = fAttributeCount++;
+			Attribute &attrib = attributes[attribIndex];
+			
+			attrib.type = attribData.type;
+			attrib.comp_minus_1 = attribData.components - 1;
+			attrib.normalized = attribData.normalized;
 			attrib.offset = curGroup->size;
 			
 			curGroup->count++;
-			curGroup->size += attrib.GetSize();
+			
+			NamedAttributeInfo& ainfo = info[attribIndex];
+			size_t nameLength = strlen( attribData.name ); // TODO: comes from Lua, known
+
+			if ( numAttribs > 1 ) // window?
+			{
+				ainfo.name = windowNames + windowNamePos;
+			
+				strcpy( windowNames + windowNamePos, attribData.name );
+
+				int onesPos = ( index >= 10 );
+				int tensPos = 1 - onesPos;
+				
+				digits[tensPos] = ( '0' + ( index / 10 ) ) & -( onesPos );
+				digits[onesPos] = '0' + ( index % 10 );
+				
+				strcpy( windowNames + ( windowNamePos + nameLength ), digits );
+				
+				nameLength += 1 + ( 0 != digits[1] );
+				windowNamePos += nameLength + 1;
+			}
+			else
+			{
+				curGroup->size += attrib.GetSize();
+				
+				ainfo.name = attribData.name;
+			}
+			
+			ainfo.attribute = &attrib;
+			ainfo.length = nameLength;
         }
-        
-		info[i].name = attribData.name;
-		info[i].attribute = &attrib;
-        info[i].length = strlen( attribData.name ); // TODO: comes from Lua, known
 	}
 
-#if 0
-        if (attributeData.windowSize > 1)
-				// ^^^ TODO: don't do this (or the loop), but figure out what needs tracking
-				// make it a one-attribute group, if not already
-				int attribIndex = fAttributeCount++;
-
-                attributes[attribIndex] = attribute;//.Append( attribute );
-                // ^^^ or point to it...
-                attribute.offset += attribute.GetSize();
-            }
-            
-            int groupIndex = fGroupCount++;
-            groups[groupIndex] = group;//.Append( group );
-#endif
-    if ( extension->count > 1 )
+    if ( fAttributeCount > 1 )
     {
-		std::sort( info, info + extension->count );
+		std::sort( info, info + fAttributeCount );
     }
     
 	U16 triplesBits = 0, namesSize = 0, offsets[15];
-	for ( int i = 0, j = 0, prevTriples = -1; i < extension->count; i++ )
+	for ( int i = 0, j = 0, prevTriples = -1; i < fAttributeCount; i++ )
 	{
         U16 numTriples = String::IdentifierLengthToTriples( info[i].length );
         
@@ -472,7 +484,7 @@ FormatExtensionList::Build( Rtt_Allocator* allocator, const CoronaVertexExtensio
 	memcpy( fLookupData, &triplesBits, sizeof(U16) );
 	memcpy( fLookupData + sizeof(U16), offsets, ( triplesCount - 1 ) * sizeof(U16) );
     
-    for ( int i = 0, wpos = triplesCount * sizeof(U16), prevTriples = -1; i < extension->count; i++ )
+    for ( int i = 0, wpos = triplesCount * sizeof(U16), prevTriples = -1; i < fAttributeCount; i++ )
     {
 		U16 numTriples = String::IdentifierLengthToTriples( info[i].length );
 		if (numTriples == prevTriples)

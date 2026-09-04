@@ -1855,32 +1855,6 @@ ShaderFactory::RegisterShellTransform( const char * name, const CoronaShellTrans
     }
 }
 
-#if 0
-		else if (attribute.windowSize)
-		{
-			++info[i].length; // first one has a '0' suffix
-
-		//	info[i].suffix = 1; // store suffix + 1
-
-			// Remember this attribute and claim extra attributes for it if everything
-			// else worked out. Since that means the window-aware count remained within
-			// the attribute limits, these indices will be intact. If we then dole them
-			// out starting from info + n, this will also be robust in the event of a
-			// tight fit if we unwind the indices in reverse order.
-			if (attribute.windowSize > 1)
-			{
-				++tempCount;
-				
-				FormatExtensionList::NamedAttributeInfo& temp = info[FormatExtensionList::kMaxAttribs - tempCount];
-				
-				temp.index = i;
-				temp.length = attribute.windowSize;
-				
-				index += attribute.windowSize - 1;
-			}
-		}
-#endif
-
 bool
 ShaderFactory::RegisterVertexExtension( const char * name, const CoronaVertexExtension & extension )
 {

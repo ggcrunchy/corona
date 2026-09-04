@@ -329,55 +329,68 @@ IsDoubleType( CoronaVertexExtensionAttributeType )
 static const char kAttributePrefix[] = "a_";
 static const char kLongestTypeName[] = "double";
 static const char kDeclareAttributeString[] = "attribute %s%s %s;\n";
-static const char kDeclareAttributeArrayString[] = "attribute %s%s %s[%i];\n";
-static const char kMacroFormatString[] = "#define Corona%c%s a_%s\n";
-static const char kSuffixedMacroFormatString[] = "#define Corona%c%s%i a_%s[%i - 1]\n";
-static const char kIndexedMacroFormatString[] = "#define Corona%c%sAt( pos ) a_%s[(int)pos]\n";
-
-Rtt_STATIC_ASSERT( sizeof(kDeclareAttributeArrayString) > sizeof(kDeclareAttributeString) );
-Rtt_STATIC_ASSERT( sizeof(kSuffixedMacroFormatString) > sizeof(kMacroFormatString) );
-Rtt_STATIC_ASSERT( sizeof(kIndexedMacroFormatString) > sizeof(kMacroFormatString) );
+static const char kMacroFormatString[] = "#define Corona%c%s %s\n";
 
 #define LEN( str_const, num_specifiers ) ( sizeof(str_const) - 1 /* NUL */ - ( num_specifiers * 2 ) )
 
 enum {
 	kAttributePrefixLen = LEN( kAttributePrefix, 0 ),
 	kLongestTypeNameLen = LEN( kLongestTypeName, 0 ),
-	kDeclareAttributeArrayStringLen = LEN( kDeclareAttributeArrayString, 4 )
-		+ kLongestTypeNameLen /* type */ + 1 /* suffix digit */ + 64 /* name */ + 2 /* two-digit array size */ ,
-	kSuffixedMacroFormatStringLen = LEN( kSuffixedMacroFormatString, 5 )
-		+ ( 0 + 64 ) /* name (includes capitalized first letter) */ + 2 /* two-digit suffix */ + 64 /* name */ + 2 /* two-digit index */,
-	kIndexedMacroFormatStringLen = LEN( kIndexedMacroFormatString, 3 )
-		+ ( 0 + 64 ) /* name (includes capitalized first letter) */ + 64 /* name */ ,
-	kProgramAttribStringSize = FormatExtensionList::kMaxAttribs * ( kDeclareAttributeArrayStringLen + kSuffixedMacroFormatStringLen ) +
-								( FormatExtensionList::kMaxAttribs / 2 ) * kIndexedMacroFormatStringLen +
-								2 /* newline and NUL */
+	kDeclareAttributeStringLen = LEN( kDeclareAttributeString, 2 )
+		+ kLongestTypeNameLen /* type */ + 64 /* name */ + kAttributePrefixLen,
+	kMacroFormatStringLen = LEN( kMacroFormatString, 3 )
+		+ 2 * 64 /* name (definition and replacement) */ + kAttributePrefixLen,
+	kProgramAttribStringSize = FormatExtensionList::kMaxAttribs * ( kDeclareAttributeStringLen + kMacroFormatStringLen ) +
+								2 /* newline and NUL */ ,
+	kNamesSize = FormatExtensionList::kMaxAttribs * ( 64 + kAttributePrefixLen + 1 /* NUL */ )
 };
 
 #undef LEN
 
-static int
-AppendMacroName( const char* name, char extensionAttribStrs[], int wpos )
+static void
+MakeSuffix( int index, char digits[] )
 {
-    // TODO: array
-    
+	int onesPos = ( index >= 10 );
+	int tensPos = 1 - onesPos;
+	
+	digits[tensPos] = ( '0' + ( index / 10 ) ) & -( onesPos );
+	digits[onesPos] = '0' + ( index % 10 );
+}
+
+static int
+WriteMacro( const char* name, char extensionAttribStrs[], int wpos )
+{
 	int n = snprintf(
 		&extensionAttribStrs[wpos], kProgramAttribStringSize - wpos,
 		kMacroFormatString,
-		toupper( *name ), name + 1, name
-		);
+		toupper( name[kAttributePrefixLen] ), name + kAttributePrefixLen + 1, name
+	);
 	
+	Rtt_ASSERT( n > 0 );
+
+	return n;
+}
+
+static int
+WriteAttribute( const char* name, const char* type, const char* count, char extensionAttribStrs[], int wpos )
+{
+	int n = snprintf(
+		&extensionAttribStrs[wpos], kProgramAttribStringSize - wpos,
+		kDeclareAttributeString,
+		type, count, name
+	);
+
 	Rtt_ASSERT( n > 0 );
 	
 	return n;
 }
 
 static void
-GatherAttributeExtensions( const FormatExtensionList* extensionList, char *extensionAttribStrs, const char names[] )
+GatherAttributeExtensions( const FormatExtensionList* extensionList, char *extensionAttribStrs, const char names[], const U16 offsets[] )
 {
 	int wpos = 0;
 	
-    for (int i = 0; i < extensionList->GetAttributeCount(); ++i)
+    for ( int i = 0, groupIndex = 0; i < extensionList->GetAttributeCount(); i++ )
     {
         const FormatExtensionList::Attribute& attribute = extensionList->GetAttributes()[i];
         char count[2] = {};
@@ -396,36 +409,25 @@ GatherAttributeExtensions( const FormatExtensionList* extensionList, char *exten
             prim = "double";
             vec = "dvec";
         }
- 
         else if (!attribute.IsFloat())
         {
             prim = "int";
             vec = "ivec";
         }
-            
-		// TODO: is array?
-            
-		int n = snprintf(
-			&extensionAttribStrs[wpos], kProgramAttribStringSize - wpos,
-			kDeclareAttributeString,
-			*count ? vec : prim, count, names + i * ( 64 + 1 + kAttributePrefixLen )
-			);
-            
-		Rtt_ASSERT( n > 0 );
 
-		wpos += n;
+		wpos += WriteAttribute( names + offsets[i], *count ? vec : prim, count, extensionAttribStrs, wpos );
     }
     
 	extensionAttribStrs[wpos++] = '\n';
     
-    for (int i = 0; i < extensionList->GetAttributeCount(); ++i)
+    for ( int i = 0, groupIndex = 0; i < extensionList->GetAttributeCount(); i++ )
     {
-        wpos += AppendMacroName( names + i * ( 64 + 1 + kAttributePrefixLen ) + kAttributePrefixLen, extensionAttribStrs, wpos );
+		wpos += WriteMacro( names + offsets[i], extensionAttribStrs, wpos );
     }
 }
 
 void
-GLProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data, const char names[] )
+GLProgram::UpdateShaderSource( Program* program, Program::Version version, VersionData& data, const char names[], const U16 offsets[] )
 {
 #ifndef Rtt_USE_PRECOMPILED_SHADERS
     char maskBuffer[] = "#define MASK_COUNT 0\n";
@@ -510,6 +512,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
 
         // add any boilerplate for extended vertices and / or instancing
         const FormatExtensionList* extensionList = shaderResource->GetExtensionList();
+		char extensionAttribStrs[kProgramAttribStringSize];
         
         if (extensionList)
         {
@@ -519,9 +522,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
                 extendedHints[i] = hints[i];
             }
                         
-			char extensionAttribStrs[kProgramAttribStringSize];
-                        
-            GatherAttributeExtensions( extensionList, extensionAttribStrs, names );
+            GatherAttributeExtensions( extensionList, extensionAttribStrs, names, offsets );
             
             const char * originalSource = shader_source[4], * originalHint = hints[4];
             U32 nsources = params.nsources + 1;
@@ -995,8 +996,7 @@ GatherSamplers( GLuint program, GLchar stash[], SamplerItem items[], const int n
 		{
 			continue;
 		}
-	
-		if ( kFillSamplerNameLength == length && IsBuiltInSampler( buf ) ) // built-in?
+		else if ( kFillSamplerNameLength == length && IsBuiltInSampler( buf ) ) // built-in?
 		{
 			int index = ( 'F' == buf[2] ) ? buf[length - 1] - '0' : 2;
 			
@@ -1079,7 +1079,8 @@ GLProgram::Update( Program::Version version, VersionData& data )
 
     const FormatExtensionList* extensionList = program->GetShaderResource()->GetExtensionList();
     
-    char names[FormatExtensionList::kMaxAttribs * ( 64 + 1 + kAttributePrefixLen )];
+    char names[kNamesSize];
+    U16 offsets[FormatExtensionList::kMaxAttribs];
 
     if (extensionList)
     {
@@ -1089,12 +1090,14 @@ GLProgram::Update( Program::Version version, VersionData& data )
 		for ( auto&& iter : extensionList->NamedAttributes() )
 		{
 			memcpy( buf, kAttributePrefix, kAttributePrefixLen );
-
-			String::DecodeIdentifier( buf + kAttributePrefixLen, iter.nameData, iter.triplesCount );
+			
+			U8 count = (U8)String::DecodeIdentifier( buf + kAttributePrefixLen, iter.nameData, iter.triplesCount );
 			
             glBindAttribLocation( data.fProgram, first + iter.attributeIndex, buf );
             
-            buf += kAttributePrefixLen + ( 64 + 1 );
+			offsets[iter.attributeIndex] = (U16)( buf - names );
+            
+            buf += count + kAttributePrefixLen + 1;
         }
 
         GL_CHECK_ERROR();
@@ -1104,7 +1107,7 @@ GLProgram::Update( Program::Version version, VersionData& data )
     UpdateShaderSource( program,
                         version,
                         data,
-                        names );
+                        names, offsets );
 
 #ifdef Rtt_USE_PRECOMPILED_SHADERS
     ShaderBinary *shaderBinary = program->GetCompiledShaders()->Get(version);
@@ -1398,68 +1401,46 @@ GLExtraUniforms::Find( const char * name, GLint & size, GLenum & type )
 	// For possible expansion:
 	// If these turn up, the shader presumably linked and the driver supports them...
 	// so need to look up the symbol and add commands
+looks like signatures:
+	uniform?*v: (int, sizei, const T*);
+	uniformmatrix*: (int, sizei, boolean, const F*);
 
-	#define GL_DOUBLE                         0x140A
-	#define GL_DOUBLE_VEC2                    0x8FFC
-	#define GL_DOUBLE_VEC3                    0x8FFD
-	#define GL_DOUBLE_VEC4                    0x8FFE
+	0x92DB GL_UNSIGNED_INT_ATOMIC_COUNTER	atomic_uint
 
-	#define GL_INT                            0x1404
-	#define GL_INT_VEC2                       0x8B53
-	#define GL_INT_VEC3                       0x8B54
-	#define GL_INT_VEC4                       0x8B55
+	#define GL_INT                            0x1404, int
+	#define GL_UNSIGNED_INT                   0x1405, unsigned int (or uint)
+	#define GL_FLOAT                          0x1406, float
+	#define GL_DOUBLE                         0x140A, double
+	#define GL_INT64_ARB                      0x140E int64_t
+	#define GL_UNSIGNED_INT64_ARB             0x140F uint64_t
+	
+	#define GL_FLOAT_VEC(2-4)             	  0x8B5(0-2)	
+	#define GL_INT_VEC(2-4)                   0x8B5(3-5), ivec(2-4)
+	#define GL_BOOL                           0x8B56 bool (int?)
+	#define GL_BOOL_VEC(2-4)                  0x8B5(7-9) bvec(2-4)
 
-	#define GL_UNSIGNED_INT                   0x1405
-	#define GL_UNSIGNED_INT_VEC2              0x8DC6
-	#define GL_UNSIGNED_INT_VEC3              0x8DC7
-	#define GL_UNSIGNED_INT_VEC4              0x8DC8
+	#define GL_FLOAT_MAT(*)                   0x8B6(5-A) mat(2x3, 2x4, 3x2, 3x4, 4x2, 4x3)
+	#define GL_UNSIGNED_INT_VEC(2-4)          0x8DC(6-8), uvec(2-4)
+	#define GL_DOUBLE_MAT(*)                  0x8F4(6-E) dmat(2, 3, 4, then per mat*)
 
-	#define GL_INT64_ARB                      0x140E
-	#define GL_INT64_VEC2_ARB                 0x8FE9
-	#define GL_INT64_VEC3_ARB                 0x8FEA
-	#define GL_INT64_VEC4_ARB                 0x8FEB
+	#define GL_UNSIGNED_INT64_VEC(2-4)_ARB    0x8FE(5-7)
+	#define GL_INT64_VEC(2-4)_ARB             0x8FE(9-B)
 
-	#define GL_UNSIGNED_INT64_ARB             0x140F
-	#define GL_UNSIGNED_INT64_VEC2_ARB        0x8FE5
-	#define GL_UNSIGNED_INT64_VEC3_ARB        0x8FE6
-	#define GL_UNSIGNED_INT64_VEC4_ARB        0x8FE7
+	#define GL_FLOAT16_NV                     0x8FF8 float16_t (NV_gpu_shader5)
+	#define GL_FLOAT16_VEC(2-4)_NV            0x8FF(9-B) f16vec(2-4) (possibly some variability in naming)
+	#define GL_DOUBLE_VEC(2-4)                0x8FF(C-E), dvec(2-4)	
 
-	#define GL_BOOL                           0x8B56
-	#define GL_BOOL_VEC2                      0x8B57
-	#define GL_BOOL_VEC3                      0x8B58
-	#define GL_BOOL_VEC4                      0x8B59
+	#define GL_FLOAT16_MAT(*)_AMD             0x91C(5-D) f16mat(*) (follows dmat)
 
-	#define GL_FLOAT_MAT2x3                   0x8B65
-	#define GL_FLOAT_MAT2x4                   0x8B66
-	#define GL_FLOAT_MAT3x2                   0x8B67
-	#define GL_FLOAT_MAT3x4                   0x8B68
-	#define GL_FLOAT_MAT4x2                   0x8B69
-	#define GL_FLOAT_MAT4x3                   0x8B6A
+	0x140(4-6, A, E), 0x8B5(0-9), 0x8B6(5-A), 0x8DC(6-8), 0x8F4(6-E), 0x8FE(5-7, 9-B), 0x8FF(8-E), 0x91C(5-D), 0x92DB
+		8 16-bit bitsets
 
-	#define GL_DOUBLE_MAT2                    0x8F46
-	#define GL_DOUBLE_MAT3                    0x8F47
-	#define GL_DOUBLE_MAT4                    0x8F48
-	#define GL_DOUBLE_MAT2x3                  0x8F49
-	#define GL_DOUBLE_MAT2x4                  0x8F4A
-	#define GL_DOUBLE_MAT3x2                  0x8F4B
-	#define GL_DOUBLE_MAT3x4                  0x8F4C
-	#define GL_DOUBLE_MAT4x2                  0x8F4D
-	#define GL_DOUBLE_MAT4x3                  0x8F4E
-
-	#define GL_FLOAT16_NV                     0x8FF8
-	#define GL_FLOAT16_VEC2_NV                0x8FF9
-	#define GL_FLOAT16_VEC3_NV                0x8FFA
-	#define GL_FLOAT16_VEC4_NV                0x8FFB
-
-	#define GL_FLOAT16_MAT2_AMD               0x91C5
-	#define GL_FLOAT16_MAT3_AMD               0x91C6
-	#define GL_FLOAT16_MAT4_AMD               0x91C7
-	#define GL_FLOAT16_MAT2x3_AMD             0x91C8
-	#define GL_FLOAT16_MAT2x4_AMD             0x91C9
-	#define GL_FLOAT16_MAT3x2_AMD             0x91CA
-	#define GL_FLOAT16_MAT3x4_AMD             0x91CB
-	#define GL_FLOAT16_MAT4x2_AMD             0x91CC
-	#define GL_FLOAT16_MAT4x3_AMD             0x91CD
+	third nybbles = 0, 4-6, C-F -> eight values (3-bit constant)
+	
+	high = 0x14, else in [8B, 92] -> [8B : 2, 8C : 0, 8D : 1, 8E : 0, 8F : 3, 90 : 0, 91 : 1, 92 : 1] (8 ranges)
+		could be a set of "third nybble index" u8s (1 << (third nybble) | ...)
+		third nybble = 0 for 0x14
+		pack into a u64 LUT and extract by offset; also popcount() into above-mentioned bitsets?
 #endif
         default:
             Rtt_LogException( "Location of uniform `%s` found, but type unsupported", name );
