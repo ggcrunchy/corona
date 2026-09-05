@@ -57,6 +57,7 @@ class CommandBuffer
 		void WriteBytes( const void * value, size_t size );
 		
 	public:
+	#if 0
 		static size_t GetMaxUniformVectorsCount();
 		static size_t GetMaxTextureUnits();
 		static size_t GetMaxVertexTextureUnits();
@@ -66,6 +67,8 @@ class CommandBuffer
 
         virtual bool HasFramebufferBlit( bool * canScale ) const = 0;
 		virtual void GetVertexAttributes( VertexAttributeSupport & support ) const = 0;
+#endif
+		static uintptr_t QueryBackendDetail( U32 detail, uintptr_t arg );
 
     public:
         CommandBuffer( Rtt_Allocator* allocator );

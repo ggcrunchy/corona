@@ -1955,11 +1955,21 @@ Display::GetViewProjectionMatrix(glm::mat4 &viewMatrix, glm::mat4 &projMatrix)
 #endif
 }
 
+uintptr_t
+Display::QueryBackendDetail( U32 detail, uintptr_t arg )
+{
+    return Renderer::QueryBackendDetail( (Renderer::BackendDetail)detail, arg );
+}
+
 U32
 Display::GetMaxTextureSize()
-{
+{/*
     U32 result = 1024;
     result = Renderer::GetMaxTextureSize();
+    Rtt_ASSERT( result > 0 );
+    return result;*/
+    
+    U32 result = (U32)QueryBackendDetail( Renderer::kMaxTextureSize );
     Rtt_ASSERT( result > 0 );
     return result;
 }
@@ -1967,37 +1977,50 @@ Display::GetMaxTextureSize()
 const char *
 Display::GetGlString( const char *s )
 {
-    return Renderer::GetGlString( s );
+// Renderer::GetGlString( s )
+    uintptr_t str = QueryBackendDetail( Renderer::kGlString, reinterpret_cast<uintptr_t>( s ) );
+    return reinterpret_cast<const char*>( str );
 }
 
 bool
 Display::GetGpuSupportsHighPrecisionFragmentShaders()
 {
-    return Renderer::GetGpuSupportsHighPrecisionFragmentShaders();
+    return ( 0 != QueryBackendDetail( Renderer::kSupportsHighPrecisionFragmentShaders ) );
+    //return Renderer::GetGpuSupportsHighPrecisionFragmentShaders();
 }
 
 U32
 Display::GetMaxUniformVectorsCount()
 {
-    return Renderer::GetMaxUniformVectorsCount();
+    return (U32)QueryBackendDetail( Renderer::kMaxUniformVectorsCount );
+//    return Renderer::GetMaxUniformVectorsCount();
 }
 
 U32
 Display::GetMaxVertexTextureUnits()
 {
-    return Renderer::GetMaxVertexTextureUnits();
+    return (U32)QueryBackendDetail( Renderer::kMaxVertexTextureUnits );
+//    return Renderer::GetMaxVertexTextureUnits();
 }
 
 bool
 Display::HasFramebufferBlit( bool * canScale ) const
 {
-    return fRenderer->HasFramebufferBlit( canScale );
+    U32 canScaleU32;
+    bool hasBlit = ( 0 != QueryBackendDetail( Renderer::kHasFramebufferBlit, reinterpret_cast<uintptr_t>( &canScaleU32 ) ) );
+//    return fRenderer->HasFramebufferBlit( canScale );
+    if ( NULL != canScale )
+    {
+        memset( canScale, canScaleU32 ? 1 : 0, sizeof(bool) ); // in case unaligned
+    }
+    return hasBlit;
 }
 
 void
 Display::GetVertexAttributes( VertexAttributeSupport & support ) const
 {
-    fRenderer->GetVertexAttributes( support );
+    QueryBackendDetail( Renderer::kVertexAttributes, reinterpret_cast<uintptr_t>( &support ) ); // assume aligned
+//    fRenderer->GetVertexAttributes( support );
 }
 
 void

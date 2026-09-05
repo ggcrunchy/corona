@@ -188,7 +188,7 @@ class Renderer
 
         // Render triangles as outlines with no interior. Useful for debugging.
         void SetWireframeEnabled( bool enabled );
-
+#if 0
 		static U32 GetMaxTextureSize();
 		static const char *GetGlString( const char *s );
 		static bool GetGpuSupportsHighPrecisionFragmentShaders();
@@ -199,6 +199,21 @@ class Renderer
 
         bool HasFramebufferBlit(  bool * canScale ) const;
         void GetVertexAttributes( VertexAttributeSupport & support ) const;
+#endif
+
+		typedef enum _BackendDetail : U32 {
+			kMaxTextureSize,
+			kGlString,
+			kSupportsHighPrecisionFragmentShaders,
+			kMaxUniformVectorsCount,
+			kMaxVertexTextureUnits,
+			kMaxImageUnits,
+			kHasFramebufferBlit,
+			kVertexAttributes
+		}
+		BackendDetail;
+
+		static uintptr_t QueryBackendDetail( BackendDetail detail, uintptr_t arg );
 
         struct Statistics
         {

@@ -881,7 +881,7 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 			QueueCreate( fillTexture0 );
 		}
 
-		bool postponeBind = fCaptureGroups.Length() > 0 && !HasFramebufferBlit( NULL );
+		bool postponeBind = ( fCaptureGroups.Length() > 0 ) && ( 0 != QueryBackendDetail( kHasFramebufferBlit, 0 ) );/*HasFramebufferBlit( NULL )*/;
 		if (!postponeBind)
 		{
 			fBackCommandBuffer->BindTexture( fillTexture0, Texture::kFill0 );
@@ -1379,7 +1379,7 @@ Renderer::IssueCaptures( Texture * fill0 )
 	Rtt_ASSERT( fCaptureGroups.Length() > 0 );
 	Rtt_ASSERT( fCaptureRects.Length() > 0 );
 	
-	bool hasFramebufferBlit = HasFramebufferBlit( NULL );
+	bool hasFramebufferBlit = 0 != QueryBackendDetail( kHasFramebufferBlit, 0 );// HasFramebufferBlit( NULL );
 	FrameBufferObject * oldFBO = NULL;
 	Texture * mostRecentTexture = NULL;
 	
@@ -1621,6 +1621,12 @@ Renderer::SetWireframeEnabled( bool enabled )
     fWireframeEnabled = enabled;
 }
 
+uintptr_t
+Renderer::QueryBackendDetail( BackendDetail detail, uintptr_t arg )
+{
+	return CommandBuffer::QueryBackendDetail( detail, arg );
+}
+#if 0
 U32
 Renderer::GetMaxTextureSize()
 {
@@ -1669,7 +1675,7 @@ Renderer::HasFramebufferBlit( bool * canScale ) const
 {
 	return fBackCommandBuffer->HasFramebufferBlit( canScale );
 }
-
+#endif
 bool
 Renderer::GetStatisticsEnabled() const
 {

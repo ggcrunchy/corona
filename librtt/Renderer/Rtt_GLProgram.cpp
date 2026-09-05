@@ -39,6 +39,8 @@
 // Include GL header for glGetActiveUniform
 #include "Renderer/Rtt_GL.h"
 
+#include "Renderer/Rtt_Renderer.h"
+
 // To reduce memory consumption and startup cost, defer the
 // creation of GL shaders and programs until they're needed.
 // Depending on usage, this could result in framerate dips.
@@ -440,7 +442,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
     }
 
     char highp_support[] = "#define FRAGMENT_SHADER_SUPPORTS_HIGHP 0\n";
-    highp_support[ sizeof( highp_support ) - 3 ] = ( CommandBuffer::GetGpuSupportsHighPrecisionFragmentShaders() ? '1' : '0' );
+    highp_support[ sizeof( highp_support ) - 3 ] = ( CommandBuffer::QueryBackendDetail( Renderer::kSupportsHighPrecisionFragmentShaders, 0 )/* GetGpuSupportsHighPrecisionFragmentShaders()*/ ? '1' : '0' );
 
     //! \TODO Make the definition of "TEX_COORD_Z" conditional.
     char texCoordZBuffer[] = "";//#define TEX_COORD_Z 1\n";

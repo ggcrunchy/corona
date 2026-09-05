@@ -330,7 +330,11 @@ class Display
         TextureFactory& GetTextureFactory() const { return * fTextureFactory; }
 
         void GetViewProjectionMatrix( glm::mat4 &viewMatrix, glm::mat4 &projMatrix );
-                
+
+	public:
+		static uintptr_t QueryBackendDetail( U32 detail, uintptr_t arg = 0 );
+	
+	public:
         static U32 GetMaxTextureSize();
         static const char *GetGlString( const char *s );
         static bool GetGpuSupportsHighPrecisionFragmentShaders();

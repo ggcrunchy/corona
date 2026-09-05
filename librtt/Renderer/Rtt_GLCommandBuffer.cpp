@@ -33,6 +33,7 @@
 #include "Core/Rtt_String.h"
 
 #include "Corona/CoronaGraphics.h"
+#include "Renderer/Rtt_Renderer.h"
 
 #define ENABLE_DEBUG_PRINT    0
 
@@ -148,8 +149,8 @@ namespace Rtt
 
 // ----------------------------------------------------------------------------
 
-size_t
-CommandBuffer::GetMaxUniformVectorsCount()
+static size_t
+/*CommandBuffer::*/GetMaxUniformVectorsCount()
 {
     GLint count;
 
@@ -173,8 +174,8 @@ CommandBuffer::GetMaxUniformVectorsCount()
     return count;
 }
 
-size_t
-CommandBuffer::GetMaxVertexTextureUnits()
+static size_t
+/*CommandBuffer::*/GetMaxVertexTextureUnits()
 {
     static size_t sMaxUnits = ~0; // 0 would be valid result
     
@@ -190,8 +191,8 @@ CommandBuffer::GetMaxVertexTextureUnits()
     return sMaxUnits;
 }
 
-size_t
-CommandBuffer::GetMaxTextureUnits()
+static size_t
+/*CommandBuffer::*/GetMaxTextureUnits()
 {
     static size_t sMaxUnits;
     
@@ -207,8 +208,8 @@ CommandBuffer::GetMaxTextureUnits()
     return sMaxUnits;
 }
 
-size_t
-CommandBuffer::GetMaxTextureSize()
+static size_t
+/*CommandBuffer::*/GetMaxTextureSize()
 {
     static size_t sMaxSize = 0;
     
@@ -222,8 +223,8 @@ CommandBuffer::GetMaxTextureSize()
     return sMaxSize;
 }
 
-const char *
-CommandBuffer::GetGlString( const char *s )
+static const char *
+/*CommandBuffer::*/GetGlString( const char *s )
 {
     if( Rtt_StringCompare( s, "GL_VENDOR" ) == 0 )
     {
@@ -251,8 +252,8 @@ CommandBuffer::GetGlString( const char *s )
     }
 }
 
-bool
-CommandBuffer::GetGpuSupportsHighPrecisionFragmentShaders()
+static bool
+/*CommandBuffer::*/GetGpuSupportsHighPrecisionFragmentShaders()
 {
 #if defined( Rtt_MAC_ENV ) || defined( Rtt_WIN_DESKTOP_ENV ) || defined( Rtt_EMSCRIPTEN_ENV )|| defined( Rtt_LINUX_ENV )
 
@@ -345,14 +346,15 @@ CommandBuffer::GetGpuSupportsHighPrecisionFragmentShaders()
 #endif
 }
 
-bool
-GLCommandBuffer::HasFramebufferBlit( bool * canScale ) const
+static bool
+/*GLCommandBuffer::*/HasFramebufferBlit( U32 * )// const
 {
-	return GLFrameBufferObject::HasFramebufferBlit( canScale );
+	// TODO: no scaling yet
+	return GLFrameBufferObject::HasFramebufferBlit( NULL );
 }
 
-void
-GLCommandBuffer::GetVertexAttributes( VertexAttributeSupport & support ) const
+static void
+/*GLCommandBuffer::*/GetVertexAttributes( VertexAttributeSupport & support )// const
 {
     static GLint sMaxVertexAttribs = -1;
     
@@ -373,6 +375,33 @@ GLCommandBuffer::GetVertexAttributes( VertexAttributeSupport & support ) const
     support.hasDivisors = GLGeometry::SupportsDivisors();
     support.hasPerInstance = support.hasDivisors; // divisor == 1
     support.suffix = GLGeometry::InstanceIDSuffix();
+}
+
+uintptr_t
+CommandBuffer::QueryBackendDetail( U32 detail, uintptr_t arg )
+{
+	switch (detail)
+	{
+	case Renderer::kMaxTextureSize:
+		return GetMaxTextureSize();
+	case Renderer::kGlString:
+		return reinterpret_cast<uintptr_t>( GetGlString( reinterpret_cast<const char*>( arg ) ) );
+	case Renderer::kSupportsHighPrecisionFragmentShaders:
+		return GetGpuSupportsHighPrecisionFragmentShaders();
+	case Renderer::kMaxUniformVectorsCount:
+		return GetMaxUniformVectorsCount();
+	case Renderer::kMaxVertexTextureUnits:
+		return GetMaxVertexTextureUnits();
+	case Renderer::kMaxImageUnits:
+		return GetMaxTextureUnits();
+	case Renderer::kHasFramebufferBlit:
+		return HasFramebufferBlit( reinterpret_cast<U32 *>( arg ) );
+	case Renderer::kVertexAttributes:
+		GetVertexAttributes( *reinterpret_cast<VertexAttributeSupport*>( arg ) );
+	default:
+		Rtt_ASSERT_NOT_REACHED();
+		return 0;
+	}
 }
 
 GLCommandBuffer::GLCommandBuffer( Rtt_Allocator* allocator )
