@@ -784,7 +784,7 @@ static const SamplerTypeDetails kDetails[] = {
 #undef SHADOW_SAMPLER_ARRAY
 
 #define COUNT_IN_RANGE( low, high ) ( high - low + 1 )
-#define LOW_TO_HIGH( low, high ) ( (uint8_t)( high - low ) )
+#define LOW_TO_HIGH( low, high ) ( (U8)( high - low ) )
 #define COMP_RANGES( low, high, value ) ( LOW_TO_HIGH( low, value ) <= LOW_TO_HIGH( low, high ) )
 #define GET_OFFSET_IN_RANGE( low, high, base, value ) ( ( base + LOW_TO_HIGH( low, value ) ) & -COMP_RANGES( low, high, value ) )
 
@@ -796,9 +796,9 @@ ClassifySampler( GLenum type )
 	// Valid constants only have high bytes 0x8B, 0x8D, 0x90, and 0x91,
 	// and these can use delta from 0x8B as an index into a LUT byte as
 	// validity check. Similar interval-based work gives a flat offset.
-	uint8_t delta = (uint8_t)( ( type >> 8 ) - 0x8B );
-	uint8_t valid = ( delta <= 6 ) & ( 0x65 /* 01100101b */ >> ( delta & 7 ) );
-	uint8_t low = (uint8_t)( type & -valid );
+	U8 delta = (U8)( ( type >> 8 ) - 0x8B );
+	U8 valid = ( delta <= 6 ) & ( 0x65 /* 01100101b */ >> ( delta & 7 ) );
+	U8 low = (U8)( type & -valid );
 
 	const int Base1 = 1;
 	const int Base2 = Base1 + COUNT_IN_RANGE( 0x8, 0xF );
@@ -816,29 +816,29 @@ ClassifySampler( GLenum type )
 	// As it happens, the first four IDs are 0, and the sentinel can be
 	// as well; several trailing IDs are as well. The form shown here
 	// uses some indexing adjustments to lop off the dead weight.
-	const uint16_t kPatternIDs[] = {
+	const U16 kPatternIDs[] = {
 		0x2489, 0x2492, 0x2492, 0x2492, 0x36DA, 0x26DB,
 		0x2492, 0x4912, 0x4924, 0x5B24, 0x5B6D, 0x0B6D
 	};
 
-	uint8_t ids_index = (uint8_t)( offset / 5 - 1 ), shift = ( offset % 5 ) * 3;
-	uint64_t id = ids_index <= 11 ? ( kPatternIDs[ids_index] >> shift ) & 7 : 0;
+	U8 ids_index = (U8)( offset / 5 - 1 ), shift = ( offset % 5 ) * 3;
+	U64 id = ids_index <= 11 ? ( kPatternIDs[ids_index] >> shift ) & 7 : 0;
 
 	// Find the ID's pattern, which consists of two 3-bit high byte
 	// deltas, indicating what may validly pair with the low byte.
 	// (Most cases only support one pairing, with the second delta
 	// being the sentinel, 7.)
-	uint8_t pair = ( 0x3FCBAA3DD7EULL >> ( id * 6 ) ) & 63;
+	U8 pair = ( 0x3FCBAA3DD7EULL >> ( id * 6 ) ) & 63;
 
 	// Check both at once with a SWAR operation.
-	uint8_t diff = pair ^ SPLAT(delta);
-    uint8_t hits = (diff - SPLAT(0x1)) & ~diff & SPLAT(0x4) & -valid;
+	U8 diff = pair ^ SPLAT(delta);
+    U8 hits = (diff - SPLAT(0x1)) & ~diff & SPLAT(0x4) & -valid;
 
 	// There is a stretch of the flat offset space, < 64 in length,
 	// where the low bytes with two entries occur, so this can be
 	// captured in a mask. Account for these pairs in the final
-	// offset, and also invalidate the result on a bad high byte.
-	uint64_t mask = ( 1ULL << Min( Max( offset - 5, 0 ), 63 ) ) - 1;
+	// offset, and also invalidate the result on a bad low byte.
+	U64 mask = ( 1ULL << Min( Max( offset - 5, 0 ), 63 ) ) - 1;
 
 	offset += __builtin_popcountll( 0x7FF00001FE00003ULL & mask );
 	offset &= -( hits > 0 );
