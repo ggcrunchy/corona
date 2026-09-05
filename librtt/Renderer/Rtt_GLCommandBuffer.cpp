@@ -398,6 +398,7 @@ CommandBuffer::QueryBackendDetail( U32 detail, uintptr_t arg )
 		return HasFramebufferBlit( reinterpret_cast<U32 *>( arg ) );
 	case Renderer::kVertexAttributes:
 		GetVertexAttributes( *reinterpret_cast<VertexAttributeSupport*>( arg ) );
+		return 0;
 	default:
 		Rtt_ASSERT_NOT_REACHED();
 		return 0;
