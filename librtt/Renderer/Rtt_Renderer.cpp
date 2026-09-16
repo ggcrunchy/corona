@@ -881,8 +881,9 @@ Renderer::Insert( const RenderData* data, const ShaderData * shaderData, RenderD
 			QueueCreate( fillTexture0 );
 		}
 
-		bool postponeBind = ( fCaptureGroups.Length() > 0 ) && ( 0 != QueryBackendDetail( kHasFramebufferBlit, 0 ) );/*HasFramebufferBlit( NULL )*/;
-		if (!postponeBind)
+		bool hasCaptures = ( fCaptureGroups.Length() > 0 );
+		bool noFramebufferBlit = hasCaptures && ( 0 == QueryBackendDetail( kHasFramebufferBlit, 0 ) );
+		if ( !hasCaptures || !noFramebufferBlit ) /* nothing to capture OR must use non-blit technique? */
 		{
 			fBackCommandBuffer->BindTexture( fillTexture0, Texture::kFill0 );
 		}
@@ -1379,7 +1380,7 @@ Renderer::IssueCaptures( Texture * fill0 )
 	Rtt_ASSERT( fCaptureGroups.Length() > 0 );
 	Rtt_ASSERT( fCaptureRects.Length() > 0 );
 	
-	bool hasFramebufferBlit = 0 != QueryBackendDetail( kHasFramebufferBlit, 0 );// HasFramebufferBlit( NULL );
+	bool hasFramebufferBlit = 0 != QueryBackendDetail( kHasFramebufferBlit, 0 );
 	FrameBufferObject * oldFBO = NULL;
 	Texture * mostRecentTexture = NULL;
 	
@@ -1626,56 +1627,7 @@ Renderer::QueryBackendDetail( BackendDetail detail, uintptr_t arg )
 {
 	return CommandBuffer::QueryBackendDetail( detail, arg );
 }
-#if 0
-U32
-Renderer::GetMaxTextureSize()
-{
-    U32 result = (U32) CommandBuffer::GetMaxTextureSize();
-    return result;
-}
 
-const char *
-Renderer::GetGlString( const char *s )
-{
-    return CommandBuffer::GetGlString( s );
-}
-
-bool
-Renderer::GetGpuSupportsHighPrecisionFragmentShaders()
-{
-    return CommandBuffer::GetGpuSupportsHighPrecisionFragmentShaders();
-}
-
-U32
-Renderer::GetMaxUniformVectorsCount()
-{
-    return CommandBuffer::GetMaxUniformVectorsCount();
-}
-
-U32
-Renderer::GetMaxVertexTextureUnits()
-{
-    return CommandBuffer::GetMaxVertexTextureUnits();
-}
-
-U32
-Renderer::GetMaxTextureUnits()
-{
-	return CommandBuffer::GetMaxTextureUnits();
-}
-
-void
-Renderer::GetVertexAttributes( VertexAttributeSupport & support ) const
-{
-    fBackCommandBuffer->GetVertexAttributes( support );
-}
-
-bool
-Renderer::HasFramebufferBlit( bool * canScale ) const
-{
-	return fBackCommandBuffer->HasFramebufferBlit( canScale );
-}
-#endif
 bool
 Renderer::GetStatisticsEnabled() const
 {

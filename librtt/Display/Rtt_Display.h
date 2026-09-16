@@ -339,6 +339,7 @@ class Display
         static const char *GetGlString( const char *s );
         static bool GetGpuSupportsHighPrecisionFragmentShaders();
         static U32 GetMaxUniformVectorsCount();
+        static U32 GetMaxTextureUnits();
         static U32 GetMaxVertexTextureUnits();
 
         bool HasFramebufferBlit( bool * canScale ) const;

@@ -150,7 +150,7 @@ namespace Rtt
 // ----------------------------------------------------------------------------
 
 static size_t
-/*CommandBuffer::*/GetMaxUniformVectorsCount()
+GetMaxUniformVectorsCount()
 {
     GLint count;
 
@@ -175,7 +175,7 @@ static size_t
 }
 
 static size_t
-/*CommandBuffer::*/GetMaxVertexTextureUnits()
+GetMaxVertexTextureUnits()
 {
     static size_t sMaxUnits = ~0; // 0 would be valid result
     
@@ -192,7 +192,7 @@ static size_t
 }
 
 static size_t
-/*CommandBuffer::*/GetMaxTextureUnits()
+GetMaxTextureUnits()
 {
     static size_t sMaxUnits;
     
@@ -209,7 +209,7 @@ static size_t
 }
 
 static size_t
-/*CommandBuffer::*/GetMaxTextureSize()
+GetMaxTextureSize()
 {
     static size_t sMaxSize = 0;
     
@@ -224,7 +224,7 @@ static size_t
 }
 
 static const char *
-/*CommandBuffer::*/GetGlString( const char *s )
+GetGlString( const char *s )
 {
     if( Rtt_StringCompare( s, "GL_VENDOR" ) == 0 )
     {
@@ -253,7 +253,7 @@ static const char *
 }
 
 static bool
-/*CommandBuffer::*/GetGpuSupportsHighPrecisionFragmentShaders()
+GetGpuSupportsHighPrecisionFragmentShaders()
 {
 #if defined( Rtt_MAC_ENV ) || defined( Rtt_WIN_DESKTOP_ENV ) || defined( Rtt_EMSCRIPTEN_ENV )|| defined( Rtt_LINUX_ENV )
 
@@ -347,14 +347,14 @@ static bool
 }
 
 static bool
-/*GLCommandBuffer::*/HasFramebufferBlit( U32 * )// const
+HasFramebufferBlit( U32 * )
 {
 	// TODO: no scaling yet
 	return GLFrameBufferObject::HasFramebufferBlit( NULL );
 }
 
 static void
-/*GLCommandBuffer::*/GetVertexAttributes( VertexAttributeSupport & support )// const
+GetVertexAttributes( VertexAttributeSupport & support )
 {
     static GLint sMaxVertexAttribs = -1;
     
@@ -1713,25 +1713,9 @@ void
 GLCommandBuffer::Write( T value )
 {
 	U32 size = sizeof(T);
-
-    /*
-    U32 bytesNeeded = fBytesUsed + size;
-    if( bytesNeeded > fBytesAllocated )
-    {
-        U32 doubleSize = fBytesUsed ? 2 * fBytesUsed : 4;
-        U32 newSize = Max( bytesNeeded, doubleSize );
-        U8* newBuffer = new U8[newSize];
-
-        memcpy( newBuffer, fBuffer, fBytesUsed );
-        delete [] fBuffer;
-
-        fBuffer = newBuffer;
-        fBytesAllocated = newSize;
-    }*/
     U8 * writePos = Reserve( size );
 
-    memcpy( /*fBuffer + fBytesUsed*/writePos, &value, size );
-    //fBytesUsed += size;
+    memcpy( writePos, &value, size );
 }
 
 void GLCommandBuffer::LoadUniforms()
