@@ -159,6 +159,30 @@ class LuaContext
 
 // ----------------------------------------------------------------------------
 
+class LuaContextUserdata
+{
+	public:
+		LuaContextUserdata( Rtt_Allocator* pAllocator, const MPlatform& platform, Runtime *runtime );
+
+	public:
+		void Initialize( LuaContext *owner );
+
+	public:
+		Rtt_Allocator* GetAllocator() const { return fAllocator; }
+		const MPlatform& GetPlatform() const { return fPlatform; }
+		Runtime* GetRuntime() const { return fRuntime; }
+		LuaContext* GetOwner() const { return fOwner; }
+
+	// Weak references. Does NOT own these.
+	private:
+		Rtt_Allocator *fAllocator;
+		const MPlatform& fPlatform;
+		Runtime *fRuntime;
+		LuaContext *fOwner;
+};
+
+// ----------------------------------------------------------------------------
+
 } // namespace Rtt
 
 // ----------------------------------------------------------------------------

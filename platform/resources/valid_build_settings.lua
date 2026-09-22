@@ -22,8 +22,13 @@ stoplist = {
 	"onDemandResources",
 	"strings",
 	"coronaActivityFlags",
+	"temporaryLuaDirectories",
 	"entitlements",
 	"xcassets",
+}
+
+choices = {
+	["?FS"] = { "", function() end }
 }
 
 settings =
@@ -280,6 +285,18 @@ settings =
 			image = "",
 		},
 	},
+
+	callbacks =
+	{
+		simulatorStart = "?FS",
+		appStart = "?FS",
+		preBuild = "?FS"
+	},
+
+	luaExcludeDirs = "",
+	luaExcludeFiles = "",
+
+	temporaryLuaDirectories = {},  -- key-value pairs, key = name, value = { excludeDirs = "", excludeFiles = "" }
 
 	plugins =
 	{

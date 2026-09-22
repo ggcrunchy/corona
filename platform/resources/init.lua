@@ -869,7 +869,30 @@ print = coronabaselib.print
 
 _coronaPreservedLuaFunctions.require = require
 require = function (modname)
-	if string.find(modname, "/") then
+	if ( _coronaPreservedLuaFunctions == nil ) then -- rebuilding from dumped code?
+		_coronaPreservedLuaFunctions = { require = require }
+		
+		function string.starts( s, prefix )
+			return string.sub(s,1,string.len(prefix)) == prefix
+		end
+
+		function string.ends( s, suffix )
+			return suffix == '' or string.sub(s,-string.len(suffix)) == suffix
+		end
+		
+		local plugins = modname -- reinterpret as "already loaded" list
+		if plugins then
+			local pluginsSet = {}
+			
+			for i = 1, #plugins do
+				pluginsSet[plugins[i]] = true
+			end
+
+			_coronaBuildSettings = { plugins = pluginsSet }
+		end
+		
+		return
+	elseif string.find(modname, "/") then
 		-- Bug:13760
 		-- Override require so we trap users using '/' as separators instead of '.'
 		error("Error calling 'require(\"" .. modname .. "\")'. Lua requires package names to use '.' as path separators, not '/'. Replace the '/' characters with '.' and try again.")
@@ -963,6 +986,13 @@ require = function (modname)
 	end
 	return _coronaPreservedLuaFunctions.require( modname )
 end
+
+-- This is yoinked into a C-side reference (and the global itself then evicted)
+-- immediately after running this init script. The upvalues will all be nil and
+-- trigger the first `if` in require(), where the preserved functions table is
+-- missing; this is used to instantiate slightly more minimal require() regimes
+-- in temporary states created for build callbacks.
+_requireDumped = string.dump(require)
 
 -- luacheck: pop
 
@@ -1277,6 +1307,19 @@ function sendLaunchAnalytics()
 end
 
 -- luacheck: pop
+
+-------------------------------------------------------------------------------
+-- Startup Scripts
+-------------------------------------------------------------------------------
+
+function _callStartFunction( startFuncOrError, ok )
+	assert( ok, startFuncOrError )
+	assert( type( startFuncOrError) == "function" )
+	
+	local args = {}
+	
+	startFuncOrError( args )
+end
 
 --------------------------------------------------------------------------------
 -- Startup Logging

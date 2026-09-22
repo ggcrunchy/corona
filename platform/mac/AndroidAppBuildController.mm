@@ -363,6 +363,7 @@ static NSString *kChooseFromFollowing = @"Choose from the following…";
                                           versioncode
                                           );
 
+	params->SetRuntime([appDelegate runtime]);
     params->SetStripDebug( isStripDebug );
 	params->SetLiveBuild(isLiveBuild);
 

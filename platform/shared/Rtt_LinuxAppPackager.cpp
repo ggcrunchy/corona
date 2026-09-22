@@ -54,7 +54,7 @@ namespace Rtt
 	int luaload_luasocket_tp(lua_State* L);
 	int luaload_luasocket_url(lua_State* L);
 
-	bool CompileScriptsInDirectory(lua_State* L, AppPackagerParams& params, const char* dstDir, const char* srcDir);
+	bool CompileScriptsInDirectory(lua_State* L, AppPackagerParams& params, const char* dstDir, const char* srcDir, const char* baseDir);
 	bool FetchDirectoryTreeFilePaths(const char* directoryPath, std::vector<std::string>& filePathCollection);
 	int processExecute(lua_State* L);
 	int luaload_linuxPackageApp(lua_State* L);
@@ -74,7 +74,7 @@ namespace Rtt
 		Rtt::AppPackagerParams params(p->GetAppName(), p->GetVersion(), p->GetIdentity(), NULL, srcDir, dstDir, NULL, p->GetTargetPlatform(), NULL, 0, 0, NULL, NULL, NULL, true);
 		params.SetStripDebug(p->IsStripDebug());
 
-		bool rc = CompileScriptsInDirectory(L, params, dstDir, srcDir);
+		bool rc = CompileScriptsInDirectory(L, params, dstDir, srcDir, params.GetSrcDir());
 
 		if (rc)
 		{
@@ -201,6 +201,14 @@ namespace Rtt
 		{
 			debugBuildProcess = (int)strtol(debugBuildProcessPref.GetString(), (char**)NULL, 10);
 		}
+
+	#if !defined( Rtt_NO_GUI )
+		Runtime *runtime = params->GetRuntime();
+		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, "linux" ) )
+		{
+			return PlatformAppPackager::kBuildError;
+		}
+	#endif
 
 		lua_State* L = fVM;
 		lua_getglobal(L, "linuxPackageApp");

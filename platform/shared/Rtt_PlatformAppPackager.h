@@ -31,6 +31,10 @@ class MPlatformServices;
 
 // ----------------------------------------------------------------------------
 
+#if !defined( Rtt_NO_GUI )
+	struct PackagerParamsFilterState;
+#endif
+
 class AppPackagerParams
 {
 	private:
@@ -60,6 +64,11 @@ class AppPackagerParams
 		bool fLiveBuild;
         bool fIncludeStandardResources = true;
 		String fCoronaUser;
+
+	#if !defined( Rtt_NO_GUI )
+		Runtime* fRuntime;
+		PackagerParamsFilterState* fFilterState;
+	#endif
 
 	public:
 		AppPackagerParams( const char* appName,
@@ -122,6 +131,15 @@ class AppPackagerParams
 		void SetIncludeBuildSettings( bool value ) { fIncludeBuildSettings = value; }
 		bool IncludeBuildSettings() const { return fIncludeBuildSettings; }
 		DeviceBuildData& GetDeviceBuildData( const MPlatform& platform, const MPlatformServices& services ) const;
+
+	public:
+	#if !defined( Rtt_NO_GUI )
+		void SetRuntime( Runtime* value ) { fRuntime = value; }
+		Runtime* GetRuntime() const { return fRuntime; }
+		
+		void SetFilterState( PackagerParamsFilterState* state ) { fFilterState = state; }
+		PackagerParamsFilterState* GetFilterState() const { return fFilterState; }
+	#endif
 
 	public:
 		virtual void Print();
@@ -281,6 +299,11 @@ class PlatformAppPackager
 	public:
 		static bool IsAppSettingsEmpty( const MPlatform& platform );
 
+	public:
+	#if !defined( Rtt_NO_GUI )
+		bool DoPreBuild( Runtime *runtime, const char* srcDir, const char* tmpDir, const char* platform );
+	#endif
+
 	protected:
 		const MPlatformServices& fServices;
 		lua_State *fVM;
@@ -292,6 +315,20 @@ class PlatformAppPackager
 		String fSplashImageFile;
         bool fNeverStripDebugInfo;
 		TargetDevice::Platform fTargetPlatform;
+		char *fPreBuildFunc;
+		size_t fPreBuildFuncLength;
+		char *fAppStartFunc;
+		size_t fAppStartFuncLength;
+		
+	#if !defined( Rtt_NO_GUI )
+		String fExcludeDirs;
+		String fExcludeFiles;
+		String fTemporaryDirs;
+		
+		void ReadFilter( lua_State *L, const char *key, bool isForFiles );
+		void ReadFilterSet( lua_State *L, const char *key, String& dirs );
+		void PrepareFilters( AppPackagerParams* params );
+	#endif
 };
 
 Rtt_EXPORT int Rtt_LuaCompile( lua_State *L, int numSources, const char** sources, const char* dstFile, int stripDebug );

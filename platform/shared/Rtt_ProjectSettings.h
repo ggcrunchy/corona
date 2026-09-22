@@ -345,6 +345,9 @@ class ProjectSettings
 		 */
 		bool IsWindowTitleShown() const;
 
+		/** TODO */
+		const std::string &GetStartFunc() const { return fStartFunc; }
+
 		/**
 		 * Determines if the window should be transparent.
 		 * @return
@@ -504,6 +507,9 @@ class ProjectSettings
 
 		/** One of the following: "gl", "wantVulkan", "requireVulkan".*/
 		std::string fBackend;
+		
+		/** Code called at start */
+		std::string fStartFunc;
 };
 
 } // namespace Rtt

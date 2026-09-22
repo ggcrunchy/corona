@@ -23,6 +23,8 @@
 #include "Core/Rtt_String.h"
 #include "Corona/CoronaLog.h"
 
+#include "Core/Rtt_FileSystem.h"
+
 #include <signal.h>
 #include <string.h>
 
@@ -569,6 +571,88 @@ Lua::RegisterModuleLoaders( lua_State *L, const luaL_Reg moduleLoaders[], int nu
 
 	lua_pop( L, 2 );
 	lua_pop( L, nupvalues );
+}
+
+static int
+WriteToBuffer( lua_State *L, const void* p, size_t sz, void* ud )
+{
+	luaL_addlstring( static_cast<luaL_Buffer *>( ud ), static_cast<const char *>( p ), sz );
+
+	return 0;
+}
+
+static int
+AuxLoadFuncOrFilename( const char *projectPath, lua_State *L, const char *key, bool dumpCode )
+{
+	int oldTop = lua_gettop( L ), top = oldTop;
+
+	lua_getfield( L, -1, key ); // params, code?
+
+	bool isLuaFunction = lua_isfunction( L, -1 ) && !lua_iscfunction( L, -1 );
+	bool ok = isLuaFunction || lua_isnil( L, -1 );
+	if ( isLuaFunction || lua_isstring( L, -1 ) )
+	{
+		if ( !isLuaFunction )
+		{
+			do { /* allow breaks */
+				const char *filename = lua_tostring( L, -1 );
+				if ( !Rtt_StringEndsWith( filename, ".lua" ) )
+				{
+					Rtt_LogException( "Error: %s is not a Lua file", filename );
+					break;
+				}
+
+				String resourcePath( projectPath );
+				resourcePath.AppendPathSeparator();
+				resourcePath.Append( "buildScripts/" );
+				resourcePath.Append( filename );
+
+				const char *path = resourcePath.GetString();
+				if ( !Rtt_FileExists( path ) )
+				{
+					Rtt_LogException( "Error: unable to find %s", filename );
+					break;
+				}
+
+				int loaded = luaL_loadfile( L, path );
+				if ( 0 != loaded )
+				{
+					Rtt_LogException( "Error: failure while loading %s: %s", filename, lua_tostring( L, -1 ) );
+					break;
+				}
+				
+				ok = true;
+			} while (0); /* /allow breaks */
+		}
+
+		if ( dumpCode && ok )
+		{
+			luaL_Buffer buf;
+			
+			luaL_buffinit( L, &buf );
+			lua_dump( L, WriteToBuffer, &buf );
+			luaL_pushresult( &buf );
+			lua_replace( L, top + 1 );
+			
+			++top;
+		}
+	}
+
+	lua_settop( L, top );
+
+	return ok ? ( top - oldTop ) : -1;
+}
+
+bool
+Lua::VerifyFuncOrFilename( const char *projectPath, lua_State *L, const char *key )
+{
+	return 0 == AuxLoadFuncOrFilename( projectPath, L, key, false );
+}
+
+int
+Lua::DumpFuncOrFilename( const char *projectPath, lua_State *L, const char *key )
+{
+	return AuxLoadFuncOrFilename( projectPath, L, key, true );
 }
 
 // ----------------------------------------------------------------------------

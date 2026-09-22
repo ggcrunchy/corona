@@ -322,6 +322,8 @@ Rtt_EXPORT const luaL_Reg* Rtt_GetCustomModulesList()
 			// Used to fetch supported orientations, supported image suffix scales, and content width/height.
 			_projectSettings->LoadFromDirectory([_projectPath UTF8String]);
 
+			runtime->SetStartFunction( _projectSettings->GetStartFunc() );
+			
 			_GLView.isResizable = _projectSettings->IsWindowResizable();
 			
 			Rtt::DeviceOrientation::Type orientation = _projectSettings->GetDefaultOrientation();

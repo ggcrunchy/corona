@@ -440,6 +440,7 @@ static NSString *kValueNone = @"None";
                                       apppackage,
                                       isDistributionBuild );
 
+	params->SetRuntime([appDelegate runtime]);
     params->SetStripDebug( isStripDebug );
 	params->SetLiveBuild(isLiveBuild);
 	if(currentSDK.customTemplate)

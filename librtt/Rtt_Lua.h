@@ -99,6 +99,10 @@ class Lua
 		static void RegisterModuleLoaders( lua_State *L, const luaL_Reg moduleLoaders[], int nupvalues = 0 );
 
 	public:
+		static bool VerifyFuncOrFilename( const char *projectPath, lua_State *L, const char *key );
+		static int DumpFuncOrFilename( const char *projectPath, lua_State *L, const char *key );
+
+	public:
 		template < int (*F)( lua_State * ) >
 		static int Open( lua_State *L );
 

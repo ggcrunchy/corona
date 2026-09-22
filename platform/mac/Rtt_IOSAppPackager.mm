@@ -124,7 +124,21 @@ IOSAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 
 	if ( Rtt_VERIFY( 0 == system( cmd ) ) )
 	{
+	#if !defined( Rtt_NO_GUI )
+		Runtime *runtime = params->GetRuntime();
+		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, "iphone" ) )
+		{
+			return PlatformAppPackager::kBuildError;
+		}
+		
+		PrepareFilters( params ); // compiles source first...
+	#endif
+	
 		char* inputFile = Prepackage( params, tmpDir );
+
+	#if !defined( Rtt_NO_GUI )
+		PrepareFilters( NULL ); // ...then plugins?
+	#endif
 
 		if ( inputFile )
 		{

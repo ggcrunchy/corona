@@ -393,6 +393,16 @@ class Runtime : public MCallback,
 		const MRuntimeDelegate *fDelegate;
 		mutable bool fShowingTrialMessages;
 
+		std::string fRequiredPlugins;
+		std::string fRequireFunc;
+		std::string fStartFunc;
+		
+	public:
+		const std::string& GetRequiredPlugins() const { return fRequiredPlugins; }
+		const std::string& GetRequireFunction() const { return fRequireFunc; }
+		void SetRequireFunction( const std::string& require ) { fRequireFunc = require; }
+		void SetStartFunction( const std::string& start ) { fStartFunc = start; }
+
 	private:
 		friend class LoadMainTask;
 

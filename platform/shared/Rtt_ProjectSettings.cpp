@@ -328,6 +328,25 @@ bool ProjectSettings::LoadFromDirectory(const char* directoryPath)
 		{
 			fOrientationsSupportedSet.insert(fDefaultOrientation);
 		}
+		
+		lua_getfield(luaStatePointer, -1, "callbacks");
+		if (lua_istable(luaStatePointer, -1))
+		{
+			int result = Lua::DumpFuncOrFilename( directoryPath, luaStatePointer, "appStart" );
+			if ( result < 0 )
+			{
+				// TODO: error
+				return false;
+			}
+			else if ( result > 0 )
+			{
+				fStartFunc.assign( lua_tostring( luaStatePointer, -1 ), lua_objlen( luaStatePointer, -1 ) );
+				
+				lua_pop( luaStatePointer, 1 );
+			}
+		}
+
+		lua_pop( luaStatePointer, 1 );
 	}
 	lua_pop(luaStatePointer, 1);
 

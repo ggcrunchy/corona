@@ -18,6 +18,9 @@
 #include "Rtt_MPlatform.h"
 #include "Rtt_MPlatformDevice.h"
 #include "Rtt_MPlatformServices.h"
+
+#include "Rtt_LuaLibSystem.h"
+
 #if defined(Rtt_WIN_ENV) && !defined(Rtt_LINUX_ENV)
 #	include "Core/Rtt_FileSystem.h"
 #	include "stdafx.h"
@@ -62,10 +65,30 @@
 #elif Rtt_WIN_ENV
 #endif
 
+#if !defined( Rtt_NO_GUI )
+	#include <regex>
+#endif
+
 // ----------------------------------------------------------------------------
+
+
+#if !defined(Rtt_NO_GUI)
+
+extern "C" {
+	int luaopen_coronabaselib(lua_State *L);
+	int luaopen_lfs(lua_State *L);
+}
+
+#endif
 
 namespace Rtt
 {
+
+#if !defined(Rtt_NO_GUI)
+
+int luaload_json(lua_State* L);
+
+#endif
 
 static const char *kUserPreferenceCustomBuildID = "userPreferenceCustomBuildID";
 static const char *kUserPreferenceCustomDailyBuild = "userPreferenceCustomDailyBuild";
@@ -86,6 +109,129 @@ Rtt_EXPORT int Rtt_LuaCompile(lua_State *L, int numSources, const char** sources
 #endif
 
 // ----------------------------------------------------------------------------
+
+#if !defined( Rtt_NO_GUI )
+
+struct ListOfStringsIter {
+	void FindNextSemicolon()
+	{
+		fSemicolon = strchr( fStr, ';' );
+	}
+
+	ListOfStringsIter( const char * str )
+	:	fStr( str )
+	{
+		if ( str )
+		{
+			FindNextSemicolon();
+		}
+	}
+
+	std::string operator*() const
+	{
+		if ( fSemicolon )
+		{
+			return std::string( fStr, fSemicolon - fStr );
+		}
+		else
+		{
+			return fStr;
+		}
+	}
+
+	ListOfStringsIter& operator++()
+	{
+		if ( NULL != fSemicolon )
+		{
+			fStr = fSemicolon + 1;
+			
+			FindNextSemicolon();
+		}
+		else
+		{
+			fStr = NULL;
+		}
+		
+		return *this;
+	}
+	
+	ListOfStringsIter& begin() { return *this; }
+	ListOfStringsIter& end() { return *this; }
+	
+	bool operator!=( const ListOfStringsIter& ) const
+	{
+		return NULL != fStr;
+	}
+
+	const char * fStr;
+	const char * fSemicolon;
+};
+
+struct PackagerParamsFilterState {
+	const char* fExcludeFiles;
+	const char* fExcludeDirs;
+	std::regex * fExcludeFilesRegex;
+	std::regex * fExcludeDirsRegex;
+	
+	static void
+	AuxSetRegex( std::regex* regex, const char **filter )
+	{
+		const char *start = *filter;
+		if ( start )
+		{
+			const char *sep = strchr( start, ';' );
+			
+			Rtt_ASSERT( sep );
+			Rtt_ASSERT( regex );
+			Rtt_ASSERT( *start );
+
+			regex->assign( start, sep - start );
+			
+			*filter = sep + 1;
+		}
+	}
+	
+	void BindRegexes( std::regex &excludeFilesRegex, std::regex &excludeDirsRegex )
+	{
+		fExcludeFilesRegex = fExcludeFiles ? &excludeFilesRegex : NULL;
+		fExcludeDirsRegex = fExcludeDirs ? &excludeDirsRegex : NULL;
+	}
+	
+	void
+	UpdateRegexState()
+	{
+		AuxSetRegex( fExcludeFilesRegex, &fExcludeFiles );
+		AuxSetRegex( fExcludeDirsRegex, &fExcludeDirs );
+	}
+	
+	static bool
+	CanInclude( const char* path, const std::regex *exclude )
+	{
+		if ( NULL == exclude || !std::regex_match( path, *exclude ) )
+		{
+			return true;
+		}
+		else
+		{
+			Rtt_TRACE_SIM(( "Filtering out '%s'", path ));
+			return false;
+		}
+	}
+	
+	bool
+	CanIncludeFile( const char *file ) const
+	{
+		return CanInclude( file, fExcludeFilesRegex );
+	}
+
+	bool
+	CanIncludeDir( const char *dir ) const
+	{
+		return CanInclude( dir, fExcludeDirsRegex );
+	}
+};
+
+#endif
 
 #define kDefaultNumBytes 128
 
@@ -109,8 +255,11 @@ AppPackagerParams::AppPackagerParams( const char* appName,
 	fTargetDevice( targetDevice ),
 	fIsStripDebug( true ),
 	fDeviceBuildData( NULL ),
-	fIncludeBuildSettings( false )
-,   fLiveBuild( false )
+	fIncludeBuildSettings( false ),
+	fLiveBuild( false )
+#if !defined( Rtt_NO_GUI )
+	, fRuntime( NULL ), fFilterState( NULL )
+#endif
 {
 	fAppName.Set(appName);
 	fVersion.Set(version);
@@ -140,6 +289,10 @@ AppPackagerParams::AppPackagerParams( const char* appName,
 
 AppPackagerParams::~AppPackagerParams()
 {
+#if !defined( Rtt_NO_GUI)
+	Rtt_FREE( fFilterState );
+#endif
+
 	delete fDeviceBuildData;
 }
 
@@ -258,7 +411,15 @@ PlatformAppPackager::PlatformAppPackager( const MPlatformServices& services,
 	fCustomBuildId( & fServices.Platform().GetAllocator() ),
 	fGlobalCustomBuildId( & fServices.Platform().GetAllocator() ),
 	fAppSettingsCustomBuildId( & fServices.Platform().GetAllocator() ),
-    fNeverStripDebugInfo( false )
+    fNeverStripDebugInfo( false ),
+#if !defined( Rtt_NO_GUI )
+	fExcludeDirs( & fServices.Platform().GetAllocator() ),
+	fExcludeFiles( & fServices.Platform().GetAllocator() ),
+#endif
+    fPreBuildFunc( NULL ),
+    fPreBuildFuncLength( 0 ),
+	fAppStartFunc( NULL ),
+	fAppStartFuncLength( 0 )
 {
 	fCustomBuildId.Set( "" );
 	fGlobalCustomBuildId.Set( "" );
@@ -490,9 +651,13 @@ IsDirectory( const char *path )
 }
 
 bool
-CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *dstDir, const char *srcDir )
+CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *dstDir, const char *srcDir, const char *baseDir )
 {
-	const char *baseDir = params.GetSrcDir(); // this is the project directory
+#if !defined( Rtt_NO_GUI )
+	const PackagerParamsFilterState *filterState = params.GetFilterState();
+#endif
+
+//	const char *baseDir = params.GetSrcDir(); // this is the project directory
 	bool isDirectory = false;
 	bool result = false;
 
@@ -574,7 +739,17 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 					// If the next item is a directory, then recursively compile the files under that directory.
 					if ( IsDirectory( srcPath ) )
 					{
-						result = CompileScriptsInDirectory( L, params, dstDir, srcPath );
+						if ( Rtt_StringCompare( filename, "buildScripts" ) == 0 )
+						{
+							continue;
+						}
+					#if !defined( Rtt_NO_GUI )
+						else if ( filterState && !filterState->CanIncludeDir( srcPath ) )
+						{
+							continue;
+						}
+					#endif
+						result = CompileScriptsInDirectory( L, params, dstDir, srcPath, baseDir );
 						continue;
 					}
 
@@ -587,6 +762,12 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 					{
 						isBuildSettingsFile = (Rtt_StringCompare( filename, "build.settings" ) == 0);
 					}
+				#if !defined( Rtt_NO_GUI )
+					if ( isLuaFile && filterState && !filterState->CanIncludeFile( filename ) )
+					{
+						continue;
+					}
+				#endif
 					if ( isLuaFile || ( isBuildSettingsFile && params.IncludeBuildSettings() ) )
 					{
 						// Create a destination file path for the resulting compiled file.
@@ -856,6 +1037,32 @@ ReplaceMainLuaWithLiveDebug( lua_State *L, AppPackagerParams& params, const char
 	return res;
 }
 
+#if !defined( Rtt_NO_GUI )
+
+static const char* FindLastTempPathComponent( const char *tmpDir )
+{
+	const char *slash = strrchr( tmpDir, '/' );
+
+#ifdef _WIN32
+	const char *backslash = strrchr( tmpDir, '\\' );
+	
+	Rtt_ASSERT( slash || backslash );
+	
+	if ( NULL == slash || backslash > slash )
+	{
+		return backslash;
+	}
+	else
+#endif
+	{
+		Rtt_ASSERT( slash );
+
+		return slash;
+	}
+}
+
+#endif
+
 bool
 PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmpDir )
 {
@@ -880,6 +1087,17 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 	free( srcMain );
 #else
 
+#if !defined( Rtt_NO_GUI )
+	PackagerParamsFilterState* state = params->GetFilterState();
+	std::regex excludeFilesRegex, excludeDirsRegex;
+
+	if ( NULL != state )
+	{
+		state->BindRegexes( excludeFilesRegex, excludeDirsRegex );
+		state->UpdateRegexState();
+	}
+#endif
+
 	const char* baseDir = params->GetSrcDir();
 	const char* dstDir = tmpDir;
 
@@ -892,7 +1110,36 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
         params->SetStripDebug(false);
     }
     
-	bool result = CompileScriptsInDirectory( fVM, * params, dstDir, baseDir );
+	bool result = CompileScriptsInDirectory( fVM, * params, dstDir, baseDir, params->GetSrcDir() );
+#endif
+
+#if !defined( Rtt_NO_GUI )
+	if ( result )
+	{
+		const char *sep = FindLastTempPathComponent( tmpDir );
+		std::string root( tmpDir, sep - tmpDir + 1 );
+		
+		root += "exDirs";
+		
+		for ( auto&& tempDir : ListOfStringsIter( fTemporaryDirs.GetString() ) )
+		{
+			if ( !result )
+			{
+				break;
+			}
+			else
+			{
+				if ( NULL != state )
+				{
+					state->UpdateRegexState();
+				}
+			
+				std::string path = root + "/" + tempDir;
+				
+				result = CompileScriptsInDirectory( fVM, * params, dstDir, path.c_str(), root.c_str() );
+			}
+		}
+	}
 #endif
 
 	if(result)
@@ -1501,6 +1748,256 @@ PlatformAppPackager::OpenBuildSettings( const char * srcDir )
 	return status;
 }
 
+
+#if !defined( Rtt_NO_GUI )
+
+static int
+SaveStack( lua_State *L )
+{
+	int top = lua_gettop( L );
+	if ( top  > 0 )
+	{
+		lua_createtable( L, top, 1 );
+		lua_pushinteger( L, top );
+		lua_setfield( L, -1, "n" );
+		lua_insert( L, 1 );
+		
+		for ( int i = top; i > 0; i-- )
+		{
+			lua_rawseti( L, 1, i );
+		}
+	
+		return -1;
+	}
+	else
+	{
+		return LUA_REFNIL;
+	}
+}
+
+static void
+RestoreStack( lua_State *L, int ref )
+{
+	if ( LUA_REFNIL != ref )
+	{
+		lua_getref( L, ref );
+		lua_getfield( L, -1, "n" );
+		
+		int n = luaL_checkint( L, -1 );
+		
+		lua_pop( L, 1 );
+		
+		for ( int i = 1; i <= n; i++ )
+		{
+			lua_rawgeti( L, -i, i );
+		}
+	
+		lua_remove( L, -( n + 1 ) );
+		lua_unref( L, ref );
+	}
+}
+
+static void
+InitLuaForBuild( lua_State *L, const MPlatform& platform )
+{
+	int stackRef = SaveStack( L ); // InitializeLuaPath() expects empty stack
+
+	lua_pushcfunction( L, luaopen_coronabaselib );
+	lua_pushstring( L, "coronabaselib" );
+	lua_call( L, 1, 0 );
+	lua_getglobal( L, "coronabaselib" );
+
+	Rtt_ASSERT( lua_istable( L, -1 ) );
+
+	lua_getfield( L, -1, "print" );
+
+	Rtt_ASSERT( lua_isfunction( L, -1 ) );
+
+	lua_setglobal( L, "print" );
+	lua_pop( L, 1 );
+	lua_pushcfunction( L, luaopen_lfs );
+	lua_pushstring( L, "lfs" );
+	lua_call( L, 1, 0 );
+
+	Lua::RegisterModuleLoader( L, "json", Lua::Open< luaload_json > );
+	LuaContext::InitializeLuaPath( L, platform );
+
+	RestoreStack( L, stackRef );
+}
+
+#endif
+
+#if !defined( Rtt_NO_GUI )
+static bool
+ResolveClause( const char* str, bool isForFile, std::string& clause )
+{
+	const char * dot = strstr( str, "." );
+
+	if ( dot && Rtt_StringCompare( dot, ".lua" ) != 0 )
+	{
+		Rtt_LogException( "WARNING: dot found but not used for Lua extension" );
+		return false;
+	}
+
+	clause = str;
+		
+	if ( isForFile && !dot )
+	{
+		clause += ".lua";
+	}
+
+	for ( size_t pos = 0; pos < clause.size(); )
+	{
+		switch ( clause[pos] )
+		{
+		case '*':
+			clause.insert( clause.begin() + pos, '.' );
+			pos += 2;
+			break;
+		case '?':
+			clause[pos++] = '.';
+			break;
+		case '.':
+			clause.insert( clause.begin() + pos, '\\' );
+			pos += 2;
+			break;
+		default:
+			pos++;
+		}
+	}
+	
+	return true;
+}
+
+static void
+AuxReadFilter( const char *str, String& filter, bool isForFile )
+{
+	char ch;
+	bool ok = true;
+	
+	for ( int i = 0; ok && str[i]; i++ )
+	{
+		ch = str[i];
+		
+		if ( isdigit( ch ) )
+		{
+			ok = i; // n.b. false on i == 0
+		}
+		else if ( '.' == ch )
+		{
+			ok = isForFile;
+		}
+		else
+		{
+			ok = isalnum( ch ) || '_' == ch || '*' == ch || '?' == ch || ';';
+		}
+	}
+		
+	if ( ok )
+	{
+		std::string build;
+		
+		for ( auto&& iter : ListOfStringsIter( str ) )
+		{
+			std::string clause;
+			if ( ResolveClause( iter.c_str(), isForFile, clause ) )
+			{
+				if ( !build.empty() )
+				{
+					build += '|';
+				}
+				
+				build += clause;
+			}
+		}
+
+		filter.Append( build.c_str() );
+	}
+	else
+	{
+		Rtt_Log( "Bad character in %s exclusions: '%c'", isForFile ? "file" : "directory", ch );
+	}
+}
+		
+void
+PlatformAppPackager::ReadFilter( lua_State *L, const char* key, bool isForFile )
+{
+	lua_getfield( L, -1, key );
+	
+	String &exclude = isForFile ? fExcludeFiles : fExcludeDirs;
+	
+	if ( lua_isstring( L, -1 ) )
+	{
+		AuxReadFilter( lua_tostring( L, -1 ), exclude, isForFile );
+	}
+	else if ( !lua_isnil( L, -1 ) )
+	{
+		Rtt_LogException( "WARNING: expected string for '%s' filter, got %s", key, luaL_typename( L, -1 ) );
+	}
+	
+	exclude.Append( ";" );
+	
+	lua_pop( L, 1 );
+}
+
+void
+PlatformAppPackager::ReadFilterSet( lua_State *L, const char* key, String& dirs )
+{
+	lua_getfield( L, -1, key );
+
+	if ( lua_istable( L, -1 ) )
+	{
+		for ( lua_pushnil( L ); lua_next( L, -2 ); lua_pop( L, 1 ) )
+		{
+			if ( !lua_isstring( L, -2 ) )
+			{
+				Rtt_LogException( "WARNING: Expected string for extra %s directory name, got %s", key, luaL_typename( L, -2 ) );
+			}
+			else if ( !lua_istable( L, -1 ) && ( LUA_TBOOLEAN != lua_type( L, -1 ) || !lua_toboolean( L, -1 ) ) )
+			{
+				Rtt_LogException( "WARNING: Expected table or boolean true for extra %s directory info, got %s", key, luaL_typename( L, -1 ) );
+			}
+			else
+			{
+				if ( lua_istable( L, -1 ) )
+				{
+					ReadFilter( L, "excludeDirs", false );
+					ReadFilter( L, "excludeFiles", true );
+				}
+
+				if ( !dirs.IsEmpty() )
+				{
+					dirs.Append( ";" );
+				}
+				
+				dirs.Append( lua_tostring( L, -2 ) );
+			}
+		}
+	}
+
+	lua_pop( L, 1 );
+}
+
+void
+PlatformAppPackager::PrepareFilters( AppPackagerParams* params )
+{
+	if ( NULL == params )
+	{
+		params->SetFilterState( NULL );
+	}
+	else if ( !fExcludeFiles.IsEmpty() || !fExcludeDirs.IsEmpty() )
+	{
+		PackagerParamsFilterState *state = (PackagerParamsFilterState *)Rtt_CALLOC( fExcludeFiles.GetAllocator(), 1, sizeof(PackagerParamsFilterState) );
+
+		state->fExcludeFiles = !fExcludeFiles.IsEmpty() ? fExcludeFiles.GetString() : NULL;
+		state->fExcludeDirs = !fExcludeDirs.IsEmpty() ? fExcludeDirs.GetString() : NULL;
+		
+		params->SetFilterState( state );
+	}
+}
+
+#endif
+
 bool
 PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 {
@@ -1593,7 +2090,49 @@ PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 				lua_pop( L, 1 ); // pop settings.splashScreen.{platform}
 			}
 			lua_pop( L, 1 ); // pop settings.splashScreen
+			
+			lua_getfield( L, -1, "callbacks" ); // push settings.callbacks
+
+			if ( lua_istable( L, -1 ) )
+			{
+			#if defined( Rtt_NO_GUI )
+				Rtt_TRACE(( "`callbacks` not yet supported in builder" ));
+			#else
+				int preBuildResult = Lua::DumpFuncOrFilename( srcDir, L, "preBuild" );
+				if ( preBuildResult > 0 )
+				{
+					const char* str = lua_tolstring( L, -1, &fPreBuildFuncLength );
+	
+					fPreBuildFunc = (char*)Rtt_MALLOC( NULL, fPreBuildFuncLength );
+					
+					memcpy( fPreBuildFunc, str, fPreBuildFuncLength );
+					
+					lua_pop( L, 1 );
+				}
+				
+				int appStartResult = Lua::DumpFuncOrFilename( srcDir, L, "appStart" );
+				if ( appStartResult > 0 )
+				{
+					const char* str = lua_tolstring( L, -1, &fAppStartFuncLength );
+	
+					fAppStartFunc = (char*)Rtt_MALLOC( NULL, fAppStartFuncLength );
+					
+					memcpy( fAppStartFunc, str, fAppStartFuncLength );
+					
+					lua_pop( L, 1 );
+				}
+			#endif
+			}
+
+			lua_pop( L, 1 ); // pop	settings.callbacks
 		}
+		
+	#if !defined( Rtt_NO_GUI )
+		ReadFilter( L, "luaExcludeFiles", true );
+		ReadFilter( L, "luaExcludeDirs", false );
+		ReadFilterSet( L, "temporaryLuaDirectories", fTemporaryDirs );
+	#endif
+		
 		lua_pop( L, 1 ); // pop settings
 		
 		// set global table "settings" to nil
@@ -1739,6 +2278,202 @@ PlatformAppPackager::IsAppSettingsEmpty( const MPlatform& platform )
 
 	return result;
 }
+
+#if !defined( Rtt_NO_GUI )
+
+static int NoOp( lua_State * ) { return 0; }
+
+static void
+AddSystemLib( lua_State *L )
+{
+	lua_createtable( L, 0, 2 );
+	
+	luaL_Reg funcs[] = {
+		{ "getInfo", LuaLibSystem::getInfo },
+		{ "pathForFile", NoOp },
+		{ NULL, NULL },
+	};
+	
+	luaL_register( L, "system", funcs );
+}
+
+static int
+AddRequireFunc( lua_State *L, const std::string& requireFunc, const std::string& requiredPlugins )
+{
+	if ( 0 != luaL_loadbuffer( L, requireFunc.data(), requireFunc.size(), "require" ) )
+	{
+		Rtt_LogException( "Error: failed to load 'require'" );
+		return LUA_REFNIL;
+	}
+	else
+	{
+		lua_pushvalue( L, -1 );
+		lua_newtable( L );
+
+		int index = 1;
+		for ( auto&& pluginName : ListOfStringsIter( requiredPlugins.c_str() ) )
+		{
+			lua_pushstring( L, pluginName.c_str() );
+			lua_rawseti( L, -2, index ++ );
+		}
+
+		if ( 0 == lua_pcall( L, 1, 0, 0 ) )
+		{
+			lua_getglobal( L, "require" );
+			
+			int oldRequire = lua_ref( L, 1 );
+			
+			lua_setglobal( L, "require" );
+			
+			AddSystemLib( L );
+			
+			return oldRequire;
+		}
+		else
+		{
+			Rtt_LogException( "Error: failed to initialize custom require: %s", lua_tostring( L, -1 ) );
+			return LUA_REFNIL;
+		}
+	}
+}
+
+static void
+RestoreRequire( lua_State *L, int oldRequireRef )
+{
+	if ( LUA_NOREF != oldRequireRef && LUA_REFNIL != oldRequireRef )
+	{
+		lua_getref( L, oldRequireRef );
+		lua_setglobal( L, "require" );
+	}
+	
+	lua_pushnil( L );
+	lua_setglobal( L, "system" );
+}
+
+static void
+AddFile( lua_State *L, const char *code, size_t codeLength, const char *root, const char *dstDir, int stripDebug )
+{
+	const char kScriptSuffix[] = "." Rtt_LUA_SCRIPT_FILE_EXTENSION;
+
+	lua_pushfstring( L, "%s" LUA_DIRSEP "%s." Rtt_LUA_SCRIPT_FILE_EXTENSION, dstDir, root );
+
+	const char *scriptName = lua_tostring( L, -1 );
+	FILE *fp = fopen( scriptName, "wb" );
+	if ( Rtt_VERIFY( fp ) )
+	{
+		fwrite( code, 1, codeLength, fp );
+		fclose( fp );
+	}
+
+	lua_pushfstring( L, "%s" LUA_DIRSEP "%s." Rtt_LUA_OBJECT_FILE_EXTENSION, dstDir, root );
+
+	const char *compiledName = lua_tostring( L, -1 );
+	int status = Rtt_LuaCompile( L, 1, &scriptName, compiledName, stripDebug );
+
+	if ( !Rtt_VERIFY( 0 == status ) )
+	{
+		// TODO: error?
+	}
+
+	unlink( scriptName );
+
+	lua_pop( L, 2 );
+}
+
+bool
+PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const char* tmpDir, const char* platform )
+{
+	bool ok = true;
+		
+	if ( 0 != fPreBuildFuncLength )
+	{
+		lua_State *L = fVM;
+		int top = lua_gettop( L ), oldRequireRef = LUA_NOREF;
+		
+		// TODO: these next couple steps should be one time only, i.e. guarded by a flag
+		// if / when a "postBuild" or similar comes along
+
+		void *ud;
+		lua_Alloc alloc = lua_getallocf( L, &ud );
+		
+		LuaContextUserdata contextUD( NULL, fServices.Platform(), runtime );
+		
+		lua_setallocf( L, alloc, &contextUD );
+		
+		InitLuaForBuild( L, fServices.Platform() );
+
+		const std::string &requireFunc = runtime->GetRequireFunction();
+		if ( !requireFunc.empty() )
+		{
+			oldRequireRef = AddRequireFunc( L, requireFunc, runtime->GetRequiredPlugins() );
+
+			if ( LUA_REFNIL == oldRequireRef )
+			{
+				ok = false;
+			}
+		}
+		
+		if ( ok )
+		{
+			if ( 0 != luaL_loadbuffer( L, fPreBuildFunc, fPreBuildFuncLength, "preBuild" ) )
+			{
+				Rtt_LogException( "Error: failed to load `preBuild`" );
+				ok = false;
+			}
+			else
+			{
+				lua_newtable( L );
+				lua_pushstring( L, srcDir );
+				lua_setfield( L, -2, "srcDir" );
+				lua_pushstring( L, tmpDir );
+				lua_setfield( L, -2, "dstDir" );
+				
+				const char *sep = FindLastTempPathComponent( tmpDir );
+				
+				Rtt_ASSERT( sep );
+				
+				std::string root( tmpDir, sep - tmpDir + 1 );
+				
+				root += "exDirs/";
+				
+				lua_pushstring( L, root.c_str() );
+				lua_setfield( L, -2, "transientLuaDirs" );
+				lua_pushstring( L, platform );
+
+				for ( auto&& tempDir : ListOfStringsIter( fTemporaryDirs.GetString() ) )
+				{
+					std::string segment = root + tempDir;
+					
+					if ( !mkdir( segment.c_str() ) )
+					{
+						Rtt_LogException( "Error: failed to make temp directory `%s`", tempDir.c_str() );
+						ok = false;
+					}
+				}
+			
+				if ( 0 != lua_pcall( L, 2, 0, 0 ) )
+				{
+					Rtt_LogException( "Error: `preBuild` failed with `%s`", lua_tostring( L, -1 ) );
+					ok = false;
+				}
+			}
+		}
+		
+		RestoreRequire( L, oldRequireRef );
+		
+		lua_setallocf( L, alloc, ud );
+		lua_settop( L, top );
+	}
+	
+	if ( ok && 0 != fAppStartFuncLength ) // TODO: better call site? more robust debug stripping?
+	{
+		AddFile( fVM, fAppStartFunc, fAppStartFuncLength, "_appStart_", tmpDir, !fNeverStripDebugInfo );
+	}
+	
+	return ok;
+}
+
+#endif
 
 /// Returns a copy of the input string, escaping characters as needed such as apostrophies and double quotes.
 /// @param input The source string to escape. Expected to be an ASCII or UTF-8 string. Cannot be NULL.

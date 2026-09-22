@@ -1041,7 +1041,7 @@ LuaContext::DoFile( lua_State *L, const char* file, int narg, bool clear )
 }
 
 // ----------------------------------------------------------------------------	
-
+/*
 class LuaContextUserdata
 {
 	public:
@@ -1063,7 +1063,7 @@ class LuaContextUserdata
 		Runtime *fRuntime;
 		LuaContext *fOwner;
 };
-
+*/
 LuaContextUserdata::LuaContextUserdata( Rtt_Allocator* pAllocator, const MPlatform& platform, Runtime *runtime )
 :	fAllocator( pAllocator ),
 	fPlatform( platform ),

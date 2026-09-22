@@ -50,7 +50,7 @@ namespace Rtt
 	int luaload_luasocket_mime(lua_State* L);
 	int luaload_luasocket_ltn12(lua_State* L);
 
-	bool CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *dstDir, const char *srcDir );
+	bool CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *dstDir, const char *srcDir, const char* baseDir );
 	bool FetchDirectoryTreeFilePaths( const char* directoryPath, std::vector<std::string>& filePathCollection );
 
 	int prn(lua_State *L)
@@ -123,7 +123,7 @@ namespace Rtt
 		Rtt::AppPackagerParams params(p->GetAppName(), p->GetVersion(), p->GetIdentity(), NULL, srcDir, dstDir, NULL, p->GetTargetPlatform(), NULL,	0, 0, NULL, NULL, NULL, true);
 		params.SetStripDebug(p->IsStripDebug());
 
-		bool rc = CompileScriptsInDirectory(L, params, dstDir, srcDir);
+		bool rc = CompileScriptsInDirectory(L, params, dstDir, srcDir, params.GetSrcDir());
 		if (rc)
 		{
 			// Bundle all of the compiled Lua scripts in the intermediate directory into a "resource.car" file.
@@ -256,6 +256,14 @@ int WebAppPackager::Build(AppPackagerParams* params, const char* tmpDirBase)
 		params->SetBuildMessage(tmpString.GetString());
 		return PlatformAppPackager::kLocalPackagingError;
 	}
+
+	#if !defined( Rtt_NO_GUI )
+		Runtime *runtime = params->GetRuntime();
+		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, "web" ) )
+		{
+			return PlatformAppPackager::kBuildError;
+		}
+	#endif
 
 	lua_State *L = fVM;
 	lua_getglobal(L, "webPackageApp"); Rtt_ASSERT(lua_isfunction(L, -1));

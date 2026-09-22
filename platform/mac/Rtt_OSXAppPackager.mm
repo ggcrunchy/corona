@@ -137,10 +137,22 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 		String outputDir;
 		outputDir.Set(tmpDir);
 
+	#if !defined( Rtt_NO_GUI )
+		Runtime *runtime = params->GetRuntime();
+		if ( !DoPreBuild( runtime, osxParams->GetSrcDir(), tmpDir, "mac" ) )
+		{
+			return PlatformAppPackager::kBuildError;
+		}
+	#endif
+
 		if ((result = PrepackagePlugins(osxParams, tmpPluginsDir, outputDir)) != PlatformAppPackager::kNoError)
 		{
 			return result;
 		}
+			
+	#if !defined( Rtt_NO_GUI )
+		PrepareFilters( params );
+	#endif
 			
         if ( CompileScripts( osxParams, tmpDir ) && ArchiveDirectoryTree(osxParams, tmpDir, tmpResourceCar) )
         {

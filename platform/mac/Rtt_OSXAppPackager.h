@@ -86,7 +86,7 @@ class OSXAppPackagerParams : public AppPackagerParams
 		///  <para>Returns a pointer to the Corona runtime associated with the project being built.</para>
 		///  <para>Returns null if not assigned yet.</para>
 		/// </returns>
-		Runtime* GetRuntime() const { return fRuntime; }
+		//Runtime* GetRuntime() const { return fRuntime; }
 		const char* GetAppSigningIdentity() const { return fAppSigningIdentity; }
 		const char* GetInstallerSigningIdentity() const { return fInstallerSigningIdentity; }
 
@@ -97,13 +97,13 @@ class OSXAppPackagerParams : public AppPackagerParams
 		//   "developer-id-dmg" — Developer ID signed .dmg for direct distribution
 		const char* GetDistributionMethod() const { return fDistributionMethod ? fDistributionMethod : "developer"; }
 
-		void SetRuntime(Runtime* value) { fRuntime = value; }
+//		void SetRuntime(Runtime* value) { fRuntime = value; }
 		void SetAppSigningIdentity(const char* v) { fAppSigningIdentity = v; }
 		void SetInstallerSigningIdentity(const char* v) { fInstallerSigningIdentity = v; }
 		void SetDistributionMethod(const char* v) { fDistributionMethod = v; }
 
 	public:
-		Rtt::Runtime* fRuntime;
+	//	Rtt::Runtime* fRuntime;
 		const char* fAppSigningIdentity;
 		const char* fInstallerSigningIdentity;
 		const char* fDistributionMethod;

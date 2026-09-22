@@ -244,7 +244,7 @@ using namespace Rtt;
 	
 	NSString *kBuildSettings = @"build.settings";
 	params->SetBuildSettingsPath( [[self.projectPath stringByAppendingPathComponent:kBuildSettings] UTF8String]);
-
+	params->SetRuntime([appDelegate runtime]);
 	
 	// Some IDEs will terminate us quite abruptly so make sure we're on disk before starting a long operation
 	[[NSUserDefaults standardUserDefaults] synchronize];

@@ -243,7 +243,21 @@ AndroidAppPackager::Build( AppPackagerParams * params, const char * tmpDirBase )
     // This is not as foolproof as mkdtemp() but has the advantage of working on Win32
     if ( mkdir( mktemp(tmpDir) ) )
 	{
+	#if !defined( Rtt_NO_GUI )
+		Runtime *runtime = params->GetRuntime();
+		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, "android" ) )
+		{
+			return PlatformAppPackager::kBuildError;
+		}
+		
+		PrepareFilters( params ); // compiles source first...
+	#endif
+	
 		char* inputFile = Prepackage( params, tmpDir );
+
+	#if !defined( Rtt_NO_GUI )
+		PrepareFilters( NULL ); // ...then plugins?
+	#endif
 
 		if (inputFile) //offline build
 		{
