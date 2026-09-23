@@ -1797,6 +1797,122 @@ RestoreStack( lua_State *L, int ref )
 	}
 }
 
+class ProxyPlatform : public MPlatform
+{
+public:
+	ProxyPlatform( const MPlatform& platform ) : fPlatform( platform ) {}
+
+public:
+	virtual Rtt_Allocator& GetAllocator() const { return fPlatform.GetAllocator(); }
+	virtual MPlatformDevice& GetDevice() const { return fPlatform.GetDevice(); }
+	virtual RenderingStream* CreateRenderingStream( bool antialias ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformSurface* CreateScreenSurface() const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformSurface* CreateOffscreenSurface( const PlatformSurface& parent ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformTimer* CreateTimerWithCallback( MCallback& callback ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformBitmap* CreateBitmap( const char* filePath, bool convertToGrayscale ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformBitmap* CreateBitmapMask( const char str[], const PlatformFont& font, Real w, Real h, const char alignment[], Real& baselineOffset ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual bool SaveImageToPhotoLibrary( const char* filePath ) const { Rtt_ASSERT_NOT_REACHED(); return false; }
+	virtual bool SaveBitmap( PlatformBitmap* bitmap, const char* filePath, float jpegQuality ) const { Rtt_ASSERT_NOT_REACHED(); return false; }
+	virtual bool AddBitmapToPhotoLibrary( PlatformBitmap* bitmap ) const { Rtt_ASSERT_NOT_REACHED(); return false; }
+	virtual bool OpenURL( const char* url ) const { Rtt_ASSERT_NOT_REACHED(); return false; }
+	virtual int CanOpenURL( const char* url ) const { Rtt_ASSERT_NOT_REACHED(); return 0; }
+	virtual FontMetricsMap GetFontMetrics( const PlatformFont& font ) const { Rtt_ASSERT_NOT_REACHED(); return fPlatform.GetFontMetrics( font ); }
+	virtual const MCrypto& GetCrypto() const { Rtt_ASSERT_NOT_REACHED(); return fPlatform.GetCrypto(); }
+	virtual void GetPreference( Category category, Rtt::String* value ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual Preference::ReadValueResult GetPreference( const char* categoryName, const char* keyName ) const { Rtt_ASSERT_NOT_REACHED(); return fPlatform.GetPreference( categoryName, keyName ); }
+	virtual OperationResult SetPreferences( const char* categoryName, const PreferenceCollection& collection ) const { Rtt_ASSERT_NOT_REACHED(); return fPlatform.SetPreferences( categoryName, collection ); }
+	virtual OperationResult DeletePreferences( const char* categoryName, const char** keyNameArray, U32 keyNameCount ) const { Rtt_ASSERT_NOT_REACHED(); return fPlatform.DeletePreferences( categoryName, keyNameArray, keyNameCount ); }
+	virtual PlatformEventSound* CreateEventSound( const ResourceHandle<lua_State>& handle, const char* filePath ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual void ReleaseEventSound( PlatformEventSound* soundID ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual void PlayEventSound( PlatformEventSound* soundID ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual PlatformAudioRecorder* CreateAudioRecorder( const ResourceHandle<lua_State>& handle, const char* filePath ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformAudioPlayer* GetAudioPlayer( const ResourceHandle<lua_State>& handle ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformVideoPlayer* GetVideoPlayer( const ResourceHandle<lua_State>& handle ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformImageProvider* GetImageProvider( const ResourceHandle<lua_State>& handle ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformVideoProvider* GetVideoProvider( const ResourceHandle<lua_State>& handle ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformStoreProvider* GetStoreProvider( const ResourceHandle<lua_State>& handle ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual void SetStatusBarMode( StatusBarMode newValue ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual StatusBarMode GetStatusBarMode() const { Rtt_ASSERT_NOT_REACHED(); return fPlatform.GetStatusBarMode(); }
+	virtual int GetStatusBarHeight() const { Rtt_ASSERT_NOT_REACHED(); return 0; }
+	virtual int GetTopStatusBarHeightPixels() const { Rtt_ASSERT_NOT_REACHED(); return 0; }
+	virtual int GetBottomStatusBarHeightPixels() const { Rtt_ASSERT_NOT_REACHED(); return 0; }
+	virtual void SetIdleTimer( bool enabled ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual bool GetIdleTimer() const { Rtt_ASSERT_NOT_REACHED(); return false; }
+	virtual void GetSafeAreaInsetsPixels( Rtt_Real& top, Rtt_Real& left, Rtt_Real& bottom, Rtt_Real& right ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual NativeAlertRef ShowNativeAlert( const char* title, const char* msg, const char** buttonLabels, U32 numButtons, LuaResource* resource ) const { Rtt_ASSERT_NOT_REACHED(); return fPlatform.ShowNativeAlert( title, msg, buttonLabels, numButtons, resource ); }
+	virtual void CancelNativeAlert( NativeAlertRef alert, S32 index ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual void SetActivityIndicator( bool visible ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual PlatformWebPopup* GetWebPopup() const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual bool CanShowPopup( const char* name ) const { Rtt_ASSERT_NOT_REACHED(); return false; }
+	virtual bool ShowPopup( lua_State* L, const char* name, int optionsIndex ) const { Rtt_ASSERT_NOT_REACHED(); return false; }
+	virtual bool HidePopup( const char* name ) const { Rtt_ASSERT_NOT_REACHED(); return false; }
+	virtual PlatformDisplayObject* CreateNativeTextBox( const Rect& bounds ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformDisplayObject* CreateNativeTextField( const Rect& bounds ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual void SetKeyboardFocus( PlatformDisplayObject* textObject ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual PlatformDisplayObject* CreateNativeMapView( const Rect& bounds ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformDisplayObject* CreateNativeWebView( const Rect& bounds ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformDisplayObject* CreateNativeVideo( const Rect& bounds ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformFBConnect* GetFBConnect() const { return NULL; }
+	virtual Rtt_Real GetStandardFontSize() const { return Rtt_REAL_0; }
+	virtual S32 GetFontNames( lua_State* L, int index ) const { Rtt_ASSERT_NOT_REACHED(); return -1; }
+	virtual PlatformFont* CreateFont( PlatformFont::SystemFont fontType, Rtt_Real size ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual PlatformFont* CreateFont( const char* fontName, Rtt_Real size ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual void SetTapDelay( Rtt_Real delay ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual Rtt_Real GetTapDelay() const { Rtt_ASSERT_NOT_REACHED(); return Rtt_REAL_0; }
+	virtual void* CreateAndScheduleNotification( lua_State* L, int index ) const { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual void ReleaseNotification( void* notificationId ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual void CancelNotification( void* notificationId ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual void FlurryInit( const char* applicationKey ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual void FlurryEvent( const char* eventId ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual void RuntimeErrorNotification( const char* errorType, const char* message, const char* stacktrace ) const { Rtt_ASSERT_NOT_REACHED(); }
+#ifdef Rtt_AUTHORING_SIMULATOR
+	virtual void SetCursorForRect( const char* cursorName, int x, int y, int width, int height ) const { Rtt_ASSERT_NOT_REACHED(); }
+#endif
+	virtual void SetNativeProperty( lua_State* L, const char* key, int valueIndex ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual int PushNativeProperty( lua_State* L, const char* key ) const { Rtt_ASSERT_NOT_REACHED(); return 0; }
+	virtual int PushSystemInfo( lua_State* L, const char* key ) const { Rtt_ASSERT_NOT_REACHED(); return 0; }
+	virtual void RaiseError( Error e, const char* reason ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual void SetProjectResourceDirectory( const char* filename ) { Rtt_ASSERT_NOT_REACHED(); }
+	virtual void SetSkinResourceDirectory( const char* filename ) { Rtt_ASSERT_NOT_REACHED(); }
+	virtual bool FileExists( const char* filename ) const { Rtt_ASSERT_NOT_REACHED(); return fPlatform.FileExists( filename ); }
+	virtual int SetSync( lua_State* L ) const { Rtt_ASSERT_NOT_REACHED(); return 0; }
+	virtual int GetSync( lua_State* L ) const { Rtt_ASSERT_NOT_REACHED(); return 0; }
+	virtual void BeginRuntime( const Runtime& runtime ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual void EndRuntime( const Runtime& runtime ) const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual PlatformExitCallback* GetExitCallback() { Rtt_ASSERT_NOT_REACHED(); return NULL; }
+	virtual bool RequestSystem( lua_State* L, const char* actionName, int optionsIndex ) const { Rtt_ASSERT_NOT_REACHED(); return false; }
+	virtual void Suspend() const { Rtt_ASSERT_NOT_REACHED(); }
+	virtual void Resume() const { Rtt_ASSERT_NOT_REACHED(); }
+
+	virtual void PathForFile( const char* filename, Directory baseDir, U32 flags, String& result ) const
+	{
+		Rtt_ASSERT( NULL == filename );
+	
+		switch (baseDir)
+		{
+		case MPlatform::kPluginsDir:
+			result.Set( fPluginsDirBase );
+			break;
+		case MPlatform::kResourceDir:
+			result.Set( fResourceDirBase );
+			break;
+		case MPlatform::kSystemResourceDir:
+			result.Set( fSystemResourceDirBase );
+			break;
+		default:
+			Rtt_ASSERT_NOT_REACHED();
+		}
+	}
+
+public:
+	String fPluginsDirBase;
+	String fSystemResourceDirBase;
+	String fResourceDirBase;
+
+private:
+	const MPlatform& fPlatform;
+};
+
 static void
 InitLuaForBuild( lua_State *L, const MPlatform& platform )
 {
@@ -2396,11 +2512,20 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 		void *ud;
 		lua_Alloc alloc = lua_getallocf( L, &ud );
 		
-		LuaContextUserdata contextUD( NULL, fServices.Platform(), runtime );
+		ProxyPlatform proxyPlatform( fServices.Platform() );
+		LuaContextUserdata contextUD( NULL, proxyPlatform, runtime );
 		
+		runtime->Platform().PathForFile( NULL, MPlatform::kPluginsDir, MPlatform::kDefaultPathFlags, proxyPlatform.fPluginsDirBase );
+		runtime->Platform().PathForFile( NULL, MPlatform::kResourceDir, MPlatform::kDefaultPathFlags, proxyPlatform.fResourceDirBase );
+	#if defined( Rtt_MAC_ENV )
+		proxyPlatform.fSystemResourceDirBase.Set( proxyPlatform.fResourceDirBase );
+	#else
+		//
+	#endif
+
 		lua_setallocf( L, alloc, &contextUD );
 		
-		InitLuaForBuild( L, fServices.Platform() );
+		InitLuaForBuild( L, proxyPlatform );
 
 		const std::string &requireFunc = runtime->GetRequireFunction();
 		if ( !requireFunc.empty() )
