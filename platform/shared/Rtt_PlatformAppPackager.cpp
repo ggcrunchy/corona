@@ -1120,25 +1120,22 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 		std::string root( tmpDir, sep - tmpDir + 1 );
 		
 		root += "exDirs";
-		
-		for ( auto&& tempDir : ListOfStringsIter( fTemporaryDirs.GetString() ) )
+
+//		for ( auto&& dirName : ListOfStringsIter( fTransientDirs.GetString() ) )
 		{
-			if ( !result )
+			if ( NULL != state )
 			{
-				break;
+//				state->UpdateRegexState();
 			}
-			else
-			{
-				if ( NULL != state )
-				{
-					state->UpdateRegexState();
-				}
+		
+			std::string path = root;// + "/" + dirName;
 			
-				std::string path = root + "/" + tempDir;
-				
-				result = CompileScriptsInDirectory( fVM, * params, dstDir, path.c_str(), root.c_str() );
+			if ( !CompileScriptsInDirectory( fVM, * params, dstDir, path.c_str(), root.c_str() ) )
+			{
+				result = false;
+//				break;
 			}
-		}
+		}//*/
 	}
 #endif
 
@@ -1948,7 +1945,7 @@ InitLuaForBuild( lua_State *L, const MPlatform& platform )
 static bool
 ResolveClause( const char* str, bool isForFile, std::string& clause )
 {
-	const char * dot = strstr( str, "." );
+	const char * dot = strchr( str, '.' );
 
 	if ( dot && Rtt_StringCompare( dot, ".lua" ) != 0 )
 	{
@@ -1971,6 +1968,13 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 			clause.insert( clause.begin() + pos, '.' );
 			pos += 2;
 			break;
+		case '~':
+			Rtt_ASSERT( 0 == pos );
+			
+			clause[0] = '(';
+			clause.insert( 1, "^(?!" );
+			pos += 5;
+			break;
 		case '?':
 			clause[pos++] = '.';
 			break;
@@ -1983,6 +1987,11 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 		}
 	}
 	
+	if ( '(' == clause[0] )
+	{
+		clause += "$).+$)";
+	}
+	
 	return true;
 }
 
@@ -1990,7 +1999,7 @@ static void
 AuxReadFilter( const char *str, String& filter, bool isForFile )
 {
 	char ch;
-	bool ok = true;
+	bool ok = true, isNewClause = true;
 	
 	for ( int i = 0; ok && str[i]; i++ )
 	{
@@ -2004,27 +2013,33 @@ AuxReadFilter( const char *str, String& filter, bool isForFile )
 		{
 			ok = isForFile;
 		}
+		else if ( '~' == ch )
+		{
+			ok = isNewClause;
+		}
 		else
 		{
-			ok = isalnum( ch ) || '_' == ch || '*' == ch || '?' == ch || ';';
+			ok = isalnum( ch ) || ( '_' == ch ) || ( '*' == ch ) || ( '?' == ch ) || ( ';' == ch );
 		}
+		
+		isNewClause = ( ';' == ch );
 	}
 		
 	if ( ok )
 	{
 		std::string build;
 		
-		for ( auto&& iter : ListOfStringsIter( str ) )
+		for ( auto&& luaForm : ListOfStringsIter( str ) )
 		{
-			std::string clause;
-			if ( ResolveClause( iter.c_str(), isForFile, clause ) )
+			std::string regexForm;
+			if ( ResolveClause( luaForm.c_str(), isForFile, regexForm ) )
 			{
 				if ( !build.empty() )
 				{
 					build += '|';
 				}
 				
-				build += clause;
+				build += regexForm;
 			}
 		}
 
@@ -2037,11 +2052,11 @@ AuxReadFilter( const char *str, String& filter, bool isForFile )
 }
 		
 void
-PlatformAppPackager::ReadFilter( lua_State *L, const char* key, bool isForFile )
+PlatformAppPackager::ReadFilter( lua_State *L, const char* key, String& exclude, bool isForFile )
 {
 	lua_getfield( L, -1, key );
 	
-	String &exclude = isForFile ? fExcludeFiles : fExcludeDirs;
+//	String &exclude = isForFile ? fExcludeFiles : fExcludeDirs;
 	
 	if ( lua_isstring( L, -1 ) )
 	{
@@ -2078,8 +2093,8 @@ PlatformAppPackager::ReadFilterSet( lua_State *L, const char* key, String& dirs 
 			{
 				if ( lua_istable( L, -1 ) )
 				{
-					ReadFilter( L, "excludeDirs", false );
-					ReadFilter( L, "excludeFiles", true );
+				//	ReadFilter( L, "excludeDirs", false );
+				//	ReadFilter( L, "excludeFiles", true );
 				}
 
 				if ( !dirs.IsEmpty() )
@@ -2245,9 +2260,8 @@ PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 		}
 		
 	#if !defined( Rtt_NO_GUI )
-		ReadFilter( L, "luaExcludeFiles", true );
-		ReadFilter( L, "luaExcludeDirs", false );
-		ReadFilterSet( L, "temporaryLuaDirectories", fTemporaryDirs );
+		ReadFilter( L, "luaExcludeFiles", fExcludeFiles, true );
+		ReadFilter( L, "luaExcludeDirs", fExcludeDirs, false );
 	#endif
 		
 		lua_pop( L, 1 ); // pop settings
@@ -2431,7 +2445,7 @@ AddRequireFunc( lua_State *L, const std::string& requireFunc, const std::string&
 		for ( auto&& pluginName : ListOfStringsIter( requiredPlugins.c_str() ) )
 		{
 			lua_pushstring( L, pluginName.c_str() );
-			lua_rawseti( L, -2, index ++ );
+			lua_rawseti( L, -2, index++ );
 		}
 
 		if ( 0 == lua_pcall( L, 1, 0, 0 ) )
@@ -2560,13 +2574,15 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 				
 				std::string root( tmpDir, sep - tmpDir + 1 );
 				
-				root += "exDirs/";
+				root += "exDirs";
 				
 				lua_pushstring( L, root.c_str() );
-				lua_setfield( L, -2, "transientLuaDirs" );
+				lua_setfield( L, -2, "transientLuaBaseDir" );
 				lua_pushstring( L, platform );
-
-				for ( auto&& tempDir : ListOfStringsIter( fTemporaryDirs.GetString() ) )
+				
+				root += "/";
+/*
+				for ( auto&& tempDir : ListOfStringsIter( fTransientDirs.GetString() ) )
 				{
 					std::string segment = root + tempDir;
 					
@@ -2575,7 +2591,7 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 						Rtt_LogException( "Error: failed to make temp directory `%s`", tempDir.c_str() );
 						ok = false;
 					}
-				}
+				}*/
 			
 				if ( 0 != lua_pcall( L, 2, 0, 0 ) )
 				{

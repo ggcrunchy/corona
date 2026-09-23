@@ -22,7 +22,7 @@ stoplist = {
 	"onDemandResources",
 	"strings",
 	"coronaActivityFlags",
-	"temporaryLuaDirectories",
+	"transientLuaDirectories",
 	"entitlements",
 	"xcassets",
 }
@@ -296,7 +296,7 @@ settings =
 	luaExcludeDirs = "",
 	luaExcludeFiles = "",
 
-	temporaryLuaDirectories = {},  -- key-value pairs, key = name, value = { excludeDirs = "", excludeFiles = "" }
+	transientLuaDirectories = {},  -- key-value pairs, key = name, value = { excludeDirs = "", excludeFiles = "" }
 
 	plugins =
 	{

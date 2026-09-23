@@ -323,9 +323,9 @@ class PlatformAppPackager
 	#if !defined( Rtt_NO_GUI )
 		String fExcludeDirs;
 		String fExcludeFiles;
-		String fTemporaryDirs;
+	//	String fTransientDirs;
 		
-		void ReadFilter( lua_State *L, const char *key, bool isForFiles );
+		void ReadFilter( lua_State *L, const char *key, String& exclude, bool isForFiles );
 		void ReadFilterSet( lua_State *L, const char *key, String& dirs );
 		void PrepareFilters( AppPackagerParams* params );
 	#endif
