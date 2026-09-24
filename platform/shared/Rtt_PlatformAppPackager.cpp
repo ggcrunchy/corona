@@ -174,34 +174,22 @@ struct PackagerParamsFilterState {
 	std::regex * fExcludeDirsRegex;
 	
 	static void
-	AuxSetRegex( std::regex* regex, const char **filter )
+	AuxAssignRegex( std::regex* regex, const String& filter )
 	{
-		const char *start = *filter;
-		if ( start )
-		{
-			const char *sep = strchr( start, ';' );
-			
-			Rtt_ASSERT( sep );
-			Rtt_ASSERT( regex );
-			Rtt_ASSERT( *start );
-
-			regex->assign( start, sep - start );
-			
-			*filter = sep + 1;
-		}
+		*regex = ( filter.GetLength() > 0 ) ? filter.GetString() : "";
 	}
 	
 	void BindRegexes( std::regex &excludeFilesRegex, std::regex &excludeDirsRegex )
 	{
-		fExcludeFilesRegex = fExcludeFiles ? &excludeFilesRegex : NULL;
-		fExcludeDirsRegex = fExcludeDirs ? &excludeDirsRegex : NULL;
+		fExcludeFilesRegex = &excludeFilesRegex;
+		fExcludeDirsRegex = &excludeDirsRegex;
 	}
 	
 	void
-	UpdateRegexState()
+	AssignRegexes( const String& excludeFiles, const String& excludeDirs )
 	{
-		AuxSetRegex( fExcludeFilesRegex, &fExcludeFiles );
-		AuxSetRegex( fExcludeDirsRegex, &fExcludeDirs );
+		AuxAssignRegex( fExcludeFilesRegex, excludeFiles );
+		AuxAssignRegex( fExcludeDirsRegex, excludeDirs );
 	}
 	
 	static bool
@@ -1094,7 +1082,7 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 	if ( NULL != state )
 	{
 		state->BindRegexes( excludeFilesRegex, excludeDirsRegex );
-		state->UpdateRegexState();
+		state->AssignRegexes( fExcludeFiles, fExcludeDirs );
 	}
 #endif
 
@@ -1116,26 +1104,22 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 #if !defined( Rtt_NO_GUI )
 	if ( result )
 	{
+		if ( NULL != state )
+		{
+			state->AssignRegexes( fTransientExcludeFiles, fTransientExcludeDirs );
+		}
+	
 		const char *sep = FindLastTempPathComponent( tmpDir );
 		std::string root( tmpDir, sep - tmpDir + 1 );
 		
 		root += "exDirs";
 
-//		for ( auto&& dirName : ListOfStringsIter( fTransientDirs.GetString() ) )
-		{
-			if ( NULL != state )
-			{
-//				state->UpdateRegexState();
-			}
+		std::string path = root;
 		
-			std::string path = root;// + "/" + dirName;
-			
-			if ( !CompileScriptsInDirectory( fVM, * params, dstDir, path.c_str(), root.c_str() ) )
-			{
-				result = false;
-//				break;
-			}
-		}//*/
+		if ( !CompileScriptsInDirectory( fVM, * params, dstDir, path.c_str(), root.c_str() ) )
+		{
+			result = false;
+		}
 	}
 #endif
 
@@ -2056,8 +2040,6 @@ PlatformAppPackager::ReadFilter( lua_State *L, const char* key, String& exclude,
 {
 	lua_getfield( L, -1, key );
 	
-//	String &exclude = isForFile ? fExcludeFiles : fExcludeDirs;
-	
 	if ( lua_isstring( L, -1 ) )
 	{
 		AuxReadFilter( lua_tostring( L, -1 ), exclude, isForFile );
@@ -2067,46 +2049,6 @@ PlatformAppPackager::ReadFilter( lua_State *L, const char* key, String& exclude,
 		Rtt_LogException( "WARNING: expected string for '%s' filter, got %s", key, luaL_typename( L, -1 ) );
 	}
 	
-	exclude.Append( ";" );
-	
-	lua_pop( L, 1 );
-}
-
-void
-PlatformAppPackager::ReadFilterSet( lua_State *L, const char* key, String& dirs )
-{
-	lua_getfield( L, -1, key );
-
-	if ( lua_istable( L, -1 ) )
-	{
-		for ( lua_pushnil( L ); lua_next( L, -2 ); lua_pop( L, 1 ) )
-		{
-			if ( !lua_isstring( L, -2 ) )
-			{
-				Rtt_LogException( "WARNING: Expected string for extra %s directory name, got %s", key, luaL_typename( L, -2 ) );
-			}
-			else if ( !lua_istable( L, -1 ) && ( LUA_TBOOLEAN != lua_type( L, -1 ) || !lua_toboolean( L, -1 ) ) )
-			{
-				Rtt_LogException( "WARNING: Expected table or boolean true for extra %s directory info, got %s", key, luaL_typename( L, -1 ) );
-			}
-			else
-			{
-				if ( lua_istable( L, -1 ) )
-				{
-				//	ReadFilter( L, "excludeDirs", false );
-				//	ReadFilter( L, "excludeFiles", true );
-				}
-
-				if ( !dirs.IsEmpty() )
-				{
-					dirs.Append( ";" );
-				}
-				
-				dirs.Append( lua_tostring( L, -2 ) );
-			}
-		}
-	}
-
 	lua_pop( L, 1 );
 }
 
@@ -2117,7 +2059,7 @@ PlatformAppPackager::PrepareFilters( AppPackagerParams* params )
 	{
 		params->SetFilterState( NULL );
 	}
-	else if ( !fExcludeFiles.IsEmpty() || !fExcludeDirs.IsEmpty() )
+	else if ( !( fExcludeFiles.IsEmpty() && fExcludeDirs.IsEmpty() && fTransientExcludeFiles.IsEmpty() && fTransientExcludeDirs.IsEmpty() ) )
 	{
 		PackagerParamsFilterState *state = (PackagerParamsFilterState *)Rtt_CALLOC( fExcludeFiles.GetAllocator(), 1, sizeof(PackagerParamsFilterState) );
 
@@ -2262,6 +2204,8 @@ PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 	#if !defined( Rtt_NO_GUI )
 		ReadFilter( L, "luaExcludeFiles", fExcludeFiles, true );
 		ReadFilter( L, "luaExcludeDirs", fExcludeDirs, false );
+		ReadFilter( L, "transientLuaExcludeFiles", fTransientExcludeFiles, true );
+		ReadFilter( L, "transientLuaExcludeDirs", fTransientExcludeDirs, false );
 	#endif
 		
 		lua_pop( L, 1 ); // pop settings
@@ -2520,9 +2464,6 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 	{
 		lua_State *L = fVM;
 		int top = lua_gettop( L ), oldRequireRef = LUA_NOREF;
-		
-		// TODO: these next couple steps should be one time only, i.e. guarded by a flag
-		// if / when a "postBuild" or similar comes along
 
 		void *ud;
 		lua_Alloc alloc = lua_getallocf( L, &ud );
@@ -2581,17 +2522,6 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 				lua_pushstring( L, platform );
 				
 				root += "/";
-/*
-				for ( auto&& tempDir : ListOfStringsIter( fTransientDirs.GetString() ) )
-				{
-					std::string segment = root + tempDir;
-					
-					if ( !mkdir( segment.c_str() ) )
-					{
-						Rtt_LogException( "Error: failed to make temp directory `%s`", tempDir.c_str() );
-						ok = false;
-					}
-				}*/
 			
 				if ( 0 != lua_pcall( L, 2, 0, 0 ) )
 				{
