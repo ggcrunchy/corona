@@ -326,6 +326,7 @@ IsDoubleType( CoronaVertexExtensionAttributeType )
     return false; // NYI
 }
 
+// n.b. this fights the MSVC preprocessor, thus the `( snprintf )` nearby...
 #define ARRAY_AND_N( NAME ) NAME, sizeof(NAME)
 
 static const char kAttributePrefix[] = "a_";
@@ -454,7 +455,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
     const char *languageExtensions = shaderResource->GetExtensionPrelude();
 
 	char header_with_resolved_exts[BUFSIZ];
-	snprintf( ARRAY_AND_N( header_with_resolved_exts ), header, languageExtensions ? languageExtensions : "" );
+	( snprintf )( ARRAY_AND_N( header_with_resolved_exts ), header, languageExtensions ? languageExtensions : "" );
 	// ^^^ would be better if just supplying these as sources below, but header is built the way
 	// it is, and extensions need to crowd in there too...
 
@@ -557,7 +558,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
                             version[offset] = shader_source[0][offset];
                         }
                         
-                        snprintf( ARRAY_AND_N( buf ),
+                        ( snprintf )( ARRAY_AND_N( buf ),
                                 "%s\n\n#extension GL_%s_draw_instanced : enable%s",
                                 version, idSuffix, shader_source[0] + offset );
                         
@@ -567,7 +568,7 @@ GLProgram::UpdateShaderSource( Program* program, Program::Version version, Versi
                         // ^^^ TODO: add this to header_with_resolved_exts, above
                     }
                     
-					snprintf( ARRAY_AND_N( buf ),
+					( snprintf )( ARRAY_AND_N( buf ),
 							"\n#define CoronaInstanceID int(gl_InstanceID%s)\n"
 							"\n#define CoronaInstanceFloat float(gl_InstanceID%s)\n\n",
 							idSuffix, idSuffix );
@@ -842,7 +843,7 @@ ClassifySampler( GLenum type )
 	// offset, and also invalidate the result on a bad low byte.
 	U64 mask = ( 1ULL << Min( Max( offset - 5, 0 ), 63 ) ) - 1;
 
-	offset += __builtin_popcountll( 0x7FF00001FE00003ULL & mask );
+	offset += Rtt_Pop64( 0x7FF00001FE00003ULL & mask );
 	offset &= -( hits > 0 );
 
 	// Supply the offset, which might be the second in a pair.

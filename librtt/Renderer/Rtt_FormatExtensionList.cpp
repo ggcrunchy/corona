@@ -477,7 +477,7 @@ FormatExtensionList::Build( Rtt_Allocator* allocator, const CoronaVertexExtensio
 	// * #triples - 1 16-bit offsets (first one has impicit offset 0)
 	// * namesSize bytes for attribute index + name pairs
 	
-	int triplesCount = __builtin_popcount( triplesBits ); // TODO: Windows!
+	int triplesCount = Rtt_Pop16( triplesBits );
 	
 	fLookupData = (U8*)Rtt_MALLOC( L, triplesCount * sizeof(U16) + namesSize );
 
@@ -676,14 +676,14 @@ FormatExtensionList::NamedAttributeIterator::NamedAttributeIterator( const U8* l
 {
 	memcpy( &fTriplesBits, lookupData, sizeof(U16) );
 
-	fNameData = lookupData + __builtin_popcount( fTriplesBits ) * sizeof(U16);
+	fNameData = lookupData + Rtt_Pop16( fTriplesBits ) * sizeof(U16);
 	
 	if ( 0 != specificTriples )
 	{
 		U16 mask = 1U << ( specificTriples - 1 );
 		if ( fTriplesBits & mask )
 		{
-			U16 offsetIndex = __builtin_popcount( fTriplesBits & ( mask - 1 ) );
+			U16 offsetIndex = Rtt_Pop16( fTriplesBits & ( mask - 1 ) );
 			
 			if ( offsetIndex > 0 )
 			{
@@ -711,7 +711,7 @@ FormatExtensionList::NamedAttributeIterator::PrepareTripleCount()
 {
 	U16 lsb = fTriplesBits & -fTriplesBits;
 	
-	fTriples = __builtin_popcount( lsb - 1 ) + 1;
+	fTriples = Rtt_Pop16( lsb - 1 ) + 1;
 	fAttributeIndex = fTriplesBits ? fNameData[fTriples * 3] : 0;
 }
 
