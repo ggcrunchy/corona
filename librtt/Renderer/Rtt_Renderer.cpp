@@ -1690,6 +1690,14 @@ Renderer::CheckAndInsertDrawCommand()
 		if( fGuardDraw.fIsValid )
 		{
 			ShaderResource::ProgramMod mod = fGuardDraw.fIsMod25 ? ShaderResource::k25D : ShaderResource::kDefault;
+
+			// The fallback might be bound without having been drawn with yet, e.g. if
+			// every object so far used a custom effect, so make sure it has a resource.
+			if( !fDefaultPrograms[mod]->fGPUResource )
+			{
+				QueueCreate( fDefaultPrograms[mod] );
+			}
+
 			fBackCommandBuffer->CheckTextureConsistency( fGuardDraw.fPrevious->GetShaderResource(), fDefaultPrograms[mod], &fGuardDraw.fList, fGuardDraw.fNames );
 		}
 		else
