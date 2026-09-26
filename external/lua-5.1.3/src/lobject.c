@@ -23,9 +23,11 @@
 #include "lvm.h"
 
 
-
-const TValue luaO_nilobject_ = {{NULL}, LUA_TNIL};
-
+#if LUA_PACK_VALUE == 0 /* vanilla? */
+  const TValue luaO_nilobject_ = {{NULL}, LUA_TNIL};
+#else
+  const TValue luaO_nilobject_ = { LUA_TVALUE_NIL }; /* NaN boxing */
+#endif
 
 /*
 ** converts an integer to a "floating point byte", represented as

@@ -59,6 +59,20 @@
 #define setthreshold(g)  (g->GCthreshold = (g->estimate/100) * g->gcpause)
 
 
+#ifdef LUA_TBOX /* NaN boxing (64-bit) */
+
+static inline int islargeobjectboxed(const TValue* obj)
+{
+  return (obj->u & LUA_NAN_SIGN_MASK) && LUA_TBOX == getgcobject(obj)->gch.tt;
+}
+
+static inline int typesmatch(const TValue* obj)
+{
+  return ttype(obj) == getgcobject(obj)->gch.tt;
+}
+
+#endif
+
 static void removeentry (Node *n) {
   lua_assert(ttisnil(gval(n)));
   if (iscollectable(gkey(n)))
@@ -70,6 +84,9 @@ static void reallymarkobject (global_State *g, GCObject *o) {
   lua_assert(iswhite(o) && !isdead(g, o));
   white2gray(o);
   switch (o->gch.tt) {
+  #ifdef LUA_TBOX /* NaN boxing (64-bit)? */
+    case LUA_TBOX: /* fallthrough */
+  #endif
     case LUA_TSTRING: {
       return;
     }
@@ -391,6 +408,9 @@ static void freeobj (lua_State *L, GCObject *o) {
       luaM_freemem(L, o, sizestring(gco2ts(o)));
       break;
     }
+  #ifdef LUA_TBOX /* NaN boxing (64-bit)? */
+    case LUA_TBOX: /* fallthrough */
+  #endif
     case LUA_TUSERDATA: {
       luaM_freemem(L, o, sizeudata(gco2u(o)));
       break;

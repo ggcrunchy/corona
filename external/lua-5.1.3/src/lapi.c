@@ -556,6 +556,27 @@ LUA_API void lua_pushboolean (lua_State *L, int b) {
   lua_unlock(L);
 }
 
+#ifdef LUA_TBOX /* NaN boxing (64-bit)? */
+
+/*
+  Pointers only need to resort to boxing in 64-bit builds, where `env'
+  is exactly the right size to store them.
+  The mechanism also makes sense for, say, large 64-bit integers.
+  Since those might also be useful in 32-bit builds, where `env' can
+  only hold half the value, the other half could go into `metatable'.
+*/
+
+static void boxpointer (lua_State *L, TValue *tv, void *p)
+{
+  /* n.b. called within a setpvalue() */
+  luaC_checkGC(L);
+  Udata* box = luaS_newudata(L, 0, NULL);
+  box->uv.env = p; /* read back by `pvalue' */
+  setlargepvalue(L, tv, box);
+}
+
+#endif
+
 
 LUA_API void lua_pushlightuserdata (lua_State *L, void *p) {
   lua_lock(L);

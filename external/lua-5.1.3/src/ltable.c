@@ -73,8 +73,13 @@
 #define dummynode		(&dummynode_)
 
 static const Node dummynode_ = {
+#if LUA_PACK_VALUE == 0 /* vanilla? */
   {{NULL}, LUA_TNIL},  /* value */
   {{{NULL}, LUA_TNIL, NULL}}  /* key */
+#else /* NaN boxing */
+  {LUA_TVALUE_NIL},  /* value */
+  {LUA_TKEY_NIL}     /* key */
+#endif
 };
 
 
@@ -422,7 +427,11 @@ static TValue *newkey (lua_State *L, Table *t, const TValue *key) {
       mp = n;
     }
   }
+#if LUA_PACK_VALUE == 0 /* vanilla? */
   gkey(mp)->value = key->value; gkey(mp)->tt = key->tt;
+#else /* NaN boxing */
+  setobj2t(L, gkey(mp), key); /* NaN-boxing */
+#endif
   luaC_barriert(L, t, key);
   lua_assert(ttisnil(gval(mp)));
   return gval(mp);

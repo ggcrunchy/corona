@@ -11,7 +11,13 @@
 
 
 #define gnode(t,i)	(&(t)->node[i])
-#define gkey(n)		(&(n)->i_key.nk)
+
+#if LUA_PACK_VALUE == 0 /* vanilla? */
+  #define gkey(n)		(&(n)->i_key.nk)
+#else /* NaN boxing */
+  #define gkey(n)		(&(n)->i_key.tvk)
+#endif
+
 #define gval(n)		(&(n)->i_val)
 #define gnext(n)	((n)->i_key.nk.next)
 
