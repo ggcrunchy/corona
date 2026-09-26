@@ -118,7 +118,7 @@ typedef union {
     #define add_sig(tt) ( LUA_NOTNUMBER_SIG | ((tt) + 1) ) /* LUA_TNIL is 0, but need non-0 mask to distinguish from actual NaN */
     #define LUA_TVALUE_NIL {add_sig(LUA_TNIL)}
   #else /* One-time check */
-    error "Bad NaN packing #define constant"
+    #error Bad `LUA_PACK_VALUE` NaN-boxing constant
   #endif
 
   typedef TValuefields TValue;
