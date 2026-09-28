@@ -1778,6 +1778,10 @@ RestoreStack( lua_State *L, int ref )
 	}
 }
 
+#ifdef Rtt_WIN_ENV
+	#undef CreateFont
+#endif
+
 class ProxyPlatform : public MPlatform
 {
 public:
