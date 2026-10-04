@@ -416,6 +416,9 @@ PlatformAppPackager::PlatformAppPackager( const MPlatformServices& services,
 
 PlatformAppPackager::~PlatformAppPackager()
 {
+	Rtt_FREE( fPreBuildFunc );
+	Rtt_FREE( fAppStartFunc );
+
 	Lua::Delete( fVM );
 }
 
