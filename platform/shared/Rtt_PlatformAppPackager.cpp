@@ -172,14 +172,30 @@ struct PackagerParamsFilterState {
 	const char* fExcludeDirs;
 	std::regex * fExcludeFilesRegex;
 	std::regex * fExcludeDirsRegex;
+	bool fHasExcludeFilesFilter;
+	bool fHasExcludeDirsFilter;
 	
-	static void
-	AuxAssignRegex( std::regex* regex, const String& filter )
+	void
+	Reset()
 	{
-		*regex = ( filter.GetLength() > 0 ) ? filter.GetString() : "";
+		fHasExcludeFilesFilter = false;
+		fHasExcludeDirsFilter = false;
 	}
 	
-	void BindRegexes( std::regex &excludeFilesRegex, std::regex &excludeDirsRegex )
+	static bool
+	AuxAssignRegex( std::regex* regex, const String& filter )
+	{
+		bool hasExcludeFilter = ( filter.GetLength() > 0 );
+		if ( hasExcludeFilter )
+		{
+			*regex = filter.GetString();
+		}
+		
+		return hasExcludeFilter;
+	}
+	
+	void
+	BindRegexes( std::regex &excludeFilesRegex, std::regex &excludeDirsRegex )
 	{
 		fExcludeFilesRegex = &excludeFilesRegex;
 		fExcludeDirsRegex = &excludeDirsRegex;
@@ -188,14 +204,14 @@ struct PackagerParamsFilterState {
 	void
 	AssignRegexes( const String& excludeFiles, const String& excludeDirs )
 	{
-		AuxAssignRegex( fExcludeFilesRegex, excludeFiles );
-		AuxAssignRegex( fExcludeDirsRegex, excludeDirs );
+		fHasExcludeFilesFilter = AuxAssignRegex( fExcludeFilesRegex, excludeFiles );
+		fHasExcludeDirsFilter = AuxAssignRegex( fExcludeDirsRegex, excludeDirs );
 	}
 	
 	static bool
 	CanInclude( const char* path, const std::regex *exclude )
 	{
-		if ( NULL == exclude || !std::regex_match( path, *exclude ) )
+		if ( !std::regex_match( path, *exclude ) )
 		{
 			return true;
 		}
@@ -209,13 +225,17 @@ struct PackagerParamsFilterState {
 	bool
 	CanIncludeFile( const char *file ) const
 	{
-		return CanInclude( file, fExcludeFilesRegex );
+		Rtt_ASSERT( !fHasExcludeFilesFilter || ( NULL != fExcludeFilesRegex ) );
+	
+		return !fHasExcludeFilesFilter || CanInclude( file, fExcludeFilesRegex );
 	}
 
 	bool
 	CanIncludeDir( const char *dir ) const
 	{
-		return CanInclude( dir, fExcludeDirsRegex );
+		Rtt_ASSERT( !fHasExcludeDirsFilter || ( NULL != fExcludeDirsRegex ) );
+	
+		return !fHasExcludeDirsFilter || CanInclude( dir, fExcludeDirsRegex );
 	}
 };
 
@@ -403,6 +423,7 @@ PlatformAppPackager::PlatformAppPackager( const MPlatformServices& services,
 #if !defined( Rtt_NO_GUI )
 	fExcludeDirs( & fServices.Platform().GetAllocator() ),
 	fExcludeFiles( & fServices.Platform().GetAllocator() ),
+	fUseFilters( false ),
 #endif
     fPreBuildFunc( NULL ),
     fPreBuildFuncLength( 0 ),
@@ -1084,8 +1105,15 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 
 	if ( NULL != state )
 	{
-		state->BindRegexes( excludeFilesRegex, excludeDirsRegex );
-		state->AssignRegexes( fExcludeFiles, fExcludeDirs );
+		if ( fUseFilters )
+		{
+			state->BindRegexes( excludeFilesRegex, excludeDirsRegex );
+			state->AssignRegexes( fExcludeFiles, fExcludeDirs );
+		}
+		else
+		{
+			state->Reset();
+		}
 	}
 #endif
 
@@ -1107,7 +1135,7 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 #if !defined( Rtt_NO_GUI )
 	if ( result )
 	{
-		if ( NULL != state )
+		if ( NULL != state && fUseFilters )
 		{
 			state->AssignRegexes( fTransientExcludeFiles, fTransientExcludeDirs );
 		}
@@ -2062,19 +2090,12 @@ PlatformAppPackager::ReadFilter( lua_State *L, const char* key, String& exclude,
 void
 PlatformAppPackager::PrepareFilters( AppPackagerParams* params )
 {
-	if ( NULL == params )
-	{
-		params->SetFilterState( NULL );
-	}
-	else if ( !( fExcludeFiles.IsEmpty() && fExcludeDirs.IsEmpty() && fTransientExcludeFiles.IsEmpty() && fTransientExcludeDirs.IsEmpty() ) )
-	{
-		PackagerParamsFilterState *state = (PackagerParamsFilterState *)Rtt_CALLOC( fExcludeFiles.GetAllocator(), 1, sizeof(PackagerParamsFilterState) );
+	Rtt_ASSERT( NULL != params );
+	Rtt_ASSERT( !params->GetFilterState() );
+	
+	PackagerParamsFilterState *newState = (PackagerParamsFilterState *)Rtt_CALLOC( NULL, 1, sizeof(PackagerParamsFilterState) );
 
-		state->fExcludeFiles = !fExcludeFiles.IsEmpty() ? fExcludeFiles.GetString() : NULL;
-		state->fExcludeDirs = !fExcludeDirs.IsEmpty() ? fExcludeDirs.GetString() : NULL;
-		
-		params->SetFilterState( state );
-	}
+	params->SetFilterState( newState );
 }
 
 #endif

@@ -152,6 +152,7 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 			
 	#if !defined( Rtt_NO_GUI )
 		PrepareFilters( params );
+		EnableFilters( true );
 	#endif
 			
         if ( CompileScripts( osxParams, tmpDir ) && ArchiveDirectoryTree(osxParams, tmpDir, tmpResourceCar) )

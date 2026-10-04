@@ -325,7 +325,9 @@ class PlatformAppPackager
 		String fExcludeFiles;
 		String fTransientExcludeDirs;
 		String fTransientExcludeFiles;
+		bool fUseFilters;
 		
+		void EnableFilters( bool newValue ) { fUseFilters = newValue; }
 		void ReadFilter( lua_State *L, const char *key, String& exclude, bool isForFiles );
 		void PrepareFilters( AppPackagerParams* params );
 	#endif

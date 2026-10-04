@@ -132,13 +132,14 @@ TVOSAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 			return PlatformAppPackager::kBuildError;
 		}
 		
-		PrepareFilters( params ); // compiles source first...
+		PrepareFilters( params );
+		EnableFilters( true ); // compiles source first...
 	#endif
 	
 		char* inputFile = Prepackage( params, tmpDir );
 
 	#if !defined( Rtt_NO_GUI )
-		PrepareFilters( NULL ); // ...then plugins?
+		EnableFilters( false ); // ...then plugins?
 	#endif
 
 		if ( inputFile )
