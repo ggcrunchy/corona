@@ -38,7 +38,11 @@
 	#include <sys/stat.h>
 	#include <errno.h>
 
-#if defined(_WIN32)
+	#ifdef Rtt_MAC_ENV
+		#include <copyfile.h>
+	#endif
+
+#if defined(_WIN32) /* ?? */
 	#include <direct.h>   // _mkdir
 #endif
 
@@ -572,41 +576,96 @@ Rtt_EXPORT int Rtt_CopyFile(const char *srcFilePath, const char *dstFilePath)
 
 	DestroyUtf16String(utf16SrcFilePath);
 	DestroyUtf16String(utf16DstFilePath);
+#elif defined( Rtt_MAC_ENV )
+	result = copyfile(srcFilePath, dstFilePath, NULL, COPYFILE_DATA | COPYFILE_STAT);
 #else
 	FILE *inFp = NULL;
 	FILE *outFp = NULL;
-
+	
 	if ((inFp = Rtt_FileOpen(srcFilePath, "rb")) == NULL)
 	{
 		printf("Rtt_CopyFile: failed to open '%s' for reading\n", srcFilePath);
 
-		return 0;
+		/*return*/result = 0;
 	}
 	
-	if ((outFp = Rtt_FileOpen(dstFilePath, "wb")) == NULL)
+	if (result && (outFp = Rtt_FileOpen(dstFilePath, "wb")) == NULL)
 	{
 		printf("Rtt_CopyFile: failed to open '%s' for writing\n", dstFilePath);
 
-		return 0;
+		/*return*/result = 0;
 	}
 
 	char buf[BUFSIZ];
 
 	size_t bytesRead = 0;
-	while ((bytesRead = read(fileno(inFp), buf, BUFSIZ)) > 0)
+	while (result && (bytesRead = read(fileno(inFp), buf, BUFSIZ)) > 0)
 	{
+		int totalWritten = 0;
+		
+		do {
+			int bytesWritten = write(fileno(outFp), buf + totalWritten, bytesRead - totalWritten);
+			if (bytesWritten < 0)
+			{
+				printf("Rtt_CopyFile: write < 0"); // TODO: errno?
+				
+				result = 0;
+				
+				break;
+			}
+			else
+			{
+				totalWritten += bytesWritten;
+			}
+			
+			if ( totalWritten == bytesRead )
+			{
+				break;
+			}
+	/*
 		if (write(fileno(outFp), buf, bytesRead) == 0)
 		{
 			Rtt_FileClose(inFp);
 			Rtt_FileClose(outFp);
 
 			return 0;
-		}
+		}*/
 	}
 
-	Rtt_FileClose(inFp);
-	Rtt_FileClose(outFp);
+	struct stat source_stat;
 
+	if (result && fstat(fileno(inFp), &source_stat) == -1)
+	{
+		printf("Rtt_CopyFile: failed to fstat '%s'", srcFilePath);
+		
+		result = 0;
+	}
+
+	if (result && fflush(outFp) == EOF)
+	{
+		printf("Rtt_CopyFile: failed to flush '%s'", dstFilePath);
+		
+		result = 0;
+	}
+
+	mode_t mode = source_stat.st_mode & 0777;
+
+	if (result && fchmod(fileno(outFp), mode) == -1)
+	{
+		printf("Rtt_CopyFile: failed to fchmod '%s'", dstFilePath);
+		
+		result = 0;
+	}
+
+	if ( inFp )
+	{
+		Rtt_FileClose(inFp);
+	}
+	
+	if ( outFp )
+	{
+		Rtt_FileClose(outFp);
+	}
 #endif
 
 	return result;
@@ -682,6 +741,19 @@ Rtt_EXPORT int Rtt_DeleteFile(const char *filePath)
 	return result;
 }
 
+Rtt_EXPORT int Rtt_IsLink( const char *path )
+{
+	#ifdef Rtt_WIN_ENV
+		struct _stati64 s;
+		lua_wstati64( path, &s );
+	#else
+		struct stat s;
+		lstat( path, &s );
+	#endif
+	
+	return S_ISLNK( s.st_mode );
+}
+
 Rtt_EXPORT int Rtt_IsDirectory(const char *dirPath)
 {
 	bool result = false;
@@ -691,12 +763,15 @@ Rtt_EXPORT int Rtt_IsDirectory(const char *dirPath)
 		result = ::PathIsDirectoryW(path) ? true : false;
 		DestroyUtf16String(path);
 	#else
-		DIR *subdp = opendir(dirPath);
-		if ( subdp )
+		if ( !Rtt_IsLink(dirPath))
 		{
-			closedir( subdp );
-			subdp = NULL;
-			result = true;
+			DIR *subdp = opendir(dirPath);
+			if ( subdp )
+			{
+				closedir( subdp );
+				subdp = NULL;
+				result = true;
+			}
 		}
 	#endif
 
@@ -705,6 +780,13 @@ Rtt_EXPORT int Rtt_IsDirectory(const char *dirPath)
 
 Rtt_EXPORT int Rtt_DeleteDirectory(const char *dirPath)
 {
+	if ( Rtt_IsLink( dirPath ) )
+	{
+		fprintf(stderr, "Rtt_DeleteDirectory: '%s' is a link\n", dirPath);
+	
+		return 0;
+	}
+
 	int result = 0;
 
 	std::vector<std::string> fileList = Rtt_ListFiles(dirPath);

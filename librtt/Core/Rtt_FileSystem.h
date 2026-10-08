@@ -39,6 +39,7 @@ Rtt_EXPORT void Rtt_FileMemoryUnmap(const void *memoryMapPointer, size_t byteCou
 Rtt_EXPORT void Rtt_FileMemoryFlush(const void *memoryMapPointer, size_t byteCount);
 
 Rtt_EXPORT int Rtt_CopyFile(const char *srcFilePath, const char *dstFilePath);
+Rtt_EXPORT int Rtt_IsLink(const char *filePath);
 Rtt_EXPORT int Rtt_IsDirectory(const char *dirPath);
 Rtt_EXPORT int Rtt_MakeDirectory(const char *dirPath);
 Rtt_EXPORT int Rtt_DeleteFile(const char *filePath);
