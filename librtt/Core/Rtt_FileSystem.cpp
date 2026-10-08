@@ -741,18 +741,15 @@ Rtt_EXPORT int Rtt_DeleteFile(const char *filePath)
 	return result;
 }
 
-Rtt_EXPORT int Rtt_IsLink( const char *path )
+#if !defined( Rtt_WIN_ENV)
+
+static bool IsLink( const char *path )
 {
-	#ifdef Rtt_WIN_ENV
-		struct _stati64 s;
-		lua_wstati64( path, &s );
-	#else
-		struct stat s;
-		lstat( path, &s );
-	#endif
-	
-	return S_ISLNK( s.st_mode );
+	struct stat s;
+	return 0 == lstat( path, &s ) && S_ISLNK( s.st_mode );
 }
+
+#endif
 
 Rtt_EXPORT int Rtt_IsDirectory(const char *dirPath)
 {
@@ -763,7 +760,7 @@ Rtt_EXPORT int Rtt_IsDirectory(const char *dirPath)
 		result = ::PathIsDirectoryW(path) ? true : false;
 		DestroyUtf16String(path);
 	#else
-		if ( !Rtt_IsLink(dirPath))
+		if ( !IsLink(dirPath) )
 		{
 			DIR *subdp = opendir(dirPath);
 			if ( subdp )
@@ -778,11 +775,34 @@ Rtt_EXPORT int Rtt_IsDirectory(const char *dirPath)
 	return result;
 }
 
+static bool CanDeleteLikeDirectory( const char *path )
+{
+	#ifdef Rtt_WIN_ENV
+		wchar_t *wpath = CreateUtf16StringFrom(path);
+		DWORD attribs = GetFileAttributesW(wpath);
+		DestroyUtf16String(wpath);
+
+		if ( INVALID_FILE_ATTRIBUTES == attribs )
+		{
+			return false;
+		}
+		else
+		{
+			bool isDirectory = !!( attribs & FILE_ATTRIBUTE_DIRECTORY );
+			bool isReparsePoint = !!( attribs & FILE_ATTRIBUTE_REPARSE_POINT );
+			
+			return isDirectory && !isReparsePoint;
+		}
+	#else
+		return Rtt_IsDirectory( path );
+	#endif
+}
+
 Rtt_EXPORT int Rtt_DeleteDirectory(const char *dirPath)
 {
-	if ( Rtt_IsLink( dirPath ) )
+	if ( !CanDeleteLikeDirectory( dirPath ) )
 	{
-		fprintf(stderr, "Rtt_DeleteDirectory: '%s' is a link\n", dirPath);
+		fprintf(stderr, "Rtt_DeleteDirectory: '%s' is not a directory, or also has reparse point attribute\n", dirPath);
 	
 		return 0;
 	}
@@ -794,12 +814,13 @@ Rtt_EXPORT int Rtt_DeleteDirectory(const char *dirPath)
 	for (std::vector<std::string>::iterator it = fileList.begin(); it != fileList.end(); ++it)
 	{
 		const char* path = it->c_str();
-
+/*
+already done by Rtt_ListFiles and breaks for patterns like "./something"
 		if (strncmp(path, ".", 1) == 0 || strncmp(path, "..", 2) == 0)
 		{
 			continue;
 		}
-
+*/
 		if (Rtt_IsDirectory(path))
 		{
 			result = Rtt_DeleteDirectory(path);
@@ -820,7 +841,10 @@ Rtt_EXPORT int Rtt_DeleteDirectory(const char *dirPath)
 		}
 	}
 
-	result = rmdir(dirPath) == 0;
+	if ( 0 != result )
+	{
+		result = rmdir(dirPath) == 0;
+	}
 
 	return result;
 }
@@ -971,6 +995,64 @@ Rtt_EXPORT char *Rtt_MakeTempDirectory(char *tmpDirTemplate)
 	{
 		return NULL;
 	}
+	
+	/*
+		bool found = false;
+		
+		// archive (where this has been called) seems to do GetTempPath2W() and then we just throw away the template?
+		// ensure backslash, etc.
+			// or can we just assume it ends in XXXX...?
+		
+		if (IsWindows7OrGreater())
+		{
+			U8 random[16]; // or 6, for Xs?
+
+			// do <bcrypt.h> and #pragma comment(lib, "bcrypt.lib") further up
+
+			for ( int i = 0; ( i < 64 ) && !found; i++ )
+			{
+				NTSTATUS status = BCryptGenRandom(NULL, random, sizeof(random), BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+				if ( status < 0 )
+				{
+					// gen failure
+		
+				}
+				
+				const wchar_t hex[] = L"0123456789abcdef";
+				// path = Xs
+				
+				for (int j = 0; j < sizeof(random); j++)
+				{
+					path += hex[b / 16];
+					path += hex[b % 16];
+				}
+				// ^^^ sub out Xs
+				
+				if ( CreateDirectoryW( path, NULL ) )
+				{
+					// found!
+					// return path
+				}
+				else
+				{
+					DWORD err = GetLastError();
+					
+					if ( ( ERROR_ALREADY_EXISTS == err ) || ( ERROR_FILE_EXISTS == err ) )
+					{
+						continue;
+					}
+					else
+					{
+						// more serious...
+						return NULL;
+					}
+				}
+			}
+		}
+		
+		// not found...
+			wyrand()? or just fall back to the current behavior?
+	*/
 #else
 	return mkdtemp(tmpDirTemplate);
 #endif
