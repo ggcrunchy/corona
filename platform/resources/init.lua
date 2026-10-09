@@ -992,7 +992,9 @@ end
 -- trigger the first `if` in require(), where the preserved functions table is
 -- missing; this is used to instantiate slightly more minimal require() regimes
 -- in temporary states created for build callbacks.
-_requireDumped = string.dump(require)
+if "simulator" == system.getInfo( "environment" ) then
+	_requireDumped = string.dump(require)
+end
 
 -- luacheck: pop
 

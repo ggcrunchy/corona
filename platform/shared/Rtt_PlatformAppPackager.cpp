@@ -2399,7 +2399,8 @@ AddSystemLib( lua_State *L )
 		{ NULL, NULL },
 	};
 	
-	luaL_register( L, "system", funcs );
+	luaL_register( L, NULL, funcs );
+	lua_setfield( L, -2, "system" );
 }
 
 static int
@@ -2412,47 +2413,34 @@ AddRequireFunc( lua_State *L, const std::string& requireFunc, const std::string&
 	}
 	else
 	{
-		lua_pushvalue( L, -1 );
-		lua_newtable( L );
+		lua_pushvalue( L, -1 ); // env, require, require
+		lua_setfield( L, -3, "require" ); // env = { require = require }, require
+		lua_newtable( L ); // env, require, pluginsList
 
 		int index = 1;
 		for ( auto&& pluginName : ListOfStringsIter( requiredPlugins.c_str() ) )
 		{
-			lua_pushstring( L, pluginName.c_str() );
-			lua_rawseti( L, -2, index++ );
+			lua_pushstring( L, pluginName.c_str() ); // env, require, pluginsList, pluginName
+			lua_rawseti( L, -2, index++ ); // env, require, pluginsList = { ..., pluginName }
 		}
 
-		if ( 0 == lua_pcall( L, 1, 0, 0 ) )
+		if ( 0 == lua_pcall( L, 1, 0, 0 ) ) // env
 		{
-			lua_getglobal( L, "require" );
+			lua_getfield( L, -1, "require" ); // env, require
+			lua_pushvalue( L, -2 ); // env, require, env
+			lua_setfenv( L, -2 ); // env, require; require.environment = env
+			lua_pop( L, 1 ); // env
+		
+			AddSystemLib( L ); // env = { require, system }
 			
-			int oldRequire = lua_ref( L, 1 );
-			
-			lua_setglobal( L, "require" );
-			
-			AddSystemLib( L );
-			
-			return oldRequire;
+			return true;
 		}
 		else
 		{
 			Rtt_LogException( "Error: failed to initialize custom require: %s", lua_tostring( L, -1 ) );
-			return LUA_REFNIL;
+			return false;
 		}
 	}
-}
-
-static void
-RestoreRequire( lua_State *L, int oldRequireRef )
-{
-	if ( LUA_NOREF != oldRequireRef && LUA_REFNIL != oldRequireRef )
-	{
-		lua_getref( L, oldRequireRef );
-		lua_setglobal( L, "require" );
-	}
-	
-	lua_pushnil( L );
-	lua_setglobal( L, "system" );
 }
 
 static void
@@ -2493,7 +2481,7 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 	if ( 0 != fPreBuildFuncLength )
 	{
 		lua_State *L = fVM;
-		int top = lua_gettop( L ), oldRequireRef = LUA_NOREF;
+		int top = lua_gettop( L );
 
 		void *ud;
 		lua_Alloc alloc = lua_getallocf( L, &ud );
@@ -2513,43 +2501,34 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 		
 		InitLuaForBuild( L, proxyPlatform );
 
+		lua_newtable( L ); // ..., env
+
 		const std::string &requireFunc = runtime->GetRequireFunction();
 		if ( !requireFunc.empty() )
 		{
-			oldRequireRef = AddRequireFunc( L, requireFunc, runtime->GetRequiredPlugins() );
-
-			if ( LUA_REFNIL == oldRequireRef )
-			{
-				ok = false;
-			}
+			ok = AddRequireFunc( L, requireFunc, runtime->GetRequiredPlugins() ); // ..., env
 		}
 		
 		if ( ok )
 		{
-			if ( 0 != luaL_loadbuffer( L, fPreBuildFunc, fPreBuildFuncLength, "preBuild" ) )
+			if ( 0 != luaL_loadbuffer( L, fPreBuildFunc, fPreBuildFuncLength, "preBuild" ) ) // ..., env[, preBuild]
 			{
 				Rtt_LogException( "Error: failed to load `preBuild`" );
 				ok = false;
 			}
 			else
 			{
+				lua_insert( L, -2 ); // ..., preBuild, env
+				lua_createtable( L, 0, 1 ); // ..., preBuild, env, env_mt
+				lua_pushvalue( L, LUA_GLOBALSINDEX ); // ..., preBuild, env, env_mt, _G
+				lua_setfield( L, -2, "__index" ); // ..., preBuild, env, env_mt = { __index = _G }
+				lua_setmetatable( L, -2 ); // ..., preBuild, env; env.metatable = env_mt
+				lua_setfenv( L, -2 ); // ..., preBuild; preBuild.environment = env
+	
 				lua_newtable( L );
 				lua_pushstring( L, srcDir );
 				lua_setfield( L, -2, "srcDir" );
-				/*
-				lua_pushstring( L, tmpDir );
-				lua_setfield( L, -2, "dstDir" );
-				
-				const char *sep = FindLastTempPathComponent( tmpDir );
-				
-				Rtt_ASSERT( sep );
-				
-				std::string root( tmpDir, sep - tmpDir + 1 );
-				
-				root += "exDirs";
-				
-				lua_pushstring( L, root.c_str() );
-				lua_setfield( L, -2, "transientLuaBaseDir" );*/
+
 				if ( stageDir )
 				{
 					lua_pushstring( L, stageDir );
@@ -2558,8 +2537,6 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 				
 				lua_pushstring( L, platform );
 				
-	//			root += "/";
-			
 				if ( 0 != lua_pcall( L, 2, 0, 0 ) )
 				{
 					Rtt_LogException( "Error: `preBuild` failed with `%s`", lua_tostring( L, -1 ) );
@@ -2567,8 +2544,6 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 				}
 			}
 		}
-		
-		RestoreRequire( L, oldRequireRef );
 		
 		lua_setallocf( L, alloc, ud );
 		lua_settop( L, top );

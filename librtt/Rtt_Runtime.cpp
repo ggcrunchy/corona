@@ -1336,6 +1336,7 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 		}
 		else
 		{
+		#ifdef Rtt_AUTHORING_SIMULATOR
 			lua_getglobal( L, "_requireDumped" );
 			if ( lua_isstring( L, -1 ) )
 			{
@@ -1348,6 +1349,7 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 				Rtt_LogException( "Error: failed to find valid '_requireDumped'" );	
 			}
 			lua_pop( L, 1 );
+		#endif
 		
 			int result = LUA_ERRFILE;
 			if ( ! IsProperty( kIsApplicationNotArchived ) )
