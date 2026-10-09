@@ -259,7 +259,7 @@ int WebAppPackager::Build(AppPackagerParams* params, const char* tmpDirBase)
 
 	#if !defined( Rtt_NO_GUI )
 		Runtime *runtime = params->GetRuntime();
-		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, "web" ) )
+		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, NULL, "web" ) )
 		{
 			return PlatformAppPackager::kBuildError;
 		}

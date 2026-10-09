@@ -126,7 +126,7 @@ IOSAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 	{
 	#if !defined( Rtt_NO_GUI )
 		Runtime *runtime = params->GetRuntime();
-		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, "iphone" ) )
+		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, NULL, "iphone" ) )
 		{
 			return PlatformAppPackager::kBuildError;
 		}

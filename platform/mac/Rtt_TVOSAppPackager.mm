@@ -127,7 +127,7 @@ TVOSAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 	{
 	#if !defined( Rtt_NO_GUI )
 		Runtime *runtime = params->GetRuntime();
-		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, "tvos" ) )
+		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, NULL, "tvos" ) )
 		{
 			return PlatformAppPackager::kBuildError;
 		}

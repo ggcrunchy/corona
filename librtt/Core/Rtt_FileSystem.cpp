@@ -577,7 +577,7 @@ Rtt_EXPORT int Rtt_CopyFile(const char *srcFilePath, const char *dstFilePath)
 	DestroyUtf16String(utf16SrcFilePath);
 	DestroyUtf16String(utf16DstFilePath);
 #elif defined( Rtt_MAC_ENV )
-	result = copyfile(srcFilePath, dstFilePath, NULL, COPYFILE_DATA | COPYFILE_STAT);
+	result = copyfile(srcFilePath, dstFilePath, NULL, COPYFILE_DATA | COPYFILE_STAT) == 0;
 #else
 	FILE *inFp = NULL;
 	FILE *outFp = NULL;
@@ -598,16 +598,16 @@ Rtt_EXPORT int Rtt_CopyFile(const char *srcFilePath, const char *dstFilePath)
 
 	char buf[BUFSIZ];
 
-	size_t bytesRead = 0;
+	ssize_t bytesRead = 0;
 	while (result && (bytesRead = read(fileno(inFp), buf, BUFSIZ)) > 0)
 	{
-		int totalWritten = 0;
+		ssize_t totalWritten = 0;
 		
 		do {
 			int bytesWritten = write(fileno(outFp), buf + totalWritten, bytesRead - totalWritten);
-			if (bytesWritten < 0)
+			if (bytesWritten <= 0)
 			{
-				printf("Rtt_CopyFile: write < 0"); // TODO: errno?
+				printf("Rtt_CopyFile: %s\n", strerror(errno));
 				
 				result = 0;
 				
@@ -617,11 +617,6 @@ Rtt_EXPORT int Rtt_CopyFile(const char *srcFilePath, const char *dstFilePath)
 			{
 				totalWritten += bytesWritten;
 			}
-			
-			if ( totalWritten == bytesRead )
-			{
-				break;
-			}
 	/*
 		if (write(fileno(outFp), buf, bytesRead) == 0)
 		{
@@ -630,6 +625,7 @@ Rtt_EXPORT int Rtt_CopyFile(const char *srcFilePath, const char *dstFilePath)
 
 			return 0;
 		}*/
+		} while ( totalWritten < bytesWritten );
 	}
 
 	struct stat source_stat;
@@ -641,16 +637,7 @@ Rtt_EXPORT int Rtt_CopyFile(const char *srcFilePath, const char *dstFilePath)
 		result = 0;
 	}
 
-	if (result && fflush(outFp) == EOF)
-	{
-		printf("Rtt_CopyFile: failed to flush '%s'", dstFilePath);
-		
-		result = 0;
-	}
-
-	mode_t mode = source_stat.st_mode & 0777;
-
-	if (result && fchmod(fileno(outFp), mode) == -1)
+	if (result && fchmod(fileno(outFp), ( source_stat.st_mode & 0777 )) == -1)
 	{
 		printf("Rtt_CopyFile: failed to fchmod '%s'", dstFilePath);
 		
@@ -807,7 +794,7 @@ Rtt_EXPORT int Rtt_DeleteDirectory(const char *dirPath)
 		return 0;
 	}
 
-	int result = 0;
+	int result = 1/*0*/;
 
 	std::vector<std::string> fileList = Rtt_ListFiles(dirPath);
 

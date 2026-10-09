@@ -204,7 +204,7 @@ namespace Rtt
 
 	#if !defined( Rtt_NO_GUI )
 		Runtime *runtime = params->GetRuntime();
-		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, "linux" ) )
+		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, NULL, "linux" ) )
 		{
 			return PlatformAppPackager::kBuildError;
 		}

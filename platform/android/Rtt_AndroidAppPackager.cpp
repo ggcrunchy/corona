@@ -245,7 +245,7 @@ AndroidAppPackager::Build( AppPackagerParams * params, const char * tmpDirBase )
 	{
 	#if !defined( Rtt_NO_GUI )
 		Runtime *runtime = params->GetRuntime();
-		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, "android" ) )
+		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, NULL, "android" ) )
 		{
 			return PlatformAppPackager::kBuildError;
 		}
@@ -598,7 +598,7 @@ AndroidAppPackager::Prepackage( AppPackagerParams * params, const char * tmpDir 
 		Rtt_Log("Prepackage: Compiling Lua ...");
 	}
 	
-	if ( CompileScripts( params, tmpDir ) && CreateBuildProperties( * params, tmpDir ) )
+	if ( CompileScripts( params, tmpDir, NULL /* TODO */ ) && CreateBuildProperties( * params, tmpDir ) )
 	{
 		if (! Rtt_StringIsEmpty(GetSplashImageFile()))
 		{

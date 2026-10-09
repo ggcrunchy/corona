@@ -203,7 +203,7 @@ class PlatformAppPackager
 
 	protected:
 		virtual char* Prepackage( AppPackagerParams * params, const char* tmpDir );
-		bool CompileScripts( AppPackagerParams * params, const char* tmpDir );
+		bool CompileScripts( AppPackagerParams * params, const char* tmpDir, const char* stageDir );
 
 		/**
 		 * Archives all files in a given directory tree to a "resource.car" file.
@@ -301,7 +301,7 @@ class PlatformAppPackager
 
 	public:
 	#if !defined( Rtt_NO_GUI )
-		bool DoPreBuild( Runtime *runtime, const char* srcDir, const char* tmpDir, const char* platform );
+		bool DoPreBuild( Runtime *runtime, const char* srcDir, const char* tmpDir, const char* stageDir, const char* platform );
 	#endif
 
 	protected:

@@ -554,7 +554,7 @@ PlatformAppPackager::Prepackage( AppPackagerParams * params, const char* tmpDir 
 	}
 
 	// Build *.lu into tmpDir
-	if ( CompileScripts( params, tmpDir ) )
+	if ( CompileScripts( params, tmpDir, NULL /* TODO? */ ) )
 	{
 		// Compress files in tmpDir into a file kDstName and place it in tmpDir
 		const char kDstName[] = "input.zip";
@@ -1078,7 +1078,7 @@ static const char* FindLastTempPathComponent( const char *tmpDir )
 #endif
 
 bool
-PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmpDir )
+PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmpDir, const char* stageDir )
 {
 #if 0
 	const char* srcDir = params->GetSrcDir();
@@ -1135,17 +1135,17 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 #endif
 
 #if !defined( Rtt_NO_GUI )
-	if ( result )
+	if ( result && stageDir )
 	{
 		if ( NULL != state && fUseFilters )
 		{
 			state->AssignRegexes( fTransientExcludeFiles, fTransientExcludeDirs );
 		}
 	
-		const char *sep = FindLastTempPathComponent( tmpDir );
-		std::string root( tmpDir, sep - tmpDir + 1 );
+//		const char *sep = FindLastTempPathComponent( tmpDir );
+		std::string root = stageDir;
 		
-		root += "exDirs";
+		root += "/lua";
 
 		std::string path = root;
 		
@@ -2486,7 +2486,7 @@ AddFile( lua_State *L, const char *code, size_t codeLength, const char *root, co
 }
 
 bool
-PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const char* tmpDir, const char* platform )
+PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const char* tmpDir, const char* stageDir, const char* platform )
 {
 	bool ok = true;
 		
@@ -2536,6 +2536,7 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 				lua_newtable( L );
 				lua_pushstring( L, srcDir );
 				lua_setfield( L, -2, "srcDir" );
+				/*
 				lua_pushstring( L, tmpDir );
 				lua_setfield( L, -2, "dstDir" );
 				
@@ -2548,10 +2549,16 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 				root += "exDirs";
 				
 				lua_pushstring( L, root.c_str() );
-				lua_setfield( L, -2, "transientLuaBaseDir" );
+				lua_setfield( L, -2, "transientLuaBaseDir" );*/
+				if ( stageDir )
+				{
+					lua_pushstring( L, stageDir );
+					lua_setfield( L, -2, "stageDir" );
+				}
+				
 				lua_pushstring( L, platform );
 				
-				root += "/";
+	//			root += "/";
 			
 				if ( 0 != lua_pcall( L, 2, 0, 0 ) )
 				{

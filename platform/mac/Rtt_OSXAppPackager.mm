@@ -125,6 +125,13 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
     snprintf( cmd, kDefaultNumBytes, kCmdFormat, tmpDir );*/
     char *tmpResult = Rtt_MakeTempDirectory( tmpDir );
     
+    char stageDir[kDefaultNumBytes + 1], *stageResult = NULL;
+#if !defined( Rtt_NO_GUI )
+	snprintf( stageDir, kDefaultNumBytes, "%s%s", tmpDirBase, "stageXXXXXX" );
+	
+	stageResult = Rtt_MakeTempDirectory( stageDir );
+#endif
+
     const char kTmpResourceCarFormat[] = "%s-resource.car";
     char tmpResourceCar[kDefaultNumBytes + 1]; Rtt_ASSERT( kDefaultNumBytes > ( sizeof( kTmpResourceCarFormat ) + tmpDirLen ) );
     snprintf( tmpResourceCar, kDefaultNumBytes, kTmpResourceCarFormat, tmpDir );
@@ -142,7 +149,7 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 
 	#if !defined( Rtt_NO_GUI )
 		Runtime *runtime = params->GetRuntime();
-		if ( !DoPreBuild( runtime, osxParams->GetSrcDir(), tmpDir, "mac" ) )
+		if ( !DoPreBuild( runtime, osxParams->GetSrcDir(), tmpDir, stageResult, "mac" ) )
 		{
 			return PlatformAppPackager::kBuildError;
 		}
@@ -158,7 +165,7 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 		EnableFilters( true );
 	#endif
 			
-        if ( CompileScripts( osxParams, tmpDir ) && ArchiveDirectoryTree(osxParams, tmpDir, tmpResourceCar) )
+        if ( CompileScripts( osxParams, tmpDir, stageResult ) && ArchiveDirectoryTree(osxParams, tmpDir, tmpResourceCar) )
         {
             lua_State *L = fVM;
             lua_getglobal( L, "OSXPostPackage" ); Rtt_ASSERT( lua_isfunction( L, -1 ) );
@@ -249,7 +256,13 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 		snprintf( cmd, kDefaultNumBytes, "rm -rf \"%s\"", tmpDir );
 		(void)Rtt_VERIFY( 0 == system( cmd ) );*/
 		(void)Rtt_VERIFY( rmdir( tmpDir ) );
-		// TODO: clean up staging directory too, if present...
+		(void)Rtt_VERIFY( rmdir( tmpPluginsDir ) );
+		(void)Rtt_VERIFY( rmdir( tmpResourceCar ) );
+		
+		if ( stageResult )
+		{
+			(void)Rtt_VERIFY( rmdir( stageResult ) );
+		}
 	}
 
     // Indicate status in the console
@@ -338,7 +351,7 @@ OSXAppPackager::PrepackagePlugins(OSXAppPackagerParams *params, String& pluginsD
 		// Note: Compiling already compiled Lua works fine, the result will be stripped
 		OSXAppPackagerParams pluginParamsSettings(params->GetAppName(), "", pluginsDir.GetString(), outputDir.GetString());
 
-		bool wasCompiled = CompileScripts(&pluginParamsSettings, outputDir.GetString());
+		bool wasCompiled = CompileScripts(&pluginParamsSettings, outputDir.GetString(), NULL);
 
 		if (!wasCompiled)
 		{
@@ -373,7 +386,7 @@ OSXAppPackager::PrepackagePlugins(OSXAppPackagerParams *params, String& pluginsD
 	// OSXPostPackage picks up the compiled .lu files alongside the native dylibs.
 	OSXAppPackagerParams pluginParamsSettings(params->GetAppName(), "", pluginsDir.GetString(), outputDir.GetString());
 
-	bool wasCompiled = CompileScripts(&pluginParamsSettings, outputDir.GetString());
+	bool wasCompiled = CompileScripts(&pluginParamsSettings, outputDir.GetString(), NULL);
 	if (!wasCompiled)
 	{
 		if (Rtt_StringIsEmpty(pluginParamsSettings.GetBuildMessage()))
