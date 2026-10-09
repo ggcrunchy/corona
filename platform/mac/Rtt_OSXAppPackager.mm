@@ -29,6 +29,8 @@ class Rtt::MacSimulatorServices
 #include "Rtt_MPlatformServices.h"
 #include "Rtt_Runtime.h"
 
+#include "Rtt_FileSystem.h"
+
 #include "XcodeToolHelper.h"
 
 #include <string.h>
@@ -115,19 +117,20 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 
 	const char tmpTemplate[] = "CLtmpXXXXXX";
 	char tmpDir[kDefaultNumBytes + 1]; Rtt_ASSERT( kDefaultNumBytes > ( strlen( tmpDirBase ) + strlen( tmpTemplate ) ) );
-	int tmpDirLen = snprintf( tmpDir, kDefaultNumBytes, "%s%s", tmpDirBase, tmpTemplate );
+	int tmpDirLen = snprintf( tmpDir, kDefaultNumBytes, "%s%s", tmpDirBase, tmpTemplate );/*
 	mktemp(tmpDir);
-	
+
     const char kCmdFormat[] = "mkdir -p %s";
     char cmd[kDefaultNumBytes + 1]; Rtt_ASSERT( kDefaultNumBytes > ( sizeof( kCmdFormat ) + tmpDirLen ) );
-    snprintf( cmd, kDefaultNumBytes, kCmdFormat, tmpDir );
+    snprintf( cmd, kDefaultNumBytes, kCmdFormat, tmpDir );*/
+    char *tmpResult = Rtt_MakeTempDirectory( tmpDir );
     
     const char kTmpResourceCarFormat[] = "%s-resource.car";
     char tmpResourceCar[kDefaultNumBytes + 1]; Rtt_ASSERT( kDefaultNumBytes > ( sizeof( kTmpResourceCarFormat ) + tmpDirLen ) );
     snprintf( tmpResourceCar, kDefaultNumBytes, kTmpResourceCarFormat, tmpDir );
     
     // Create the temporary directory
-	if ( Rtt_VERIFY( 0 == system( cmd ) ) )
+	if ( Rtt_VERIFY( tmpResult/*0 == system( cmd )*/ ) )
 	{
         osxParams->SetIncludeBuildSettings(true);
 		
@@ -242,9 +245,11 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
         }
 
 		// Clean up intermediate files
-		Rtt_ASSERT(strcmp(tmpDir, "/") != 0);
+		Rtt_ASSERT(strcmp(tmpDir, "/") != 0);/*
 		snprintf( cmd, kDefaultNumBytes, "rm -rf \"%s\"", tmpDir );
-		(void)Rtt_VERIFY( 0 == system( cmd ) );
+		(void)Rtt_VERIFY( 0 == system( cmd ) );*/
+		(void)Rtt_VERIFY( rmdir( tmpDir ) );
+		// TODO: clean up staging directory too, if present...
 	}
 
     // Indicate status in the console

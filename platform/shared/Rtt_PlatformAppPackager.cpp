@@ -241,7 +241,7 @@ struct PackagerParamsFilterState {
 
 #endif
 
-#define kDefaultNumBytes 128
+#define kDefaultNumBytes 1024 /*128*/
 
 AppPackagerParams::AppPackagerParams( const char* appName, 
 	const char* version,
@@ -462,7 +462,7 @@ PlatformAppPackager::mkdir( const char *sDir )
 	Rtt_ASSERT( kDefaultNumBytes > ( sizeof( kCmdFormat ) + strlen( sDir ) ) );
 	snprintf( cmd, kDefaultNumBytes, kCmdFormat, sDir );
     int result = system( cmd );
-	if (0 == result)
+	if ( 0 == result )
 	{
 		hasSucceeded = true;
 	}
@@ -505,6 +505,8 @@ PlatformAppPackager::rmdir( const char *sDir )
 	snprintf( cmd, kDefaultNumBytes, "rm -rf \"%s\"", sDir );
     result = system( cmd );
 #endif
+	// TODO: can this just use Rtt_DeleteDirectory()?
+		// or rather, how can we modify things to allow for that?
 
 	return (0 == result);
 }
