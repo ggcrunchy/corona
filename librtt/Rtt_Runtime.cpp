@@ -1382,8 +1382,6 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 		
 			SetStartFunction( "" );
 		}
-
-		lua_pushnil( L );
 		
 		const char *tempGlobals[] = { "_callStartFunction", "_requireDumped" };
 		for ( const char *name : tempGlobals )

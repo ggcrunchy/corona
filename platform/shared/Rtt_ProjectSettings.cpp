@@ -340,6 +340,10 @@ bool ProjectSettings::LoadFromDirectory(const char* directoryPath)
 			}
 			else if ( result > 0 )
 			{
+			#ifdef Rtt_AUTHORING_SIMULATOR
+				Rtt_ASSERT_NOT_REACHED();
+			#endif
+
 				fStartFunc.assign( lua_tostring( luaStatePointer, -1 ), lua_objlen( luaStatePointer, -1 ) );
 				
 				lua_pop( luaStatePointer, 1 );

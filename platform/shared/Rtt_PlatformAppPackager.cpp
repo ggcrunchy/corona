@@ -1051,32 +1051,6 @@ ReplaceMainLuaWithLiveDebug( lua_State *L, AppPackagerParams& params, const char
 	return res;
 }
 
-#if !defined( Rtt_NO_GUI )
-
-static const char* FindLastTempPathComponent( const char *tmpDir )
-{
-	const char *slash = strrchr( tmpDir, '/' );
-
-#ifdef _WIN32
-	const char *backslash = strrchr( tmpDir, '\\' );
-	
-	Rtt_ASSERT( slash || backslash );
-	
-	if ( NULL == slash || backslash > slash )
-	{
-		return backslash;
-	}
-	else
-#endif
-	{
-		Rtt_ASSERT( slash );
-
-		return slash;
-	}
-}
-
-#endif
-
 bool
 PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmpDir, const char* stageDir )
 {
@@ -1142,7 +1116,6 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 			state->AssignRegexes( fTransientExcludeFiles, fTransientExcludeDirs );
 		}
 	
-//		const char *sep = FindLastTempPathComponent( tmpDir );
 		std::string root = stageDir;
 		
 		root += "/lua";
@@ -2019,14 +1992,16 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 static void
 AuxReadFilter( const char *str, String& filter, bool isForFile )
 {
-	char ch;
+	char ch = '\0';
 	bool ok = true, isNewClause = true;
 	
 	for ( int i = 0; ok && str[i]; i++ )
 	{
 		ch = str[i];
 		
-		if ( isdigit( ch ) )
+		unsigned char uch = static_cast<unsigned char> ( ch ); // n.b. is*() undefined for negative values
+		
+		if ( isdigit( uch ) )
 		{
 			ok = i; // n.b. false on i == 0
 		}
@@ -2040,7 +2015,7 @@ AuxReadFilter( const char *str, String& filter, bool isForFile )
 		}
 		else
 		{
-			ok = isalnum( ch ) || ( '_' == ch ) || ( '*' == ch ) || ( '?' == ch ) || ( ';' == ch );
+			ok = isalnum( uch ) || ( '_' == ch ) || ( '*' == ch ) || ( '?' == ch ) || ( ';' == ch );
 		}
 		
 		isNewClause = ( ';' == ch );
@@ -2053,7 +2028,11 @@ AuxReadFilter( const char *str, String& filter, bool isForFile )
 		for ( auto&& luaForm : ListOfStringsIter( str ) )
 		{
 			std::string regexForm;
-			if ( ResolveClause( luaForm.c_str(), isForFile, regexForm ) )
+			if ( luaForm.empty() )
+			{
+				continue;
+			}
+			else if ( ResolveClause( luaForm.c_str(), isForFile, regexForm ) )
 			{
 				if ( !build.empty() )
 				{
@@ -2064,17 +2043,19 @@ AuxReadFilter( const char *str, String& filter, bool isForFile )
 			}
 		}
 
-		filter.Append( build.c_str() );
+		filter.Set( build.c_str() );
 	}
 	else
 	{
-		Rtt_Log( "Bad character in %s exclusions: '%c'", isForFile ? "file" : "directory", ch );
+		Rtt_LogException( "WARNING: Bad character in %s exclusions: '%c'", isForFile ? "file" : "directory", ch );
 	}
 }
 		
 void
 PlatformAppPackager::ReadFilter( lua_State *L, const char* key, String& exclude, bool isForFile )
 {
+	exclude.Set( "" );
+
 	lua_getfield( L, -1, key );
 	
 	if ( lua_isstring( L, -1 ) )
@@ -2213,6 +2194,10 @@ PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 					
 					lua_pop( L, 1 );
 				}
+				else if ( preBuildResult < 0 ) // n.b. already logged
+				{
+					retflag = false;
+				}
 				
 				int appStartResult = Lua::DumpFuncOrFilename( srcDir, L, "appStart" );
 				if ( appStartResult > 0 )
@@ -2225,18 +2210,22 @@ PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 					
 					lua_pop( L, 1 );
 				}
+				else if ( appStartResult < 0 )
+				{
+					retflag = false;
+				}
 			#endif
 			}
 
 			lua_pop( L, 1 ); // pop	settings.callbacks
+
+		#if !defined( Rtt_NO_GUI )
+			ReadFilter( L, "luaExcludeFiles", fExcludeFiles, true );
+			ReadFilter( L, "luaExcludeDirs", fExcludeDirs, false );
+			ReadFilter( L, "transientLuaExcludeFiles", fTransientExcludeFiles, true );
+			ReadFilter( L, "transientLuaExcludeDirs", fTransientExcludeDirs, false );
+		#endif
 		}
-		
-	#if !defined( Rtt_NO_GUI )
-		ReadFilter( L, "luaExcludeFiles", fExcludeFiles, true );
-		ReadFilter( L, "luaExcludeDirs", fExcludeDirs, false );
-		ReadFilter( L, "transientLuaExcludeFiles", fTransientExcludeFiles, true );
-		ReadFilter( L, "transientLuaExcludeDirs", fTransientExcludeDirs, false );
-	#endif
 		
 		lua_pop( L, 1 ); // pop settings
 		

@@ -621,6 +621,12 @@ Archive::Serialize( const char *dstPath, int numSrcPaths, const char *srcPaths[]
 #endif
 
 	const char *tmpDirName = Rtt_MakeTempDirectory(tmpDirTemplate);
+	if (NULL == tmpDirName)
+	{
+		fprintf(stderr, "car: cannot create temporary directory '%s'\n", tmpDirTemplate);
+
+		return;
+	}
 
 	if (Rtt_FileExists(dstPath))
 	{
@@ -641,6 +647,8 @@ Archive::Serialize( const char *dstPath, int numSrcPaths, const char *srcPaths[]
 			if ( ! Rtt_CopyFile(srcPaths[i], tmpFileCopy.GetString()))
 			{
 				fprintf(stderr, "car: cannot open '%s' for reading\n", srcPaths[i]);
+
+				Rtt_DeleteDirectory(tmpDirName);
 
 				return;
 			}

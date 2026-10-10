@@ -42,7 +42,7 @@
 		#include <copyfile.h>
 	#endif
 
-#if defined(_WIN32) /* ?? */
+#if defined(_WIN32) /* e.g. MinGW */
 	#include <direct.h>   // _mkdir
 #endif
 
@@ -103,6 +103,51 @@ static void ConvertUtf8ToUtf16(const char* utf8String, wchar_t* utf16String, siz
 	}
 }
 
+/* IDEA (to replace Create/DestroyUTF16String (and prefer stack)
+	maybe templatize the length, with PATH_MAX as default? (generally these are paths, but mode can be much smaller)
+
+class UTF16String {
+public:
+	UTFString( const char *utf8String )
+	:	fPointer( NULL )
+	{
+		int conversionLength = MultiByteToWideChar(CP_UTF8, 0, utf8String, -1, NULL, 0);
+		if (conversionLength > sizeof(fArray))
+		{
+			fPointer = (wchar_t*)Rtt_MALLOC(NULL, (size_t)conversionLength * sizeof(wchar_t));
+		}
+		else
+		{
+			fPointer = fArray;
+		}
+			
+		if (conversionLength > 0)
+		{
+			MultiByteToWideChar(CP_UTF8, 0, utf8String, -1, fPointer, conversionLength);
+		}
+		else
+		{
+			*fPointer = L'\0';
+		}
+	}
+	
+	~UTFString()
+	{
+		if ( fPointer != fArray )
+		{
+			Rtt_FREE( fPointer );
+		}
+	}
+	
+	wchar_t* Get() const { return fPointer; }
+	
+private:
+	wchar_t *fPointer; 
+	wchar_t fArray[PATH_MAX];
+};
+
+*/
+
 static wchar_t* CreateUtf16StringFrom(const char* utf8String)
 {
 	wchar_t *utf16String = NULL;
@@ -140,6 +185,7 @@ Rtt_EXPORT FILE* Rtt_FileOpen(const char *filePath, const char *mode)
 	FILE *fileHandle = NULL;
 
 #if defined( Rtt_WIN_ENV )
+	// TODO: UTF16String utf16Filename(filePath); etc.
 	wchar_t *utf16Filename = CreateUtf16StringFrom(filePath);
 	wchar_t *utf16Mode = CreateUtf16StringFrom(mode);
 	errno_t errorCode = _wfopen_s(&fileHandle, utf16Filename, utf16Mode);
@@ -586,28 +632,52 @@ Rtt_EXPORT int Rtt_CopyFile(const char *srcFilePath, const char *dstFilePath)
 	{
 		printf("Rtt_CopyFile: failed to open '%s' for reading\n", srcFilePath);
 
-		/*return*/result = 0;
+		result = 0;
 	}
 	
 	if (result && (outFp = Rtt_FileOpen(dstFilePath, "wb")) == NULL)
 	{
 		printf("Rtt_CopyFile: failed to open '%s' for writing\n", dstFilePath);
 
-		/*return*/result = 0;
+		result = 0;
 	}
 
 	char buf[BUFSIZ];
 
-	ssize_t bytesRead = 0;
-	while (result && (bytesRead = read(fileno(inFp), buf, BUFSIZ)) > 0)
+	while (result)
 	{
-		ssize_t totalWritten = 0;
-		
-		do {
-			int bytesWritten = write(fileno(outFp), buf + totalWritten, bytesRead - totalWritten);
-			if (bytesWritten <= 0)
+		ssize_t bytesRead = read(fileno(inFp), buf, BUFSIZ);
+		if ( 0 == bytesRead )
+		{
+			break;
+		}
+		else if ( bytesRead < 0 )
+		{
+			if (EINTR == errno) /* interrupted by signal? */
+ 			{
+				continue;
+			}
+			else
 			{
-				printf("Rtt_CopyFile: %s\n", strerror(errno));
+				// n.b. previously this just ended the loop, i.e. a truncated copy "succeeded"
+				printf("Rtt_CopyFile: failed to read '%s': %s\n", srcFilePath, strerror(errno));
+
+				result = 0;
+
+				break;
+			}
+		}
+		
+		for ( ssize_t totalWritten = 0; totalWritten < bytesRead; )
+		{
+			int bytesWritten = write(fileno(outFp), buf + totalWritten, bytesRead - totalWritten);
+			if ( bytesWritten < 0 && EINTR == errno ) /* interrupted by signal? */
+			{
+				continue;
+ 			}
+			else if ( bytesWritten <= 0 )
+			{
+				printf("Rtt_CopyFile: failed to write %s: %s\n", dstFilePath, strerror(errno));
 				
 				result = 0;
 				
@@ -617,29 +687,21 @@ Rtt_EXPORT int Rtt_CopyFile(const char *srcFilePath, const char *dstFilePath)
 			{
 				totalWritten += bytesWritten;
 			}
-	/*
-		if (write(fileno(outFp), buf, bytesRead) == 0)
-		{
-			Rtt_FileClose(inFp);
-			Rtt_FileClose(outFp);
-
-			return 0;
-		}*/
-		} while ( totalWritten < bytesWritten );
+		}
 	}
 
 	struct stat source_stat;
 
 	if (result && fstat(fileno(inFp), &source_stat) == -1)
 	{
-		printf("Rtt_CopyFile: failed to fstat '%s'", srcFilePath);
+		printf("Rtt_CopyFile: failed to fstat '%s'\n", srcFilePath);
 		
 		result = 0;
 	}
 
 	if (result && fchmod(fileno(outFp), ( source_stat.st_mode & 0777 )) == -1)
 	{
-		printf("Rtt_CopyFile: failed to fchmod '%s'", dstFilePath);
+		printf("Rtt_CopyFile: failed to fchmod '%s'\n", dstFilePath);
 		
 		result = 0;
 	}
@@ -649,10 +711,12 @@ Rtt_EXPORT int Rtt_CopyFile(const char *srcFilePath, const char *dstFilePath)
 		Rtt_FileClose(inFp);
 	}
 	
-	if ( outFp )
-	{
-		Rtt_FileClose(outFp);
-	}
+	if ( outFp && 0 != Rtt_FileClose(outFp) ) // n.b. the close can be what reports a failed (buffered / NFS) write
+ 	{
+		printf("Rtt_CopyFile: failed to close '%s': %s\n", dstFilePath, strerror(errno));
+
+		result = 0;
+ 	}
 #endif
 
 	return result;
