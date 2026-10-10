@@ -125,21 +125,17 @@ TVOSAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 
 	if ( Rtt_VERIFY( 0 == system( cmd ) ) )
 	{
-	#if !defined( Rtt_NO_GUI )
-		Runtime *runtime = params->GetRuntime();
-		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, NULL, "tvos" ) )
-		{
-			return PlatformAppPackager::kBuildError;
-		}
-		
-		PrepareFilters( params );
-		EnableFilters( true ); // compiles source first...
+		char* inputFile = NULL;
+
+ 	#if !defined( Rtt_NO_GUI )
+		if ( BeginBuildCallbacks( params, tmpDirBase, "tvos" ) )
 	#endif
-	
-		char* inputFile = Prepackage( params, tmpDir );
+ 		{
+			inputFile = Prepackage( params, tmpDir ); // n.b. picks up the stage directory, filters, and `appStart`
+ 		}
 
 	#if !defined( Rtt_NO_GUI )
-		EnableFilters( false ); // ...then plugins?
+		EndBuildCallbacks(); // n.b. everything after this only consumes tmpDir / input.zip
 	#endif
 
 		if ( inputFile )

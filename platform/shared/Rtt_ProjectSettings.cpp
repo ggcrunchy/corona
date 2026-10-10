@@ -335,8 +335,7 @@ bool ProjectSettings::LoadFromDirectory(const char* directoryPath)
 			int result = Lua::DumpFuncOrFilename( directoryPath, luaStatePointer, "appStart" );
 			if ( result < 0 )
 			{
-				// TODO: error
-				return false;
+				Rtt_LogException( "Failed to load `appStart` from project settings" );
 			}
 			else if ( result > 0 )
 			{

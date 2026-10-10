@@ -54,7 +54,6 @@ namespace Rtt
 	int luaload_luasocket_tp(lua_State* L);
 	int luaload_luasocket_url(lua_State* L);
 
-	bool CompileScriptsInDirectory(lua_State* L, AppPackagerParams& params, const char* dstDir, const char* srcDir, const char* baseDir);
 	bool FetchDirectoryTreeFilePaths(const char* directoryPath, std::vector<std::string>& filePathCollection);
 	int processExecute(lua_State* L);
 	int luaload_linuxPackageApp(lua_State* L);
@@ -70,12 +69,15 @@ namespace Rtt
 		Rtt_ASSERT(lua_isstring(L, 4));
 		const char* tmpDir = lua_tostring(L, 4);
 
+		PlatformAppPackager* packager = (PlatformAppPackager*)lua_touserdata(L, lua_upvalueindex(1));
+		Rtt_ASSERT(packager);
+
 		// Package build settings parameters.
 		Rtt::AppPackagerParams params(p->GetAppName(), p->GetVersion(), p->GetIdentity(), NULL, srcDir, dstDir, NULL, p->GetTargetPlatform(), NULL, 0, 0, NULL, NULL, NULL, true);
 		params.SetStripDebug(p->IsStripDebug());
 
-		bool rc = CompileScriptsInDirectory(L, params, dstDir, srcDir, params.GetSrcDir());
-
+		// n.b. via the packager, so that filters, the `preBuild` stage directory, and `appStart` apply
+		bool rc = packager->CompileAppScripts(&params, dstDir);
 		if (rc)
 		{
 			// Bundle all of the compiled Lua scripts in the intermediate directory into a "resource.car" file.
@@ -204,8 +206,11 @@ namespace Rtt
 
 	#if !defined( Rtt_NO_GUI )
 		Runtime *runtime = params->GetRuntime();
-		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, NULL, "linux" ) )
-		{
+		if ( !BeginBuildCallbacks( params, tmpDirBase, "linux" ) )
+ 		{
+			EndBuildCallbacks();
+			Rtt_DeleteDirectory(tmpDir);
+
 			return PlatformAppPackager::kBuildError;
 		}
 	#endif
@@ -293,7 +298,8 @@ namespace Rtt
 		lua_setglobal(L, "_download");
 		lua_pushcfunction(L, luaPrint);
 		lua_setglobal(L, "luaPrint");
-		lua_pushcfunction(L, Rtt::GenerateResourceCar);
+		lua_pushlightuserdata(L, this);
+		lua_pushcclosure(L, Rtt::GenerateResourceCar, 1);
 		lua_setglobal(L, "compileScriptsAndMakeCAR");
 
 		int result = PlatformAppPackager::kNoError;
@@ -314,6 +320,10 @@ namespace Rtt
 
 			lua_pop(L, 1);
 		}
+
+	#if !defined( Rtt_NO_GUI )
+		EndBuildCallbacks();
+	#endif
 
 		if (Rtt_IsDirectory(tmpDir))
 		{

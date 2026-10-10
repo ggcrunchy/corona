@@ -1,4 +1,4 @@
-﻿//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 //
 // This file is part of the Corona game engine.
 // For overview and more information on licensing please refer to README.md 
@@ -40,7 +40,7 @@ extern "C" {
 
 namespace Rtt
 {
-	bool CompileScriptsInDirectory(lua_State* L, AppPackagerParams& params, const char* dstDir, const char* srcDir);
+	bool CompileScriptsInDirectory(lua_State* L, AppPackagerParams& params, const char* dstDir, const char* srcDir, const char* baseDir);
 	bool FetchDirectoryTreeFilePaths(const char* directoryPath, std::vector<std::string>& filePathCollection);
 
 	int prn(lua_State* L);

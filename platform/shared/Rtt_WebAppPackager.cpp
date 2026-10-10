@@ -119,11 +119,17 @@ namespace Rtt
 		Rtt_ASSERT(lua_isstring(L, 4)); 
 		const char* tmpDir = lua_tostring( L, 4);
 
+		PlatformAppPackager* packager = (PlatformAppPackager*) lua_touserdata( L, lua_upvalueindex( 1 ) );
+		Rtt_ASSERT(packager);
+
 		// Package build settings parameters.
 		Rtt::AppPackagerParams params(p->GetAppName(), p->GetVersion(), p->GetIdentity(), NULL, srcDir, dstDir, NULL, p->GetTargetPlatform(), NULL,	0, 0, NULL, NULL, NULL, true);
 		params.SetStripDebug(p->IsStripDebug());
 
-		bool rc = CompileScriptsInDirectory(L, params, dstDir, srcDir, params.GetSrcDir());
+		// n.b. goes through the packager (rather than CompileScriptsInDirectory()) so that the
+		// Lua filters, the `preBuild` stage directory, and `appStart` all land in dstDir, which
+		// is where the archive below is gathered from
+		bool rc = packager->CompileAppScripts(&params, dstDir);
 		if (rc)
 		{
 			// Bundle all of the compiled Lua scripts in the intermediate directory into a "resource.car" file.
@@ -259,8 +265,11 @@ int WebAppPackager::Build(AppPackagerParams* params, const char* tmpDirBase)
 
 	#if !defined( Rtt_NO_GUI )
 		Runtime *runtime = params->GetRuntime();
-		if ( !DoPreBuild( runtime, params->GetSrcDir(), tmpDir, NULL, "web" ) )
-		{
+		if ( !BeginBuildCallbacks( params, tmpDirBase, "web" ) )
+ 		{
+			EndBuildCallbacks();
+			rmdir(tmpDir);
+
 			return PlatformAppPackager::kBuildError;
 		}
 	#endif
@@ -329,7 +338,8 @@ int WebAppPackager::Build(AppPackagerParams* params, const char* tmpDirBase)
 #endif
 	lua_pushcfunction(L, Rtt::prn);
 	lua_setglobal(L, "myprint");
-	lua_pushcfunction(L, Rtt::CompileScriptsAndMakeCAR);
+	lua_pushlightuserdata(L, this);
+	lua_pushcclosure(L, Rtt::CompileScriptsAndMakeCAR, 1);
 	lua_setglobal(L, "compileScriptsAndMakeCAR");
 	
 	HTTPClient::registerFetcherModuleLoaders(L);
@@ -352,9 +362,12 @@ int WebAppPackager::Build(AppPackagerParams* params, const char* tmpDirBase)
 		lua_pop(L, 1);
 	}
 
+	#if !defined( Rtt_NO_GUI )
+		EndBuildCallbacks();
+	#endif
+
 	// Clean up intermediate files
 	rmdir(tmpDir);
-
 
 	return result;
 }

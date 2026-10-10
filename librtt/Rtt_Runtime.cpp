@@ -1134,10 +1134,14 @@ Runtime::FindDownloadablePlugins( const char *simPlatformName )
 				Rtt_TRACE(( "`callbacks` not yet supported in builder" ));
 			#else
 				int top = lua_gettop( L );
+				
+				String projectDir( & fPlatform.GetAllocator() );
+				fPlatform.PathForFile( NULL, MPlatform::kResourceDir, MPlatform::kDefaultPathFlags, projectDir );
+				
 				int result = Lua::DumpFuncOrFilename( filePath.GetString(), L, "simulatorStart" );
 				if ( result < 0 )
 				{
-					Rtt_TRACE(( "Error loading `simulatorStart`" ));
+					Rtt_LogException(( "Error loading `simulatorStart`" ));
 				}
 				else if ( result > 0 )
 				{
@@ -1352,10 +1356,15 @@ Runtime::LoadApplication( const LoadParameters& parameters )
 		#endif
 		
 			int result = LUA_ERRFILE;
-			if ( ! IsProperty( kIsApplicationNotArchived ) )
+			if ( ! IsProperty( kIsApplicationNotArchived ) && GetArchive() )
 			{
 				const char kAppStart[] = Rtt_LUA_OBJECT_FILE( "_appStart_" );
 				result = GetArchive()->LoadResource( L, kAppStart );
+				
+				if ( LUA_ERRFILE == result )
+				{
+					lua_pop( L, 1 );
+				}
 			}
 			
 			if ( ( LUA_ERRFILE == result ) && !fStartFunc.empty() )

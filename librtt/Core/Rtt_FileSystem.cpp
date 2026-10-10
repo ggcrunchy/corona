@@ -728,7 +728,12 @@ Rtt_EXPORT int Rtt_MakeDirectory(const char *dirPath)
 	int result = false;
 	std::string path = dirPath;
 
-#if defined(_WIN32)
+#ifdef Rtt_WIN_ENV
+		// n.b. _mkdir() takes the ANSI code page, so non-ASCII (UTF-8) paths would fail or go astray
+		wchar_t *wpath = CreateUtf16StringFrom(path.c_str());
+		int ret = wpath ? _wmkdir(wpath) : -1;
+		DestroyUtf16String(wpath);
+#elif defined(_WIN32)
 		int ret = _mkdir(path.c_str());
 #else
 		mode_t mode = 0755;
@@ -743,16 +748,13 @@ Rtt_EXPORT int Rtt_MakeDirectory(const char *dirPath)
 		{
 			case ENOENT:  // parent doesn't exist, try to create it
 			{
-				size_t pos = path.find_last_of('/');
-
-				if (pos == std::string::npos)
 #if defined(_WIN32)
-				{
-					pos = path.find_last_of('\\');
-				}
+				size_t pos = path.find_last_of("/\\"); // n.b. whichever is last, not '/' first
+#else
+				size_t pos = path.find_last_of('/');
+#endif
 
 				if (pos == std::string::npos)
-#endif
 				{
 					return false;
 				}
@@ -762,7 +764,15 @@ Rtt_EXPORT int Rtt_MakeDirectory(const char *dirPath)
 				}
 			}
 				// now, try to create again
-#if defined(_WIN32)
+#if defined( Rtt_WIN_ENV )
+			{
+				wchar_t *wpath = CreateUtf16StringFrom(path.c_str());
+				int created = wpath && (0 == _wmkdir(wpath));
+				DestroyUtf16String(wpath);
+
+				return created;
+			}
+#elif defined(_WIN32)
 				return 0 == _mkdir(path.c_str());
 #else
 				return 0 == mkdir(path.c_str(), mode);
@@ -783,24 +793,30 @@ Rtt_EXPORT int Rtt_DeleteFile(const char *filePath)
 	int result = 0;
 
 #ifdef Rtt_WIN_ENV
-	std::wstring path(filePath, filePath + strlen(filePath));		// string ==> wstring
-	result = DeleteFile(path.c_str());
+	wchar_t *path = CreateUtf16StringFrom(filePath);
+	if (path)
+	{
+		result = DeleteFileW(path);
+
+		if (!result && ERROR_ACCESS_DENIED == GetLastError())
+		{
+			// read-only files (e.g. from git checkouts or copied resources) refuse deletion
+			DWORD attribs = GetFileAttributesW(path);
+			if (INVALID_FILE_ATTRIBUTES != attribs && (attribs & FILE_ATTRIBUTE_READONLY))
+			{
+				SetFileAttributesW(path, attribs & ~FILE_ATTRIBUTE_READONLY);
+				result = DeleteFileW(path);
+			}
+		}
+
+		DestroyUtf16String(path);
+	}
 #else
 	result = unlink(filePath) == 0;
 #endif
 
 	return result;
 }
-
-#if !defined( Rtt_WIN_ENV)
-
-static bool IsLink( const char *path )
-{
-	struct stat s;
-	return 0 == lstat( path, &s ) && S_ISLNK( s.st_mode );
-}
-
-#endif
 
 Rtt_EXPORT int Rtt_IsDirectory(const char *dirPath)
 {
@@ -811,77 +827,115 @@ Rtt_EXPORT int Rtt_IsDirectory(const char *dirPath)
 		result = ::PathIsDirectoryW(path) ? true : false;
 		DestroyUtf16String(path);
 	#else
-		if ( !IsLink(dirPath) )
+		DIR *subdp = opendir(dirPath);
+		if ( subdp )
 		{
-			DIR *subdp = opendir(dirPath);
-			if ( subdp )
-			{
-				closedir( subdp );
-				subdp = NULL;
-				result = true;
-			}
+			closedir( subdp );
+			subdp = NULL;
+			result = true;
 		}
 	#endif
 
 	return result;
 }
 
-static bool CanDeleteLikeDirectory( const char *path )
+enum DeleteEntryKind
+{
+	kDeleteEntryMissing,
+	kDeleteEntryFile,
+	kDeleteEntryDirectory,
+	kDeleteEntryLink, // symlink or reparse point
+};
+
+static DeleteEntryKind ClassifyForDelete( const char *path )
 {
 	#ifdef Rtt_WIN_ENV
 		wchar_t *wpath = CreateUtf16StringFrom(path);
-		DWORD attribs = GetFileAttributesW(wpath);
+		DWORD attribs = wpath ? GetFileAttributesW(wpath) : INVALID_FILE_ATTRIBUTES;
 		DestroyUtf16String(wpath);
 
 		if ( INVALID_FILE_ATTRIBUTES == attribs )
 		{
-			return false;
+			return kDeleteEntryMissing;
+		}
+		else if ( attribs & FILE_ATTRIBUTE_REPARSE_POINT )
+		{
+			return kDeleteEntryLink;
+ 		}
+		else
+		{
+			return ( attribs & FILE_ATTRIBUTE_DIRECTORY ) ? kDeleteEntryDirectory : kDeleteEntryFile;
+		}
+	#else
+		struct stat s;
+
+		if ( 0 != lstat( path, &s ) )
+		{
+			return kDeleteEntryMissing;
+		}
+		else if ( S_ISLNK( s.st_mode ) )
+		{
+			return kDeleteEntryLink;
 		}
 		else
 		{
-			bool isDirectory = !!( attribs & FILE_ATTRIBUTE_DIRECTORY );
-			bool isReparsePoint = !!( attribs & FILE_ATTRIBUTE_REPARSE_POINT );
-			
-			return isDirectory && !isReparsePoint;
+			return S_ISDIR( s.st_mode ) ? kDeleteEntryDirectory : kDeleteEntryFile;
 		}
-	#else
-		return Rtt_IsDirectory( path );
 	#endif
 }
 
+static bool RemoveEmptyDirectory( const char *dirPath )
+{
+	#ifdef Rtt_WIN_ENV
+		// n.b. not the CRT rmdir(), which takes the ANSI code page rather than UTF-8
+		wchar_t *wpath = CreateUtf16StringFrom(dirPath);
+		bool result = wpath && ::RemoveDirectoryW(wpath);
+		DestroyUtf16String(wpath);
+
+		return result;
+	#else
+		return 0 == rmdir(dirPath);
+	#endif
+}
+
+static bool RemoveLink( const char *path ) // n.b. does not remove link target
+{
+	#ifdef Rtt_WIN_ENV
+		return RemoveEmptyDirectory( path ) /* or junction / symlink */ || Rtt_DeleteFile( path ) /* or file symlink */;
+	#else
+		return 0 == unlink( path );
+ 	#endif
+ }
+
 Rtt_EXPORT int Rtt_DeleteDirectory(const char *dirPath)
 {
-	if ( !CanDeleteLikeDirectory( dirPath ) )
-	{
-		fprintf(stderr, "Rtt_DeleteDirectory: '%s' is not a directory, or also has reparse point attribute\n", dirPath);
-	
-		return 0;
-	}
+	if ( kDeleteEntryDirectory != ClassifyForDelete( dirPath ) )
+ 	{
+		fprintf(stderr, "Rtt_DeleteDirectory: '%s' is not a directory, or is a link\n", dirPath);
 
-	int result = 1/*0*/;
+ 		return 0;
+ 	}
 
-	std::vector<std::string> fileList = Rtt_ListFiles(dirPath);
+	int result = 1;
+	std::vector<std::string> fileList = Rtt_ListFiles(dirPath); // n.b. will filter "." and ".."
 
 	for (std::vector<std::string>::iterator it = fileList.begin(); it != fileList.end(); ++it)
 	{
 		const char* path = it->c_str();
-/*
-already done by Rtt_ListFiles and breaks for patterns like "./something"
-		if (strncmp(path, ".", 1) == 0 || strncmp(path, "..", 2) == 0)
-		{
-			continue;
-		}
-*/
-		if (Rtt_IsDirectory(path))
-		{
-			result = Rtt_DeleteDirectory(path);
 
-			// hmmmm.. Why is the 'path' deleting twice ?
-			// result = rmdir(path) == 0;
-		}
-		else
+		switch (ClassifyForDelete(path))
 		{
-			result = Rtt_DeleteFile(path);
+		case kDeleteEntryDirectory:
+			result = Rtt_DeleteDirectory(path);
+			break;
+		case kDeleteEntryLink:
+			result = RemoveLink(path);
+			break;
+		case kDeleteEntryFile:
+ 			result = Rtt_DeleteFile(path);
+			break;
+		default: // vanished in the meantime
+			result = 1;
 		}
 
 		if (! result)
@@ -894,7 +948,7 @@ already done by Rtt_ListFiles and breaks for patterns like "./something"
 
 	if ( 0 != result )
 	{
-		result = rmdir(dirPath) == 0;
+		result = RemoveEmptyDirectory(dirPath);
 	}
 
 	return result;
@@ -976,134 +1030,81 @@ Rtt_WriteDataToFile(const char *filename, Rtt::Data<const unsigned char> &data)
 		charsWritten = fwrite(data.GetData(), 1, data.GetLength(), fp);
 
 		Rtt_ASSERT(charsWritten == (size_t)data.GetLength());
+
+		Rtt_FileClose(fp);
 	}
-
-	Rtt_FileClose(fp);
-
+	
 	return charsWritten;
 }
-
-#if defined(Rtt_WIN_ENV) && !defined(Rtt_LINUX_ENV)
-static void ReplaceString(std::string& subject, const std::string& search, const std::string& replace)
-{
-	size_t pos = 0;
-	while ((pos = subject.find(search, pos)) != std::string::npos)
-	{
-		subject.replace(pos, search.length(), replace);
-		pos += replace.length();
-	}
-}
-#endif // Rtt_WIN_ENV
-
-#if defined(Rtt_LINUX_ENV)
-void ReplaceString(std::string& subject, const std::string& search, const std::string& replace)
-{
-	size_t pos = 0;
-	while ((pos = subject.find(search, pos)) != std::string::npos)
-	{
-		subject.replace(pos, search.length(), replace);
-		pos += replace.length();
-	}
-}
-#endif // Rtt_WIN_ENV
 
 Rtt_EXPORT char *Rtt_MakeTempDirectory(char *tmpDirTemplate)
 {
 #if defined(Rtt_WIN_ENV)
+	if ( !tmpDirTemplate )
+ 	{
+		errno = EINVAL;
+ 
+		return NULL;
+ 	}
 
-	static char utf8FileName[MAX_PATH];
-	
-	// We need to implement the semantics of POSIX mkdtemp() which doesn't exist on Windows
+	const char kXs[] = "XXXXXX";
+	const size_t kNumXs = sizeof( kXs ) - 1;
+	size_t len = strlen( tmpDirTemplate );
 
-	/*
-	 One option is to use a GUID but these symbols are undefined in some modules for reasons that were not investigated
-	UUID  uuid;
-	char *uuidStr;
-	if (UuidCreate(&uuid) == RPC_S_OK && UuidToStringA(&uuid, (RPC_CSTR *)&uuidStr) == RPC_S_OK)
+	if ( ( len < kNumXs ) || 0 != strcmp( tmpDirTemplate + len - kNumXs, kXs ) )
 	{
-		ReplaceString(dirname, "XXXXXX", uuidStr);
-
-		RpcStringFreeA((RPC_CSTR *)&uuidStr);
-	}
-	*/
-
-
-	TCHAR tempPath[MAX_PATH];
-	TCHAR tempFileName[MAX_PATH];
-
-
-	if (GetTempPath(MAX_PATH, tempPath) && GetTempFileName(tempPath, L"CL", 0, tempFileName))
-	{
-		// This is not thread safe
-		DeleteFile(tempFileName);
-		ConvertUtf16ToUtf8(tempFileName, utf8FileName, MAX_PATH);
-
-		_mkdir(utf8FileName);
-
-		return utf8FileName;
-	}
-	else
-	{
+		errno = EINVAL;
+ 
 		return NULL;
 	}
+
+	char *xs = tmpDirTemplate + len - kNumXs;
+ 
+	// Mix a few varying sources to get a reasonably unique state.
+	LARGE_INTEGER counter;
+	QueryPerformanceCounter( &counter );
 	
-	/*
-		bool found = false;
-		
-		// archive (where this has been called) seems to do GetTempPath2W() and then we just throw away the template?
-		// ensure backslash, etc.
-			// or can we just assume it ends in XXXX...?
-		
-		if (IsWindows7OrGreater())
-		{
-			U8 random[16]; // or 6, for Xs?
+	ULONGLONG state = (ULONGLONG)counter.QuadPart ^ ( (ULONGLONG)GetCurrentProcessId() << 32 ) ^ (ULONGLONG)(size_t)tmpDirTemplate;
 
-			// do <bcrypt.h> and #pragma comment(lib, "bcrypt.lib") further up
+	const char kChars[] = "abcdefghijklmnopqrstuvwxyz0123456789";
 
-			for ( int i = 0; ( i < 64 ) && !found; i++ )
-			{
-				NTSTATUS status = BCryptGenRandom(NULL, random, sizeof(random), BCRYPT_USE_SYSTEM_PREFERRED_RNG);
-				if ( status < 0 )
-				{
-					// gen failure
-		
-				}
-				
-				const wchar_t hex[] = L"0123456789abcdef";
-				// path = Xs
-				
-				for (int j = 0; j < sizeof(random); j++)
-				{
-					path += hex[b / 16];
-					path += hex[b % 16];
-				}
-				// ^^^ sub out Xs
-				
-				if ( CreateDirectoryW( path, NULL ) )
-				{
-					// found!
-					// return path
-				}
-				else
-				{
-					DWORD err = GetLastError();
-					
-					if ( ( ERROR_ALREADY_EXISTS == err ) || ( ERROR_FILE_EXISTS == err ) )
-					{
-						continue;
-					}
-					else
-					{
-						// more serious...
-						return NULL;
-					}
-				}
-			}
+	for ( int attempt = 0; attempt < 100; attempt++ )
+	{
+		for ( size_t i = 0; i < kNumXs; i++ )
+ 		{
+			// splitmix64 step
+			state += 0x9E3779B97F4A7C15ULL;
+
+			ULONGLONG z = state;
+
+			z = ( z ^ ( z >> 30 ) ) * 0xBF58476D1CE4E5B9ULL;
+			z = ( z ^ ( z >> 27 ) ) * 0x94D049BB133111EBULL;
+			z ^= z >> 31;
+
+			xs[i] = kChars[z % ( sizeof( kChars ) - 1 )];
 		}
-		
-		// not found...
-			wyrand()? or just fall back to the current behavior?
-	*/
+
+		wchar_t *wpath = CreateUtf16StringFrom( tmpDirTemplate );
+		BOOL created = wpath && ::CreateDirectoryW( wpath, NULL );
+		DWORD err = created ? ERROR_SUCCESS : GetLastError();
+
+		DestroyUtf16String( wpath );
+
+		if ( created )
+		{
+			return tmpDirTemplate;
+ 		}
+		else if ( ERROR_ALREADY_EXISTS != err && ERROR_FILE_EXISTS != err )
+		{
+			break; // e.g. the parent is missing or not writable: retrying won't help
+		}
+	}
+
+	strcpy( xs, kXs );
+	
+	errno = EEXIST;
+
+	return NULL;
 #else
 	return mkdtemp(tmpDirTemplate);
 #endif

@@ -168,12 +168,15 @@ struct ListOfStringsIter {
 };
 
 struct PackagerParamsFilterState {
-	const char* fExcludeFiles;
-	const char* fExcludeDirs;
-	std::regex * fExcludeFilesRegex;
-	std::regex * fExcludeDirsRegex;
+	std::regex fExcludeFilesRegex;
+	std::regex fExcludeDirsRegex;
 	bool fHasExcludeFilesFilter;
 	bool fHasExcludeDirsFilter;
+	
+	PackagerParamsFilterState()
+	{
+		Reset();
+	}
 	
 	void
 	Reset()
@@ -183,41 +186,47 @@ struct PackagerParamsFilterState {
 	}
 	
 	static bool
-	AuxAssignRegex( std::regex* regex, const String& filter )
+	AuxAssignRegex( std::regex& regex, const String& filter, bool& hasExcludeFilter )
 	{
-		bool hasExcludeFilter = ( filter.GetLength() > 0 );
+		hasExcludeFilter = ( filter.GetLength() > 0 );
 		if ( hasExcludeFilter )
 		{
-			*regex = filter.GetString();
+		//	try
+			{
+			// TODO: check for non-exception case?
+				regex.assign( filter.GetString(), std::regex::ECMAScript | std::regex::optimize );
+			}/*
+			catch ( const std::regex_error& err )
+			{
+				Rtt_LogException( "ERROR: invalid Lua exclusion filter '%s': %s", filter.GetString(), err.what() );
+				hasExcludeFilter = false;
+
+				return false;
+			}*/
 		}
 		
-		return hasExcludeFilter;
+		return true;
 	}
 	
-	void
-	BindRegexes( std::regex &excludeFilesRegex, std::regex &excludeDirsRegex )
-	{
-		fExcludeFilesRegex = &excludeFilesRegex;
-		fExcludeDirsRegex = &excludeDirsRegex;
-	}
-	
-	void
+	bool
 	AssignRegexes( const String& excludeFiles, const String& excludeDirs )
 	{
-		fHasExcludeFilesFilter = AuxAssignRegex( fExcludeFilesRegex, excludeFiles );
-		fHasExcludeDirsFilter = AuxAssignRegex( fExcludeDirsRegex, excludeDirs );
+		 bool filesOK = AuxAssignRegex( fExcludeFilesRegex, excludeFiles, fHasExcludeFilesFilter );
+		 bool dirsOK = AuxAssignRegex( fExcludeDirsRegex, excludeDirs, fHasExcludeDirsFilter );
+
+		return filesOK && dirsOK;
 	}
 	
 	static bool
-	CanInclude( const char* path, const std::regex *exclude )
+	CanInclude( const char* name, const std::regex &exclude )
 	{
-		if ( !std::regex_match( path, *exclude ) )
+		if ( !std::regex_match( name, exclude ) )
 		{
 			return true;
 		}
 		else
 		{
-			Rtt_TRACE_SIM(( "Filtering out '%s'", path ));
+			Rtt_TRACE_SIM(( "Filtering out '%s'", name ));
 			return false;
 		}
 	}
@@ -225,16 +234,12 @@ struct PackagerParamsFilterState {
 	bool
 	CanIncludeFile( const char *file ) const
 	{
-		Rtt_ASSERT( !fHasExcludeFilesFilter || ( NULL != fExcludeFilesRegex ) );
-	
 		return !fHasExcludeFilesFilter || CanInclude( file, fExcludeFilesRegex );
 	}
 
 	bool
 	CanIncludeDir( const char *dir ) const
 	{
-		Rtt_ASSERT( !fHasExcludeDirsFilter || ( NULL != fExcludeDirsRegex ) );
-	
 		return !fHasExcludeDirsFilter || CanInclude( dir, fExcludeDirsRegex );
 	}
 };
@@ -298,7 +303,7 @@ AppPackagerParams::AppPackagerParams( const char* appName,
 AppPackagerParams::~AppPackagerParams()
 {
 #if !defined( Rtt_NO_GUI)
-	Rtt_FREE( fFilterState );
+	Rtt_DELETE( fFilterState );
 #endif
 
 	delete fDeviceBuildData;
@@ -437,8 +442,11 @@ PlatformAppPackager::PlatformAppPackager( const MPlatformServices& services,
 
 PlatformAppPackager::~PlatformAppPackager()
 {
-	Rtt_FREE( fPreBuildFunc );
-	Rtt_FREE( fAppStartFunc );
+#if !defined( Rtt_NO_GUI )
+	EndBuildCallbacks(); // in case a Build() bailed out early
+#endif
+
+	ClearBuildCallbacks();
 
 	Lua::Delete( fVM );
 }
@@ -554,7 +562,7 @@ PlatformAppPackager::Prepackage( AppPackagerParams * params, const char* tmpDir 
 	}
 
 	// Build *.lu into tmpDir
-	if ( CompileScripts( params, tmpDir, NULL /* TODO? */ ) )
+	if ( CompileAppScripts( params, tmpDir ) )
 	{
 		// Compress files in tmpDir into a file kDstName and place it in tmpDir
 		const char kDstName[] = "input.zip";
@@ -758,7 +766,7 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 							continue;
 						}
 					#if !defined( Rtt_NO_GUI )
-						else if ( filterState && !filterState->CanIncludeDir( srcPath ) )
+						else if ( filterState && !filterState->CanIncludeDir( filename ) )
 						{
 							continue;
 						}
@@ -1077,18 +1085,18 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 
 #if !defined( Rtt_NO_GUI )
 	PackagerParamsFilterState* state = params->GetFilterState();
-	std::regex excludeFilesRegex, excludeDirsRegex;
 
 	if ( NULL != state )
 	{
-		if ( fUseFilters )
-		{
-			state->BindRegexes( excludeFilesRegex, excludeDirsRegex );
-			state->AssignRegexes( fExcludeFiles, fExcludeDirs );
-		}
-		else
+		if ( !fUseFilters )
 		{
 			state->Reset();
+		}
+		else if ( !state->AssignRegexes( fExcludeFiles, fExcludeDirs ) )
+		{
+			params->SetBuildMessage( "ERROR: invalid 'luaExcludeFiles' or 'luaExcludeDirs' in build.settings" );
+
+			return false;
 		}
 	}
 #endif
@@ -1118,14 +1126,23 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 	
 		std::string root = stageDir;
 		
-		root += "/lua";
+		root += LUA_DIRSEP "lua";
 
-		std::string path = root;
-		
-		if ( !CompileScriptsInDirectory( fVM, * params, dstDir, path.c_str(), root.c_str() ) )
-		{
-			result = false;
-		}
+		// `preBuild` is free to not generate anything; compiling a missing directory would
+		// otherwise fail the build with "source directory is inaccessible"
+		if ( Rtt_IsDirectory( root.c_str() ) )
+ 		{
+			if ( NULL != state && fUseFilters && !state->AssignRegexes( fTransientExcludeFiles, fTransientExcludeDirs ) )
+			{
+				params->SetBuildMessage( "ERROR: invalid 'transientLuaExcludeFiles' or 'transientLuaExcludeDirs' in build.settings" );
+
+				result = false;
+			}
+			else if ( !CompileScriptsInDirectory( fVM, * params, dstDir, root.c_str(), root.c_str() ) )
+			{
+				result = false;
+			}
+ 		}
 	}
 #endif
 
@@ -2074,11 +2091,11 @@ void
 PlatformAppPackager::PrepareFilters( AppPackagerParams* params )
 {
 	Rtt_ASSERT( NULL != params );
-	Rtt_ASSERT( !params->GetFilterState() );
 	
-	PackagerParamsFilterState *newState = (PackagerParamsFilterState *)Rtt_CALLOC( NULL, 1, sizeof(PackagerParamsFilterState) );
-
-	params->SetFilterState( newState );
+	if ( NULL == params->GetFilterState() )
+	{
+		params->SetFilterState( Rtt_NEW( NULL, PackagerParamsFilterState ) );
+	}
 }
 
 #endif
@@ -2392,6 +2409,22 @@ AddSystemLib( lua_State *L )
 	lua_setfield( L, -2, "system" );
 }
 
+#endif
+
+/*
+TODO?
+
+// Evict everything the rebuilt require() and AddSystemLib() left behind. In particular,
+// a surviving _coronaPreservedLuaFunctions would send the next DoPreBuild() on this VM
+// down require()'s normal path with a table argument, rather than its setup path.
+const char *tempGlobals[] = { "system", "_coronaPreservedLuaFunctions", "_coronaBuildSettings" };
+for ( const char *name : tempGlobals )
+{
+	lua_pushnil( L );
+	lua_setglobal( L, name );
+}
+*/
+
 static int
 AddRequireFunc( lua_State *L, const std::string& requireFunc, const std::string& requiredPlugins )
 {
@@ -2432,43 +2465,170 @@ AddRequireFunc( lua_State *L, const std::string& requireFunc, const std::string&
 	}
 }
 
-static void
-AddFile( lua_State *L, const char *code, size_t codeLength, const char *root, const char *dstDir, int stripDebug )
+bool
+PlatformAppPackager::WriteAppStart( const char* dstDir, bool stripDebug )
 {
-	const char kScriptSuffix[] = "." Rtt_LUA_SCRIPT_FILE_EXTENSION;
-
-	lua_pushfstring( L, "%s" LUA_DIRSEP "%s." Rtt_LUA_SCRIPT_FILE_EXTENSION, dstDir, root );
-
-	const char *scriptName = lua_tostring( L, -1 );
-	FILE *fp = fopen( scriptName, "wb" );
-	if ( Rtt_VERIFY( fp ) )
+	if ( 0 == fAppStartFuncLength )
 	{
-		fwrite( code, 1, codeLength, fp );
-		fclose( fp );
+		return true;
 	}
 
-	lua_pushfstring( L, "%s" LUA_DIRSEP "%s." Rtt_LUA_OBJECT_FILE_EXTENSION, dstDir, root );
+	lua_State *L = fVM;
 
+	#define PATT(TYPE) "%s" LUA_DIRSEP "_appStart_." Rtt_LUA_##SCRIPT##_FILE_EXTENSION
+
+	lua_pushfstring( L, PATT( SCRIPT ), dstDir );
+	lua_pushfstring( L, PATT( OBJECT ), dstDir );
+
+	const char *scriptName = lua_tostring( L, -2 );
 	const char *compiledName = lua_tostring( L, -1 );
-	int status = Rtt_LuaCompile( L, 1, &scriptName, compiledName, stripDebug );
-
-	if ( !Rtt_VERIFY( 0 == status ) )
+	
+	#undef PATT
+	
+	bool ok = false;
+	FILE *fp = Rtt_FileOpen( scriptName, "wb" );
+	if ( fp )
 	{
-		// TODO: error?
-	}
+		ok = ( fwrite( fAppStartFunc, 1, fAppStartFuncLength, fp ) == fAppStartFuncLength );
+		ok = ok && ( 0 == Rtt_FileClose( fp ) );
 
-	unlink( scriptName );
+		if ( ok )
+		{
+			ok = ( 0 == Rtt_LuaCompile( L, 1, &scriptName, compiledName, stripDebug ) );
+		}
+
+		Rtt_DeleteFile( scriptName );
+	}
+	
+	if ( !ok )
+	{
+		Rtt_LogException( "ERROR: failed to write `appStart` to '%s'", compiledName );
+	}
 
 	lua_pop( L, 2 );
+	
+	return ok;
+}
+
+void
+PlatformAppPackager::ClearBuildCallbacks()
+{
+	Rtt_FREE( fPreBuildFunc );
+	Rtt_FREE( fAppStartFunc );
+
+	fPreBuildFunc = NULL;
+	fAppStartFunc = NULL;
+	fPreBuildFuncLength = 0;
+	fAppStartFuncLength = 0;
+
+#if !defined( Rtt_NO_GUI )
+	fExcludeFiles.Set( "" );
+	fExcludeDirs.Set( "" );
+	fTransientExcludeFiles.Set( "" );
+	fTransientExcludeDirs.Set( "" );
+#endif
 }
 
 bool
-PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const char* tmpDir, const char* stageDir, const char* platform )
+PlatformAppPackager::CompileAppScripts( AppPackagerParams * params, const char* dstDir )
+{
+	const char *stageDir = NULL;
+
+#if !defined( Rtt_NO_GUI )
+	if ( fUseFilters )
+	{
+		PrepareFilters( params );
+	}
+
+	stageDir = GetStageDir();
+#endif
+
+	// n.b. CompileScripts() may turn off stripping (neverStripDebugInfo), so ask afterward
+	return CompileScripts( params, dstDir, stageDir ) && WriteAppStart( dstDir, params->IsStripDebug() );
+}
+
+#if !defined( Rtt_NO_GUI )
+
+bool
+PlatformAppPackager::BeginBuildCallbacks( AppPackagerParams* params, const char* tmpDirBase, const char* platform )
+{
+	Rtt_ASSERT( fStageDir.IsEmpty() );
+
+	std::string stageTemplate( tmpDirBase );
+
+	if ( !stageTemplate.empty() && '/' != stageTemplate.back() && LUA_DIRSEP[0] != stageTemplate.back() )
+	{
+		stageTemplate += LUA_DIRSEP;
+	}
+
+	stageTemplate += "CLstageXXXXXX";
+
+	std::vector<char> buffer( stageTemplate.begin(), stageTemplate.end() );
+
+	buffer.push_back( '\0' );
+
+	const char *stageDir = Rtt_MakeTempDirectory( buffer.data() );
+	if ( NULL == stageDir )
+	{
+		String message( "ERROR: failed to create build stage directory: " );
+
+		message.Append( stageTemplate.c_str() );
+		params->SetBuildMessage( message.GetString() );
+
+		Rtt_LogException( "%s", message.GetString() );
+
+		return false;
+	}
+
+	fStageDir.Set( stageDir );
+
+	if ( !DoPreBuild( params->GetRuntime(), params->GetSrcDir(), stageDir, platform ) )
+	{
+		if ( NULL == params->GetBuildMessage() )
+		{
+			params->SetBuildMessage( "ERROR: `preBuild` callback failed. Check the Simulator console for details." );
+		}
+
+		return false;
+	}
+
+	EnableFilters( true ); // n.b. picked up by CompileAppScripts()
+
+	return true;
+}
+
+void
+PlatformAppPackager::EndBuildCallbacks()
+{
+	EnableFilters( false );
+
+	if ( !fStageDir.IsEmpty() )
+	{
+		// n.b. Rtt_DeleteDirectory() does not follow links, so anything `preBuild`
+		// symlinked into the stage directory is only unlinked, never emptied
+		if ( Rtt_IsDirectory( fStageDir.GetString() ) && !Rtt_DeleteDirectory( fStageDir.GetString() ) )
+		{
+			Rtt_LogException( "WARNING: failed to remove build stage directory '%s'", fStageDir.GetString() );
+		}
+
+		fStageDir.Set( "" );
+	}
+}
+
+bool
+PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const char* stageDir, const char* platform )
 {
 	bool ok = true;
 		
 	if ( 0 != fPreBuildFuncLength )
 	{
+		if ( NULL == runtime )
+		{
+			Rtt_LogException( "ERROR: `preBuild` needs the project's runtime, but none was supplied to the packager" );
+
+			return false;
+		}
+
 		lua_State *L = fVM;
 		int top = lua_gettop( L );
 
@@ -2483,7 +2643,7 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 	#if defined( Rtt_MAC_ENV )
 		proxyPlatform.fSystemResourceDirBase.Set( proxyPlatform.fResourceDirBase );
 	#else
-		//
+		runtime->Platform().PathForFile( NULL, MPlatform::kSystemResourceDir, MPlatform::kDefaultPathFlags, proxyPlatform.fSystemResourceDirBase );
 	#endif
 
 		lua_setallocf( L, alloc, &contextUD );
@@ -2518,6 +2678,8 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 				lua_pushstring( L, srcDir );
 				lua_setfield( L, -2, "srcDir" );
 
+				// Lua written under "<stageDir>/lua" is compiled into the app, cf. CompileScripts(),
+				// subject to the transientLuaExclude* filters
 				if ( stageDir )
 				{
 					lua_pushstring( L, stageDir );
@@ -2534,13 +2696,10 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 			}
 		}
 		
+		// TODO: restore require() stuff?
+		
 		lua_setallocf( L, alloc, ud );
 		lua_settop( L, top );
-	}
-	
-	if ( ok && 0 != fAppStartFuncLength ) // TODO: better call site? more robust debug stripping?
-	{
-		AddFile( fVM, fAppStartFunc, fAppStartFuncLength, "_appStart_", tmpDir, !fNeverStripDebugInfo );
 	}
 	
 	return ok;

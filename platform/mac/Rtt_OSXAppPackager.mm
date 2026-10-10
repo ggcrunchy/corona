@@ -117,27 +117,15 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 
 	const char tmpTemplate[] = "CLtmpXXXXXX";
 	char tmpDir[kDefaultNumBytes + 1]; Rtt_ASSERT( kDefaultNumBytes > ( strlen( tmpDirBase ) + strlen( tmpTemplate ) ) );
-	int tmpDirLen = snprintf( tmpDir, kDefaultNumBytes, "%s%s", tmpDirBase, tmpTemplate );/*
-	mktemp(tmpDir);
-
-    const char kCmdFormat[] = "mkdir -p %s";
-    char cmd[kDefaultNumBytes + 1]; Rtt_ASSERT( kDefaultNumBytes > ( sizeof( kCmdFormat ) + tmpDirLen ) );
-    snprintf( cmd, kDefaultNumBytes, kCmdFormat, tmpDir );*/
+	int tmpDirLen = snprintf( tmpDir, kDefaultNumBytes, "%s%s", tmpDirBase, tmpTemplate );
     char *tmpResult = Rtt_MakeTempDirectory( tmpDir );
     
-    char stageDir[kDefaultNumBytes + 1], *stageResult = NULL;
-#if !defined( Rtt_NO_GUI )
-	snprintf( stageDir, kDefaultNumBytes, "%s%s", tmpDirBase, "stageXXXXXX" );
-	
-	stageResult = Rtt_MakeTempDirectory( stageDir );
-#endif
-
     const char kTmpResourceCarFormat[] = "%s-resource.car";
     char tmpResourceCar[kDefaultNumBytes + 1]; Rtt_ASSERT( kDefaultNumBytes > ( sizeof( kTmpResourceCarFormat ) + tmpDirLen ) );
     snprintf( tmpResourceCar, kDefaultNumBytes, kTmpResourceCarFormat, tmpDir );
     
     // Create the temporary directory
-	if ( Rtt_VERIFY( tmpResult/*0 == system( cmd )*/ ) )
+	if ( Rtt_VERIFY( tmpResult ) )
 	{
         osxParams->SetIncludeBuildSettings(true);
 		
@@ -147,26 +135,34 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
 		String outputDir;
 		outputDir.Set(tmpDir);
 
+		bool ok = true;
+
 	#if !defined( Rtt_NO_GUI )
-		Runtime *runtime = params->GetRuntime();
-		if ( !DoPreBuild( runtime, osxParams->GetSrcDir(), tmpDir, stageResult, "mac" ) )
+		if ( !BeginBuildCallbacks( params, tmpDirBase, "mac" ) )
 		{
-			return PlatformAppPackager::kBuildError;
+			result = PlatformAppPackager::kBuildError;
+			ok = false;
 		}
 	#endif
 
-		if ((result = PrepackagePlugins(osxParams, tmpPluginsDir, outputDir)) != PlatformAppPackager::kNoError)
+		// n.b. no early returns from here on, so that the intermediate files get cleaned up
+		if (ok && (result = PrepackagePlugins(osxParams, tmpPluginsDir, outputDir)) != PlatformAppPackager::kNoError)
 		{
-			return result;
+			ok = false;
 		}
 			
+		bool compiled = ok && CompileAppScripts( osxParams, tmpDir );
+			
 	#if !defined( Rtt_NO_GUI )
-		PrepareFilters( params );
-		EnableFilters( true );
+		EndBuildCallbacks();
 	#endif
 			
-        if ( CompileScripts( osxParams, tmpDir, stageResult ) && ArchiveDirectoryTree(osxParams, tmpDir, tmpResourceCar) )
+        if ( !ok )
         {
+            // result already set
+        }
+        else if ( compiled && ArchiveDirectoryTree(osxParams, tmpDir, tmpResourceCar) )
+		{
             lua_State *L = fVM;
             lua_getglobal( L, "OSXPostPackage" ); Rtt_ASSERT( lua_isfunction( L, -1 ) );
             
@@ -251,19 +247,18 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
             result = PlatformAppPackager::kLocalPackagingError;
         }
 
-		// Clean up intermediate files
-		Rtt_ASSERT(strcmp(tmpDir, "/") != 0);/*
-		snprintf( cmd, kDefaultNumBytes, "rm -rf \"%s\"", tmpDir );
-		(void)Rtt_VERIFY( 0 == system( cmd ) );*/
-		(void)Rtt_VERIFY( rmdir( tmpDir ) );
-		(void)Rtt_VERIFY( rmdir( tmpPluginsDir ) );
-		(void)Rtt_VERIFY( rmdir( tmpResourceCar ) );
+		// Clean up intermediate files (n.b. rmdir() is "rm -rf", so the resource.car file is fine too)
+		Rtt_ASSERT( strcmp(tmpDir, "/") != 0 );
 		
-		if ( stageResult )
-		{
-			(void)Rtt_VERIFY( rmdir( stageResult ) );
-		}
+ 		(void)Rtt_VERIFY( rmdir( tmpDir ) );
+		(void)Rtt_VERIFY( rmdir( tmpPluginsDir.GetString() ) );
+ 		(void)Rtt_VERIFY( rmdir( tmpResourceCar ) );
 	}
+	else
+	{
+		result = PlatformAppPackager::kLocalPackagingError;
+		osxParams->SetBuildMessage( "ERROR: failed to create temporary build directory" );
+ 	}
 
     // Indicate status in the console
 	if (PlatformAppPackager::kNoError == result)

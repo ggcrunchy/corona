@@ -138,6 +138,7 @@ CBuildResult appAndroidBuild(
 	Rtt::Runtime *runtimePointer = pSim->GetRuntime();
 	U32 luaModules = runtimePointer->VMContext().GetModules();
 	params.InitializeProductId( luaModules );
+	params.SetRuntime( runtimePointer );
 
 	const char kBuildSettings[] = "build.settings";
 	Rtt::String buildSettingsPath;
@@ -268,6 +269,7 @@ CBuildResult appWebBuild(
 	Rtt::Runtime* runtimePointer = pSim->GetRuntime();
 	U32 luaModules = runtimePointer->VMContext().GetModules();
 	params.InitializeProductId( luaModules );
+	params.SetRuntime( runtimePointer );
 
 	const char kBuildSettings[] = "build.settings";
 	Rtt::String buildSettingsPath;
@@ -365,6 +367,7 @@ CBuildResult appLinuxBuild(
 	Rtt::Runtime* runtimePointer = pSim->GetRuntime();
 	U32 luaModules = runtimePointer->VMContext().GetModules();
 	params.InitializeProductId( luaModules );
+	params.SetRuntime( runtimePointer );
 
 	const char kBuildSettings[] = "build.settings";
 	Rtt::String buildSettingsPath;
@@ -462,6 +465,7 @@ CBuildResult appNxSBuild(
 	Rtt::Runtime* runtimePointer = pSim->GetRuntime();
 	U32 luaModules = runtimePointer->VMContext().GetModules();
 	params.InitializeProductId(luaModules);
+	params.SetRuntime( runtimePointer );
 
 	const char kBuildSettings[] = "build.settings";
 	Rtt::String buildSettingsPath;
