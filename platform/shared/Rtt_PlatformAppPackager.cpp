@@ -65,10 +65,6 @@
 #elif Rtt_WIN_ENV
 #endif
 
-#if !defined( Rtt_NO_GUI )
-	#include <regex>
-#endif
-
 // ----------------------------------------------------------------------------
 
 
@@ -113,25 +109,26 @@ Rtt_EXPORT int Rtt_LuaCompile(lua_State *L, int numSources, const char** sources
 #if !defined( Rtt_NO_GUI )
 
 struct ListOfStringsIter {
-	void FindNextSemicolon()
+	void FindNextSeparator()
 	{
-		fSemicolon = strchr( fStr, ';' );
+		fSeparator = strchr( fStr, fSeparatorChar );
 	}
 
-	ListOfStringsIter( const char * str )
-	:	fStr( str )
+	ListOfStringsIter( const char * str, char sep = ';' )
+	:	fStr( str ),
+		fSeparatorChar( sep )
 	{
 		if ( str )
 		{
-			FindNextSemicolon();
+			FindNextSeparator();
 		}
 	}
 
 	std::string operator*() const
 	{
-		if ( fSemicolon )
+		if ( fSeparator )
 		{
-			return std::string( fStr, fSemicolon - fStr );
+			return std::string( fStr, fSeparator - fStr );
 		}
 		else
 		{
@@ -141,11 +138,11 @@ struct ListOfStringsIter {
 
 	ListOfStringsIter& operator++()
 	{
-		if ( NULL != fSemicolon )
+		if ( NULL != fSeparator )
 		{
-			fStr = fSemicolon + 1;
+			fStr = fSeparator + 1;
 			
-			FindNextSemicolon();
+			FindNextSeparator();
 		}
 		else
 		{
@@ -164,83 +161,103 @@ struct ListOfStringsIter {
 	}
 
 	const char * fStr;
-	const char * fSemicolon;
+	const char * fSeparator;
+	char fSeparatorChar;
 };
 
 struct PackagerParamsFilterState {
-	std::regex fExcludeFilesRegex;
-	std::regex fExcludeDirsRegex;
-	bool fHasExcludeFilesFilter;
-	bool fHasExcludeDirsFilter;
+	const String* fExcludeFilesPattern;
+	const String* fExcludeDirsPattern;
+	int fStringMatchRef;
 	
 	PackagerParamsFilterState()
 	{
+		fStringMatchRef = LUA_NOREF;
+	
 		Reset();
 	}
 	
 	void
 	Reset()
 	{
-		fHasExcludeFilesFilter = false;
-		fHasExcludeDirsFilter = false;
+		fExcludeFilesPattern = NULL;
+		fExcludeDirsPattern = NULL;
 	}
 	
-	static bool
-	AuxAssignRegex( std::regex& regex, const String& filter, bool& hasExcludeFilter )
+	static const String*
+	AuxAssignPattern( const String& filter )
 	{
-		hasExcludeFilter = ( filter.GetLength() > 0 );
-		if ( hasExcludeFilter )
+		if( filter.GetLength() > 0 )
 		{
-		//	try
+			return &filter;
+		}
+		else
+		{
+			return NULL;
+		}
+	}
+	
+	void
+	AssignPatterns( const String& excludeFiles, const String& excludeDirs )
+	{
+		fExcludeFilesPattern = AuxAssignPattern( excludeFiles );
+		fExcludeDirsPattern = AuxAssignPattern( excludeDirs );
+	}
+	
+	bool
+	CanInclude( lua_State *L, const char* name, const String *exclude ) const
+	{
+		Rtt_ASSERT( exclude );
+	
+		for ( std::string&& clause : ListOfStringsIter( exclude->GetString(), '|' ) )
+		{
+			bool isNegation = ( '~' == clause[0] );
+			
+			lua_getref( L, fStringMatchRef );
+			lua_pushstring( L, clause.c_str() + isNegation );
+			lua_pushstring( L, name );
+			
+			if ( lua_pcall( L, 2, 1, 0 ) == 0 )
 			{
-			// TODO: check for non-exception case?
-				regex.assign( filter.GetString(), std::regex::ECMAScript | std::regex::optimize );
-			}/*
-			catch ( const std::regex_error& err )
+				bool isMatch = lua_toboolean( L, -1 );
+				bool shouldExclude = isMatch;
+				
+				if ( isNegation )
+				{
+					shouldExclude = !shouldExclude;
+				}
+				
+				lua_pop( L, 1 );
+				
+				if ( shouldExclude )
+				{
+					Rtt_TRACE_SIM(( "Filtering out '%s'", name ));
+					return false;
+				}
+			}
+			else
 			{
-				Rtt_LogException( "ERROR: invalid Lua exclusion filter '%s': %s", filter.GetString(), err.what() );
-				hasExcludeFilter = false;
-
+				Rtt_LogException( "ERROR: broken match: %s", lua_isstring( L, -1 ) ? lua_tostring( L, -1 ) : "unknown" );
+				
+				lua_pop( L, 1 );
+				
 				return false;
-			}*/
+			}
 		}
 		
 		return true;
 	}
 	
 	bool
-	AssignRegexes( const String& excludeFiles, const String& excludeDirs )
+	CanIncludeFile( lua_State *L, const char *file ) const
 	{
-		 bool filesOK = AuxAssignRegex( fExcludeFilesRegex, excludeFiles, fHasExcludeFilesFilter );
-		 bool dirsOK = AuxAssignRegex( fExcludeDirsRegex, excludeDirs, fHasExcludeDirsFilter );
-
-		return filesOK && dirsOK;
-	}
-	
-	static bool
-	CanInclude( const char* name, const std::regex &exclude )
-	{
-		if ( !std::regex_match( name, exclude ) )
-		{
-			return true;
-		}
-		else
-		{
-			Rtt_TRACE_SIM(( "Filtering out '%s'", name ));
-			return false;
-		}
-	}
-	
-	bool
-	CanIncludeFile( const char *file ) const
-	{
-		return !fHasExcludeFilesFilter || CanInclude( file, fExcludeFilesRegex );
+		return ( NULL == fExcludeFilesPattern ) || CanInclude( L, file, fExcludeFilesPattern );
 	}
 
 	bool
-	CanIncludeDir( const char *dir ) const
+	CanIncludeDir( lua_State *L, const char *dir ) const
 	{
-		return !fHasExcludeDirsFilter || CanInclude( dir, fExcludeDirsRegex );
+		return ( NULL == fExcludeDirsPattern ) || CanInclude( L, dir, fExcludeDirsPattern );
 	}
 };
 
@@ -766,7 +783,7 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 							continue;
 						}
 					#if !defined( Rtt_NO_GUI )
-						else if ( filterState && !filterState->CanIncludeDir( filename ) )
+						else if ( filterState && !filterState->CanIncludeDir( L, filename ) )
 						{
 							continue;
 						}
@@ -785,7 +802,7 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 						isBuildSettingsFile = (Rtt_StringCompare( filename, "build.settings" ) == 0);
 					}
 				#if !defined( Rtt_NO_GUI )
-					if ( isLuaFile && filterState && !filterState->CanIncludeFile( filename ) )
+					if ( isLuaFile && filterState && !filterState->CanIncludeFile( L, filename ) )
 					{
 						continue;
 					}
@@ -1092,11 +1109,34 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 		{
 			state->Reset();
 		}
-		else if ( !state->AssignRegexes( fExcludeFiles, fExcludeDirs ) )
+		else
 		{
-			params->SetBuildMessage( "ERROR: invalid 'luaExcludeFiles' or 'luaExcludeDirs' in build.settings" );
-
-			return false;
+			if ( LUA_NOREF == state->fStringMatchRef )
+			{
+				lua_State *L = fVM;
+				int type = LUA_TNONE;
+				
+				lua_getglobal( L, "string" );
+				
+				if ( !lua_isnil( L, -1 ) )
+				{
+					lua_getfield( L, -1, "match" );
+					
+					type = lua_type( L, -1 );
+					state->fStringMatchRef = lua_ref( L, 1 );
+				}
+				
+				lua_pop( L, 1 );
+				
+				if ( LUA_TFUNCTION != type )
+				{
+					Rtt_LogException( "ERROR: CompileScripts() wants to use filters, but string.match() is broken" );
+				
+					return false;
+				}
+			}
+		
+			state->AssignPatterns( fExcludeFiles, fExcludeDirs );
 		}
 	}
 #endif
@@ -1119,11 +1159,6 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 #if !defined( Rtt_NO_GUI )
 	if ( result && stageDir )
 	{
-		if ( NULL != state && fUseFilters )
-		{
-			state->AssignRegexes( fTransientExcludeFiles, fTransientExcludeDirs );
-		}
-	
 		std::string root = stageDir;
 		
 		root += LUA_DIRSEP "lua";
@@ -1132,13 +1167,12 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 		// otherwise fail the build with "source directory is inaccessible"
 		if ( Rtt_IsDirectory( root.c_str() ) )
  		{
-			if ( NULL != state && fUseFilters && !state->AssignRegexes( fTransientExcludeFiles, fTransientExcludeDirs ) )
+			if ( NULL != state && fUseFilters )
 			{
-				params->SetBuildMessage( "ERROR: invalid 'transientLuaExcludeFiles' or 'transientLuaExcludeDirs' in build.settings" );
-
-				result = false;
+				state->AssignPatterns( fTransientExcludeFiles, fTransientExcludeDirs );
 			}
-			else if ( !CompileScriptsInDirectory( fVM, * params, dstDir, root.c_str(), root.c_str() ) )
+			
+			if ( !CompileScriptsInDirectory( fVM, * params, dstDir, root.c_str(), root.c_str() ) )
 			{
 				result = false;
 			}
@@ -1968,8 +2002,10 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 		
 	if ( isForFile && !dot )
 	{
-		clause += ".lua";
+		clause += "%.lua";
 	}
+
+	int startPos = 0;
 
 	for ( size_t pos = 0; pos < clause.size(); )
 	{
@@ -1982,9 +2018,8 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 		case '~':
 			Rtt_ASSERT( 0 == pos );
 			
-			clause[0] = '(';
-			clause.insert( 1, "^(?!" );
-			pos += 5;
+			startPos++;
+			pos++;
 			break;
 		case '?':
 			clause[pos++] = '.';
@@ -1998,10 +2033,8 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 		}
 	}
 	
-	if ( '(' == clause[0] )
-	{
-		clause += "$).+$)";
-	}
+	clause.insert( clause.begin() + startPos, '^' );
+	clause.insert( clause.end(), '$' );
 	
 	return true;
 }
@@ -2044,19 +2077,19 @@ AuxReadFilter( const char *str, String& filter, bool isForFile )
 		
 		for ( auto&& luaForm : ListOfStringsIter( str ) )
 		{
-			std::string regexForm;
+			std::string patternForm;
 			if ( luaForm.empty() )
 			{
 				continue;
 			}
-			else if ( ResolveClause( luaForm.c_str(), isForFile, regexForm ) )
+			else if ( ResolveClause( luaForm.c_str(), isForFile, patternForm ) )
 			{
 				if ( !build.empty() )
 				{
 					build += '|';
 				}
 				
-				build += regexForm;
+				build += patternForm;
 			}
 		}
 
