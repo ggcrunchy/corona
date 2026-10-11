@@ -262,7 +262,7 @@ struct PackagerParamsFilterState {
 	{
 		ptrdiff_t i = 0;  /* counts maximum expand for item */
 
-		while ( (s + i ) < src_end && SingleMatch(uchar( s[i] ), p ) )
+		while ( ( s + i ) < src_end && SingleMatch(uchar( s[i] ), p ) )
 		{
 			i++;
 		}
@@ -270,7 +270,7 @@ struct PackagerParamsFilterState {
 		/* keeps trying to match with the maximum repetitions */
 		while ( i >= 0 )
 		{
-			if ( Match( src_end, ( s + i ), ep + 1 ) )
+			if ( Match( src_end, s + i, ep + 1 ) )
 			{
 				return true;
 			}
@@ -291,15 +291,15 @@ struct PackagerParamsFilterState {
 			{ 
 				return MaxExpand(src_end, s, p, ep);
 			}
-			else if ( !( s < src_end && SingleMatch( uchar( *s ), p ) ) )
-			{
-				return false;
-			}
-			else
+			else if ( s < src_end && SingleMatch( uchar( *s ), p ) )
 			{
 				s++;
 				
 				p = ep;
+			}
+			else
+			{
+				return false;
 			}
 		}
 
