@@ -214,8 +214,8 @@ struct PackagerParamsFilterState {
 			bool isNegation = ( '~' == clause[0] );
 			
 			lua_getref( L, fStringMatchRef );
-			lua_pushstring( L, clause.c_str() + isNegation );
 			lua_pushstring( L, name );
+			lua_pushstring( L, clause.c_str() + isNegation );
 			
 			if ( lua_pcall( L, 2, 1, 0 ) == 0 )
 			{
@@ -2038,6 +2038,83 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 	
 	return true;
 }
+
+#define uchar(p) ((unsigned char)p)
+
+static const char *classend( const char *p )
+{
+	return ( '%' == *p++ ) ? ( p + 1 ) : p;
+}
+
+static int singlematch( int c, const char *p )
+{
+	return ( '.' == *p ) || ( uchar(*p) == c );
+}
+
+static bool match( const char *src_end, const char *s, const char *p );
+
+static bool max_expand( const char *src_end, const char *s, const char *p, const char *ep )
+{
+	ptrdiff_t i = 0;  /* counts maximum expand for item */
+
+	while ( (s + i ) < src_end && singlematch(uchar( s[i] ), p ) )
+	{
+		i++;
+	}
+
+	/* keeps trying to match with the maximum repetitions */
+	while ( i >= 0 )
+	{
+		if ( match( src_end, ( s + i ), ep + 1 ) )
+		{
+			return true;
+		}
+
+		i--;  /* else didn't match; reduce 1 repetition to try again */
+	}
+
+	return false;
+}
+
+static bool match( const char *src_end, const char *s, const char *p )
+{
+	while ( '\0' != *p ) /* end of pattern? */
+	{
+		const char *ep = classend( p );  /* points to what is next */
+		if ( '*' == *ep ) /* 0 or more repetitions */
+		{ 
+			return max_expand(src_end, s, p, ep);
+		}
+		else if ( !( s < src_end && singlematch( uchar( *s ), p ) ) )
+		{
+			return false;
+		}
+		else
+		{
+			s++;
+			
+			p = ep;
+		}
+	}
+
+	return true;
+}
+
+static int str_find_aux( const char *s, const char *p )
+{
+	const char *src_end = s + strlen( s );
+
+	do {
+		if ( match( src_end, s, p ) )
+		{
+			return true;
+		}
+	} while ( s++ < src_end );
+
+	return false;
+}
+
+#undef uchar
 
 static void
 AuxReadFilter( const char *str, String& filter, bool isForFile )
