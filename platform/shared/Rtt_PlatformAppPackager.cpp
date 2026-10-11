@@ -2758,15 +2758,6 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 				
 				lua_pushstring( L, proxyPlatform.fCachesDirBase.GetString() );
 				lua_setfield( L, -2, "cacheDir" );
-				
-				// TODO: includeDir, libDir
-					// Windows: look in %CORONA_ROOT%, %...PATH%
-					// Mac: look for $HOME... whatever script sets
-					// Linux: ?? (...have some analysis on this and others)
-					// yoink stuff from TinyCC... at least available for Xcode (will double as system.getInfo() thing... perhaps use that as authority)
-					// add env. variable setup in desktop builds: Visual Studio, Xcode
-						// add "dev" flag in these cases (or just make alt. dirs available under different names)
-				
 				lua_pushstring( L, platform );
 				
 				if ( 0 != lua_pcall( L, 2, 0, 0 ) )

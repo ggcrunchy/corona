@@ -71,6 +71,87 @@ static void PushStringOrNil( lua_State *L, const char *str )
     }
 }
 
+static bool
+GetNativePath( lua_State *L )
+{
+	#ifdef Rtt_WIN_ENV
+		// CORONA_ROOT, CORONA_PATH
+	#elif defined( Rtt_MAC_ENV )
+		const char *home = getenv( "HOME" );
+		
+		Rtt_ASSERT( home );
+		
+		std::string pathToLink = home;
+		
+		pathToLink += "/Library/Application Support/Corona/Native";
+	
+		char path[PATH_MAX];
+		ssize_t linkLength = readlink( pathToLink.c_str(), path, PATH_MAX );
+		if( linkLength > 0 )
+		{
+			path[linkLength] = '\0';
+			
+			lua_pushfstring( L, "%sCorona", path );
+			
+			return true;
+		}
+		else
+		{
+			Rtt_LogException( "WARNING: unable to find `Native` symbolic link (for `include` and `lib` in application support" );
+		}
+		
+	#elif defined( Rtt_LINUX_ENV )
+		// ???
+	#endif
+
+	// yoink stuff from TinyCC... at least available for Xcode (will double as system.getInfo() thing... perhaps use that as authority)
+	// add env. variable setup in desktop builds: Visual Studio, Xcode
+		// add "dev" flag in these cases (or just make alt. dirs available under different names)
+
+	return false;
+}
+
+#if defined( Rtt_IS_LOCAL_BUILD )
+
+static bool GetDevPaths( lua_State *L )
+{
+	const char *baseDir = NULL;
+
+	#if defined( Rtt_WIN_ENV )
+		// Visual Studio...
+	#elif defined( Rtt_MAC_ENV )
+		const char *ide = getenv( "RUNNING_IN_IDE" );
+		if ( Rtt_StringCompare( ide, "Xcode" ) == 0 )
+		{
+			Rtt_VERIFY( baseDir = getenv( "CODE_BASE_DIR" ) );
+		}
+		else /* local build, or other IDE */
+		{
+			Rtt_LogException( "ERROR: Unknown IDE or dev-built app; unable to find dev paths" );
+		}
+	#elif defined( Rtt_LINUX_ENV )
+		// ??
+	#else
+		// Zig, etc.
+	#endif
+
+	if ( baseDir )
+	{
+		lua_createtable( L, 0, 2 );
+		lua_pushfstring( L, "%s/librtt/Corona", baseDir );
+		lua_setfield( L, -2, "Corona" );
+		lua_pushfstring( L, "%s/external/lua-5.1.3/src", baseDir );
+		lua_setfield( L, -2, "lua" );
+		
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+#endif
+
 int
 LuaLibSystem::getInfo( lua_State *L )
 {
@@ -299,6 +380,18 @@ LuaLibSystem::getInfo( lua_State *L )
                 lua_setfield( L, -2, "hasInstanceID" );
             }
         }
+    }
+    else if ( Rtt_StringCompare( key, "nativeCoronaDir" ) == 0 )
+    {
+		result = GetNativePath( L );
+    }
+    else if ( Rtt_StringCompare( key, "devCoronaDir" ) == 0 )
+    {
+    #if defined( Rtt_IS_LOCAL_BUILD )
+		result = GetDevPaths( L );
+    #else
+		return 0;
+    #endif
     }
     else
     {
