@@ -258,11 +258,11 @@ struct PackagerParamsFilterState {
 	}
 
 	static bool
-	MaxExpand( const char *src_end, const char *s, const char *p, const char *ep )
+	MaxExpand( /*const char *src_end, */const char *s, const char *p, const char *ep )
 	{
 		ptrdiff_t i = 0;  /* counts maximum expand for item */
 
-		while ( ( s + i ) < src_end && SingleMatch(uchar( s[i] ), p ) )
+		while ( *( s + i )/* < src_end*/ && SingleMatch( uchar( s[i] ), p ) )
 		{
 			i++;
 		}
@@ -270,7 +270,7 @@ struct PackagerParamsFilterState {
 		/* keeps trying to match with the maximum repetitions */
 		while ( i >= 0 )
 		{
-			if ( Match( src_end, s + i, ep + 1 ) )
+			if ( Match( /*src_end, */s + i, ep + 1 ) )
 			{
 				return true;
 			}
@@ -282,16 +282,16 @@ struct PackagerParamsFilterState {
 	}
 
 	static bool
-	Match( const char *src_end, const char *s, const char *p )
+	Match( /*const char *src_end, */const char *s, const char *p )
 	{
 		while ( *p ) /* end of pattern? */
 		{
 			const char *ep = ClassEnd( p );  /* points to what is next */
 			if ( '*' == *ep ) /* 0 or more repetitions */
 			{ 
-				return MaxExpand(src_end, s, p, ep);
+				return MaxExpand( /*src_end, */s, p, ep );
 			}
-			else if ( s < src_end && SingleMatch( uchar( *s ), p ) )
+			else if ( *s/*s < src_end*/ && SingleMatch( uchar( *s ), p ) )
 			{
 				s++;
 				
@@ -309,14 +309,14 @@ struct PackagerParamsFilterState {
 	static bool
 	MatchPattern( const char *s, const char *p )
 	{
-		const char *src_end = s + strlen( s );
+	//	const char *src_end = s + strlen( s );
 
 		do {
-			if ( Match( src_end, s, p ) )
+			if ( Match( /*src_end, */s, p ) )
 			{
 				return true;
 			}
-		} while ( s++ < src_end );
+		} while ( *s++ );// < src_end );
 
 		return false;
 	}
