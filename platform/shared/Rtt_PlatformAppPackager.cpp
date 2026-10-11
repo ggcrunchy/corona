@@ -168,12 +168,11 @@ struct ListOfStringsIter {
 struct PackagerParamsFilterState {
 	const String* fExcludeFilesPattern;
 	const String* fExcludeDirsPattern;
-	int fStringMatchRef;
+	
+	
 	
 	PackagerParamsFilterState()
 	{
-		fStringMatchRef = LUA_NOREF;
-	
 		Reset();
 	}
 	
@@ -205,42 +204,24 @@ struct PackagerParamsFilterState {
 	}
 	
 	bool
-	CanInclude( lua_State *L, const char* name, const String *exclude ) const
+	CanInclude( const char* name, const String *exclude ) const
 	{
 		Rtt_ASSERT( exclude );
 	
 		for ( std::string&& clause : ListOfStringsIter( exclude->GetString(), '|' ) )
 		{
 			bool isNegation = ( '~' == clause[0] );
+			bool isMatch = MatchPattern( name, clause.c_str() + isNegation );
+			bool shouldExclude = isMatch;
 			
-			lua_getref( L, fStringMatchRef );
-			lua_pushstring( L, name );
-			lua_pushstring( L, clause.c_str() + isNegation );
-			
-			if ( lua_pcall( L, 2, 1, 0 ) == 0 )
+			if ( isNegation )
 			{
-				bool isMatch = lua_toboolean( L, -1 );
-				bool shouldExclude = isMatch;
-				
-				if ( isNegation )
-				{
-					shouldExclude = !shouldExclude;
-				}
-				
-				lua_pop( L, 1 );
-				
-				if ( shouldExclude )
-				{
-					Rtt_TRACE_SIM(( "Filtering out '%s'", name ));
-					return false;
-				}
+				shouldExclude = !shouldExclude;
 			}
-			else
+			
+			if ( shouldExclude )
 			{
-				Rtt_LogException( "ERROR: broken match: %s", lua_isstring( L, -1 ) ? lua_tostring( L, -1 ) : "unknown" );
-				
-				lua_pop( L, 1 );
-				
+				Rtt_TRACE_SIM(( "Filtering out '%s'", name ));
 				return false;
 			}
 		}
@@ -249,16 +230,98 @@ struct PackagerParamsFilterState {
 	}
 	
 	bool
-	CanIncludeFile( lua_State *L, const char *file ) const
+	CanIncludeFile( const char *file ) const
 	{
-		return ( NULL == fExcludeFilesPattern ) || CanInclude( L, file, fExcludeFilesPattern );
+		return ( NULL == fExcludeFilesPattern ) || CanInclude( file, fExcludeFilesPattern );
 	}
 
 	bool
-	CanIncludeDir( lua_State *L, const char *dir ) const
+	CanIncludeDir( const char *dir ) const
 	{
-		return ( NULL == fExcludeDirsPattern ) || CanInclude( L, dir, fExcludeDirsPattern );
+		return ( NULL == fExcludeDirsPattern ) || CanInclude( dir, fExcludeDirsPattern );
 	}
+
+	/* boiled down from str_match */
+	
+	#define uchar(p) ((unsigned char)p)
+
+	static const char *
+	ClassEnd( const char *p )
+	{
+		return ( '%' == *p++ ) ? ( p + 1 ) : p;
+	}
+
+	static bool
+	SingleMatch( int c, const char *p )
+	{
+		return ( '.' == *p ) || ( uchar(*p) == c );
+	}
+
+	static bool
+	MaxExpand( const char *src_end, const char *s, const char *p, const char *ep )
+	{
+		ptrdiff_t i = 0;  /* counts maximum expand for item */
+
+		while ( (s + i ) < src_end && SingleMatch(uchar( s[i] ), p ) )
+		{
+			i++;
+		}
+
+		/* keeps trying to match with the maximum repetitions */
+		while ( i >= 0 )
+		{
+			if ( Match( src_end, ( s + i ), ep + 1 ) )
+			{
+				return true;
+			}
+
+			i--;  /* else didn't match; reduce 1 repetition to try again */
+		}
+
+		return false;
+	}
+
+	static bool
+	Match( const char *src_end, const char *s, const char *p )
+	{
+		while ( *p ) /* end of pattern? */
+		{
+			const char *ep = ClassEnd( p );  /* points to what is next */
+			if ( '*' == *ep ) /* 0 or more repetitions */
+			{ 
+				return MaxExpand(src_end, s, p, ep);
+			}
+			else if ( !( s < src_end && SingleMatch( uchar( *s ), p ) ) )
+			{
+				return false;
+			}
+			else
+			{
+				s++;
+				
+				p = ep;
+			}
+		}
+
+		return true;
+	}
+
+	static bool
+	MatchPattern( const char *s, const char *p )
+	{
+		const char *src_end = s + strlen( s );
+
+		do {
+			if ( Match( src_end, s, p ) )
+			{
+				return true;
+			}
+		} while ( s++ < src_end );
+
+		return false;
+	}
+
+	#undef uchar
 };
 
 #endif
@@ -783,7 +846,7 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 							continue;
 						}
 					#if !defined( Rtt_NO_GUI )
-						else if ( filterState && !filterState->CanIncludeDir( L, filename ) )
+						else if ( filterState && !filterState->CanIncludeDir( filename ) )
 						{
 							continue;
 						}
@@ -802,7 +865,7 @@ CompileScriptsInDirectory( lua_State *L, AppPackagerParams& params, const char *
 						isBuildSettingsFile = (Rtt_StringCompare( filename, "build.settings" ) == 0);
 					}
 				#if !defined( Rtt_NO_GUI )
-					if ( isLuaFile && filterState && !filterState->CanIncludeFile( L, filename ) )
+					if ( isLuaFile && filterState && !filterState->CanIncludeFile( filename ) )
 					{
 						continue;
 					}
@@ -1111,31 +1174,6 @@ PlatformAppPackager::CompileScripts( AppPackagerParams * params, const char* tmp
 		}
 		else
 		{
-			if ( LUA_NOREF == state->fStringMatchRef )
-			{
-				lua_State *L = fVM;
-				int type = LUA_TNONE;
-				
-				lua_getglobal( L, "string" );
-				
-				if ( !lua_isnil( L, -1 ) )
-				{
-					lua_getfield( L, -1, "match" );
-					
-					type = lua_type( L, -1 );
-					state->fStringMatchRef = lua_ref( L, 1 );
-				}
-				
-				lua_pop( L, 1 );
-				
-				if ( LUA_TFUNCTION != type )
-				{
-					Rtt_LogException( "ERROR: CompileScripts() wants to use filters, but string.match() is broken" );
-				
-					return false;
-				}
-			}
-		
 			state->AssignPatterns( fExcludeFiles, fExcludeDirs );
 		}
 	}
@@ -2005,8 +2043,6 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 		clause += "%.lua";
 	}
 
-	int startPos = 0;
-
 	for ( size_t pos = 0; pos < clause.size(); )
 	{
 		switch ( clause[pos] )
@@ -2018,7 +2054,6 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 		case '~':
 			Rtt_ASSERT( 0 == pos );
 			
-			startPos++;
 			pos++;
 			break;
 		case '?':
@@ -2033,88 +2068,8 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 		}
 	}
 	
-	clause.insert( clause.begin() + startPos, '^' );
-	clause.insert( clause.end(), '$' );
-	
 	return true;
 }
-
-#define uchar(p) ((unsigned char)p)
-
-static const char *classend( const char *p )
-{
-	return ( '%' == *p++ ) ? ( p + 1 ) : p;
-}
-
-static int singlematch( int c, const char *p )
-{
-	return ( '.' == *p ) || ( uchar(*p) == c );
-}
-
-static bool match( const char *src_end, const char *s, const char *p );
-
-static bool max_expand( const char *src_end, const char *s, const char *p, const char *ep )
-{
-	ptrdiff_t i = 0;  /* counts maximum expand for item */
-
-	while ( (s + i ) < src_end && singlematch(uchar( s[i] ), p ) )
-	{
-		i++;
-	}
-
-	/* keeps trying to match with the maximum repetitions */
-	while ( i >= 0 )
-	{
-		if ( match( src_end, ( s + i ), ep + 1 ) )
-		{
-			return true;
-		}
-
-		i--;  /* else didn't match; reduce 1 repetition to try again */
-	}
-
-	return false;
-}
-
-static bool match( const char *src_end, const char *s, const char *p )
-{
-	while ( '\0' != *p ) /* end of pattern? */
-	{
-		const char *ep = classend( p );  /* points to what is next */
-		if ( '*' == *ep ) /* 0 or more repetitions */
-		{ 
-			return max_expand(src_end, s, p, ep);
-		}
-		else if ( !( s < src_end && singlematch( uchar( *s ), p ) ) )
-		{
-			return false;
-		}
-		else
-		{
-			s++;
-			
-			p = ep;
-		}
-	}
-
-	return true;
-}
-
-static int str_find_aux( const char *s, const char *p )
-{
-	const char *src_end = s + strlen( s );
-
-	do {
-		if ( match( src_end, s, p ) )
-		{
-			return true;
-		}
-	} while ( s++ < src_end );
-
-	return false;
-}
-
-#undef uchar
 
 static void
 AuxReadFilter( const char *str, String& filter, bool isForFile )
