@@ -248,13 +248,14 @@ struct PackagerParamsFilterState {
 	static const char *
 	ClassEnd( const char *p )
 	{
-		return ( '%' == *p++ ) ? ( p + 1 ) : p;
+		bool isEscape = ( '%' == *p++ );
+		return isEscape ? ( p + 1 ) : p;
 	}
 
 	static bool
 	SingleMatch( int c, const char *p )
 	{
-		return ( '.' == *p ) || ( uchar(*p) == c );
+		return ( '.' == *p ) || ( uchar( *p ) == c );
 	}
 
 	static bool
@@ -324,7 +325,7 @@ struct PackagerParamsFilterState {
 
 #endif
 
-#define kDefaultNumBytes 1024 /*128*/
+#define kDefaultNumBytes 1024
 
 AppPackagerParams::AppPackagerParams( const char* appName, 
 	const char* version,
@@ -1972,6 +1973,9 @@ public:
 	
 		switch (baseDir)
 		{
+		case MPlatform::kCachesDir:
+			result.Set( fCachesDirBase );
+			break;
 		case MPlatform::kPluginsDir:
 			result.Set( fPluginsDirBase );
 			break;
@@ -1987,6 +1991,7 @@ public:
 	}
 
 public:
+	String fCachesDirBase;
 	String fPluginsDirBase;
 	String fSystemResourceDirBase;
 	String fResourceDirBase;
@@ -2700,7 +2705,9 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 		
 		ProxyPlatform proxyPlatform( fServices.Platform() );
 		LuaContextUserdata contextUD( NULL, proxyPlatform, runtime );
+		// ^^ TODO: the proxy platform is annoying... is it avoidable? trying with Runtime->Platform() was crashing in pthread_setspecific() or something adjacent
 		
+		runtime->Platform().PathForFile( NULL, MPlatform::kCachesDir, MPlatform::kDefaultPathFlags, proxyPlatform.fCachesDirBase );
 		runtime->Platform().PathForFile( NULL, MPlatform::kPluginsDir, MPlatform::kDefaultPathFlags, proxyPlatform.fPluginsDirBase );
 		runtime->Platform().PathForFile( NULL, MPlatform::kResourceDir, MPlatform::kDefaultPathFlags, proxyPlatform.fResourceDirBase );
 	#if defined( Rtt_MAC_ENV )
@@ -2748,6 +2755,17 @@ PlatformAppPackager::DoPreBuild( Runtime *runtime, const char* srcDir, const cha
 					lua_pushstring( L, stageDir );
 					lua_setfield( L, -2, "stageDir" );
 				}
+				
+				lua_pushstring( L, proxyPlatform.fCachesDirBase.GetString() );
+				lua_setfield( L, -2, "cacheDir" );
+				
+				// TODO: includeDir, libDir
+					// Windows: look in %CORONA_ROOT%, %...PATH%
+					// Mac: look for $HOME... whatever script sets
+					// Linux: ?? (...have some analysis on this and others)
+					// yoink stuff from TinyCC... at least available for Xcode (will double as system.getInfo() thing... perhaps use that as authority)
+					// add env. variable setup in desktop builds: Visual Studio, Xcode
+						// add "dev" flag in these cases (or just make alt. dirs available under different names)
 				
 				lua_pushstring( L, platform );
 				

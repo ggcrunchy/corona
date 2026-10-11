@@ -253,6 +253,7 @@ OSXAppPackager::Build( AppPackagerParams * params, const char* tmpDirBase )
  		(void)Rtt_VERIFY( rmdir( tmpDir ) );
 		(void)Rtt_VERIFY( rmdir( tmpPluginsDir.GetString() ) );
  		(void)Rtt_VERIFY( rmdir( tmpResourceCar ) );
+ 		// TODO: add the retainTmpDir option here and consistently elsewhere
 	}
 	else
 	{
