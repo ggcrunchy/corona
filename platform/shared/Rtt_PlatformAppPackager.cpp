@@ -255,7 +255,7 @@ struct PackagerParamsFilterState {
 	static bool
 	SingleMatch( int c, const char *p )
 	{
-		return ( '.' == *p ) || ( uchar( *p ) == c );
+		return ( '%' == *p ) ? ( uchar( p[1] ) == c ) : ( '.' == *p ) || ( uchar( *p ) == c );
 	}
 
 	static bool
@@ -271,7 +271,7 @@ struct PackagerParamsFilterState {
 		/* keeps trying to match with the maximum repetitions */
 		while ( i >= 0 )
 		{
-			if ( Match( s + i, ep + 1 ) )
+			if ( MatchPattern( s + i, ep + 1 ) )
 			{
 				return true;
 			}
@@ -283,7 +283,7 @@ struct PackagerParamsFilterState {
 	}
 
 	static bool
-	Match( const char *s, const char *p )
+	MatchPattern( const char *s, const char *p )
 	{
 		while ( *p ) /* end of pattern? */
 		{
@@ -304,20 +304,7 @@ struct PackagerParamsFilterState {
 			}
 		}
 
-		return true;
-	}
-
-	static bool
-	MatchPattern( const char *s, const char *p )
-	{
-		do {
-			if ( Match( s, p ) )
-			{
-				return true;
-			}
-		} while ( *s++ );
-
-		return false;
+		return ( '\0' == *s );
 	}
 
 	#undef uchar
@@ -2043,7 +2030,7 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 		
 	if ( isForFile && !dot )
 	{
-		clause += "%.lua";
+		clause += ".lua";
 	}
 
 	for ( size_t pos = 0; pos < clause.size(); )
@@ -2063,7 +2050,7 @@ ResolveClause( const char* str, bool isForFile, std::string& clause )
 			clause[pos++] = '.';
 			break;
 		case '.':
-			clause.insert( clause.begin() + pos, '\\' );
+			clause.insert( clause.begin() + pos, '%' );
 			pos += 2;
 			break;
 		default:
@@ -2171,6 +2158,8 @@ PlatformAppPackager::PrepareFilters( AppPackagerParams* params )
 bool
 PlatformAppPackager::ReadBuildSettings( const char * srcDir )
 {
+	ClearBuildCallbacks();
+
 	lua_State *L = fVM;
 	
 	int status = OpenBuildSettings( srcDir );
@@ -2479,20 +2468,6 @@ AddSystemLib( lua_State *L )
 
 #endif
 
-/*
-TODO?
-
-// Evict everything the rebuilt require() and AddSystemLib() left behind. In particular,
-// a surviving _coronaPreservedLuaFunctions would send the next DoPreBuild() on this VM
-// down require()'s normal path with a table argument, rather than its setup path.
-const char *tempGlobals[] = { "system", "_coronaPreservedLuaFunctions", "_coronaBuildSettings" };
-for ( const char *name : tempGlobals )
-{
-	lua_pushnil( L );
-	lua_setglobal( L, name );
-}
-*/
-
 static int
 AddRequireFunc( lua_State *L, const std::string& requireFunc, const std::string& requiredPlugins )
 {
@@ -2543,7 +2518,7 @@ PlatformAppPackager::WriteAppStart( const char* dstDir, bool stripDebug )
 
 	lua_State *L = fVM;
 
-	#define PATT(TYPE) "%s" LUA_DIRSEP "_appStart_." Rtt_LUA_##SCRIPT##_FILE_EXTENSION
+	#define PATT(TYPE) "%s" LUA_DIRSEP "_appStart_." Rtt_LUA_##TYPE##_FILE_EXTENSION
 
 	lua_pushfstring( L, PATT( SCRIPT ), dstDir );
 	lua_pushfstring( L, PATT( OBJECT ), dstDir );
@@ -2557,9 +2532,10 @@ PlatformAppPackager::WriteAppStart( const char* dstDir, bool stripDebug )
 	FILE *fp = Rtt_FileOpen( scriptName, "wb" );
 	if ( fp )
 	{
-		ok = ( fwrite( fAppStartFunc, 1, fAppStartFuncLength, fp ) == fAppStartFuncLength );
-		ok = ok && ( 0 == Rtt_FileClose( fp ) );
+		bool writeOk = ( fwrite( fAppStartFunc, 1, fAppStartFuncLength, fp ) == fAppStartFuncLength );
+		bool closeOk = ( 0 == Rtt_FileClose( fp ) );
 
+		ok = ( writeOk && closeOk );
 		if ( ok )
 		{
 			ok = ( 0 == Rtt_LuaCompile( L, 1, &scriptName, compiledName, stripDebug ) );

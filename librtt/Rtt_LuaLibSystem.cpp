@@ -86,12 +86,17 @@ GetNativePath( lua_State *L )
 		pathToLink += "/Library/Application Support/Corona/Native";
 	
 		char path[PATH_MAX];
-		ssize_t linkLength = readlink( pathToLink.c_str(), path, PATH_MAX );
+		ssize_t linkLength = readlink( pathToLink.c_str(), path, PATH_MAX - 1 );
 		if( linkLength > 0 )
 		{
+			if ( '/' == path[linkLength - 1] )
+			{
+				--linkLength;
+			}
+			
 			path[linkLength] = '\0';
 			
-			lua_pushfstring( L, "%sCorona", path );
+			lua_pushfstring( L, "%s/Corona", path );
 			
 			return true;
 		}

@@ -722,6 +722,18 @@ Rtt_EXPORT int Rtt_CopyFile(const char *srcFilePath, const char *dstFilePath)
 	return result;
 }
 
+#if defined(Rtt_LINUX_ENV)
+void ReplaceString(std::string& subject, const std::string& search, const std::string& replace)
+{
+	size_t pos = 0;
+	while ((pos = subject.find(search, pos)) != std::string::npos)
+	{
+		subject.replace(pos, search.length(), replace);
+		pos += replace.length();
+	}
+}
+#endif // Rtt_LINUX_ENV
+
 // Adapted from https://stackoverflow.com/questions/675039/how-can-i-create-directory-tree-in-c-linux
 Rtt_EXPORT int Rtt_MakeDirectory(const char *dirPath)
 {

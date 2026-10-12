@@ -1138,7 +1138,7 @@ Runtime::FindDownloadablePlugins( const char *simPlatformName )
 				String projectDir( & fPlatform.GetAllocator() );
 				fPlatform.PathForFile( NULL, MPlatform::kResourceDir, MPlatform::kDefaultPathFlags, projectDir );
 				
-				int result = Lua::DumpFuncOrFilename( filePath.GetString(), L, "simulatorStart" );
+				int result = Lua::DumpFuncOrFilename( projectDir.GetString(), L, "simulatorStart" );
 				if ( result < 0 )
 				{
 					Rtt_LogException(( "Error loading `simulatorStart`" ));

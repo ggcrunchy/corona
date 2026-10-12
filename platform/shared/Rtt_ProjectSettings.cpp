@@ -329,6 +329,7 @@ bool ProjectSettings::LoadFromDirectory(const char* directoryPath)
 			fOrientationsSupportedSet.insert(fDefaultOrientation);
 		}
 		
+	#if !defined( Rtt_AUTHORING_SIMULATOR ) /* are we in the shell? */
 		lua_getfield(luaStatePointer, -1, "callbacks");
 		if (lua_istable(luaStatePointer, -1))
 		{
@@ -339,16 +340,13 @@ bool ProjectSettings::LoadFromDirectory(const char* directoryPath)
 			}
 			else if ( result > 0 )
 			{
-			#ifdef Rtt_AUTHORING_SIMULATOR
-				Rtt_ASSERT_NOT_REACHED();
-			#endif
-
 				fStartFunc.assign( lua_tostring( luaStatePointer, -1 ), lua_objlen( luaStatePointer, -1 ) );
 				
 				lua_pop( luaStatePointer, 1 );
 			}
 		}
-
+	#endif
+		
 		lua_pop( luaStatePointer, 1 );
 	}
 	lua_pop(luaStatePointer, 1);

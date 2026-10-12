@@ -213,6 +213,8 @@ class PlatformAppPackager
 		 */
 		bool CompileAppScripts( AppPackagerParams * params, const char* dstDir );
 
+	protected:
+	
 		/**
 		 * Archives all files in a given directory tree to a "resource.car" file.
 		 * The files to be archived are expected to be compiled *.lu files, but will archive any file under the directory.

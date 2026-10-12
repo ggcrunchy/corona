@@ -595,7 +595,7 @@ AndroidAppPackager::Prepackage( AppPackagerParams * params, const char * tmpDir 
 		Rtt_Log("Prepackage: Compiling Lua ...");
 	}
 	
-	if ( CompileScripts( params, tmpDir ) && CreateBuildProperties( * params, tmpDir ) )
+	if ( CompileAppScripts( params, tmpDir ) && CreateBuildProperties( * params, tmpDir ) )
 	{
 		if (! Rtt_StringIsEmpty(GetSplashImageFile()))
 		{

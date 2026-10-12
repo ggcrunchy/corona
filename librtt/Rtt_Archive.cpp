@@ -621,15 +621,16 @@ Archive::Serialize( const char *dstPath, int numSrcPaths, const char *srcPaths[]
 #endif
 
 	const char *tmpDirName = Rtt_MakeTempDirectory(tmpDirTemplate);
-	if (NULL == tmpDirName)
-	{
-		fprintf(stderr, "car: cannot create temporary directory '%s'\n", tmpDirTemplate);
-
-		return;
-	}
 
 	if (Rtt_FileExists(dstPath))
 	{
+		if (NULL == tmpDirName)
+		{
+			fprintf(stderr, "car: cannot create temporary directory '%s'\n", tmpDirTemplate);
+
+			return;
+		}
+	
 		// Archive already exists, extract the current contents so we can overwrite
 		// old files with fresh copies and add any new ones (this is done to avoid
 		// implementing actual archive editing)
