@@ -345,9 +345,9 @@ bool ProjectSettings::LoadFromDirectory(const char* directoryPath)
 				lua_pop( luaStatePointer, 1 );
 			}
 		}
-	#endif
 		
 		lua_pop( luaStatePointer, 1 );
+	#endif
 	}
 	lua_pop(luaStatePointer, 1);
 

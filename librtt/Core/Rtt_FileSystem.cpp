@@ -106,32 +106,42 @@ static void ConvertUtf8ToUtf16(const char* utf8String, wchar_t* utf16String, siz
 /* IDEA (to replace Create/DestroyUTF16String (and prefer stack)
 	maybe templatize the length, with PATH_MAX as default? (generally these are paths, but mode can be much smaller)
 
+template< size_t N = MAX_PATH >
 class UTF16String {
 public:
-	UTFString( const char *utf8String )
+	UTF16String( const char *utf8String )
 	:	fPointer( NULL )
 	{
-		int conversionLength = MultiByteToWideChar(CP_UTF8, 0, utf8String, -1, NULL, 0);
-		if (conversionLength > sizeof(fArray))
+		fArray[0] = L'\0';
+
+		if ( NULL == utf8String )
 		{
-			fPointer = (wchar_t*)Rtt_MALLOC(NULL, (size_t)conversionLength * sizeof(wchar_t));
+			return;
+		}
+
+		int conversionLength = MultiByteToWideChar( CP_UTF8, 0, utf8String, -1, NULL, 0 );
+
+		if ( 0 == conversionLength )
+		{
+			return;
+		}
+
+		if ( conversionLength > N )
+		{
+			fPointer = (wchar_t*)Rtt_MALLOC( NULL, (size_t)conversionLength * sizeof(wchar_t) );
 		}
 		else
 		{
 			fPointer = fArray;
 		}
 			
-		if (conversionLength > 0)
+		if ( fPointer )
 		{
-			MultiByteToWideChar(CP_UTF8, 0, utf8String, -1, fPointer, conversionLength);
-		}
-		else
-		{
-			*fPointer = L'\0';
+			MultiByteToWideChar( CP_UTF8, 0, utf8String, -1, fPointer, conversionLength );
 		}
 	}
 	
-	~UTFString()
+	~UTF16String()
 	{
 		if ( fPointer != fArray )
 		{
@@ -141,9 +151,15 @@ public:
 	
 	wchar_t* Get() const { return fPointer; }
 	
+	explicit operator bool() const { return NULL != fPointer; }
+	
+private:
+	UTF16String( const UTF16String& ) = delete;
+	UTF16String& operator=( const UTF16String& ) = delete;
+	
 private:
 	wchar_t *fPointer; 
-	wchar_t fArray[PATH_MAX];
+	wchar_t fArray[N];
 };
 
 */

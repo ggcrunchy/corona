@@ -75,46 +75,57 @@ static void PushStringOrNil( lua_State *L, const char *str )
 static bool
 GetNativePath( lua_State *L )
 {
-	#ifdef Rtt_WIN_ENV
-		// CORONA_ROOT, CORONA_PATH
-	#elif defined( Rtt_MAC_ENV )
-		const char *home = getenv( "HOME" );
+#ifdef Rtt_WIN_ENV
+	const char *root = getenv( "CORONA_ROOT" );
+	if ( NULL != root )
+	{
+		lua_pushfstring( L, "%s/Corona", root );
 		
-		Rtt_ASSERT( home );
-		
-		std::string pathToLink = home;
-		
-		pathToLink += "/Library/Application Support/Corona/Native";
+		return true;
+	}
+	else
+	{
+		Rtt_LogException( "Missing `CORONA_ROOT` environment variable; unable to find native path" );
+		return false;
+	}
+#elif defined( Rtt_MAC_ENV )
+	const char *home = getenv( "HOME" );	
+	if ( NULL == home )
+	{
+		Rtt_LogException( "Missing `HOME` environment variable; unable to find native path" );
+		return false;
+	}
 	
-		char path[PATH_MAX];
-		ssize_t linkLength = readlink( pathToLink.c_str(), path, PATH_MAX - 1 );
-		if( linkLength > 0 )
+	std::string pathToLink = home;
+	
+	pathToLink += "/Library/Application Support/Corona/Native";
+
+	char path[PATH_MAX];
+	ssize_t linkLength = readlink( pathToLink.c_str(), path, PATH_MAX - 1 );
+	if( linkLength > 0 )
+	{
+		if ( '/' == path[linkLength - 1] )
 		{
-			if ( '/' == path[linkLength - 1] )
-			{
-				--linkLength;
-			}
-			
-			path[linkLength] = '\0';
-			
-			lua_pushfstring( L, "%s/Corona", path );
-			
-			return true;
-		}
-		else
-		{
-			Rtt_LogException( "WARNING: unable to find `Native` symbolic link (for `include` and `lib` in application support" );
+			--linkLength;
 		}
 		
-	#elif defined( Rtt_LINUX_ENV )
-		// ???
-	#endif
-
-	// yoink stuff from TinyCC... at least available for Xcode (will double as system.getInfo() thing... perhaps use that as authority)
-	// add env. variable setup in desktop builds: Visual Studio, Xcode
-		// add "dev" flag in these cases (or just make alt. dirs available under different names)
-
+		path[linkLength] = '\0';
+		
+		lua_pushfstring( L, "%s/Corona", path );
+		
+		return true;
+	}
+	else
+	{
+		Rtt_LogException( "WARNING: unable to find `Native` symbolic link (for `include` and `lib` in application support" );
+		return false;
+	}
+#elif defined( Rtt_LINUX_ENV )
+	// ???
 	return false;
+#else /* non-desktop */
+	return false;
+#endif
 }
 
 #if defined( Rtt_IS_LOCAL_BUILD )
@@ -138,7 +149,7 @@ GetDevPaths( lua_State *L )
 {
 	std::string buf = { __FILE__ };
 
-	while ( true )
+	for ( int i = 0; i < 2; i++ ) /* expects "../<corona>/librtt/Rtt_LibSystem.cpp" */
 	{
 		size_t pos = buf.find_last_of(
 			#if defined( Rtt_WIN_ENV )
@@ -150,12 +161,13 @@ GetDevPaths( lua_State *L )
 
 		if ( std::string::npos == pos )
 		{
-			Rtt_LogException( "ERROR: never found base 'corona' directory" );
+			Rtt_LogException( "ERROR: layout too shallow" );
 			return false;
 		}
-		else if ( buf.compare( pos + 1, std::string::npos, "corona" ) == 0 )
+		else if ( ( 1 == i ) && buf.compare( pos + 1, std::string::npos, "librtt" ) != 0 )
 		{
-			break;
+			Rtt_LogException( "ERROR: middle part of path expected to be `librtt`" );
+			return false;
 		}
 		else
 		{
@@ -174,6 +186,7 @@ GetDevPaths( lua_State *L )
 	}
 	else
 	{
+		Rtt_LogException( "ERROR: Unexpected file layout" );
 		return false;
 	}
 }

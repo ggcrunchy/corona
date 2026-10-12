@@ -754,7 +754,10 @@ Archive::Serialize( const char *dstPath, int numSrcPaths, const char *srcPaths[]
 		delete [] entries;
 	}
 
-	Rtt_DeleteDirectory(tmpDirName);
+	if ( tmpDirName )
+	{
+		Rtt_DeleteDirectory(tmpDirName);
+	}
 }
 
 static void
