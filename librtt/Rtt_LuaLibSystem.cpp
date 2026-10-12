@@ -40,6 +40,7 @@
 #include "Rtt_Lua.h"
 #include "CoronaLibrary.h"
 #include "CoronaLua.h"
+#include "Rtt_FileSystem.h"
 
 // ----------------------------------------------------------------------------
 
@@ -118,35 +119,56 @@ GetNativePath( lua_State *L )
 
 #if defined( Rtt_IS_LOCAL_BUILD )
 
-static bool GetDevPaths( lua_State *L )
+static void
+AddDevDir( lua_State *L, const char *key, const char *fmt, const std::string& buf )
 {
-	const char *baseDir = NULL;
+	const char *path = lua_pushfstring( L, fmt, buf.c_str() );
+	if ( Rtt_IsDirectory( path ) )
+	{
+		lua_setfield( L, -2, key );
+	}
+	else
+	{
+		lua_pop( L, 1 );
+	}
+}
 
-	#if defined( Rtt_WIN_ENV )
-		// Visual Studio...
-	#elif defined( Rtt_MAC_ENV )
-		const char *ide = getenv( "RUNNING_IN_IDE" );
-		if ( Rtt_StringCompare( ide, "Xcode" ) == 0 )
-		{
-			Rtt_VERIFY( baseDir = getenv( "CODE_BASE_DIR" ) );
-		}
-		else /* local build, or other IDE */
-		{
-			Rtt_LogException( "ERROR: Unknown IDE or dev-built app; unable to find dev paths" );
-		}
-	#elif defined( Rtt_LINUX_ENV )
-		// ??
-	#else
-		// Zig, etc.
-	#endif
+static bool
+GetDevPaths( lua_State *L )
+{
+	std::string buf = { __FILE__ };
 
-	if ( baseDir )
+	while ( true )
+	{
+		size_t pos = buf.find_last_of(
+			#if defined( Rtt_WIN_ENV )
+				"/\\"
+			#else
+				"/"
+			#endif
+		);
+
+		if ( std::string::npos == pos )
+		{
+			Rtt_LogException( "ERROR: never found base 'corona' directory" );
+			return false;
+		}
+		else if ( buf.compare( pos + 1, std::string::npos, "corona" ) == 0 )
+		{
+			break;
+		}
+		else
+		{
+			buf.resize( pos );
+		}
+	}
+
+	if ( !buf.empty() )
 	{
 		lua_createtable( L, 0, 2 );
-		lua_pushfstring( L, "%s/librtt/Corona", baseDir );
-		lua_setfield( L, -2, "Corona" );
-		lua_pushfstring( L, "%s/external/lua-5.1.3/src", baseDir );
-		lua_setfield( L, -2, "lua" );
+		
+		AddDevDir( L, "Corona", "%s/librtt/Corona", buf );
+		AddDevDir( L, "lua", "%s/external/lua-5.1.3/src", buf );
 		
 		return true;
 	}
