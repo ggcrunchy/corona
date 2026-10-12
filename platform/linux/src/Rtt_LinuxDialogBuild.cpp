@@ -1027,7 +1027,7 @@ namespace Rtt
 		// select build template
 		app->GetPlatform()->PathForFile(kBuildSettings, Rtt::MPlatform::kResourceDir, Rtt::MPlatform::kTestFileExists, buildSettingsPath);
 		webBuilderParams.SetBuildSettingsPath(buildSettingsPath.GetString());
-		androidBuilderParams.SetRuntime(runtimePointer);
+		webBuilderParams.SetRuntime(runtimePointer);
 
 		char tmpDirTemplate[] = "/tmp/webappXXXXXX";
 		const char* tmpDirName = Rtt_MakeTempDirectory(tmpDirTemplate);
@@ -1232,7 +1232,7 @@ namespace Rtt
 		// select build template
 		app->GetContext()->GetPlatform()->PathForFile(kBuildSettings, Rtt::MPlatform::kResourceDir, Rtt::MPlatform::kTestFileExists, buildSettingsPath);
 		linuxBuilderParams.SetBuildSettingsPath(buildSettingsPath.GetString());
-		androidBuilderParams.SetRuntime(runtimePointer);
+		linuxBuilderParams.SetRuntime(runtimePointer);
 
 		// build the app (warning! This is blocking call)
 		fBuildSuccessed = packager.Build(&linuxBuilderParams, "/tmp/Solar2D") == 0;
