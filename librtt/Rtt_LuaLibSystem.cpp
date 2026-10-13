@@ -73,8 +73,33 @@ static void PushStringOrNil( lua_State *L, const char *str )
 }
 
 static bool
+WarnAboutMissingEnvVar( lua_State *L, const char *message )
+{
+	static int sDummy;
+
+	lua_pushlightuserdata( L, &sDummy );
+	lua_rawget( L, LUA_REGISTRYINDEX );
+	
+	bool exists = !lua_isnil( L, -1 );
+
+	lua_pop( L, 1 );
+	
+	if ( !exists )
+	{
+		lua_pushlightuserdata( L, &sDummy );
+		lua_pushboolean( L, 1 );
+		lua_rawset( L, LUA_REGISTRYINDEX );
+		
+		Rtt_LogException( "WARNING: %s", message );
+	}
+	
+	return false;
+}
+
+static bool
 GetNativePath( lua_State *L )
 {
+
 #ifdef Rtt_WIN_ENV
 	const char *root = getenv( "CORONA_ROOT" );
 	if ( NULL != root )
@@ -85,15 +110,13 @@ GetNativePath( lua_State *L )
 	}
 	else
 	{
-		Rtt_LogException( "Missing `CORONA_ROOT` environment variable; unable to find native path" );
-		return false;
+		return WarnAboutMissingEnvVar( L, "missing `CORONA_ROOT` environment variable; unable to find native path" );
 	}
 #elif defined( Rtt_MAC_ENV )
 	const char *home = getenv( "HOME" );	
 	if ( NULL == home )
 	{
-		Rtt_LogException( "Missing `HOME` environment variable; unable to find native path" );
-		return false;
+		return WarnAboutMissingEnvVar( L, "missing `HOME` environment variable; unable to find native path" );
 	}
 	
 	std::string pathToLink = home;

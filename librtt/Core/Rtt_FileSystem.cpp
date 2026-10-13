@@ -109,7 +109,7 @@ static void ConvertUtf8ToUtf16(const char* utf8String, wchar_t* utf16String, siz
 template< size_t N = MAX_PATH >
 class UTF16String {
 public:
-	UTF16String( const char *utf8String )
+	explicit UTF16String( const char *utf8String )
 	:	fPointer( NULL )
 	{
 		fArray[0] = L'\0';
