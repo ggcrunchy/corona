@@ -92,29 +92,11 @@ class Win32AppPackagerParams : public AppPackagerParams
 		/// <param name="value">The application description. Can be null or empty string.</param>
 		void SetAppDescription(const char* value);
 
-		/// <summary>
-		///  <para>Gets a pointer to the Corona runtime associated with the project that is being built.</para>
-		///  <para>The runtime is needed to acquire and unzip its plugins for local builds.</para>
-		/// </summary>
-		/// <returns>
-		///  <para>Returns a pointer to the Corona runtime associated with the project being built.</para>
-		///  <para>Returns null if not assigned yet.</para>
-		/// </returns>
-		Runtime* GetRuntime() const;
-
-		/// <summary>
-		///  <para>Sets a pointer to the Corona runtime associated with the project that is being built.</para>
-		///  <para>The runtime is needed to acquire and unzip its plugins for local builds.</para>
-		/// </summary>
-		/// <param name="value">Pointer to the Corona runtime. Can be null.</param>
-		void SetRuntime(Runtime* value);
-
 	private:
 		Rtt::String fExeFileName;
 		Rtt::String fCompanyName;
 		Rtt::String fCopyrightString;
 		Rtt::String fAppDescription;
-		Rtt::Runtime* fRuntimePointer;
 };
 
 } // namespace Rtt

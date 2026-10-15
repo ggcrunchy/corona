@@ -179,12 +179,30 @@ int Win32AppPackager::Build(
 	buildSettings.ParamsPointer = win32ParamsPointer;
 	buildSettings.IntermediateDirectoryPath = objDirectoryPath.GetUTF8();
 	buildSettings.BinDirectoryPath = binDirectoryPath.GetUTF8();
+
+#if !defined( Rtt_NO_GUI )
+	// Run the "build.settings" `preBuild` callback and turn on the Lua filters.
+	// Note: Must be paired with EndBuildCallbacks(), even on failure.
+	if (!BeginBuildCallbacks(paramsPointer, tempDirectoryPath, "win32"))
+	{
+		EndBuildCallbacks();
+		rmdir(tempDirectoryPath);
+		return 5;
+	}
+#endif
+
 #if 1
 	buildResultCode = DoLocalBuild(buildSettings);
 #else
 	//TODO: In the future, support cloud builds via the unfinished DoRemoteBuild() method.
 	buildResultCode = DoRemoteBuild(buildSettings, webSession);
 #endif
+
+#if !defined( Rtt_NO_GUI )
+	// The stage directory's scripts are compiled into the "obj" directory by now, so it can go.
+	EndBuildCallbacks();
+#endif
+
 	if (buildResultCode != 0)
 	{
 		rmdir(tempDirectoryPath);
@@ -589,7 +607,8 @@ int Win32AppPackager::DoLocalBuild(const Win32AppPackager::BuildSettings& buildS
 	}
 
 	// Compile the Corona project's Lua scripts to the intermediate directory.
-	bool wasCompiled = CompileScripts(buildSettings.ParamsPointer, buildSettings.IntermediateDirectoryPath);
+	// Note: This also picks up the `preBuild` stage directory's scripts, the Lua filters, and `appStart`.
+	bool wasCompiled = CompileAppScripts(buildSettings.ParamsPointer, buildSettings.IntermediateDirectoryPath);
 	if (!wasCompiled)
 	{
 		if (Rtt_StringIsEmpty(buildSettings.ParamsPointer->GetBuildMessage()))

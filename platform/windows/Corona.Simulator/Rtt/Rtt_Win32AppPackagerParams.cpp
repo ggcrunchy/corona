@@ -35,8 +35,7 @@ Win32AppPackagerParams::Win32AppPackagerParams(const Win32AppPackagerParams::Cor
 		nullptr,
 		nullptr,
 		false
-	),
-	fRuntimePointer(nullptr)
+	)
 {
 	SetIncludeBuildSettings(true);
 }
@@ -87,16 +86,6 @@ const char* Win32AppPackagerParams::GetAppDescription() const
 void Win32AppPackagerParams::SetAppDescription(const char* value)
 {
 	fAppDescription.Set(value);
-}
-
-Runtime* Win32AppPackagerParams::GetRuntime() const
-{
-	return fRuntimePointer;
-}
-
-void Win32AppPackagerParams::SetRuntime(Runtime* value)
-{
-	fRuntimePointer = value;
 }
 
 #pragma endregion

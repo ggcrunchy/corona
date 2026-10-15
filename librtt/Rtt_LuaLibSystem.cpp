@@ -35,7 +35,13 @@
 #include <locale>
 #include <locale.h>
 #include <string.h>
+#include <string>
 #include <vector>
+
+#if defined( Rtt_WIN_ENV )
+	#define WIN32_LEAN_AND_MEAN
+	#include <windows.h>
+#endif
 
 #include "Rtt_Lua.h"
 #include "CoronaLibrary.h"
@@ -101,17 +107,45 @@ GetNativePath( lua_State *L )
 {
 
 #ifdef Rtt_WIN_ENV
-	const char *root = getenv( "CORONA_ROOT" );
-	if ( NULL != root )
+	// n.b. getenv() gives the ANSI code page, so non-ASCII install paths need the wide version
+	// CORONA_ROOT is "<install>\Native"; fall back to CORONA_PATH (the install directory itself),
+	// which the simulator assigns if missing, e.g. in development builds
+	struct {
+		const wchar_t *fName;
+		const char *fFormat;
+	} vars[] = {
+		{ L"CORONA_ROOT", "%s/Corona" },
+		{ L"CORONA_PATH", "%s/Native/Corona" },
+	};
+
+	for ( auto&& var : vars )
 	{
-		lua_pushfstring( L, "%s/Corona", root );
-		
-		return true;
+		const wchar_t *value = _wgetenv( var.fName );
+		if ( NULL == value || L'\0' == *value )
+		{
+			continue;
+		}
+
+		int length = WideCharToMultiByte( CP_UTF8, 0, value, -1, NULL, 0, NULL, NULL );
+		if ( length > 0 )
+		{
+			std::string root( length, '\0' );
+
+			WideCharToMultiByte( CP_UTF8, 0, value, -1, &root[0], length, NULL, NULL );
+			root.resize( length - 1 ); // n.b. drop the terminator...
+
+			while ( !root.empty() && ( '\\' == root.back() || '/' == root.back() ) )
+			{
+				root.pop_back(); // ...and any trailing separator, e.g. CORONA_PATH's
+			}
+
+			lua_pushfstring( L, var.fFormat, root.c_str() );
+
+			return true;
+		}
 	}
-	else
-	{
-		return WarnAboutMissingEnvVar( L, "missing `CORONA_ROOT` environment variable; unable to find native path" );
-	}
+	
+	return WarnAboutMissingEnvVar( L, "missing `CORONA_ROOT` environment variable; unable to find native path" );
 #elif defined( Rtt_MAC_ENV )
 	const char *home = getenv( "HOME" );	
 	if ( NULL == home )

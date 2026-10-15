@@ -1372,6 +1372,14 @@ OperationResult RuntimeEnvironment::RunUsing(const RuntimeEnvironment::CreationS
 		fRuntimePointer->SetBackend("vulkanBackend", fRenderSurfacePointer->GetBackendContext());
 	}
 
+	// Provide the "build.settings" `appStart` callback, used if the archive has no compiled copy of it.
+	// Note: Left alone in the simulator, which has no `appStart` here and gets `simulatorStart` while loading.
+	if (!fProjectSettings.GetStartFunc().empty())
+	{
+		fRuntimePointer->SetStartFunction(fProjectSettings.GetStartFunc());
+	}
+
+
 	// Load and run the Corona project.
 	fRuntimeState = RuntimeState::kStarting;
 	fLastOrientation = fProjectSettings.GetDefaultOrientation();
